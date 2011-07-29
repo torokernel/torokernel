@@ -48,10 +48,6 @@ uses
   Ext2 in 'rtl\Drivers\Ext2.pas',
   ne2000 in 'rtl\Drivers\ne2000.pas',
   e1000 in 'rtl\Drivers\e1000.pas',
-  {$IFNDEF Linux}
-   //Libc in 'rtl\Libc.pas',
-   //SQLite3 in 'rtl\Library\SQLite3.pas',
-  {$ENDIF Linux}
   IdeDisk in 'rtl\Drivers\IdeDisk.pas' // problems with this unit;
   ;
 
@@ -107,7 +103,7 @@ end;
 var
   HttpHandler: TNetworkHandler;
 
-{$R *.res}
+//{$R *.res}
 
 begin
   DedicateBlockDriver('ATA0', 0); // dedicate ATA0 driver to CPU#0

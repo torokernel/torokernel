@@ -26,7 +26,7 @@ unit BuildImg;
 
 interface
 
-procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName : string);
+procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName, OutFilename : string);
 function ELFtoKernelBin(const ELFFileName: string): Boolean;
 
 
@@ -270,7 +270,7 @@ end;
 //
 // Makes a boot's image
 //
-procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName : string);
+procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName, OutFileName : string);
 var
  BootFile: File;
  BootHead: PBootHead;
@@ -291,7 +291,7 @@ begin
  end;
  // Boot's image size
  ImageSize := (ImageSize * 1024 * 2 ) -2 ;
- Assign(ToroImageFile, 'ToroImage.img');
+ Assign(ToroImageFile, OutFileName);
  Rewrite(ToroImageFile, 1);
  Assign(BootFile, BootFileName);
  Reset(BootFile, 1);

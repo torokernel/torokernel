@@ -49,14 +49,16 @@ var
   BootFileName: string;
   ImageSize: Integer;
   EFFileName: string;
+  OutFileName: string;
 begin
-  if (Paramcount < 3) then
+  if (Paramcount < 4) then
   begin
-  	Writeln('usage: build.exe <image size in MB> <Executable file> <boot.bin>');
+  	Writeln('usage: build.exe <image size in MB> <Executable file> <boot.bin> <Output file>');
    	Exit;
   end;
   ImageSize := StrToIntDef(ParamStr(1), 1);
   EFFileName := ParamStr(2);
   BootFileName := ParamStr(3);
-  BuildBootableImage(ImageSize, EFFileName, BootFileName);
+  OutFileName := ParamStr(4);
+  BuildBootableImage(ImageSize, EFFileName, BootFileName, OutFileName);
 end.

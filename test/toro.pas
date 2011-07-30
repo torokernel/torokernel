@@ -103,8 +103,6 @@ end;
 var
   HttpHandler: TNetworkHandler;
 
-//{$R *.res}
-
 begin
   DedicateBlockDriver('ATA0', 0); // dedicate ATA0 driver to CPU#0
   SysMount('ext2', 'ATA0', 6); // Mount ATA Master device , first partition with EXT2 FS

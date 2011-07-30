@@ -315,8 +315,7 @@ pm16:
   ; Paging enabled
   mov ebx,cr0                                   
   bts ebx, 31                              
-  mov cr0,ebx 
-
+  mov cr0,ebx
   db 066h
   db 0eah
   dd boot32+main64
@@ -419,6 +418,7 @@ cleanpage:
   ; next one page is a PDPE
   mov rsi , pagedir + 4096
   mov rcx , pagedir + 7 + 4096 * 2
+
   ; Pointer page directory
   PPD:
    mov [rsi] , rcx

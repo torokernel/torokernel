@@ -31,6 +31,7 @@ toro.img : toro.pas
 clean : 
 	rm *.img
 	rm *.o
+	rm *.bin
 
 
 

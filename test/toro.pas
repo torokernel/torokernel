@@ -3,6 +3,7 @@
 // Example how to use Toro in User Application.
 //
 // Changes :
+// 2011 / 07 / 30 : Some stuff around the resource dedication
 // 2008 / 01 / 01 : Toro 0.03
 // 2007 / 05 / 04 : Toro 0.02
 // 2007 / 01 / 16 : Toro 0.01
@@ -48,7 +49,7 @@ uses
   Ext2 in 'rtl\Drivers\Ext2.pas',
   ne2000 in 'rtl\Drivers\ne2000.pas',
   e1000 in 'rtl\Drivers\e1000.pas',
-  IdeDisk in 'rtl\Drivers\IdeDisk.pas' // problems with this unit;
+  IdeDisk in 'rtl\Drivers\IdeDisk.pas'
   ;
 
 const
@@ -104,19 +105,17 @@ var
   HttpHandler: TNetworkHandler;
 
 begin
-  DedicateBlockDriver('ATA0', 0); // dedicate ATA0 driver to CPU#0
-  SysMount('ext2', 'ATA0', 6); // Mount ATA Master device , first partition with EXT2 FS
-  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil); // dedicate ne2000 network card to current CPU
-  WriteConsole('Running HTTP Service\n',[0]);
-
+  // dedicate the e1000 network card to local cpu
+  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+  WriteConsole('Listening at port 80\n',[0]);
   // Configuration of Handlers
   HttpHandler.DoInit := @HttpInit;
   HttpHandler.DoAccept := @HttpAccept;
   HttpHandler.DoTimeOut := @HttpTimeOut;
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
+  // port 80, service registration
   SysRegisterNetworkService(@HttpHandler);
-
   while True do
     ThreadSwitch;
 end.

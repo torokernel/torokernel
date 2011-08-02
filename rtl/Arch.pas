@@ -933,41 +933,6 @@ end;
 //                               Multicore Initialization
 //------------------------------------------------------------------------------
 
-{
-const
-	VIDEO_OFFSET = $B8000;
-
-type
-	TConsole = record // screen text mode
-		car: AnsiChar;
-		form: Byte;
-	end;
-
-var
-  X, Y: Byte;
-  PConsole: ^TConsole;
-
-procedure SetCursor(X, Y: Byte);
-begin
-	write_portb($0E, $3D4);
-	write_portb(Y, $3D5);
-	write_portb($0f, $3D4);
-	write_portb(X, $3D5);
-end;
-
-procedure PutC(const Car: AnsiChar);
-begin
-  Y := 24;
-  if X > 79 then
-    X := 0;
-  PConsole := Pointer(VIDEO_OFFSET + (80*2)*Y + (X*2));
-  PConsole.form := 10;
-  PConsole.car := Car;
-  X := X+1;
-  SetCursor(X, Y);
-end;
-}
-
 var
   // temporary stacks for each cpu
   start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte;

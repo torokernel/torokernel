@@ -53,7 +53,7 @@ uses
   ;
 
 const
-  Welcome: PChar = 'Aca Toro64'+#13#10;
+  Welcome: PChar = 'Welcome to Toro64'+#13#10;
   // TCP/IP Configuration
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);

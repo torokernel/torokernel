@@ -22,9 +22,9 @@ build : build.pas
 prt0.o : prt0.s
 	as prt0.s -o prt0.o
 
-toro.img : toro.pas 
-	fpc $(UNITS) toro.pas
-	./build 2 toro boot.o toro.img
+toro.img : Toro.pas 
+	fpc $(UNITS) Toro.pas
+	./build 2 Toro boot.o toro.img
 
 .PHONY : clean
 

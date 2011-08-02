@@ -3,7 +3,6 @@
 //  {$DEFINE ASMINLINE}
   {$IFNDEF FPC_IS_SYSTEM}
 		{$asmmode intel}
-//		{$mode objfpc} // required for FPC to understand the Delphi pascal syntax and symbols (ie: Result)
 	{$mode delphi} // required for FPC to understand the Delphi pascal syntax and symbols (ie: Result)
   {$ENDIF}
 {$ELSE}

@@ -52,7 +52,6 @@ uses
 
 const 
   Welcome: PChar = 'Hello from Toro!'+#13#10;
-  // TCP/IP configuration
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);

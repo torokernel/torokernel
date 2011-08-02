@@ -1,12 +1,12 @@
 {$IFDEF FPC}
-{$DEFINE TORO}
+  {$DEFINE TORO}
 //  {$DEFINE ASMINLINE}
   {$IFNDEF FPC_IS_SYSTEM}
 		{$asmmode intel}
 	{$mode delphi} // required for FPC to understand the Delphi pascal syntax and symbols (ie: Result)
   {$ENDIF}
 {$ELSE}
-	{$DEFINE DELPHI}
+	{$DEFINE DCC}
 {$ENDIF}
 //{$DEFINE cpui386}
 //{$DEFINE CPUX86_64}

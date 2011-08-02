@@ -3,7 +3,7 @@
     Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
     All Rights Reserved     
     
-    System unit of Toro.
+    System unit for Toro.
     
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,9 +13,7 @@
 
 unit System;
 
-
 interface
-
 
 {$DEFINE FPC_IS_SYSTEM}
 {$inline on}
@@ -53,7 +51,7 @@ interface
                          Global Types and Constants
 ****************************************************************************}
 
-Type
+type
   { The compiler has all integer types defined internally. Here we define only aliases }
   DWORD    = LongWord;
   Cardinal = LongWord;
@@ -179,12 +177,12 @@ type
 {$endif CPU64}
   TThreadID = THandle;
   
- PRTLCriticalSection = ^TRTLCriticalSection;
- TRTLCriticalSection = record
- 		short : boolean ;
- 		flag : dword  ;
- 		lock_tail : pointer ;
- 	end;
+  PRTLCriticalSection = ^TRTLCriticalSection;
+  TRTLCriticalSection = record
+ 		Short: Boolean;
+ 		Flag: QWORD;
+    lock_tail: Pointer; // pointer on the Thread
+  end;
 
 const
 { Maximum value of the biggest signed and unsigned integer type available}
@@ -230,7 +228,7 @@ var
   ExitCode: Word; public name 'operatingsystem_result';
   RandSeed: Cardinal;
   { Threading support }
-  fpc_threadvar_relocate_proc : pointer; public name 'FPC_THREADVAR_RELOCATE';
+  fpc_threadvar_relocate_proc: pointer; public name 'FPC_THREADVAR_RELOCATE';
 
 ThreadVar
   ThreadID: TThreadID;
@@ -338,12 +336,6 @@ const
                         Processor specific routines
 ****************************************************************************}
 
-{$ifdef FPC_USE_LIBC}
-{$ifdef SYSTEMINLINE}
-{$define INLINEGENERICS}
-{$endif}
-{$endif}
-
 Procedure Move(const source;var dest;count:SizeInt);{$ifdef INLINEGENERICS}inline;{$endif}
 Procedure FillChar(Var x;count:SizeInt;Value:Boolean);{$ifdef SYSTEMINLINE}inline;{$endif}
 Procedure FillChar(Var x;count:SizeInt;Value:Char);{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -394,11 +386,6 @@ Function swap (X : Int64) : Int64;{$ifdef SYSTEMINLINE}inline;{$endif}[interncon
 Function Align (Addr : PtrInt; Alignment : PtrInt) : PtrInt;{$ifdef SYSTEMINLINE}inline;{$endif}
 Function Align (Addr : Pointer; Alignment : PtrInt) : Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
 
-
-Function  Random: double;
-procedure Randomize(seed: Integer);
-
-
 Function abs(l:Longint):Longint;[internconst:fpc_in_const_abs];{$ifdef SYSTEMINLINE}inline;{$endif}
 Function abs(l:Int64):Int64;[internconst:fpc_in_const_abs];{$ifdef SYSTEMINLINE}inline;{$endif}
 Function sqr(l:Longint):Longint;[internconst:fpc_in_const_sqr];{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -410,10 +397,6 @@ Function odd(l:Int64):Boolean;[internconst:fpc_in_const_odd];{$ifdef SYSTEMINLIN
 Function odd(l:QWord):Boolean;[internconst:fpc_in_const_odd];{$ifdef SYSTEMINLINE}inline;{$endif}
 
 {****************************************************************************
-                         Addr/Pointer Handling
-****************************************************************************}
-
-{****************************************************************************
                       PChar and String Handling
 ****************************************************************************}
 
@@ -421,9 +404,6 @@ function strpas(p:pchar):shortstring;external name 'FPC_PCHAR_TO_SHORTSTR';
 function strlen(p:pchar):longint;external name 'FPC_PCHAR_LENGTH';
 
 { Shortstring functions }
-Procedure Delete(Var s:shortstring;index:SizeInt;count:SizeInt);
-Procedure Insert(const source:shortstring;Var s:shortstring;index:SizeInt);
-Procedure Insert(source:Char;Var s:shortstring;index:SizeInt);
 Function  Pos(const substr:shortstring;const s:shortstring):SizeInt;
 Function  Pos(C:Char;const s:shortstring):SizeInt;
 Function  Pos (Const Substr : ShortString; Const Source : AnsiString) : SizeInt;
@@ -468,10 +448,10 @@ function  lowercase(const s : ansistring) : ansistring;
 function get_caller_addr(framebp:pointer):pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
 function get_caller_frame(framebp:pointer):pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
 
-Function IOResult:Word;{$ifdef SYSTEMINLINE}inline;{$endif}
-Function Sptr:Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}[internconst:fpc_in_const_ptr];
-Function GetProcessID:SizeUInt;
-Function GetThreadID:TThreadID;{$ifdef SYSTEMINLINE}inline;{$endif}
+Function IOResult: Word; {$ifdef SYSTEMINLINE}inline;{$endif}
+Function Sptr: Pointer; {$ifdef SYSTEMINLINE}inline;{$endif}[internconst:fpc_in_const_ptr];
+Function GetProcessID: SizeUInt;
+Function GetThreadID: TThreadID; {$ifdef SYSTEMINLINE} inline; {$endif}
 
 
 {*****************************************************************************
@@ -489,16 +469,10 @@ Procedure AddExitProc(Proc:TProcedure);
 { Need to be exported for threads unit }
 Procedure SysInitExceptions;
 procedure SysInitStdIO;
-Procedure SysResetFPU;{$ifdef SYSTEMINLINE}inline;{$endif}
 
 {*****************************************************************************
                          Abstract/Assert/Error Handling
 *****************************************************************************}
-
-function ArrayStringToPPchar(const S:Array of AnsiString;reserveentries:Longint):ppchar; // const ?
-Function StringToPPChar(Var S:AnsiString;ReserveEntries:integer):ppchar;
-Function StringToPPChar(S: PChar;ReserveEntries:integer):ppchar;
-
 
 procedure AbstractError;external name 'FPC_ABSTRACTERROR';
 Function  SysBackTraceStr(Addr:Pointer): ShortString;
@@ -691,44 +665,7 @@ const
    IInterface = IUnknown;
 
    {$M+}
-   IInvokable = interface(IInterface)
-   end;
    {$M-}
-
-   { for native dispinterface support }
-   IDispatch = interface(IUnknown)
-      ['{00020400-0000-0000-C000-000000000046}']
-      function GetTypeInfoCount(out count : longint) : longint;stdcall;
-      function GetTypeInfo(Index,LocaleID : longint;
-        out TypeInfo): LongInt;stdcall;
-      function GetIDsOfNames(const iid: TGUID; names: Pointer;
-        NameCount, LocaleID: LongInt; DispIDs: Pointer) : longint;stdcall;
-      function Invoke(DispID: LongInt;const iid : TGUID;
-        LocaleID : longint; Flags: Word;var params;
-        VarResult,ExcepInfo,ArgErr : pointer) : longint;stdcall;
-   end;
-
-   TInterfacedObject = class(TObject,IUnknown)
-   protected
-      frefcount : longint;
-      { implement methods of IUnknown }
-      function QueryInterface(const iid : tguid;out obj) : longint;stdcall;
-      function _AddRef : longint;stdcall;
-      function _Release : longint;stdcall;
-    public
-      procedure AfterConstruction;override;
-      procedure BeforeDestruction;override;
-      class function NewInstance : TObject;override;
-      property RefCount : longint read frefcount;
-   end;
-   TInterfacedClass = class of TInterfacedObject;
-
-   { some pointer definitions }
-   PUnknown = ^IUnknown;
-   PPUnknown = ^PUnknown;
-   PDispatch = ^IDispatch;
-   PPDispatch = ^PDispatch;
-
 
    TExceptProc = Procedure (Obj : TObject; Addr : Pointer; FrameCount:Longint; Frame: PPointer);
 
@@ -949,7 +886,6 @@ type
       vartopstr : procedure(var s ;const v : variant);
       vartolstr : procedure(var s : ansistring;const v : variant);
      vartointf : procedure(var intf : iinterface;const v : variant);
-      vartodisp : procedure(var disp : idispatch;const v : variant);
 
       varfrombool : procedure(var dest : variant;const source : Boolean);
       varfromint : procedure(var dest : variant;const source,Range : longint);
@@ -961,7 +897,6 @@ type
       varfrompstr: procedure(var dest : variant; const source : ShortString);
       varfromlstr: procedure(var dest : variant; const source : ansistring);
       varfromintf: procedure(var dest : variant;const source : iinterface);
-      varfromdisp: procedure(var dest : variant;const source : idispatch);
      olevarfrompstr: procedure(var dest : olevariant; const source : shortstring);
       olevarfromlstr: procedure(var dest : olevariant; const source : ansistring);
       olevarfromvar: procedure(var dest : olevariant; const source : variant);
@@ -1434,8 +1369,6 @@ function fpc_qword_to_double(q: qword): double; compilerproc;
 {$endif FPC_INCLUDE_SOFTWARE_INT64_TO_DOUBLE}
 
 
-
-
 {*****************************************************************************
                                Heap
 *****************************************************************************}
@@ -1443,26 +1376,6 @@ function fpc_qword_to_double(q: qword): double; compilerproc;
 
 { Memorymanager }
 type
-  TFPCHeapStatus = record
-    MaxHeapSize,
-    MaxHeapUsed,
-    CurrHeapSize,
-    CurrHeapUsed,
-    CurrHeapFree  : ptrint;
-  end;
-  THeapStatus = record
-    TotalAddrSpace: Cardinal;
-    TotalUncommitted: Cardinal;
-    TotalCommitted: Cardinal;
-    TotalAllocated: Cardinal;
-    TotalFree: Cardinal;
-    FreeSmall: Cardinal;
-    FreeBig: Cardinal;
-    Unused: Cardinal;
-    Overhead: Cardinal;
-    HeapErrorCode: Cardinal;
-  end;
-
   PMemoryManager = ^TMemoryManager;
   TMemoryManager = record
     NeedLock            : boolean;
@@ -1472,8 +1385,6 @@ type
     AllocMem            : function(Size:ptrint):Pointer;
     ReAllocMem          : function(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
     MemSize             : function(p:pointer):ptrint;
-    GetHeapStatus       : function :THeapStatus;
-    GetFPCHeapStatus    : function :TFPCHeapStatus;
   end;
 
 procedure GetMemoryManager(var MemMgr: TMemoryManager);
@@ -1496,8 +1407,6 @@ Function  SysFreeMem(P: Pointer): PtrInt;
 Function  SysFreememSize(p:pointer;Size:ptrint):ptrint;
 Function  SysAllocMem(Size: PtrInt): Pointer;
 function SysReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
-function  SysGetHeapStatus:THeapStatus;
-function  SysGetFPCHeapStatus:TFPCHeapStatus;
 
 { Tp7 functions }
 Procedure GetMem(Var p:pointer;Size:ptrint);
@@ -1508,8 +1417,6 @@ Procedure FreeMem(P: Pointer; Size: PtrInt);
 function GetMem(Size: PtrInt): Pointer;
 function FreeMem(P: Pointer): PtrInt;
 function ReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
-function GetHeapStatus:THeapStatus;
-function GetFPCHeapStatus:TFPCHeapStatus;
 
 
 {*****************************************************************************
@@ -1533,14 +1440,14 @@ type
 
   // Function prototypes for TThreadManager Record.
   TBeginThreadHandler = function (sa : Pointer;stacksize : PtrUInt; ThreadFunction : tthreadfunc;p : pointer;creationFlags : dword; var ThreadId : TThreadID) : TThreadID;
-  TEndThreadHandler = procedure (ExitCode : DWord);
+  TEndThreadHandler = procedure (ExitCode: DWord);
   // Used for Suspend/Resume/Kill
-  TThreadHandler = function (threadHandle : TThreadID) : dword;
+  TThreadHandler = function (threadHandle: TThreadID) : dword;
   TThreadSwitchHandler = procedure;
-  TWaitForThreadTerminateHandler = function (threadHandle : TThreadID; TimeoutMs : longint) : dword;  {0=no timeout}
-  TThreadSetPriorityHandler = function (threadHandle : TThreadID; Prio: longint): boolean;            {-15..+15, 0=normal}
-  TThreadGetPriorityHandler = function (threadHandle : TThreadID): longint;
-  TGetCurrentThreadIdHandler = function : TThreadID;
+  TWaitForThreadTerminateHandler = function (threadHandle: TThreadID; TimeoutMs : longint) : dword;  {0=no timeout}
+  TThreadSetPriorityHandler = function (threadHandle: TThreadID; Prio: longint): boolean;            {-15..+15, 0=normal}
+  TThreadGetPriorityHandler = function (threadHandle: TThreadID): longint;
+  TGetCurrentThreadIdHandler = function: TThreadID;
   TCriticalSectionHandler = procedure (var cs);
   TInitThreadVarHandler = procedure (var offset : dword;size : dword);
   TRelocateThreadVarHandler = function (offset : dword) : pointer;
@@ -1595,30 +1502,23 @@ type
                          Thread Handler routines
 *****************************************************************************}
 
-
 Function GetThreadManager(Var TM : TThreadManager) : Boolean;
 Function SetThreadManager(Const NewTM : TThreadManager; Var OldTM : TThreadManager) : Boolean;
 Function SetThreadManager(Const NewTM : TThreadManager) : Boolean;
-{$ifndef DISABLE_NO_THREAD_MANAGER}
-Procedure SetNoThreadManager;
-{$endif DISABLE_NO_THREAD_MANAGER}
 // Needs to be exported, so the manager can call it.
 procedure InitThreadVars(RelocProc : Pointer);
 procedure InitThread(stklen:cardinal);
 
-{*****************************************************************************
+{-------------------------------------------------------------------------------
                          Multithread Handling
-*****************************************************************************}
+-------------------------------------------------------------------------------}
 
 function BeginThread(sa: Pointer; stacksize: dword; ThreadFunction: tthreadfunc; p: pointer; creationFlags: dword; var ThreadId: TThreadID): TThreadID;
 
-{ add some simplfied forms which make lifer easier and porting }
-{ to other OSes too ...                                        }
+// add some simplified forms which make life and porting easier
 function BeginThread(ThreadFunction : tthreadfunc) : TThreadID;
 function BeginThread(ThreadFunction : tthreadfunc;p : pointer) : TThreadID;
 function BeginThread(ThreadFunction : tthreadfunc;p : pointer; var ThreadId : TThreadID) : TThreadID;
-function BeginThread(ThreadFunction : tthreadfunc;p : pointer;
-                     var ThreadId : TThreadID; const SS: DWord) : TThreadID;
 
 procedure EndThread(ExitCode : DWord);
 procedure EndThread;
@@ -1754,11 +1654,6 @@ var
 {****************************************************************************
                                Primitives
 ****************************************************************************}
-
-procedure fpc_cpuinit;
-  begin
-    SysResetFPU;
-  end;
 
 {$define FPC_SYSTEM_HAS_SPTR}
 Function Sptr : Pointer;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -2184,37 +2079,12 @@ const
   FPU_StackOverflow = $40;
   FPU_ExceptionMask = $ff;
 
-  fpucw : word = $1300 or FPU_StackUnderflow or FPU_Underflow or FPU_Denormal;
-
   MM_MaskInvalidOp = %0000000010000000;
   MM_MaskDenorm    = %0000000100000000;
   MM_MaskDivZero   = %0000001000000000;
   MM_MaskOverflow  = %0000010000000000;
   MM_MaskUnderflow = %0000100000000000;
   MM_MaskPrecision = %0001000000000000;
-
-  mxcsr : dword = MM_MaskUnderflow or MM_MaskPrecision or MM_MaskDenorm;
-
-{$define FPC_SYSTEM_HAS_SYSRESETFPU}
-Procedure SysResetFPU;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
-asm
-{$ifndef WIN64}
-  { initialize fpu }
-  fninit
-  fwait
-{$endif WIN64}
-{$ifdef FPC_PIC}
-  movq fpucw@GOTPCREL(%rip),%rax
-  fldcw (%rax)
-  { set sse exceptions }
-  movq mxcsr@GOTPCREL(%rip),%rax
-  ldmxcsr (%rax)
-{$else FPC_PIC}
-  fldcw fpucw
-  { set sse exceptions }
-  ldmxcsr mxcsr
-{$endif FPC_PIC}
-end;
 
   {$define SYSPROCDEFINED}
 {$endif CPUX86_64}
@@ -3725,68 +3595,6 @@ begin
   fpc_shortstr_Copy[0]:=chr(Count);
   Move(s[Index+1],fpc_shortstr_Copy[1],Count);
 end;
-
-
-procedure delete(var s : shortstring;index : SizeInt;count : SizeInt);
-begin
-  if index<=0 then
-     exit;
-  if (Index<=Length(s)) and (Count>0) then
-   begin
-     if Count>length(s)-Index then
-      Count:=length(s)-Index+1;
-     s[0]:=Chr(length(s)-Count);
-     if Index<=Length(s) then
-      Move(s[Index+Count],s[Index],Length(s)-Index+1);
-   end;
-end;
-
-
-
-
-procedure insert(const source : shortstring;var s : shortstring;index : SizeInt);
-var
-  cut,srclen,indexlen : SizeInt;
-begin
-  if index<1 then
-   index:=1;
-  if index>length(s) then
-   index:=length(s)+1;
-  indexlen:=Length(s)-Index+1;
-  srclen:=length(Source);
-  if SizeInt(length(source)+length(s))>=sizeof(s) then
-   begin
-     cut:=SizeInt(length(source)+length(s))-sizeof(s)+1;
-     if cut>indexlen then
-      begin
-        dec(srclen,cut-indexlen);
-        indexlen:=0;
-      end
-     else
-      dec(indexlen,cut);
-   end;
-  move(s[Index],s[Index+srclen],indexlen);
-  move(Source[1],s[Index],srclen);
-  s[0]:=chr(index+srclen+indexlen-1);
-end;
-
-
-procedure insert(source : Char;var s : shortstring;index : SizeInt);
-var
-  indexlen : SizeInt;
-begin
-  if index<1 then
-   index:=1;
-  if index>length(s) then
-   index:=length(s)+1;
-  indexlen:=Length(s)-Index+1;
-  if (length(s)+1=sizeof(s)) and (indexlen>0) then
-   dec(indexlen);
-  move(s[Index],s[Index+1],indexlen);
-  s[Index]:=Source;
-  s[0]:=chr(index+indexlen);
-end;
-
 
 function pos(const substr : shortstring;const s : shortstring):SizeInt;
 var
@@ -6407,66 +6215,6 @@ end;
         end;
 
 {****************************************************************************
-                               TINTERFACEDOBJECT
-****************************************************************************}
-
-    function TInterfacedObject.QueryInterface(
-      const iid : tguid;out obj) : longint;stdcall;
-
-      begin
-         if getinterface(iid,obj) then
-           result:=0
-         else
-           result:=longint($80004002);
-      end;
-
-    function TInterfacedObject._AddRef : longint;stdcall;
-
-      begin
-         inclocked(frefcount);
-         _addref:=frefcount;
-      end;
-
-    function TInterfacedObject._Release : longint;stdcall;
-
-      begin
-         if declocked(frefcount) then
-           begin
-              self.destroy;
-              _Release:=0;
-           end
-         else
-           _Release:=frefcount;
-      end;
-
-    procedure TInterfacedObject.AfterConstruction;
-
-      begin
-         { we need to fix the refcount we forced in newinstance }
-         { further, it must be done in a thread safe way        }
-         declocked(frefcount);
-      end;
-
-    procedure TInterfacedObject.BeforeDestruction;
-
-      begin
-         if frefcount<>0 then
-           HandleError(204);
-      end;
-
-    class function TInterfacedObject.NewInstance : TObject;
-
-      begin
-         NewInstance:=inherited NewInstance;
-         TInterfacedObject(NewInstance).frefcount:=1;
-      end;
-
-
-{****************************************************************************
-                             Exception Support
-****************************************************************************}
-
-{****************************************************************************
                                 Exception support
 ****************************************************************************}
 
@@ -6785,8 +6533,8 @@ Procedure SysInitExceptions;
   Initialize exceptionsupport
 }
 begin
-  ExceptObjectstack:=Nil;
-  ExceptAddrStack:=Nil;
+  ExceptObjectstack := Nil;
+  ExceptAddrStack := Nil;
 end;
 
 
@@ -6860,21 +6608,20 @@ procedure fpc_variant_copy(d,s : pointer);compilerproc;
 
 
 procedure fpc_vararray_get(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
-  begin
-    d:=variantmanager.vararrayget(s,len,indices);
-  end;
+begin
+  d:=variantmanager.vararrayget(s,len,indices);
+end;
 
 
 procedure fpc_vararray_put(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
-  begin
-    variantmanager.vararrayput(d,s,len,indices);
-  end;
+begin
+  variantmanager.vararrayput(d,s,len,indices);
+end;
 
 
 { ---------------------------------------------------------------------
     Overloaded operators.
   ---------------------------------------------------------------------}
-
 
 { Integer }
 
@@ -7922,176 +7669,6 @@ procedure fpc_finalize_array(data,typeinfo : pointer;count,size : longint); [Pub
 end;
 
 
-
-
-
-{----------------------------------------------------------------------
-   Mersenne Twister: A 623-Dimensionally Equidistributed Uniform
-   Pseudo-Random Number Generator.
-
-   What is Mersenne Twister?
-   Mersenne Twister(MT) is a pseudorandom number generator developped by
-   Makoto Matsumoto and Takuji Nishimura (alphabetical order) during
-   1996-1997. MT has the following merits:
-   It is designed with consideration on the flaws of various existing
-   generators.
-   Far longer period and far higher order of equidistribution than any
-   other implemented generators. (It is proved that the period is 2^19937-1,
-   and 623-dimensional equidistribution property is assured.)
-   Fast generation. (Although it depends on the system, it is reported that
-   MT is sometimes faster than the standard ANSI-C library in a system
-   with pipeline and cache memory.)
-   Efficient use of the memory. (The implemented C-code mt19937.c
-   consumes only 624 words of working area.)
-
-   home page
-     http://www.math.keio.ac.jp/~matumoto/emt.html
-   original c source
-     http://www.math.keio.ac.jp/~nisimura/random/int/mt19937int.c
-
-   Coded by Takuji Nishimura, considering the suggestions by
-   Topher Cooper and Marc Rieffel in July-Aug. 1997.
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Library General Public
-   License as published by the Free Software Foundation; either
-   version 2 of the License, or (at your option) any later
-   version.
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-   See the GNU Library General Public License for more details.
-   You should have received a copy of the GNU Library General
-   Public License along with this library; if not, write to the
-   Free Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307  USA
-
-   Copyright (C) 1997, 1999 Makoto Matsumoto and Takuji Nishimura.
-   When you use this, send an email to: matumoto@math.keio.ac.jp
-   with an appropriate reference to your work.
-
-   REFERENCE
-   M. Matsumoto and T. Nishimura,
-   "Mersenne Twister: A 623-Dimensionally Equidistributed Uniform
-   Pseudo-Random Number Generator",
-   ACM Transactions on Modeling and Computer Simulation,
-   Vol. 8, No. 1, January 1998, pp 3--30.
-
-
-  Translated to OP and Delphi interface added by Roman Krejci (6.12.1999)
-
-  http://www.rksolution.cz/delphi/tips.htm
-
-  Revised 21.6.2000: Bug in the function RandInt_MT19937 fixed
-
-  2003/10/26: adapted to use the improved intialisation mentioned at
-  <http://www.math.keio.ac.jp/~matumoto/MT2002/emt19937ar.html> and
-  removed the assembler code
-
- ----------------------------------------------------------------------}
-
-//{$R-} {range checking off}
-//{$Q-} {overflow checking off}
-
-{ Period parameter }
-Const
-  MT19937N=624;
-  OldRandSeed : Cardinal = 0;
-Type
-  tMT19937StateArray = array [0..MT19937N-1] of longint; // the array for the state vector
-
-{ Period parameters }
-const
-  MT19937M=397;
-  MT19937MATRIX_A  =$9908b0df;  // constant vector a
-  MT19937UPPER_MASK=$80000000;  // most significant w-r bits
-  MT19937LOWER_MASK=$7fffffff;  // least significant r bits
-
-{ Tempering parameters }
-  TEMPERING_MASK_B=$9d2c5680;
-  TEMPERING_MASK_C=$efc60000;
-
-
-VAR
-  mt : tMT19937StateArray;
-
-const
-  mti: longint=MT19937N+1; // mti=MT19937N+1 means mt[] is not initialized
-
-{ Initializing the array with a seed }
-procedure sgenrand_MT19937(seed: longint);
-var
-  i: longint;
-begin
-  mt[0] := seed;
-  for i := 1 to MT19937N-1 do
-    begin
-      mt[i] := 1812433253 * (mt[i-1] xor (mt[i-1] shr 30)) + i;
-      { See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. }
-      { In the previous versions, MSBs of the seed affect   }
-      { only MSBs of the array mt[].                        }
-      { 2002/01/09 modified by Makoto Matsumoto             }
-    end;
-  mti := MT19937N;
-end;
-
-
-function genrand_MT19937: longint;
-const
-  mag01 : array [0..1] of longint =(0, longint(MT19937MATRIX_A));
-var
-  y: longint;
-  kk: longint;
-begin
-  if RandSeed<>OldRandSeed then
-    mti:=MT19937N+1;
-  if (mti >= MT19937N) { generate MT19937N longints at one time }
-  then begin
-     if mti = (MT19937N+1) then  // if sgenrand_MT19937() has not been called,
-       begin
-         sgenrand_MT19937(randseed);   // default initial seed is used
-         { hack: randseed is not used more than once in this algorithm. Most }
-         {  user changes are re-initialising reandseed with the value it had }
-         {  at the start -> with the "not", we will detect this change.      }
-         {  Detecting other changes is not useful, since the generated       }
-         {  numbers will be different anyway.                                }
-         randseed := not(randseed);
-         oldrandseed := randseed;
-       end;
-     for kk:=0 to MT19937N-MT19937M-1 do begin
-        y := (mt[kk] and MT19937UPPER_MASK) or (mt[kk+1] and MT19937LOWER_MASK);
-        mt[kk] := mt[kk+MT19937M] xor (y shr 1) xor mag01[y and $00000001];
-     end;
-     for kk:= MT19937N-MT19937M to MT19937N-2 do begin
-       y := (mt[kk] and MT19937UPPER_MASK) or (mt[kk+1] and MT19937LOWER_MASK);
-       mt[kk] := mt[kk+(MT19937M-MT19937N)] xor (y shr 1) xor mag01[y and $00000001];
-     end;
-     y := (mt[MT19937N-1] and MT19937UPPER_MASK) or (mt[0] and MT19937LOWER_MASK);
-     mt[MT19937N-1] := mt[MT19937M-1] xor (y shr 1) xor mag01[y and $00000001];
-     mti := 0;
-  end;
-  y := mt[mti]; inc(mti);
-  y := y xor (y shr 11);
-  y := y xor (y shl 7)  and TEMPERING_MASK_B;
-  y := y xor (y shl 15) and TEMPERING_MASK_C;
-  y := y xor (y shr 18);
-  Result := y;
-end;
-
-
-function random: double;
-begin
-  random := cardinal(genrand_MT19937) * (1.0/(int64(1) shl 32));
-end;
-
-procedure Randomize(seed: Integer);
-begin
-OldRandSeed:=seed;
-sgenrand_MT19937(seed);
-RandSeed:= seed;
-end;
-
-
 {*****************************************************************************
                              Directory support.
 *****************************************************************************}
@@ -8131,7 +7708,6 @@ begin
   HandleErrorFrame(215,get_frame);
 end;
 
-
 procedure fpc_iocheck;[public,alias:'FPC_IOCHECK']; compilerproc;
 var
   l : longint;
@@ -8144,18 +7720,17 @@ begin
    end;
 end;
 
-
-Function IOResult:Word;{$ifdef SYSTEMINLINE}inline;{$endif}
+Function IOResult: Word; {$ifdef SYSTEMINLINE}inline;{$endif}
 Begin
-  IOResult:=InOutRes;
-  InOutRes:=0;
+  IOResult := InOutRes;
+  InOutRes := 0;
 End;
 
-Function GetThreadID:TThreadID;{$ifdef SYSTEMINLINE}inline;{$endif}
+Function GetThreadID: TThreadID; {$ifdef SYSTEMINLINE}inline;{$endif}
 begin
-(* ThreadID is stored in a threadvar and made available in interface *)
-(* to allow setup of this value during thread initialization.        *)
-  GetThreadID := ThreadID;
+  // ThreadID is stored in a threadvar and made available in interface
+  // to allow setup of this value during thread initialization.
+  Result := ThreadID;
 end;
 
 {*****************************************************************************
@@ -8214,8 +7789,7 @@ var
   i : longint;
 begin
   { call cpu/fpu initialisation routine }
-  // bot FPU
-  //fpc_cpuinit;
+  // boot FPU
   with InitFinalTable do
    begin
      for i:=1 to TableCount do
@@ -8247,16 +7821,13 @@ end;
 
 procedure system_exit;
 begin
-//  remove_exception_handlers;
-  { call exitprocess, with cleanup as required }
-//  ExitProcess(exitcode);
 end;
 
 {$IFDEF CPUX86_64}
 //procedure install_exception_handlers;forward;
 //procedure remove_exception_handlers;forward;
-procedure PascalMain;stdcall;external name 'PASCALMAIN';
-procedure fpc_do_exit;stdcall;external name 'FPC_DO_EXIT';
+procedure PascalMain; stdcall; external name 'PASCALMAIN';
+procedure fpc_do_exit; stdcall; external name 'FPC_DO_EXIT';
 
 var
   { old compilers emitted a reference to _fltused if a module contains
@@ -8390,8 +7961,6 @@ Begin
 End;
 *)
 
-function do_isdevice(handle:thandle):boolean;forward;
-
 Procedure dump_stack(var f: string; bp : Pointer);
 var
   i : Longint;
@@ -8403,7 +7972,7 @@ Begin
   try
     prevbp:=bp-1;
     i:=0;
-    is_dev:= False; //do_isdevice(textrec(f).Handle);
+    is_dev:= False;
     while bp > prevbp Do
      Begin
        caller_addr := get_caller_addr(bp);
@@ -8460,113 +8029,6 @@ Begin
   ExitProcList:=P;
   ExitProc:=@DoExitProc;
 End;
-
-function ArrayStringToPPchar(const S:Array of AnsiString;reserveentries:Longint):ppchar; // const ?
-// Extra allocate reserveentries pchar's at the beginning (default param=0 after 1.0.x ?)
-// Note: for internal use by skilled programmers only
-// if "s" goes out of scope in the parent procedure, the pointer is dangling.
-
-var p   : ppchar;
-    i   : LongInt;
-begin
-  if High(s)<Low(s) Then Exit(NIL);
-  Getmem(p,sizeof(pchar)*(high(s)-low(s)+ReserveEntries+2));  // one more for NIL, one more
-                                              // for cmd
-  if p=nil then
-    begin
-      {$ifdef xunix}
-      fpseterrno(ESysEnomem);
-      {$endif}
-      exit(NIL);
-    end;
-  for i:=low(s) to high(s) do
-     p[i+Reserveentries]:=pchar(s[i]);
-  p[high(s)+1+Reserveentries]:=nil;
-  ArrayStringToPPchar:=p;
-end;
-
-Function StringToPPChar(Var S:AnsiString;ReserveEntries:integer):ppchar;
-{
-  Create a PPChar to structure of pchars which are the arguments specified
-  in the string S. Especially usefull for creating an ArgV for Exec-calls
-}
-
-begin
-  StringToPPChar:=StringToPPChar(PChar(S),ReserveEntries);
-end;
-
-Function StringToPPChar(S: PChar;ReserveEntries:integer):ppchar;
-
-var
-  i,nr  : longint;
-  Buf : ^char;
-  p   : ppchar;
-
-begin
-  buf:=s;
-  nr:=1;
-  while (buf^<>#0) do                   // count nr of args
-   begin
-     while (buf^ in [' ',#9,#10]) do    // Kill separators.
-      inc(buf);
-     inc(nr);
-     if buf^='"' Then                   // quotes argument?
-      begin
-        inc(buf);
-        while not (buf^ in [#0,'"']) do // then end of argument is end of string or next quote
-         inc(buf);
-        if buf^='"' then                // skip closing quote.
-          inc(buf);
-      end
-     else
-       begin                            // else std
-         while not (buf^ in [' ',#0,#9,#10]) do
-           inc(buf);
-       end;
-   end;
-  getmem(p,(ReserveEntries+nr)*sizeof(pchar));
-  StringToPPChar:=p;
-  if p=nil then
-   begin
-     {$ifdef xunix}
-     fpseterrno(ESysEnomem);
-     {$endif}
-     exit;
-   end;
-  for i:=1 to ReserveEntries do inc(p); // skip empty slots
-  buf:=s;
-  while (buf^<>#0) do
-   begin
-     while (buf^ in [' ',#9,#10]) do    // Kill separators.
-      begin
-       buf^:=#0;
-       inc(buf);
-      end;
-     if buf^='"' Then                   // quotes argument?
-      begin
-        inc(buf);
-        p^:=buf;
-        inc(p);
-        p^:=nil;
-        while not (buf^ in [#0,'"']) do // then end of argument is end of string or next quote
-         inc(buf);
-        if buf^='"' then                // skip closing quote.
-          begin
-            buf^:=#0;
-            inc(buf);
-          end;
-      end
-     else
-       begin
-        p^:=buf;
-        inc(p);
-        p^:=nil;
-         while not (buf^ in [' ',#0,#9,#10]) do
-           inc(buf);
-       end;
-   end;
-end;
-
 
 
 {*****************************************************************************
@@ -8707,8 +8169,6 @@ const
     AllocMem: @SysAllocMem;
     ReAllocMem: @SysReAllocMem;
     MemSize: nil;
-    GetHeapStatus: @SysGetHeapStatus;
-    GetFPCHeapStatus: @SysGetFPCHeapStatus;
   );
 
 
@@ -8746,17 +8206,6 @@ begin
 	MemoryManager.FreeMemSize(p,Size);
 end;
 
-function GetHeapStatus:THeapStatus;
-begin
-  Result := MemoryManager.GetHeapStatus();
-end;
-
-
-function GetFPCHeapStatus:TFPCHeapStatus;
-begin
-	Result:=MemoryManager.GetFPCHeapStatus();
-end;
-
 { Delphi style }
 function FreeMem(P: Pointer): PtrInt;
 begin
@@ -8780,7 +8229,6 @@ begin
 	Result := MemoryManager.ReAllocMem(P, OldSize, NewSize);
 end;
 
-
 { Needed for calls from Assembler }
 function fpc_getmem(size:ptrint):pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
@@ -8791,16 +8239,6 @@ procedure fpc_freemem(p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];
 begin
 	if p <> nil then
   	MemoryManager.FreeMem(p);
-end;
-
-function SysGetFPCHeapStatus: TFPCHeapStatus;
-begin
-  FillChar(Result, SizeOf(Result), 0);
-end;
-
-function SysGetHeapStatus :THeapStatus;
-begin
-	FillChar(Result, SizeOf(Result), 0);
 end;
 
 function SysGetMem(size : ptrint):pointer;
@@ -8835,27 +8273,6 @@ begin
   Result := nil;
 end;
 
-
-{*****************************************************************************
-                                 InitHeap
-*****************************************************************************}
-
-{ This function will initialize the Heap manager and need to be called from
-  the initialization of the system unit }
-procedure InitHeap;
-begin
-//  FillChar(freelists_fixed,sizeof(tfreelists),0);
-//  freelist_var := nil;
-//  freeoslist := nil;
-//  freeoslistcount := 0;
-//  fillchar(internal_status,sizeof(internal_status),0);
-end;
-
-
-{*****************************************************************************
-                          Thread support
-*****************************************************************************}
-
 Var
   CurrentTM : TThreadManager;
 
@@ -8863,83 +8280,63 @@ Var
                            Threadvar initialization
 *****************************************************************************}
 
-    procedure InitThread(stklen:cardinal);
-      begin
-        //SysResetFPU;
-        { ExceptAddrStack and ExceptObjectStack are threadvars       }
-        { so every thread has its on exception handling capabilities }
-        SysInitExceptions;
-        { Open all stdio fds again }
-        //SysInitStdio;
-        InOutRes:=0;
-        // ErrNo:=0;
-        { Stack checking }
-        StackLength:=stklen;
-        StackBottom:=Sptr - StackLength;
-        ThreadID := CurrentTM.GetCurrentThreadID();
-      end;
-
-{*****************************************************************************
-                            Overloaded functions
-*****************************************************************************}
-
-    function BeginThread(ThreadFunction : tthreadfunc) : TThreadID;
-      var
-        dummy : TThreadID;
-      begin
-        BeginThread:=BeginThread(nil,DefaultStackSize,ThreadFunction,nil,0,dummy);
-      end;
-
-
-    function BeginThread(ThreadFunction : tthreadfunc;p : pointer) : TThreadID;
-      var
-        dummy : TThreadID;
-      begin
-        BeginThread:=BeginThread(nil,DefaultStackSize,ThreadFunction,p,0,dummy);
-      end;
-
-
-    function BeginThread(ThreadFunction : tthreadfunc;p : pointer;var ThreadId : TThreadID) : TThreadID;
-      begin
-        BeginThread:=BeginThread(nil,DefaultStackSize,ThreadFunction,p,0,ThreadId);
-      end;
-
-    function BeginThread(ThreadFunction : tthreadfunc;p : pointer;
-                     var ThreadId : TThreadID; const SS: DWord) : TThreadID;
-      begin
-        BeginThread:=BeginThread(nil,SS,ThreadFunction,p,0,ThreadId);
-      end;
-
-    procedure EndThread;
-      begin
-        EndThread(0);
-      end;
-
-function BeginThread(sa : Pointer;stacksize : dword; ThreadFunction : tthreadfunc;p : pointer;creationFlags : dword;  var ThreadId : TThreadID) : TThreadID;
-
+procedure InitThread(stklen: cardinal);
 begin
-  Result:=CurrentTM.BeginThread(sa,stacksize,threadfunction,P,creationflags,ThreadID);
+  //SysResetFPU;
+  { ExceptAddrStack and ExceptObjectStack are threadvars       }
+  { so every thread has its on exception handling capabilities }
+  SysInitExceptions;
+  { Open all stdio fds again }
+  //SysInitStdio;
+  InOutRes := 0;
+  // ErrNo:=0;
+  { Stack checking }
+  StackLength := stklen;
+  StackBottom := Sptr - StackLength;
+  ThreadID := CurrentTM.GetCurrentThreadID();
 end;
 
-function BeginThread(sa : Pointer;stacksize : qword; ThreadFunction : tthreadfunc;p : pointer;creationFlags : dword;  var ThreadId : TThreadID) : TThreadID;
-
+function BeginThread(ThreadFunction: tthreadfunc): TThreadID;
+var
+  dummy: TThreadID;
 begin
-  Result:=CurrentTM.BeginThread(sa,stacksize,threadfunction,P,creationflags,ThreadID);
+  Result := BeginThread(nil, DefaultStackSize, ThreadFunction, nil, 0, dummy);
+end;
+
+function BeginThread(ThreadFunction: tthreadfunc; p: pointer): TThreadID;
+var
+  dummy: TThreadID;
+begin
+  Result := BeginThread(nil, DefaultStackSize, ThreadFunction, p, 0, dummy);
+end;
+
+function BeginThread(ThreadFunction: tthreadfunc; p: Pointer; var ThreadId: TThreadID): TThreadID;
+begin
+  Result := BeginThread(nil, DefaultStackSize, ThreadFunction, p, 0, ThreadId);
+end;
+
+procedure EndThread;
+begin
+  EndThread(0);
+end;
+
+function BeginThread(sa: Pointer; stacksize: dword; ThreadFunction: tthreadfunc; p: pointer; creationFlags: dword;  var ThreadId: TThreadID): TThreadID;
+begin
+  Result := CurrentTM.BeginThread(sa, stacksize, threadfunction, P, creationflags, ThreadID);
 end;
 
 procedure EndThread(ExitCode : DWord);
-
 begin
   CurrentTM.EndThread(ExitCode);
 end;
 
-function  SuspendThread (threadHandle : TThreadID) : dword;
+function  SuspendThread (threadHandle: TThreadID) : dword;
 
 begin
   Result:=CurrentTM.SuspendThread(ThreadHandle);
 end;
 
-function ResumeThread  (threadHandle : TThreadID) : dword;
+function ResumeThread  (threadHandle: TThreadID) : dword;
 
 begin
   Result:=CurrentTM.ResumeThread(ThreadHandle);
@@ -8957,19 +8354,18 @@ begin
   Result:=CurrentTM.KillThread(ThreadHandle);
 end;
 
-function  WaitForThreadTerminate (threadHandle : TThreadID; TimeoutMs : longint) : dword;
+function  WaitForThreadTerminate (threadHandle: TThreadID; TimeoutMs : longint) : dword;
 
 begin
   Result:=CurrentTM.WaitForThreadTerminate(ThreadHandle,TimeOutMS);
 end;
 
-function  ThreadSetPriority (threadHandle : TThreadID; Prio: longint): boolean;
+function  ThreadSetPriority (threadHandle: TThreadID; Prio: longint): boolean;
 begin
   Result:=CurrentTM.ThreadSetPriority(ThreadHandle,Prio);
 end;
 
-function  ThreadGetPriority (threadHandle : TThreadID): longint;
-
+function  ThreadGetPriority (threadHandle: TThreadID): longint;
 begin
   Result:=CurrentTM.ThreadGetPriority(ThreadHandle);
 end;
@@ -8987,39 +8383,33 @@ begin
 end;
 
 procedure DoneCriticalsection(var cs : TRTLCriticalSection);
-
 begin
   CurrentTM.DoneCriticalSection(cs);
 end;
 
 procedure EnterCriticalsection(var cs : TRTLCriticalSection);
-
 begin
   CurrentTM.EnterCriticalSection(cs);
 end;
 
 procedure LeaveCriticalsection(var cs : TRTLCriticalSection);
-
 begin
   CurrentTM.LeaveCriticalSection(cs);
 end;
 
 Function GetThreadManager(Var TM : TThreadManager) : Boolean;
-
 begin
   TM:=CurrentTM;
   Result:=True;
 end;
 
 Function SetThreadManager(Const NewTM : TThreadManager; Var OldTM : TThreadManager) : Boolean;
-
 begin
   GetThreadManager(OldTM);
   Result:=SetThreadManager(NewTM);
 end;
 
 Function SetThreadManager(Const NewTM : TThreadManager) : Boolean;
-
 begin
   Result:=True;
   If Assigned(CurrentTM.DoneManager) then
@@ -9033,19 +8423,16 @@ begin
 end;
 
 function  BasicEventCreate(EventAttributes : Pointer; AManualReset,InitialState : Boolean;const Name : ansistring):pEventState;
-
 begin
   result:=currenttm.BasicEventCreate(EventAttributes,AManualReset,InitialState, Name);
 end;
 
 procedure basiceventdestroy(state:peventstate);
-
 begin
   currenttm.basiceventdestroy(state);
 end;
 
 procedure basiceventResetEvent(state:peventstate);
-
 begin
   currenttm.basiceventResetEvent(state);
 end;
@@ -9111,65 +8498,9 @@ begin
   currenttm.rtleventsync(m,p);
 end;
 
-
-{ ---------------------------------------------------------------------
-    ThreadManager which gives run-time error. Use if no thread support.
-  ---------------------------------------------------------------------}
-
-{$ifndef DISABLE_NO_THREAD_MANAGER}
-
-Var
-  NoThreadManager : TThreadManager;
-
-Procedure SetNoThreadManager;
-
-begin
-  with NoThreadManager do
-  begin
-    InitManager            := nil;
-    DoneManager            := nil;
-    BeginThread            := nil;
-    EndThread              := nil;
-    SuspendThread          := nil;
-    ResumeThread           := nil;
-    KillThread             := nil;
-    ThreadSwitch           := nil;
-    WaitForThreadTerminate := nil;
-    ThreadSetPriority      := nil;
-    ThreadGetPriority      := nil;
-    GetCurrentThreadId     := nil;
-    InitCriticalSection    := nil;
-    DoneCriticalSection    := nil;
-    EnterCriticalSection   := nil;
-    LeaveCriticalSection   := nil;
-    InitThreadVar          := nil;
-    RelocateThreadVar      := nil;
-    AllocateThreadVars     := nil;
-    ReleaseThreadVars      := nil;
-    BasicEventCreate       := nil;
-    basiceventdestroy      := nil;
-    basiceventResetEvent   := nil;
-    basiceventSetEvent     := nil;
-    basiceventWaitFor      := nil;
-    rtlEventCreate         := nil;
-    rtleventdestroy        := nil;
-    rtleventSetEvent       := nil;
-    rtleventStartWait      := nil;
-    rtleventWaitFor        := nil;
-    rtleventsync           := nil;
-    rtleventwaitfortimeout := nil;
-  end;
-  SetThreadManager(NoThreadManager);
-end;
-
-{$endif DISABLE_NO_THREAD_MANAGER}
-
-
-
-{*****************************************************************************
+{-------------------------------------------------------------------------------
                            Threadvar support
-*****************************************************************************}
-
+-------------------------------------------------------------------------------}
 
 type
   pltvInitEntry = ^ltvInitEntry;
@@ -9184,44 +8515,40 @@ type
   end;
 
 var
-  ThreadvarTablesTable : TltvInitTablesTable; external name 'FPC_THREADVARTABLES';
+  ThreadvarTablesTable: TltvInitTablesTable; external name 'FPC_THREADVARTABLES';
 
-procedure init_unit_threadvars (tableEntry : pltvInitEntry);
+procedure init_unit_threadvars(TableEntry: pltvInitEntry);
 begin
-  while tableEntry^.varaddr <> nil do
-   begin
-     CurrentTM.InitThreadvar (tableEntry^.varaddr^, tableEntry^.size);
-     inc (pchar (tableEntry), sizeof (tableEntry^));
-   end;
+  while TableEntry^.varaddr <> nil do
+  begin
+    CurrentTM.InitThreadvar (TableEntry^.varaddr^, TableEntry^.size);
+    Inc(PChar(TableEntry), SizeOf(TableEntry^));
+  end;
 end;
-
 
 procedure init_all_unit_threadvars;
 var
-  i : integer;
+  I: Integer;
 begin
 {$ifdef DEBUG_MT}
   WriteLn ('init_all_unit_threadvars (',ThreadvarTablesTable.count,') units');
 {$endif}
-  for i := 1 to ThreadvarTablesTable.count do
-    init_unit_threadvars (ThreadvarTablesTable.tables[i]);
+  for I := 1 to ThreadvarTablesTable.count do
+    init_unit_threadvars(ThreadvarTablesTable.tables[I]);
 end;
 
-
-procedure copy_unit_threadvars (tableEntry : pltvInitEntry);
+procedure copy_unit_threadvars(TableEntry: pltvInitEntry);
 var
-  oldp,
-  newp : pointer;
+  oldp, newp: Pointer;
 begin
-  while tableEntry^.varaddr <> nil do
-   begin
-     newp:=CurrentTM.RelocateThreadVar(tableEntry^.varaddr^);
-     oldp:=pointer(pchar(tableEntry^.varaddr)+sizeof(pointer));
-     move(oldp^,newp^,tableEntry^.size);
-     inc (pchar (tableEntry), sizeof (tableEntry^));
-   end;
+  while TableEntry^.varaddr <> nil do
+  begin
+    newp := CurrentTM.RelocateThreadVar(TableEntry^.varaddr^);
+    oldp := pointer(PChar(TableEntry^.varaddr)+SizeOf(Pointer));
+    Move(oldp^, newp^, TableEntry^.size);
+    Inc(PChar(TableEntry), SizeOf(TableEntry^));
+  end;
 end;
-
 
 procedure copy_all_unit_threadvars;
 var
@@ -9231,89 +8558,20 @@ begin
   WriteLn ('copy_all_unit_threadvars (',ThreadvarTablesTable.count,') units');
 {$endif}
   for i := 1 to ThreadvarTablesTable.count do
-    copy_unit_threadvars (ThreadvarTablesTable.tables[i]);
+    copy_unit_threadvars(ThreadvarTablesTable.tables[i]);
 end;
 
-procedure InitThreadVars(RelocProc : Pointer);
-
+procedure InitThreadVars(RelocProc: Pointer);
 begin
-   { initialize threadvars }
-   init_all_unit_threadvars;
-   { allocate mem for main thread threadvars }
-   CurrentTM.AllocateThreadVars;
-   { copy main thread threadvars }
-   copy_all_unit_threadvars;
-   { install threadvar handler }
-   fpc_threadvar_relocate_proc:=RelocProc;
+  { initialize threadvars }
+  init_all_unit_threadvars;
+  { allocate mem for main thread threadvars }
+  CurrentTM.AllocateThreadVars;
+  { copy main thread threadvars }
+  copy_all_unit_threadvars;
+  { install threadvar handler }
+  fpc_threadvar_relocate_proc := RelocProc;
 end;
-
-
-{*****************************************************************************
-                            File Handling
-*****************************************************************************}
-
-
-
-function do_isdevice(handle:thandle):boolean;
-begin
-	Result := False;
-end;
-
-Procedure Do_Close(Handle:thandle);
-Begin
-End;
-
-Procedure Do_Erase(p:pchar);
-Begin
-End;
-
-
-procedure do_truncate (handle:thandle;fpos:longint);
-begin
-end;
-
-Procedure Do_Rename(p1,p2:pchar);
-Begin
-End;
-
-
-Function Do_Write(Handle:thandle;Addr:Pointer;Len:Longint):longint;
-Begin
-	Result := -1;
-End;
-
-
-Function Do_Read(Handle:thandle;Addr:Pointer;Len:Longint):Longint;
-Begin
-	Result := -1;
-End;
-
-function Do_FilePos(Handle: thandle):longint;
-Begin
-	Result := -1;
-End;
-
-Procedure Do_Seek(Handle:thandle;Pos:Longint);
-Begin
-//	Result := -1;
-End;
-
-Function Do_SeekEnd(Handle:thandle): Longint;
-begin
-	Result := -1;
-end;
-
-Function Do_FileSize(Handle:thandle): Longint;
-Begin
-	Result := -1;
-end;
-
-Procedure Do_Open(var f;p:pchar;flags:longint);
-Begin
-End;
-
-
-
 
 {*****************************************************************************
                             Resources support
@@ -9332,13 +8590,6 @@ begin
 	Result := '';
 end;
 
-
-
-procedure SetupCmdLine;
-begin
-end;
-
-
 procedure SysInitStdIO;
 begin
 end;
@@ -9354,7 +8605,6 @@ begin
 end;
 
 begin
-  InitHeap;
   SysInitExceptions;
   StackLength := 1024;
   StackBottom := Sptr - StackLength;

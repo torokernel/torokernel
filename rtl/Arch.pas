@@ -9,7 +9,7 @@
 // Changes :
 //
 // 27/10/2009 Cache Managing Implementation
-// 10/05/2009 SMP Initilization moved to Arch.pas . Supports Multicore.
+// 10/05/2009 SMP Initialization moved to Arch.pas . Supports Multicore.
 // 09/05/2009 Size of memory calculated using INT15H .
 // 12/10/2008 RelocateApic  is not used for the moment.
 // 12/01/2006 RelocateApic procedure, QEMU does not support the relocation of APIC register
@@ -58,6 +58,26 @@ const
   MEM_RESERVED = 2;
 
 type
+{$IFDEF UNICODE}
+  XChar = AnsiChar;
+  PXChar = PAnsiChar;
+{$ELSE}
+  XChar = Char;
+  AnsiString = string;
+  PXChar = PChar;
+{$ENDIF} // Alias type XMLString for string or WideString
+{$IFDEF FPC}
+  UInt32 = Cardinal;
+  UInt64 = QWORD;
+{$ENDIF}
+{$IFDEF DCC}
+  DWORD = UInt32;
+  PDWORD = ^DWORD;
+  QWORD = UInt64;
+  SizeUInt = QWORD;
+  PtrInt = Int64;
+  PtrUInt = UInt64;
+{$ENDIF}
   TNow = record
     sec : LongInt;
     min: LongInt;
@@ -76,11 +96,11 @@ type
   PMemoryRegion = ^TMemoryRegion;
 
   TCore = record
-    Apicid: LongInt; // Core Identification
+    ApicID: LongInt; // Core Identification
     Present: Boolean; // Is present?
     CPUBoot: Boolean;
-    InitConfirmation: Boolean; // Syncronitation variable between core to INIT-core
-    InitProc: procedure; // Procedure for Initialize the core
+    InitConfirmation: Boolean; // Synchronization variable between core to INIT-core
+    InitProc: procedure; // Procedure to initialize the core // signature should match Scheduling(Candidate: Pointer)
   end;
 
 procedure bit_reset(val: Pointer; pos: QWord);
@@ -88,7 +108,6 @@ procedure bit_set ( addval : Pointer ; pos : QWord ) ;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 // only used in the debug unit to synchronize access to serial port
-function cmpchg(cmpval, newval: DWORD; var addval: DWORD): DWORD;
 procedure Delay(clock_hz: Int64; milisec: LongInt);
 procedure eoi;
 function GetApicID: Byte;
@@ -98,10 +117,12 @@ procedure hlt;
 procedure irq_on(irq: Byte);
 procedure irq_off(irq: Byte);
 function is_apic_ready: Boolean ;
+procedure NOP;
 function read_portb(port: Word): Byte;
 function read_rdtsc: Int64;
 procedure send_apic_init (apicid : Byte) ;
 procedure send_apic_startup (apicid , vector : Byte );
+function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler; {$IFDEF FPC} inline; {$ENDIF}
 procedure SwitchStack(sv: Pointer; ld: Pointer);
 procedure write_portb(Data: Byte; Port: Word);
 procedure CaptureInt (int: Byte; Handler: Pointer);
@@ -112,7 +133,7 @@ procedure EnabledINT;
 procedure DisabledINT;
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
-function PciReadDWORD (bus, device, func, regnum : LongInt) : LongInt;
+function PciReadDWORD (const bus, device, func, regnum: UInt32): LongInt;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
@@ -141,16 +162,18 @@ var
 
 implementation
 
+uses Kernel, Console;
+
 const
-  Apic_Base = $Fee00000;
-  apicid_reg = apic_base + $20 ;
-  icrlo_reg = apic_base + $300 ;
-  icrhi_reg = apic_base + $310 ;
-  err_stat_reg = apic_base + $280 ;
-  timer_reg = apic_base + $320 ;
-  timer_init_reg = apic_base + $380 ;
+  Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
+  apicid_reg = apic_base + $20;
+  icrlo_reg = apic_base + $300;
+  icrhi_reg = apic_base + $310;
+  err_stat_reg = apic_base + $280;
+  timer_reg = apic_base + $320;
+  timer_init_reg = apic_base + $380;
   timer_curr_reg = apic_base + $390;
-  divide_reg = apic_base + $3e0 ;
+  divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
   
   // IDT descriptors
@@ -175,28 +198,27 @@ type
     apicid : Byte ;
   end;
 
-  gdtr_struct = record
+  TGDTR = record
     limite: Word;
     res1, res2: DWORD;
   end;
 
-
   p_mp_floating_struct  = ^mp_floating_struct ;
   mp_floating_struct = record
-    signature : array[0..3] of Char ;
-    phys : DWORD ;
-    data : DWORD;
-    mp_type : DWORD ;
+    signature: array[0..3] of XChar;
+    phys: DWORD;
+    data: DWORD;
+    mp_type: DWORD;
   end;
 
   p_mp_table_header = ^mp_table_header ;
   mp_table_header = record
-    signature : array[0..3] of Char ;
-    res : array[0..6] of DWORD ;
-    size : Word ;
-    count : Word ;
-    addres_apic : DWORD;
-    resd : DWORD ;
+    signature : array[0..3] of XChar ;
+    res: array[0..6] of DWORD ;
+    size: Word ;
+    count: Word ;
+    addres_apic: DWORD;
+    resd: DWORD ;
   end;
 
   p_mp_processor_entry = ^mp_processor_entry ;
@@ -220,7 +242,7 @@ type
   end;
 
   //  AMD X86-64  interrupt gate
-  intr_gate_struct = record
+  TInteruptGate = record
     handler_0_15: Word;
     selector: Word;
     nu: Byte;
@@ -230,14 +252,13 @@ type
     res: DWORD;
   end;
 
-  TInterruptGateArray = array[0..255] of intr_gate_struct;
+  TInterruptGateArray = array[0..255] of TInteruptGate;
   PInterruptGateArray = ^TInterruptGateArray;
-  p_intr_gate_struct = ^intr_gate_struct;
+  p_intr_gate_struct = ^TInteruptGate;
 
-  Pdirectory_page = ^directory_page_entry;
-
-  directory_page_entry = record
-    page_descriptor: QWord;
+  PDirectoryPage = ^TDirectoryPageEntry;
+  TDirectoryPageEntry = record
+    PageDescriptor: QWORD;
   end;
 
 var
@@ -273,51 +294,29 @@ asm
   out dx, al
 end;
 
-function read_portb(port: Word): Byte; assembler;{$IFDEF ASMINLINE} inline; {$ENDIF}
+function read_portb(port: Word): Byte; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
   mov dx, port
   in al, dx
 end;
 
-
-procedure write_portw (data: DWORD; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  r : Pointer;
-begin
-  r :=@data;
-  asm
-    mov dx , port
-    mov rsi, r
-    outsw
-  end;
+procedure write_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm // RCX: data, RDX: port
+//  {$IFDEF DCC} .noframe {$ENDIF}
+  //mov dx, port
+	mov rsi, data // DX=port
+  outsd
 end;
 
-function read_portw(port: Word): Word;{$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-	tmp: Word;
-	P: Pointer;
-begin
-  P := @tmp;
-  asm
-	  mov dx, port
-	  mov rdi, P
-	  insw
-  end;
-  Result := tmp;
+procedure read_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm // RCX: data, RDX: port
+//  {$IFDEF DCC} .noframe {$ENDIF}
+	//mov dx, port
+	mov rdi, data // DX=port
+	insd
 end;
 
-procedure write_portd (data: DWORD; port: Word);{$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  r: Pointer;
-begin
-  r := @data;
-  asm
-    mov dx , port
-	  mov rsi, r
-	  outsd
-  end;
-end;
-
+(*
 function read_portd (port: Word): DWORD; {$IFDEF ASMINLINE} inline; {$ENDIF}
 var
   tmp: DWORD ;
@@ -331,10 +330,11 @@ begin
   end;
   Result := tmp;
 end;
+*)
 
-// Send init interrupt to apicid   .
-// Use only in initialization procedure
-procedure send_apic_init (apicid : Byte) ;
+// Send init interrupt to apicid
+// Used only during initialization procedure
+procedure send_apic_init(apicid: Byte);
 var
 	icrl, icrh: ^DWORD;
 begin
@@ -345,13 +345,12 @@ begin
 	icrl^ := $500;
 end;
 
-
 // Send the startup IPI for initialize for processor 
 procedure send_apic_startup(apicid, vector: Byte);
 var
   icrl, icrh: ^DWORD;
 begin
-  delay(LocalCpuSpeed,50);
+  delay(LocalCpuSpeed, 50);
   icrl := Pointer(icrlo_reg);
   icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
@@ -359,14 +358,26 @@ begin
   icrl^ := $600 or vector;
 end;
 
+// CmpVal= SPINLOCK_FREE, NewVal= SPINLOCK_BUSY
+function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
+asm // RCX: CmpVal, RDX: NewVal, R8: addval
+@spin:
+  nop
+  nop
+  nop
+  nop
+  mov rax, cmpval
+//  mov rdx, newval // already setup in proper register
+//  mov rcx, addval // no need to assign rcx, the addval is in r8
+//  lock cmpxchg [rcx], rdx
+  lock cmpxchg [r8], rdx
+  jnz @spin
+end;
 
-// get Apicid of local apic 
-function GetApicID: Byte;{$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  r: PDWORD;
+// local APIC
+function GetApicID: Byte; inline;
 begin
-  r := Pointer(apicid_reg);
-  result := r^ shr 24 ;
+  Result := PDWORD(apicid_reg)^ shr 24;
 end;
 
 // read the IPI delivery status
@@ -382,7 +393,14 @@ begin
     Result := False;
 end;
 
-// wait milisec using the clock bus speed in clock_hz 
+procedure NOP;
+asm
+  nop;
+  nop;
+  nop;
+end;
+
+// wait milisec using the clock bus speed in clock_hz
 // the apic interrupt need the clock_hz
 procedure Delay(clock_hz: Int64; milisec: LongInt);
 var
@@ -395,11 +413,7 @@ begin
   tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
-    asm
-      nop;
-      nop;
-      nop;
-    end;
+    NOP;
   end;
   // send the end of interruption
   tmp := Pointer(eoi_reg);
@@ -408,16 +422,11 @@ end;
 
 // Change the Address of Apic registers
 procedure RelocateAPIC;
-var
- reg:DWORD;
-begin
-  reg := Apic_Base;
-  asm
-    mov ecx, 27
-    mov edx, 0
-    mov eax, reg
-    wrmsr
-  end;
+asm
+  mov ecx, 27
+  mov edx, 0
+  mov eax, Apic_Base
+  wrmsr
 end;
 
 // some local structure for irq
@@ -428,7 +437,6 @@ const
   
 // move the irq of 0-15 to 31-46 vectors
 procedure RelocateIrqs ;
-begin
 asm
     mov   al , 00010001b
     out   20h, al
@@ -474,7 +482,6 @@ asm
     mov   al , 0FFh
     out  0A1h, al
 end;
-end;
 
 // hability the irq
 procedure irq_on(irq: Byte);
@@ -497,150 +504,136 @@ end;
 // send the end of interruption to controllers
 procedure eoi;
 begin
-  write_portb ($20, status_port[0]);
-  write_portb ($20, status_port[1]);
+  write_portb($20, status_port[0]);
+  write_portb($20, status_port[1]);
 end;
 
 // turn off all irqs
-procedure all_irq_off ;
+procedure all_irq_off;
 begin
-  write_portb($ff,mask_port[0]);
-  write_portb($ff,mask_port[1]);
+  write_portb($ff, mask_port[0]);
+  write_portb($ff, mask_port[1]);
 end;
 
 // simple ,  get the number of irq of master controller 
 function get_irq_master: Byte ;
 begin
-  write_portb ($b,$20);
-  // some delay
-  asm
-    nop
-    nop
-    nop
-  end;
+  write_portb($b, $20);
+  NOP;
   Result := read_portb($20);
 end;
 
 function get_irq_slave : Byte ;
 begin
-  write_portb ($b,$a0);
-  // some delay
-  asm
-    nop
-    nop
-    nop
-  end ;
+  write_portb($b, $a0);
+  NOP;
   Result := read_portb($a0);
 end;
 
-
-
 // From this procedure never back
-procedure RetOfInterruption; [nostackframe]; assembler;
+procedure RetOfInterruption; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
+  {$IFDEF DCC} .noframe {$ENDIF}
   pop r15 // IP of  INT Hanlder
-  db $78 // Funcking IRET for AMD64!!!!!!!!!!!!
+  db $78 // messing IRET for AMD64 !!!
 end;
-
-
 
 const 
   cmos_port_reg = $70 ;
   cmos_port_rw  = $71 ;
 
 // write a value of the cmos register
-procedure cmos_write(data, reg: Byte);
+procedure cmos_write(Data, Reg: Byte);
 begin
-write_portb(reg , cmos_port_reg);
-write_portb(data,cmos_port_rw);
+  write_portb(Reg, cmos_port_reg);
+  write_portb(Data, cmos_port_rw);
 end;
 
 // read a value for cmos register 
-function cmos_read (reg : Byte ): Byte;
+function cmos_read(Reg: Byte): Byte;
 begin
-	write_portb (reg , cmos_port_reg);
+	write_portb(Reg, cmos_port_reg);
 	Result := read_portb(cmos_port_rw);
 end;
 
 
 // this code hes been extracted from DelphineOS <delphineos.sourceforge.net>
 // return the CPU speed in MHZ
-procedure CalculateCpuSpeed;
+function CalculateCpuSpeed: Int64;
 var
   count_lo, count_hi, family: DWORD;
-  speed : Word ;
-begin
+  speed: Word;
 asm
- mov eax , 1
- cpuid
- and eax , $0f00
- shr eax , 8
- mov family , eax
- 
- in    al , 61h
- nop
- nop
- and   al , 0FEh      
- out   61h, al
- nop
- nop
- mov   al , 0B0h    
- out   43h, al  
- nop
- nop
- mov   al , 0FFh  
- out   42h, al   
- nop
- nop
- out   42h, al  
- nop
- nop
- in    al , 61h
- nop
- nop
- or    al , 1 
- out   61h, al
-
- rdtsc    
- add   eax, 3000000
- adc   edx, 0
- cmp   family, 6
- jb    @TIMER1
- add   eax, 3000000
- adc   edx, 0
-@TIMER1:
-  mov   count_lo, eax  
-  mov   count_hi, edx
-
-@TIMER2:
-  rdtsc
-  cmp   edx, count_hi   
-  jb    @TIMER2
-  cmp   eax, count_lo
-  jb    @TIMER2        
+  mov eax , 1
+  cpuid
+  and eax , $0f00
+  shr eax , 8
+  mov family , eax
  
   in    al , 61h
   nop
   nop
-  and   al , 0FEh      
-  out   61h, al  
+  and   al , 0FEh
+  out   61h, al
   nop
   nop
-  mov   al , 80h     
+  mov   al , 0B0h
   out   43h, al
   nop
   nop
-  in    al , 42h       
+  mov   al , 0FFh
+  out   42h, al
+  nop
+  nop
+  out   42h, al
+  nop
+  nop
+  in    al , 61h
+  nop
+  nop
+  or    al , 1
+  out   61h, al
+
+  rdtsc
+  add   eax, 3000000
+  adc   edx, 0
+  cmp   family, 6
+  jb    @TIMER1
+  add   eax, 3000000
+  adc   edx, 0
+@TIMER1:
+  mov   count_lo, eax
+  mov   count_hi, edx
+
+@TIMER2:
+  rdtsc
+  cmp   edx, count_hi
+  jb    @TIMER2
+  cmp   eax, count_lo
+  jb    @TIMER2
+
+  in    al , 61h
+  nop
+  nop
+  and   al , 0FEh
+  out   61h, al
+  nop
+  nop
+  mov   al , 80h
+  out   43h, al
+  nop
+  nop
+  in    al , 42h
   nop
   nop
   mov   dl , al
-  in    al , 42h        
+  in    al , 42h
   nop
   nop
-  mov   dh , al        
+  mov   dh , al
 
   mov   cx , -1
-  sub   cx , dx        
+  sub   cx , dx
   xor   ax , ax
   xor   dx , dx
   cmp   cx , 110
@@ -663,49 +656,38 @@ asm
   pop   bx
   pop   ax
 @CPUS_SKP:
-  mov LocalCpuSpeed,  ax
-  end ;
+  //mov LocalCpuSpeed,  rax
 end;
 
-// stop the executation of cpu 
-procedure hlt ; assembler ; {$IFDEF ASMINLINE} inline; {$ENDIF}
+// Stop the execution of CPU
+procedure hlt; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
   hlt
 end;
 
-// get the rdtsc counter 
+// get the rdtsc counter // beware of specific code due to qemu x64 which is not handling rdtsc instruction properly
 function read_rdtsc: Int64;
 var
   lw, hg: DWORD;
-begin
-  asm
-    rdtsc
-    mov lw, eax
-    mov hg, edx
-  end;
-  Result := (hg shl 32) or lw ;
-end;
-
-// atomic compare and change 
-function cmpchg(cmpval, newval: DWORD; var addval: DWORD): DWORD;assembler;inline;
 asm
-@spin:
-  nop
-  nop
-  nop
-  nop
-  mov rax , cmpval
-  mov rdx , newval
-  mov rcx , addval
-  lock cmpxchg [rcx] , rdx
-jnz @spin
+  rdtsc
+  mov lw, eax // following lines are specific code for qemu x64
+  mov hg, edx
+  mov eax, hg
+  shl rax, 32
+  add eax, lw
 end;
+{
+// it should be inplemented as rdtsc instruction,
+// but it looks like there is a bug in qemu x64 which is implementing rdtsc as for x86 (32 bits)
+// placing the result in 2 registers lo part in eax and hi part in edx
+asm
+  rdtsc
+end;
+}
 
 // this procedures doesn't have lock protection
 function bit_test (Val: Pointer; pos: QWord): Boolean;
-var
-	s: Byte;
-begin
 asm
   xor rax , rax
   xor rbx , rbx
@@ -714,28 +696,26 @@ asm
   bt  [rsi] , rbx
   jc  @si
   @no:
-   mov s , 0
+   mov rax , 0
    jmp @salir
   @si:
-    mov s , 1
+    mov rax , 1
   @salir:
-  end;
-  Result := Boolean(s);
 end;
 
 procedure bit_reset(val: Pointer; pos: QWord); assembler;
 asm
-  mov rbx , pos
-  mov rsi , val
-  btr [rsi] , rbx
+  mov rbx, pos
+  mov rsi, val
+  btr [rsi], rbx
 end;
 
 procedure bit_set(addval: Pointer; pos: QWord); assembler;
 asm
-  mov rsi , addval
-  xor rdx , rdx
-  mov rdx , pos
-  bts [rsi] , rdx
+  mov rsi, addval
+  xor rdx, rdx
+  mov rdx, pos
+  bts [rsi], rdx
 end;
 
 procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -778,41 +758,40 @@ begin
     Result :=0
   else
     Result := SizeOf(TMemoryRegion);
-  desc:= Pointer(INT15H_TABLE) + SizeOf(Int15h_info) * (ID-1);
+  desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
   Buffer.Base := desc.Base;
   Buffer.length := desc.length;
   Buffer.Flag := desc.tipe;
 end;
 
-
-// Initialize Memory table  . It uses information from bootloader.
-// The bootloader use INT15h.
+// Initialize Memory table. It uses information from bootloader.
+// The bootloader uses INT15h.
 // Usable memory is above 1MB
 procedure MemoryCounterInit;
 var
-  magic: ^DWORD;
-  desc: PInt15h_info;
+  Magic: ^DWORD;
+  Desc: PInt15h_info;
 begin
   CounterID:=0;
   AvailableMemory:=0;
-  magic:= Pointer(INT15H_TABLE);
-  desc:= Pointer(INT15H_TABLE);
-  while magic^ <> $1234 do
+  Magic := Pointer(INT15H_TABLE);
+  Desc := Pointer(INT15H_TABLE);
+  while Magic^ <> $1234 do
   begin
-    if (desc.tipe = 1) and (desc.Base >=$100000) then
-      AvailableMemory:=AvailableMemory + desc.length;
-    Inc(magic);
-    Inc(desc);
+    if (Desc.tipe = 1) and (Desc.Base >= $100000) then
+      AvailableMemory := AvailableMemory + Desc.length;
+    Inc(Magic);
+    Inc(Desc);
   end;
   // Allocation start at ALLOC_MEMORY_START
   AvailableMemory := AvailableMemory;
-  CounterID := (QWord(magic)-INT15H_TABLE);
+  CounterID := (QWord(Magic)-INT15H_TABLE);
   CounterID := counterId div SizeOf(Int15h_info);
 end;
 
-procedure Bcd_To_Bin(var val: LongInt); {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure Bcd_To_Bin(var val: LongInt); inline;
 begin
-  val := (val and 15) + ((val shr 4) * 10 );
+  val := (val and 15) + ((val shr 4) * 10);
 end;
 
 // Now : Return the actual time from the CMOS .
@@ -850,13 +829,15 @@ begin
   Data.Year := Year;
 end;
 
+{$IFDEF FPC}
 procedure nolose; [public, alias: 'FPC_ABSMASK_DOUBLE'];
 begin
 end;
 
-procedure nolose2;[public, alias: 'FPC_EMPTYINTF'];
+procedure nolose2; [public, alias: 'FPC_EMPTYINTF'];
 begin
 end;
+{$ENDIF}
 
 // simple procedures to manipulate interruptions
 procedure EnabledINT; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -869,65 +850,56 @@ asm
   cli
 end;
 
-
-// Procedures for capture unhandles interruptions
-procedure Interruption_Ignore;[nostackframe];
-begin
-  EnabledINT;
-  asm
+procedure Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+asm
+  {$IFDEF DCC} .noframe {$ENDIF}
   db $48
   db $cf
-  end;
 end;
 
-procedure IRQ_Ignore;[nostackframe];
+// Procedures for capture unhandles interruptions
+procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  EnabledINT;
+  //Ignore;
+  // asm // TODO: restore if this is critical
+  // db $48
+  // db $cf
+  // end;
+end;
+
+procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
   EOI;
-  asm
-  db $48
-  db $cf
-  end;
+  //Ignore;
+  //asm // TODO: restore if this is critical
+  // db $48
+  //db $cf
+  //end;
 end;
 
-//
-// Access to PCI bus
-//
+// PCI bus access
+
 const
  PCI_CONF_PORT_INDEX = $CF8;
  PCI_CONF_PORT_DATA  = $CFC;
 
-function PciReadDWORD(bus, device, func, regnum : LongInt): LongInt;
+function PciReadDWORD(const bus, device, func, regnum: UInt32): LongInt;
 var
-  send: LongInt;
+  Send: DWORD;
 begin
-  asm
-    xor rax , rax
-    xor rbx , rbx
-    mov   eax, $80000000
-    mov   ebx, bus
-    shl   ebx, 16
-    or    eax, ebx
-    mov   ebx, device
-    shl   ebx, 11
-    or    eax, ebx
-    mov   ebx, func
-    shl   ebx, 8
-    or    eax, ebx
-    mov   ebx, regnum
-    shl   ebx, 2
-    or    eax, ebx
-    mov   send, eax
-  end;
-  write_portd(send,PCI_CONF_PORT_INDEX);
-  Result := read_portd(PCI_CONF_PORT_DATA);
+  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum shl 2);
+  write_portd(@Send, PCI_CONF_PORT_INDEX);
+  read_portd(@Send, PCI_CONF_PORT_DATA);
+  Result := Send;
 end;
 
-
-// Initilization of the SSE and SSE2 Extensions
-// Every Core has got to do that
+// Initialization of the SSE and SSE2 Extensions
+// Every Core need to perform this initialization
 // TODO : Floating-Point exception is ignored
-procedure SSEInit;assembler;
+{$IFDEF FPC}
+procedure SSEInit; assembler;
 asm
   xor rax , rax
   // Set OSFXSR bit
@@ -935,16 +907,66 @@ asm
   or ah , 10b
   mov cr4 , rax
   xor rax , rax
-  mov rax , cr0
+  mov rax, cr0
   // Clear MP and EM bit
   and al ,11111001b
   mov cr0 , rax
 end;
-
+{$ENDIF}
+{$IFDEF DCC}
+procedure SSEInit; assembler;
+asm
+  xor rax , rax
+  // Set OSFXSR bit
+  mov eax, cr4
+  or ah , 10b
+  mov cr4 , eax
+  xor rax , rax
+  mov eax, cr0
+  // Clear MP and EM bit
+  and al ,11111001b
+  mov cr0 , eax
+end;
+{$ENDIF}
 
 //------------------------------------------------------------------------------
-//                               Multicore Initilization
+//                               Multicore Initialization
 //------------------------------------------------------------------------------
+
+{
+const
+	VIDEO_OFFSET = $B8000;
+
+type
+	TConsole = record // screen text mode
+		car: AnsiChar;
+		form: Byte;
+	end;
+
+var
+  X, Y: Byte;
+  PConsole: ^TConsole;
+
+procedure SetCursor(X, Y: Byte);
+begin
+	write_portb($0E, $3D4);
+	write_portb(Y, $3D5);
+	write_portb($0f, $3D4);
+	write_portb(X, $3D5);
+end;
+
+procedure PutC(const Car: AnsiChar);
+begin
+  Y := 24;
+  if X > 79 then
+    X := 0;
+  PConsole := Pointer(VIDEO_OFFSET + (80*2)*Y + (X*2));
+  PConsole.form := 10;
+  PConsole.car := Car;
+  X := X+1;
+  SetCursor(X, Y);
+end;
+}
 
 var
   // temporary stacks for each cpu
@@ -953,15 +975,15 @@ var
   esp_tmp: Pointer;
 
 // External Declarations for Initialization
-procedure KernelStart; external name 'KernelStart';
+//procedure KernelStart; external name 'KernelStart';
 procedure boot_confirmation; forward;
 
 // Start stack for Initialization of CPU#0
 var
- stack : array[1..5000] of Byte ;
+  stack : array[1..5000] of Byte ;
 
 const
- pstack : Pointer = @stack[5000] ;
+  pstack: Pointer = @stack[5000] ;
 
 // Initialize the CPU in SMP initialization
 procedure InitCpu; assembler;
@@ -975,23 +997,34 @@ asm
   mov rsp, esp_tmp
   // load new Page Directory
   mov rax, PDADD
-  mov cr3, rax
+  {$IFDEF FPC} mov cr3, rax {$ENDIF}
+  {$IFDEF DCC} mov cr3, eax {$ENDIF}
   xor rbp, rbp
   sti
   call SSEInit
   call boot_confirmation
 end;
 
-// entry point of PE64 executable
+// entry point of PE64 EXE
+// the Toro bootloader is starting all CPUs(Cores) with this entry point
+// ie: this procedure is executed in parallel by all CPUs when booting
+{$IFDEF FPC}
 procedure main; [public, alias: '_mainCRTStartup']; assembler;
 asm
-  mov rax, cr3 // Cannot remove this warning! using eax generates error at compile-time.
-  cmp rax, 90000h
+  {$IFDEF FPC}
+    mov rax, cr3 // Cannot remove this warning! using eax generates error at compile-time.
+    cmp rax, 90000h  // rax = $100000 when executed the first time from the bootloader (debugged once using FPC version)
+  {$ENDIF}
+  {$IFDEF DCC}
+    mov eax, cr3
+    cmp eax, 90000h
+  {$ENDIF}
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
   call KernelStart
 end;
+{$ENDIF}
 
 // Boot CPU using IPI messages.
 // Warning this procedure must be do it just one per CPU
@@ -1019,17 +1052,17 @@ begin
     Delay(CPU_CYLES, 50);
     Dec(Attempt);
   end;
-  esp_tmp := Pointer(esp_tmp) - size_start_stack;
+  esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// Simple syncronization with bsp CPU
+// Simple synchronization with bsp CPU
 procedure boot_confirmation;
 var
   CpuID: Byte;
 begin
   CpuID := GetApicID;
   Cores[CPUID].InitConfirmation := True;
-  // Local Kernel Initilization
+  // Local Kernel Initialization
   Cores[CPUID].InitProc;
 end;
 
@@ -1051,20 +1084,19 @@ begin
       tmp := m;
       cp := tmp;
       CPU_COUNT:=CPU_COUNT+1;
-      Cores[cp.Apic_id].Apicid := cp.Apic_id;
-      Cores[cp.Apic_id].present := True;
-      m := m+SizeOf(mp_processor_entry);
+      Cores[cp.Apic_id].ApicID := cp.Apic_id;
+      Cores[cp.Apic_id].Present := True;
+      m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
       // Boot core doesn't need initilization
       if (cp.flags and 2 ) = 2 then
         Cores[cp.Apic_id].CpuBoot := True ;
     end else
     begin
-      m := m+SizeOf(mp_apic_entry);
+      m := Pointer(SizeUInt(m)+SizeOf(mp_apic_entry));
     end;
     Inc(I);
   end;
 end;
-
 
 // search and read the Mp configuration table version 1.4  , the begin of search is in $e000 address
 procedure mp_table_detect;
@@ -1083,18 +1115,17 @@ begin
       end
       else exit;
     end;
-    find := find+1;
+    Inc(find); // := find+1;
    end;
 end;
 
-
-//
+//------------------------------------------------------------------------------
 // Structures of ACPI table.
-//
+//------------------------------------------------------------------------------
 
 type
   TAcpiRsdp = packed record
-    Signature: array[0..7] of Char;
+    Signature: array[0..7] of XChar;
     Checksum: Byte;
     oem_id:array[0..5] of Byte;
     Revision: Byte;
@@ -1107,14 +1138,14 @@ type
   PAcpiRsdp = ^TAcpiRsdp;
 
   TAcpiTableHeader = packed record
-    Signature: array[0..3] of Char;
+    Signature: array[0..3] of XChar;
     Length: DWORD;
     Revision: Byte;
     Checksum: Byte;
-    oem_id: array[0..5] of Char;
-    oem_table_id : array[0..7] of Char;
+    oem_id: array[0..5] of XChar;
+    oem_table_id : array[0..7] of XChar;
     oem_revision: DWORD;
-    asl_compiler_id:array[0..3] of Char;
+    asl_compiler_id:array[0..3] of XChar;
     asl_compiler_revision: DWORD;
   end;
   PAcpiTableHeader = ^TAcpiTableHeader;
@@ -1177,9 +1208,9 @@ begin
         if (TableHeader.Signature[0] = 'A') and (TableHeader.Signature[1] = 'P')  then
         begin
           madt := Pointer(TableHeader);
-          MadEnd := Pointer(madt) + TableHeader.length;
-          Entry := Pointer(madt) + SizeOf(TAcpiMadt);
-          while Entry < MadEnd do
+          MadEnd := Pointer(SizeUInt(madt) + TableHeader.length);
+          Entry := Pointer(SizeUInt(madt) + SizeOf(TAcpiMadt));
+          while SizeUInt(Entry) < SizeUInt(MadEnd) do
           begin // that 's a new Processor.
             if Entry.nType=0 then
             begin
@@ -1188,34 +1219,33 @@ begin
               if Processor.flags and 1 = 1 then
               begin
                 Inc(CPU_COUNT);
-                Cores[Processor.apicid].Apicid := Processor.apicid;
+                Cores[Processor.apicid].ApicID := Processor.apicid;
                 Cores[Processor.apicid].Present := True;
                 // CPU#0 is a BOOT cpu
                 if Processor.apicid = 0 then
                   Cores[Processor.apicid].CPUBoot := True;
               end;
             end;
-            Entry := Pointer(Entry) + Entry.Length;
+            Entry := Pointer(SizeUInt(Entry) + Entry.Length);
           end;
         end;
       end;
       Break;
     end;
-    Inc(p, 16);
+    Inc(P, 16);
   end;
 end;
 
 // Detect all Cores using MP's Intel tables and ACPI Tables.
-procedure SMPInitilization;
+procedure SMPInitialization;
 var
   J: LongInt;
 begin
-  // clear the tables
   for J :=0 to MAX_CPU-1 do
-  begin
-    Cores[J].present := False;
+  begin // clear fields
+    Cores[J].Present := False;
     Cores[J].CPUBoot:= False;
-    Cores[J].Apicid := 0;
+    Cores[J].ApicID := 0;
     Cores[J].InitConfirmation := False;
     Cores[J].InitProc := nil;
   end;
@@ -1223,79 +1253,76 @@ begin
   acpi_table_detect; // ACPI detection
   if CPU_COUNT = 0 then
     mp_table_detect; // if cpu_count is zero then use a MP Tables
-  // we have only one core
   if CPU_COUNT = 0 then
-  begin
-    CPU_COUNT:=1;
-    // all this information is not important in this context
-    Cores[0].present := True;
+  begin // only one core
+    CPU_COUNT := 1;
+    // following settings are not important in the case of single core
+    Cores[0].Present := True;
     Cores[0].CPUBoot := True;
-    Cores[0].Apicid := GetApicid;
+    Cores[0].ApicID := GetApicID;
     Cores[0].InitConfirmation := True;
   end;
-  // temporary stack used for initialization of every Core
+  // temporary stack used to initialize every Core
   esp_tmp := @start_stack[MAX_CPU-1][size_start_stack];
 end;
 
-
-//
-// Pagination and Cache's Manager
-//
+//------------------------------------------------------------------------------
+// Pagination and Cache Manager
+//------------------------------------------------------------------------------
 
 var
-  PML4_Table:Pdirectory_page;
+  PML4_Table: PDirectoryPage;
 
 // We have to refresh the TLB's Cache
-procedure FlushCr3;assembler;
+procedure FlushCr3; assembler;
 asm
   mov rax, PDADD
-  mov cr3, rax
+  {$IFDEF FPC} mov cr3, rax {$ENDIF}
+  {$IFDEF DCC} mov cr3, eax {$ENDIF}
 end;
 
 // Set Page as cacheable
 // Add is Pointer to page , It's a multiple of 2MB (Page Size)
-// Warning : Refresh TLB after use it
 procedure SetPageCache(Add: Pointer);
 var
   I_PML4,I_PPD,I_PDE: LongInt;
-  PDD_Table, PDE_Table, Entry: Pdirectory_page;
+  PDD_Table, PDE_Table, Entry: PDirectoryPage;
   Page: QWord;
 begin
   Page := QWord(Add);
   I_PML4:= Page div 512*1024*1024*1024;
   I_PPD := (Page div (1024*1024*1024)) mod 512;
   I_PDE := (Page div (1024*1024*2)) mod 512;
-  Entry:= Pointer(PML4_Table + SizeOf(directory_page_entry)*I_PML4);
-  PDD_Table := Pointer((entry.page_descriptor shr 12)*4096);
-  Entry := Pointer(PDD_Table + SizeOf(directory_page_entry)*I_PPD);
-  PDE_Table := Pointer((Entry.page_descriptor shr 12)*4096);
+  Entry:= Pointer(SizeUInt(PML4_Table) + SizeOf(TDirectoryPageEntry)*I_PML4);
+  PDD_Table := Pointer((entry.PageDescriptor shr 12)*4096);
+  Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
+  PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-  Entry := Pointer(PDE_Table + SizeOf(directory_page_entry)*I_PDE);
+//  Entry := Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE);
   // PCD bit is Reset --> Page In Cached
-  Bit_Reset(Pointer(PDE_Table + SizeOf(directory_page_entry)*I_PDE),4);
+  Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
 // Set Page as not-cacheable
 // Add is Pointer to page , It's a multiple of 2MB (Page Size)
-// Warning : Refresh TLB after use it
 procedure RemovePageCache(Add: Pointer);
 var
   I_PML4,I_PPD,I_PDE: LongInt;
-  PDD_Table, PDE_Table, entry: Pdirectory_page;
+  PDD_Table, PDE_Table, Entry: PDirectoryPage;
   page: QWord;
 begin
   page:= QWord(Add);
   I_PML4:= Page div 512*1024*1024*1024;
   I_PPD := (Page div (1024*1024*1024)) mod 512;
   I_PDE := (Page div (1024*1024*2)) mod 512;
-  entry:= Pointer(PML4_Table + SizeOf(directory_page_entry)*I_PML4);
-  PDD_Table := Pointer((entry.page_descriptor shr 12)*4096);
-  entry := Pointer(PDD_Table + SizeOf(directory_page_entry)*I_PPD);
-  PDE_Table := Pointer((entry.page_descriptor shr 12)*4096);
+  Entry:= Pointer(SizeUInt(PML4_Table) + SizeOf(TDirectoryPageEntry)*I_PML4);
+  PDD_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
+  Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
+  PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-  entry := Pointer(PDE_Table + SizeOf(directory_page_entry)*I_PDE);
+//  Entry := Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE);
   // PCD bit is Reset --> Page In Cached
-  Bit_Set(Pointer(PDE_Table + SizeOf(directory_page_entry)*I_PDE),4);
+  Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
 // Cache Manager Initialization
@@ -1308,9 +1335,9 @@ begin
   // First two Pages aren't Cacheable (0-2*PAGE_SIZE)
   // maybe we have ROM-BIOS and other Devices' Memory
   RemovePageCache(Page);
-  Page := Page + PAGE_SIZE;
+  Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);
-  Page := Page + PAGE_SIZE;
+//  Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   // The whole kernel is cacheable from bootloader
   FlushCr3;
 end;
@@ -1322,12 +1349,12 @@ var
 begin
   // the bootloader creates the idt
   idt_gates := Pointer(IDTADDRESS);
-  FillChar(PChar(IDTADDRESS)^, SizeOf(intr_gate_struct)*256, 0);
+  FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   RelocateIrqs;
   MemoryCounterInit;
   // Cache Page structures
   CacheManagerInit;
-  CalculateCpuSpeed;
+  LocalCpuSpeed := CalculateCpuSpeed;
   // increment of RDTSC counter per miliseg
   CPU_CYLES  := LocalCpuSpeed * 100000;
   Irq_On(2);
@@ -1339,11 +1366,10 @@ begin
     CaptureInt(I, @Interruption_Ignore);
   EnabledINT;
   Now(@StartTime);
-  SMPInitilization;
+  SMPInitialization;
   // Initilization of Floating Point Unit
   SSEInit;
 end;
-
 
 end.
 

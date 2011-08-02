@@ -48,19 +48,10 @@ const
   SOCKET_DATAGRAM = 1; // For datagrams like UDP
   SOCKET_STREAM = 2; // For connections like TCP
   MAX_SocketPORTS = 10000; // Max number of ports supported
-  
-  // Max Window Size
-  MAX_WINDOW = $4000;
-
-  // MAX Size of packet for TCP Stack
-  MTU = 1200;
-
-  // First PORT used by GetFreePort
-  USER_START_PORT = 7000;
-  
-  // Size of Sockets Bitmaps
-  SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1;
-
+  MAX_WINDOW = $4000; // Max Window Size
+  MTU = 1200; // MAX Size of packet for TCP Stack
+  USER_START_PORT = 7000; // First PORT used by GetFreePort
+  SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1; // Size of Sockets Bitmaps
   // Max Time that Network Card can be Inactive with packet in a Buffer,  in ms
   // TODO: This TIMER wont be necessary
   MAX_TIME_SENDER = 50;
@@ -79,22 +70,15 @@ type
   PNetworkService = ^TNetworkService;
   PNetworkHandler = ^TNetworkHandler;
   PBufferSender = ^TBufferSender;
+  THardwareAddress = array[0..5] of Byte; // MAC Address
+  TIPAddress = DWORD; // IP v4
 
-
-  // MAC Address
-  THardwareAddress = array[0..5] of Byte;
-
-  // IP Address
-  TIPAddress = DWORD;
-
-  // Ethernet Header
   TEthHeader = packed record
     Destination: THardwareAddress ;
     Source : THardwareAddress ;
     ProtocolType: Word;
   end;
 
-  // ARP Header
   TArpHeader =  packed record
     Hardware: Word;
     Protocol: Word;
@@ -107,7 +91,6 @@ type
     TargetIpAddr: TIPAddress;
   end;
 
-  // Ip Header
   TIPHeader = packed record
     VerLen       : Byte;
     TOS          : Byte;
@@ -122,7 +105,6 @@ type
     DestIP       : TIPAddress;
   end;
 
-  // TCP Header
   TTCPHeader = packed record
     SourcePort, DestPort: Word;
     SequenceNumber: DWORD;
@@ -134,7 +116,6 @@ type
     UrgentPointer: Word;
   end;
 
-  // UDP Header
   TUDPHeader = packed record
     ID: Word;
     SourceIP, DestIP: TIPAddress;
@@ -143,7 +124,6 @@ type
     checksum: Word;
   end;
 
-  // ICMP Header
   TICMPHeader = packed record
     tipe: Byte;
     code: Byte;
@@ -152,8 +132,7 @@ type
     seq: Word;
   end;
 
-  // packet structure in Packet-Cache
-  TPacket = record
+  TPacket = record // managed by Packet-Cache
     Size: LongInt;
     Data: Pointer;
     Status: Boolean; // result of transmition
@@ -169,9 +148,8 @@ type
     Next: PMachine;
   end;
    
-  // Network Interface structure
   TNetworkInterface = record
-    Name: string; // Name of interface
+    Name: AnsiString; // Name of interface
     Minor: LongInt; // Internal Identificator
     MaxPacketSize: LongInt; // Max size of packet
     HardAddress: THardwareAddress; // MAC Address
@@ -188,7 +166,6 @@ type
     Next: PNetworkInterface;
   end;
 
-  // Dedicate Network Interface
   TNetworkDedicate = record
     NetworkInterface: PNetworkInterface; // Hardware Driver
     IpAddress: TIPAddress; // Internet Protocol Address
@@ -212,12 +189,12 @@ type
     SocketType: LongInt;
     Mode: LongInt;
     State: LongInt;
-    LastSequenceNumber: LongInt;
+    LastSequenceNumber: UInt32;
     LastAckNumber: LongInt;
-    RemoteWinLen: LongInt;
-    RemoteWinCount: Longint;
+    RemoteWinLen: UInt32;
+    RemoteWinCount: UInt32;
     BufferReader: PChar;
-    BufferLength: LongInt;
+    BufferLength: UInt32;
     Buffer: PChar;
     ConnectionsQueueLen: LongInt;
     ConnectionsQueueCount: LongInt;
@@ -271,9 +248,9 @@ function SysSocketBind(Socket: PSocket; IPLocal, IPRemote: TIPAddress; LocalPort
 procedure SysSocketClose(Socket: PSocket);
 function SysSocketConnect(Socket: PSocket): Boolean;
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
-function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: LongInt): LongInt;
-function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: LongInt) : LongInt;
-function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: LongInt): LongInt;
+function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
+function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32) : LongInt;
+function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 function SysSocketSelect(Socket:PSocket;TimeOut: LongInt):Boolean;
 
 procedure NetworkInit; // used by kernel
@@ -286,10 +263,8 @@ procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
 
-
 // primitive for programmer to register a NIC
-procedure DedicateNetwork(const Name: string; const IP, Gateway, Mask: array of Byte;Handler:TThreadFunc);
-
+procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 
 implementation
 
@@ -402,17 +377,13 @@ begin
   end;
 end;
 
-// Convert Array of Byte to TIPAddress type
-procedure IPtoTIPAddress(const Ip: array of Byte; var Ipd: TIPAddress);
-var
-  I: LongInt;
+// Convert [192.168.1.11] to native IPAddress
+procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
 begin
-  Ipd := 0;
-  for I := 0 to SizeOf(TIPAddress)-1 do
-    Ipd := Ipd or (Ip[I] shl (I*8));
+  Result := (Ip[3] shl 24) or (Ip[2] shl 16) or (Ip[1] shl 8) or Ip[0];
 end;
 
-// The interface is enqueue in Network Driver tail
+// The interface is added in Network Driver list
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
   NetInterface.Next := NetworkInterfaces;
@@ -556,8 +527,8 @@ begin
     Exit;
   end;
   EthHeader:= Packet.Data;
-  IPHeader:= Pointer(EthHeader) + SizeOf(TEthHeader);
-  TCPHeader:= Pointer(IPHeader) + SizeOf(TIPHeader);
+  IPHeader:= Pointer(PtrUInt(EthHeader) + SizeOf(TEthHeader));
+  TCPHeader:= Pointer(PtrUInt(IPHeader) + SizeOf(TIPHeader));
   LocalPort:= SwapWORD(TCPHeader.DestPort);
   // We have the max number of request for connections
   if Socket.ConnectionsQueueLen = Socket.ConnectionsQueueCount then
@@ -589,9 +560,9 @@ begin
   end;
   // Create a new connection
   ClientSocket.State := SCK_NEGOTIATION;
-  ClientSocket.BufferLength:=0;
+  ClientSocket.BufferLength := 0;
   ClientSocket.Buffer := Buffer;
-  ClientSocket.BufferReader:= ClientSocket.Buffer;
+  ClientSocket.BufferReader := ClientSocket.Buffer;
   // Enqueue the socket to Network Service Structure
   ClientSocket.Next := Service.ClientSocket;
   Service.ClientSocket := ClientSocket;
@@ -600,9 +571,9 @@ begin
   ClientSocket.SourcePort := Socket.SourcePort;
   ClientSocket.DestPort := SwapWORD(TcpHeader.SourcePort);
   ClientSocket.DestIp := IpHeader.SourceIP;
-  ClientSocket.LastSequenceNumber:= 300;
-  ClientSocket.LastAckNumber:=SwapDWORD(TCPHeader.SequenceNumber)+1 ;
-  ClientSocket.RemoteWinLen:= SwapWORD(TCPHeader.Window_Size);
+  ClientSocket.LastSequenceNumber := 300;
+  ClientSocket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+1 ;
+  ClientSocket.RemoteWinLen := SwapWORD(TCPHeader.Window_Size);
   ClientSocket.RemoteWinCount := ClientSocket.RemoteWinLen;
   ClientSocket.NeedFreePort := False;
   ClientSocket.AckTimeOUT := 0;
@@ -610,7 +581,7 @@ begin
   // we don't need the packet
   ToroFreeMem(Packet);
   // Increment the queue of new connections
-  Socket.ConnectionsQueueCount := Socket.ConnectionsQueueCount +1;
+  Socket.ConnectionsQueueCount := Socket.ConnectionsQueueCount+1;
   // Send the SYNACK confirmation
   // Now , the socket waits in NEGOTIATION State for the confirmation with Remote ACK
   TCPSendPacket(TCP_SYNACK, ClientSocket);
@@ -653,9 +624,9 @@ begin
   if Packet = nil then
     Exit;
   CPUID:= GetApicid;
-  Packet.Data := Packet+SizeOf(TPacket);
+  Packet.Data := Pointer(PtrUInt(Packet)+SizeOf(TPacket));
   Packet.Size := SizeOf(TArpHeader)+SizeOf(TEthHeader);
-  ARPPacket := Packet.Data+SizeOf(TEthHeader);
+  ARPPacket := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket := Packet.Data;
   ARPPacket.Hardware := SwapWORD(1);
   ARPPacket.Protocol := ETH_FRAME_IP;
@@ -734,7 +705,7 @@ var
 begin
   CpuID := GetApicid;
   EthHeader := Packet.Data;
-  IPHeader := Packet.Data+SizeOf(TEthHeader);
+  IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthHeader.Source := DedicateNetworks[CpuID].NetworkInterface.HardAddress;
   Machine := RouteIP(IPHeader.destip);
   if Machine = nil then
@@ -749,8 +720,8 @@ procedure IPSendPacket(Packet: PPacket; IpDest: TIPAddress; Protocol: Byte);
 var
   IPHeader: PIPHeader;
 begin
-  IPHeader := Packet.Data+SizeOf(TEthHeader);
-  FillByte(IPHeader^, SizeOf(TIPHeader), 0);
+  IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
+  FillChar(IPHeader^, SizeOf(TIPHeader), 0);
   IPHeader.VerLen := IPv4_VERSION_LEN;
   IPHeader.TOS := 0;
   IPHeader.PacketLength := SwapWORD(Packet.Size-SizeOf(TEthHeader));
@@ -779,12 +750,12 @@ begin
   if Packet = nil then
     Exit;
   Packet.Size := TCPPacketLen - SizeOf(TPacket);
-  Packet.Data := Packet + TCPPacketLen - SizeOf(TPacket);
+  Packet.Data := Pointer(PtrUInt(Packet) + TCPPacketLen - SizeOf(TPacket));
   Packet.ready := False;
   Packet.Status := False;
   Packet.Delete := True;
   Packet.Next := nil;
-  TcpHeader := Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader);
+  TcpHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
   FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
   TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
   TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
@@ -797,9 +768,11 @@ begin
   IPSendPacket(Packet, Socket.DestIp, IP_TYPE_TCP);
   // Sequence Number depends of the flags in the TCP Header
   if (Socket.State = SCK_NEGOTIATION) or (Socket.State = SCK_CONNECTING) or (Socket.State= SCK_LOCALCLOSING) then
-    Socket.LastSequenceNumber := Socket.LastSequenceNumber+1
+    Inc(Socket.LastSequenceNumber)
   else if Socket.State = SCK_TRANSMITTING then
-    Socket.LastSequenceNumber := Socket.LastSequenceNumber;
+  begin
+//    Socket.LastSequenceNumber := Socket.LastSequenceNumber;
+  end;
 end;
 
 // Inform the Kernel that the last packet has been sent, returns the next packet to send
@@ -893,7 +866,7 @@ var
   EthPacket: PEthHeader;
 begin
   CPUID:= GetApicid;
-  ArpPacket:=Packet.Data+SizeOf(TEthHeader);
+  ArpPacket:=Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket:= Packet.Data;
   if SwapWORD(ArpPacket.Protocol) = ETH_FRAME_IP then
   begin
@@ -927,11 +900,12 @@ procedure ProcessTCPSocket(Socket: PSocket; Packet: PPacket);
 var
   TCPHeader: PTCPHeader;
   IPHeader: PIPHeader;
-  DataSize: LongInt;
+  DataSize: UInt32;
+  Source, Dest: PByte;
 begin
-  IPHeader:= Packet.Data+SizeOf(TETHHeader);
-  TCPHeader:= Packet.Data+SizeOf(TETHHeader)+SizeOf(TIPHeader);
-  DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
+  IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TETHHeader));
+  TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TETHHeader)+SizeOf(TIPHeader));
+//  DataSize := SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
   case Socket.State of
     SCK_CONNECTING: // The socket is connecting to remote host
       begin
@@ -945,12 +919,12 @@ begin
             Socket.DispatcherEvent := DISP_CONNECT;
             Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+1;
             Socket.LastSequenceNumber := 301;
-            Socket.RemoteWinLen:= SwapWORD(TCPHeader.Window_Size);
+            Socket.RemoteWinLen := SwapWORD(TCPHeader.Window_Size);
             Socket.RemoteWinCount :=Socket.RemoteWinLen;
             Socket.State := SCK_TRANSMITTING;
-            Socket.BufferLength:=0;
+            Socket.BufferLength := 0;
             Socket.Buffer := ToroGetMem(MAX_WINDOW);
-            Socket.BufferReader:= Socket.Buffer;
+            Socket.BufferReader := Socket.Buffer;
             // Confirm the connection sending a ACK
             TCPSendPacket(TCP_ACK, Socket);
           end;
@@ -962,7 +936,7 @@ begin
         // Closing Local Connection
         if TCPHeader.flags and TCP_FIN = TCP_FIN then
         begin
-          Socket.LastAckNumber := Socket.LastAckNumber + 1;
+          Socket.LastAckNumber := Socket.LastAckNumber+1;
           // confirm remote close
           TCPSendPacket(TCP_ACK, Socket);
           // Free Resources in Socket
@@ -1014,11 +988,13 @@ begin
         end;
        end else if TCPHeader.flags = TCP_ACKPSH then
        begin
-          if SwapDWORD(TCPHeader.AckNumber)=Socket.LastSequenceNumber then
+          if SwapDWORD(TCPHeader.AckNumber) = Socket.LastSequenceNumber then
           begin
             DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
             Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
-            Move(PChar(Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader))^, PChar(Socket.Buffer+Socket.BufferLength)^, DataSize);
+            Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
+            Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
+            Move(Source^, Dest^, DataSize);
             Socket.BufferLength := Socket.BufferLength + DataSize;
             // New Data in buffer!
             // The dispatcher has got to know
@@ -1082,11 +1058,11 @@ var
   EthHeader: PEthHeader;
   DataLen: LongInt;
 begin
-  IPHeader := Packet.Data+SizeOf(TEthHeader);
+  IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   case IPHeader.protocol of
     IP_TYPE_ICMP :
       begin
-        ICMPHeader := Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader);
+        ICMPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
         EthHeader := Packet.Data;
         // Request of Ping
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
@@ -1109,7 +1085,7 @@ begin
       end;
     IP_TYPE_TCP  :
       begin
-        TCPHeader := Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader);
+        TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
         {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving TCP packet', 0, 0, 0); {$ENDIF}
         if TCPHeader.Flags=TCP_SYN then
         begin
@@ -1194,7 +1170,7 @@ begin
         if (r > MAX_TIME_SENDER*LocalCPUSpeed*1000) then
           Net.Reset(Net);
       end;
-      ThreadSwitch;
+      SysThreadSwitch;
       Continue;
     end;
     EthPacket := Packet.Data;
@@ -1254,10 +1230,12 @@ end;
 
 // Dedicate the Network Interface to CPU in CPUID
 // If Handler=nil then the Network Stack is managed by the KERNEL
-procedure DedicateNetwork(const Name: string; const IP, Gateway, Mask: array of Byte;Handler:TThreadFunc);
+procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 var
-  Net: PNetworkInterface;
   CPUID: LongInt;
+  Net: PNetworkInterface;
+  Network: PNetworkDedicate;
+  ThreadID: TThreadID;
 begin
   Net := NetworkInterfaces;
   CPUID := GetApicid;
@@ -1266,46 +1244,45 @@ begin
     if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
     begin
       // Only this CPU will be granted access to this network interface
-      Net.CPUID:= CPUID;
-      DedicateNetworks[CPUID].NetworkInterface:= Net;
+      Net.CPUID := CPUID;
+      DedicateNetworks[CPUID].NetworkInterface := Net;
       // The User Hands the packets
-      if (@Handler <> nil) then
+      if @Handler <> nil then
       begin
-       if PtrUInt(BeginThread(nil, 10*1024, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
-        printk_('Networks Packets Service .... /VRunning/n\n',0)
-       else
-       begin
-        printk_('Networks Packets Service .... /VFail!/n\n',0);
-        exit;
-       end;
+        if PtrUInt(BeginThread(nil, 10*1024, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
+          printk_('Network Packets Service .... /VRunning/n\n',0)
+        else
+        begin
+          printk_('Network Packets Service .... /VFail!/n\n',0);
+          exit;
+        end;
       end else
-      begin
-       // Initialize Local Packet-Cache
-       // The kernel hands the packets
-       if not LocalNetworkInit then
-       begin
-        DedicateNetworks[CPUID].NetworkInterface := nil;
-        Exit;
-       end;
+      begin // Initialize Local Packet-Cache, the kernel will handle packets
+        if not LocalNetworkInit then
+        begin
+          DedicateNetworks[CPUID].NetworkInterface := nil;
+          Exit;
+        end;
       end;
       // Loading the IP address
       // some translation from array of Byte to LongInt
-      IPtoTIPAddress(IP, DedicateNetworks[CPUID].IpAddress);
-      IPtoTIPAddress(Gateway, DedicateNetworks[CPUID].Gateway);
-      IPtoTIPAddress(Mask, DedicateNetworks[CPUID].Mask);
+      Network := @DedicateNetworks[CPUID];
+      _IPAddress(IP, Network.IpAddress);
+      _IPAddress(Gateway, Network.Gateway);
+      _IPAddress(Mask, Network.Mask);
       printk_('Network configuration :\n',0);
-      printk_('Local IP ... /V%d.',(DedicateNetworks[CPUID].Ipaddress and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Ipaddress shr 8) and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Ipaddress shr 16) and $ff));
-      printk_('%d\n',((DedicateNetworks[CPUID].Ipaddress shr 24) and $ff));
-      printk_('/nGateway ...  /V%d.',(DedicateNetworks[CPUID].Gateway and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Gateway shr 8) and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Gateway shr 16) and $ff));
-      printk_('%d\n',((DedicateNetworks[CPUID].Gateway shr 24) and $ff));
-      printk_('/nMask ...  /V%d.',(DedicateNetworks[CPUID].Mask and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Mask shr 8) and $ff));
-      printk_('%d.',((DedicateNetworks[CPUID].Mask shr 16) and $ff));
-      printk_('%d\n/n',((DedicateNetworks[CPUID].Mask shr 24) and $ff));
+      printk_('Local IP ... /V%d.', Network.Ipaddress and $ff);
+      printk_('%d.', (Network.Ipaddress shr 8) and $ff);
+      printk_('%d.', (Network.Ipaddress shr 16) and $ff);
+      printk_('%d\n', (Network.Ipaddress shr 24) and $ff);
+      printk_('/nGateway ...  /V%d.', Network.Gateway and $ff);
+      printk_('%d.', (Network.Gateway shr 8) and $ff);
+      printk_('%d.', (Network.Gateway shr 16) and $ff);
+      printk_('%d\n', (Network.Gateway shr 24) and $ff);
+      printk_('/nMask ...  /V%d.', Network.Mask and $ff);
+      printk_('%d.', (Network.Mask shr 8) and $ff);
+      printk_('%d.', (Network.Mask shr 16) and $ff);
+      printk_('%d\n/n', (Network.Mask shr 24) and $ff);
       {$IFDEF DebugNetwork} DebugTrace('DedicateNetwork: New Driver dedicate to CPU#%d',0,CPUID,0); {$ENDIF}
       Exit;
     end;
@@ -1325,9 +1302,9 @@ begin
     DedicateNetworks[I].NetworkInterface := nil;
     DedicateNetworks[I].TranslationTable := nil;
     // Free all ports
-    FillByte(DedicateNetworks[I].SocketStreamBitmap, SZ_SocketBitmap, 0);
-    FillByte(DedicateNetworks[I].SocketDatagram, MAX_SocketPORTS*SizeOf(Pointer), 0);
-    FillByte(DedicateNetworks[I].SocketStream, MAX_SocketPORTS*SizeOf(Pointer), 0);
+    FillChar(DedicateNetworks[I].SocketStreamBitmap, SZ_SocketBitmap, 0);
+    FillChar(DedicateNetworks[I].SocketDatagram, MAX_SocketPORTS*SizeOf(Pointer), 0);
+    FillChar(DedicateNetworks[I].SocketStream, MAX_SocketPORTS*SizeOf(Pointer), 0);
   end;
   NetworkInterfaces := nil;
 end;
@@ -1343,24 +1320,23 @@ function CheckTimeOut(Counter, TimeOut: Int64): Boolean;
 var
   ResumeTime: Int64;
 begin
-  ResumeTime:= read_rdtsc;
+  ResumeTime := read_rdtsc;
   // Correction for Overflow
   if Counter < ResumeTime then
     Counter := Counter - ResumeTime
   else
     Counter := $FFFFFFFF-Counter+ResumeTime;
   if TimeOut < Counter then
-  begin
-    Result:= True;
-    Exit;
-  end;
+    Result := True
+  else
+    Result := False;
 end;
 
 // Send the packets prepared in Buffer
 procedure DispatcherFlushPacket(Socket: PSocket);
 var
   Buffer: PBufferSender;
-  DataLen: LongInt;
+  DataLen: UInt32;
 begin
   // Sender Dispatcher can't send  , we have got to wait for remote host
   // While The WinFlag is up the timer 'll be refreshed
@@ -1391,7 +1367,7 @@ begin
       Buffer := Socket.BufferSender.NextBuffer;
       ToroFreeMem(Socket.BufferSender.Packet); // Free the packet
       ToroFreeMem(Socket.BufferSender); // Free the Buffer
-      Socket.LastSequenceNumber:= Socket.LastSequenceNumber+DataLen;
+      Socket.LastSequenceNumber := Socket.LastSequenceNumber+DataLen;
       // preparing the next packet to send
       Socket.BufferSender := Buffer;
       if Socket.WinFlag then
@@ -1507,7 +1483,7 @@ begin
   while True do
   begin
     NetworkDispatcher(Handler); // Fetch event for socket and dispatch
-    ThreadSwitch;
+    SysThreadSwitch;
   end;
   Result := 0;
 end;
@@ -1517,7 +1493,7 @@ procedure SysRegisterNetworkService(Handler: PNetworkHandler);
 var
   Service: PNetworkService;
   Thread: PThread;
-  ThreadID: TThreadId;
+  ThreadID: TThreadID; // FPC was using ThreadVar ThreadID
 begin
   Service:= ToroGetMem(SizeOf(TNetworkService));
   if Service = nil then
@@ -1556,7 +1532,7 @@ begin
   Socket.AckFlag := False;
   Socket.AckTimeOut := 0;
   Socket.BufferSender := nil;
-  Fillbyte(Socket.DestIP,0,SizeOf(TIPAddress));
+  FillChar(Socket.DestIP, 0, SizeOf(TIPAddress));
   Socket.DestPort := 0 ;
   Result := Socket;
   {$IFDEF DebugNetwork} DebugTrace('SysSocket: New Socket Type %d', 0, SocketType, 0); {$ENDIF}
@@ -1606,8 +1582,8 @@ begin
   // we haven't got memory
   if Socket.Buffer = nil then
   begin
-   Result:=False;
-   Exit;
+    Result:=False;
+    Exit;
   end;
   Socket.SourcePort := GetFreePort;
   // we haven't got free ports
@@ -1638,6 +1614,7 @@ begin
   TcpSendPacket(TCP_SYN, Socket);
   // we have got to set a TimeOut for wait the ACK confirmation
   SetSocketTimeOut(Socket,WAIT_ACK);
+  Result := True;
 end;
 
 // Close connection to Remote Host
@@ -1699,12 +1676,12 @@ begin
 end;
 
 // Read Data from Buffer and save it in Addr , The data continue into the buffer
-function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: LongInt): LongInt;
+function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
 var
   FragLen: LongInt;
 begin
   {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek BufferLength: %d', 0, Socket.BufferLength, 0); {$ENDIF}
-  {$IFDEF DebugNetwork} DebugTrace(PChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} DebugTrace(PXChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
   Result := 0;
   if (Socket.State <> SCK_TRANSMITTING) or (AddrLen=0) or (Socket.Buffer+Socket.BufferLength=Socket.BufferReader) then
   begin
@@ -1728,12 +1705,12 @@ begin
 end;
 
 // Read Data from Buffer and save it in Addr
-function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: LongInt): LongInt;
+function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 var
   FragLen: LongInt;
 begin
   {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv BufferLength: %d', 0, Socket.BufferLength, 0); {$ENDIF}
-  {$IFDEF DebugNetwork} DebugTrace(PChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} DebugTrace(PXChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
   Result := 0;
   if (Socket.State <> SCK_TRANSMITTING) or (AddrLen=0) or (Socket.Buffer+Socket.BufferLength = Socket.BufferReader) then
   begin
@@ -1789,10 +1766,11 @@ end;
 
 // Send data to Remote Host using a Client Socket
 // every packet is sended with ACKPSH bit  , with the maximus size  possible.
-function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: LongInt): LongInt;
+function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 var
   Buffer: PBufferSender;
-  FragLen: LongInt;
+  Dest: PByte;
+  FragLen: UInt32;
   P: PChar;
   Packet: PPacket;
   TCPHeader: PTCPHeader;
@@ -1819,16 +1797,17 @@ begin
     // we need a new packet structure
     Buffer := ToroGetMem(SizeOf(TBufferSender));
     // TODO: Maybe the syscall returns nil
-    Packet.Data := Packet + SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader);
+    Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     Packet.Size := SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen;
     Packet.ready := False;
     Packet.Delete := False;
     Packet.Next := nil;
     // Fill TCP paramters
-    TcpHeader:= Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader);
+    TcpHeader:= Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
     FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
     // Copy user DATA to new packet
-    Move(P^, PChar(Packet.Data+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader))^, FragLen);
+    Dest := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
+    Move(P^, Dest^, FragLen);
     TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
     TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
     TcpHeader.Flags := TCP_ACKPSH;

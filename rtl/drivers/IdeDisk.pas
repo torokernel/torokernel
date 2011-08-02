@@ -68,7 +68,7 @@ const
  BLKSIZE= 512;
  
  // Interface with User
- ATANAMES : array[0..3] of string = ('ATA0','ATA1','ATA2','ATA3');
+ ATANAMES : array[0..3] of AnsiString = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
  
  // ATA Ports
  ATA_DATA= 0;
@@ -100,7 +100,7 @@ Type
    IOPort: LongInt;
    irq: LongInt;
    // Pool the Irq
-   IrqReady: boolean;
+   IrqReady: Boolean;
    IrqHandler: pointer;
    Driver:TBlockDriver;
    Minors:array[0..MAX_ATA_MINORS-1] of  TIDEBlockDisk;
@@ -118,12 +118,12 @@ Type
   vendor0        : word;    // vendor unique
   vendor1        : word;    // vendor unique
   vendor2        : word;    // vendor unique
-  serial_no      : array[1..20] of char;    // Serail number
+  serial_no      : array[1..20] of XChar;    // Serial number
   buf_type       : word;    // Obsolete
   buf_size       : word;    // 512 byte increments; 0 = not_specified
   ecc_bytes      : word;    // Obsolete
-  fw_rev         : array[1..8] of char;      // Firmware revision
-  model          : array[1..40] of char;     // Model number
+  fw_rev         : array[1..8] of XChar;      // Firmware revision
+  model          : array[1..40] of XChar;     // Model number
   max_mulsect    : byte;    // read/write multiple support
   vendor3        : byte;    // vendor unique
   dword_io       : word;    // 0 = not_implemented; 1 = implemented
@@ -213,132 +213,112 @@ Type
   reserved       : array[1..127] of word;
  end;
  
- // entry in Partition Table.
- TPartitionEntry = record
-  boot: byte;
-  BeginHead: byte;
-  BeginSectCyl: word;
-  pType: byte;
-  EndHead: byte;
-  EndSecCyl: word;
-  FirstSector: dword;
-  Size: dword;
- end;
- 
- 
- // All information about ATA Disk
- var 
-  ATAControllers: array[0..MAX_ATA_CONTROLLER-1] of TIDEController; 
+  // entry in Partition Table.
+  TPartitionEntry = record
+    boot: byte;
+    BeginHead: byte;
+    BeginSectCyl: word;
+    pType: byte;
+    EndHead: byte;
+    EndSecCyl: word;
+    FirstSector: dword;
+    Size: dword;
+  end;
 
-
-
-procedure ATASelectDisk(Ctr:PIDEController;Drv:LongInt);{$IFDEF Inline} inline;{$ENDIF}
-begin
-if Drv<5 then 
- Drv:=$a0 
-else
- Drv:=$b0;
-write_portb(Drv,Ctr.IOPort+ATA_DRIVHD);
-end;
-
-
-procedure ATASendCommand(Ctr:PIDEController;Cmd:LongInt);{$IFDEF Inline} inline;{$ENDIF}
-begin
-write_portb(Cmd,Ctr.IOPort+ATA_CMD_STATUS);
-end;
-
-function ATAWork(Ctr:PIDEController):boolean;{$IFDEF Inline} inline;{$ENDIF}
+// All information about ATA Disk
 var
- tmp:byte;
+  ATAControllers: array[0..MAX_ATA_CONTROLLER-1] of TIDEController;
+
+procedure ATASelectDisk(Ctr:PIDEController;Drv:LongInt); inline;
 begin
-tmp:=read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-if tmp=$ff then
- result:=false
-else
- result:=true;
+  if Drv<5 then
+    Drv := $a0
+  else
+    Drv := $b0;
+  write_portb(Drv, Ctr.IOPort+ATA_DRIVHD);
 end;
 
 
-function ATABusy(Ctr:PIDEController):boolean;{$IFDEF Inline} inline;{$ENDIF}
+procedure ATASendCommand(Ctr: PIDEController; Cmd: LongInt); inline;
+begin
+  write_portb(Cmd, Ctr.IOPort+ATA_CMD_STATUS);
+end;
+
+function ATAWork(Ctr:PIDEController):Boolean; inline;
+begin
+  Result := read_portb(Ctr.IOPort+ATA_CMD_STATUS) <> $ff;
+end;
+
+function ATABusy(Ctr:PIDEController): Boolean; inline;
 var
- tmp:byte;
+  Temp: Byte;
 begin
-tmp:=read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-result:=Bit_Test(@tmp,7);
+  Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
+  Result := Bit_Test(@Temp, 7);
 end;
 
-function ATAError(Ctr:PIDEController): boolean;{$IFDEF Inline} inline;{$ENDIF}
+function ATAError(Ctr:PIDEController): Boolean; inline;
 var
- tmp:byte;
+  Temp: Byte;
 begin
-tmp:=read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-result:=Bit_Test(@tmp,0);
+  Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
+  Result := Bit_Test(@Temp, 0);
 end;
 
-
-function ATADataReady (Ctr:PIDEController): boolean;{$IFDEF Inline} inline;{$ENDIF}
+function ATADataReady (Ctr:PIDEController): Boolean; inline;
 var
- tmp:byte;
+  tmp: byte;
 begin
-tmp:=read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-result:=Bit_Test(@tmp,3);
+  Tmp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
+  Result := Bit_Test(@tmp,3);
 end;
 
-procedure ATAIn(Ctr:PIDEController;Buffer:pointer);{$IFDEF Inline} inline;{$ENDIF}
-var 
- port:word;
-begin
-port:=Ctr.IOPort+ATA_DATA;
-asm
-mov dx , port
-mov edi , buffer
-mov ecx , 256
-rep insw
-end;
+procedure ATAIn(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
+asm // RCX: Buffer, RDX: IOPort
+  mov rdi, Buffer
+  add rdx, ATA_DATA
+  mov rcx, 256
+  rep insw
 end;
 
-
-procedure ATAOut(Ctr:PIDEController;Buffer: pointer);{$IFDEF Inline} inline;{$ENDIF}
-var
- port:word;
-begin
-port:=Ctr.IOPort+ATA_DATA;
-asm
-mov dx , port
-mov esi , buffer
-mov ecx , 256
-rep outsw
-end;
+procedure ATAOut(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
+asm // RCX: Buffer, RDX: IOPort
+  mov rsi, Buffer
+  add rdx, ATA_DATA
+  mov rcx, 256
+  rep outsw
 end;
 
-
-//
-//ATAPrepare :
 // Prepare the Controller to Operation.
-//
 procedure ATAPrepare(Ctr:PIDEController;Drv: LongInt;Sector: LongInt;count: LongInt);
 var
- lba1,lba2,lba3,lba4,CylH,CylL:byte;
+ lba1, lba2, lba3, lba4: Byte;
 begin
-asm
- xor eax , eax
- mov eax , Sector
- mov lba1 , al
- mov lba2 , ah
- shr eax , 16
- mov lba3 , al
- and ah ,  $0F
- mov lba4 , ah
-end;
-write_portb(byte(count),Ctr.IOPort+ATA_COUNT);
-write_portb(lba1,Ctr.IOPort+ATA_SECTOR);
-write_portb(lba2,Ctr.IOPort+ATA_CylLow);
-write_portb(lba3,Ctr.IOPort+ATA_CylHig);
-if Drv<5 then
- Drv:= $a0
-else
- Drv:=$b0;
- write_portb(lba4 or byte(drv) or $40,Ctr.IOPort+ATA_DRIVHD);
+{
+  asm // TODO: replace this asm code with pascal code
+    xor eax , eax
+    mov eax, Sector
+    mov lba1, al
+    mov lba2, ah
+    shr eax, 16
+    mov lba3, al
+    and ah, $0F
+    mov lba4, ah
+  end;
+}
+  lba1 := Sector and $FF;
+  lba2 := (Sector shr 8) and $FF;
+  lba3 := (Sector shr 16) and $FF;
+  lba4 := (Sector shr 24) and $F;
+  write_portb(byte(count),Ctr.IOPort+ATA_COUNT);
+  write_portb(lba1,Ctr.IOPort+ATA_SECTOR);
+  write_portb(lba2,Ctr.IOPort+ATA_CylLow);
+  write_portb(lba3,Ctr.IOPort+ATA_CylHig);
+  if Drv < 5 then
+    Drv := $a0
+  else
+    Drv := $b0;
+  write_portb(lba4 or byte(drv) or $40,Ctr.IOPort+ATA_DRIVHD);
 end;
 
 // Look for valid Partitions in Device (Device is a NOT_FILESYSTEM block type) .
@@ -351,16 +331,10 @@ begin
   ATAPrepare(Ctr,Minor,0,1);
   ATASendCommand(Ctr,ATA_READ);
   while AtaBusy(Ctr) do
-  begin
-    asm
-      nop;
-      nop;
-      nop;
-    end;
-  end;
+    NOP;
   if not AtaError(Ctr) and ATADataReady(Ctr) then
   begin
-    ATAIn(Ctr,@Buff[0]);
+    ATAIn(@Buff[0], Ctr.IOPort);
     if (Buff[511] = $AA) and (Buff[510] = $55) then
     begin
       Entry:= @Buff[446];
@@ -374,7 +348,7 @@ begin
           Ctr.Minors[Minor+I].FileDesc.BlockDriver:= @Ctr.Driver;
           Ctr.Minors[Minor+I].FileDesc.Minor:=Minor+I;
 	        Ctr.Minors[Minor+I].FileDesc.BlockSize:= BLKSIZE;
-          Ctr.Minors[Minor+I].FileDesc.next:=nil;
+          Ctr.Minors[Minor+I].FileDesc.Next:=nil;
 	        WriteConsole('IdeDisk: /V', []);
           WriteConsole(ATANames[Ctr.Driver.Major], []);
 	        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
@@ -405,16 +379,10 @@ begin
       ATASendCommand(@ATAControllers[I],ATA_IDENTIFY);
       // Wait for the driver
       while ATABusy(@ATAControllers[I]) do
-      begin
-        asm
-          nop;
-          nop;
-          nop;
-        end;
-      end;
+        NOP;
       if ATADataReady(@ATAControllers[I]) and not ATAError(@ATAControllers[I]) then
       begin
-        ATAIn(@ATAControllers[I],@ATA_Buffer);
+        ATAIn(@ATA_Buffer, ATAControllers[I].IOPort);
         ATAControllers[I].Minors[Drv*5].StartSector:= 0;
         ATAControllers[I].Minors[Drv*5].Size:= ATA_Buffer.LBA_Capacity;
         ATAControllers[I].Minors[Drv*5].FSType:= NOT_FILESYSTEM;
@@ -462,141 +430,129 @@ end;
 // Irq Handlers only for ATA0 and ATA1 Standart Controllers.
 procedure ATAHandler(Controller:LongInt);
 begin
-eoi;
-ATAControllers[Controller].Driver.WaitOn.state := tsReady;
-{$IFDEF DebugIdeDisk}
- DebugTrace('IdeDisk: ATA0 Irq Captured , Thread Wake Up: #%q',Int64(ATAControllers[Controller].Driver.WaitOn),0,0);
-{$ENDIF}
+  eoi;
+  ATAControllers[Controller].Driver.WaitOn.state := tsReady;
+  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATA0 Irq Captured , Thread Wake Up: #%q', Int64(ATAControllers[Controller].Driver.WaitOn), 0, 0); {$ENDIF}
 end;
 
-procedure ATA0IrqHandler;[nostackframe];assembler;
+procedure ATA0IrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
- // save registers
- push rbp
- push rax
- push rbx
- push rcx
- push rdx
- push rdi
- push rsi
- push r8
- push r9
- push r13
- push r14
- // protect the stack
- mov r15 , rsp
- mov rbp , r15
- sub r15 , 32
- mov  rsp , r15
- // set interruption
- sti
- {$IFDEF Win64}
+  {$IFDEF DCC} .noframe {$ENDIF}
+  // save registers
+  push rbp
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rdi
+  push rsi
+  push r8
+  push r9
+  push r13
+  push r14
+  // protect the stack
+  mov r15 , rsp
+  mov rbp , r15
+  sub r15 , 32
+  mov  rsp , r15
+  // set interruption
+  sti
+  {$IFDEF Win64}
   xor rcx , rcx
- {$ELSE WIN64}
+  {$ELSE WIN64}
   xor edi , edi
- {$ENDIF WIN64}
- // call handler
- Call ATAHandler
- mov rsp , rbp
- // restore the registers
- pop r14
- pop r13
- pop r9
- pop r8
- pop rsi
- pop rdi
- pop rdx
- pop rcx
- pop rbx
- pop rax
- pop rbp
- db $48
- db $cf
+  {$ENDIF WIN64}
+  // call handler
+  Call ATAHandler
+  mov rsp , rbp
+  // restore the registers
+  pop r14
+  pop r13
+  pop r9
+  pop r8
+  pop rsi
+  pop rdi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  pop rbp
+  db $48
+  db $cf
 end;
 
-
-
-
-procedure ATA1IrqHandler;[nostackframe];assembler;
+procedure ATA1IrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
- // save registers
- push rbp
- push rax
- push rbx
- push rcx
- push rdx
- push rdi
- push rsi
- push r8
- push r9
- push r13
- push r14
- // protect the stack
- mov r15 , rsp
- mov rbp , r15
- sub r15 , 32
- mov  rsp , r15
- // set interruption
- sti
- {$IFDEF Win64}
+  {$IFDEF DCC} .noframe {$ENDIF}
+  // save registers
+  push rbp
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rdi
+  push rsi
+  push r8
+  push r9
+  push r13
+  push r14
+  // protect the stack
+  mov r15 , rsp
+  mov rbp , r15
+  sub r15 , 32
+  mov  rsp , r15
+  // set interruption
+  sti
+  {$IFDEF Win64}
   mov rcx , 1
- {$ELSE WIN64}
+  {$ELSE WIN64}
   mov edi , 1
- {$ENDIF WIN64}
- // call handler
- Call ATAHandler
- mov rsp , rbp
- // restore the registers
- pop r14
- pop r13
- pop r9
- pop r8
- pop rsi
- pop rdi
- pop rdx
- pop rcx
- pop rbx
- pop rax
- pop rbp
- db $48
- db $cf
+  {$ENDIF WIN64}
+  // call handler
+  Call ATAHandler
+  mov rsp , rbp
+  // restore the registers
+  pop r14
+  pop r13
+  pop r9
+  pop r8
+  pop rsi
+  pop rdi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  pop rbp
+  db $48
+  db $cf
 end;
 
- 
-//
-// ATAReadBlock and ATAWriteBlock 
-//
-
-function ATAReadBlock(FileDesc: PFileBlock;Block,Count: LongInt;Buffer: pointer):LongInt;
+function ATAReadBlock(FileDesc: PFileBlock; Block, Count: LongInt; Buffer: Pointer): LongInt;
 var
- ncount: LongInt;
- Ctr: PIDEController;
+  ncount: LongInt;
+  Ctr: PIDEController;
 begin
-// protection from local CPU access
-GetDevice(FileDesc.BlockDriver);
-Ctr:= @ATAControllers[FileDesc.BlockDriver.Major];
-Block:=Block + Ctr.Minors[FileDesc.Minor].StartSector;
-ncount:= 0;
-Ctr.Driver.WaitOn.state := tsSuspended;
-// Sending Commands 
-ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
-ATASendCommand(Ctr,ATA_READ);
-repeat
- // wait for the irq
-  ThreadSwitch;
- // error in operation
- if not(ATADataReady(Ctr)) or ATAError(Ctr) then
-   break;
- ATAIn(Ctr,Buffer);
- Buffer:= Buffer + 512;
- ncount:= ncount+1;
-until (ncount=Count);
-// exiting with the number of blocks readed
-result:=ncount;
-FreeDevice(FileDesc.BlockDriver);
-{$IFDEF DebugIdeDisk}
- DebugTrace('IdeDisk: ATAReadBlock , Handle: %q, Begin Sector: %d, End Sector: %d',Int64(FileDesc),Block,Block+Ncount);
-{$ENDIF}
+  // protection from local CPU access
+  GetDevice(FileDesc.BlockDriver);
+  Ctr := @ATAControllers[FileDesc.BlockDriver.Major];
+  Block := Block + Ctr.Minors[FileDesc.Minor].StartSector;
+  ncount:= 0;
+  Ctr.Driver.WaitOn.state := tsSuspended;
+  // Sending Commands
+  ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
+  ATASendCommand(Ctr,ATA_READ);
+  repeat
+    SysThreadSwitch; // wait for the irq
+    if not ATADataReady(Ctr) or ATAError(Ctr) then
+      Break; // error in operation
+    ATAIn(Buffer, Ctr.IOPort);
+    Buffer := Pointer(PtrUInt(Buffer) + 512);
+    Inc(ncount);
+  until ncount = Count;
+  // exiting with the number of blocks readed
+  Result := ncount;
+  FreeDevice(FileDesc.BlockDriver);
+  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATAReadBlock , Handle: %q, Begin Sector: %d, End Sector: %d',Int64(FileDesc),Block,Block+Ncount); {$ENDIF}
 end;
 
 
@@ -605,33 +561,32 @@ var
  ncount: LongInt;
  Ctr: PIDEController;
 begin
-// Always do That , protection from local CPU access
-GetDevice(FileDesc.BlockDriver);
-Ctr:= @ATAControllers[FileDesc.BlockDriver.Major];
-// for NOT_FILESYSTEM type that is not important because StartSector is equal to 0
-Block:=Block + Ctr.Minors[FileDesc.Minor].StartSector;
-ncount:= 0;
-//suspend the thread for wait an irq
-Ctr.Driver.WaitOn.state := tsSuspended;
-ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
-ATASendCommand(Ctr,ATA_WRITE);
-// writing
-repeat
- FileDesc.BlockDriver.WaitOn.state := tsSuspended;
- ATAOut(Ctr,Buffer);
- // Waiting the IRQ
- ThreadSwitch;
- if ATAError(Ctr) then break;
- Buffer:= Buffer+512;
- ncount:= ncount+1;
- Block:= Block+1
-until (ncount=Count);
-// exiting with numbers of blocks written
-result:=ncount;
-FreeDevice(FileDesc.BlockDriver);
-{$IFDEF DebugIdeDisk}
- DebugTrace('IdeDisk: ATAWriteBlock , Handle: %q, Begin Sector: %d, End Sector: %d',Int64(FileDesc),Block,Block+Ncount);
-{$ENDIF}
+  // Always do That , protection from local CPU access
+  GetDevice(FileDesc.BlockDriver);
+  Ctr:= @ATAControllers[FileDesc.BlockDriver.Major];
+  // for NOT_FILESYSTEM type that is not important because StartSector is equal to 0
+  Block := Block + Ctr.Minors[FileDesc.Minor].StartSector;
+  ncount := 0;
+  //suspend the thread for wait an irq
+  Ctr.Driver.WaitOn.state := tsSuspended;
+  ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
+  ATASendCommand(Ctr,ATA_WRITE);
+  // writing
+  repeat
+    FileDesc.BlockDriver.WaitOn.state := tsSuspended;
+ ATAOut(Buffer, Ctr.IOPort);
+    // Waiting the IRQ
+    SysThreadSwitch;
+    if ATAError(Ctr) then
+      Break;
+    Buffer:= Pointer(PtrUInt(Buffer)+512);
+    Inc(ncount);
+    Inc(Block);
+  until ncount = Count;
+  // exiting with numbers of blocks written
+  Result := ncount;
+  FreeDevice(FileDesc.BlockDriver);
+  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATAWriteBlock , Handle: %q, Begin Sector: %d, End Sector: %d',Int64(FileDesc),Block,Block+Ncount); {$ENDIF}
 end;
 
 // Detection of IDE devices.
@@ -644,7 +599,7 @@ begin
   ATAControllers[0].Irq:= 14;
   ATAControllers[0].IrqHandler:= @ATA0IrqHandler;
   ATAControllers[0].Driver.WaitOn:= nil;
-  ATAControllers[0].Driver.busy:= false;
+  ATAControllers[0].Driver.Busy:= false;
   ATAControllers[0].Driver.name:= ATANAMES[0];
   ATAControllers[0].Driver.Major:= 0;
   ATAControllers[0].Driver.CPUID:= -1;
@@ -657,7 +612,7 @@ begin
   ATAControllers[1].Irq := 15;
   ATAControllers[1].IrqHandler:= @ATA1IrqHandler;
   ATAControllers[1].Driver.WaitOn:= nil;
-  ATAControllers[1].Driver.busy := false;
+  ATAControllers[1].Driver.Busy := false;
   ATAControllers[1].Driver.name := ATANAMES[1];
   ATAControllers[1].Driver.Major:= 1;
   ATAControllers[1].Driver.CPUID := -1;

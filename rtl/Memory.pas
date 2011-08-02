@@ -49,22 +49,28 @@ const
   MAX_SX = 30; // Size indeX used to access MemoryAllocator directory
   XHEAP_INITIAL_CAPACITY = 1024*128; // 256KB including TXHeap record
   XHEAP_MAX_CHUNKS = 128;
+  XHEAP_MAX_STACK = 128;
   XHEAP_CHUNK_CAPACITY = 1024*1024; // 1MB
 
 type
   TPointerArray = array[0..0] of Pointer;
   PPointerArray = ^TPointerArray;
+  PXHeap = ^TXHeap;
   TXHeap = record // Private heap
+    ChunkCount: Integer;
     ChunkIndex: Integer;
     ChunkOffset: PtrUInt;
     ChunkCapacity: PtrUInt;
     Chunks: array[0..XHEAP_MAX_CHUNKS-1] of Pointer; // Each chunk is 1MB
+    Root: PXHeap;
+    StackHeaps: array[0..XHEAP_MAX_STACK-1] of PXHeap; // only for RootHeap, Pool of StackHeap used by every call to XScratchStack
+    StackHeapCount: Integer;
+    StackHeapIndex: Integer;
     StatsCurrent: Integer; // Count of current blocks allocated
     StatsSize: Integer; // Size allocated
     StatsTotal: Integer; // Total of blocks allocated
     StatsVirtualAllocSize: Int64; // Count of VirtualAlloc is ChunkIndex+1
   end;
-  PXHeap = ^TXHeap;
   TBlockList = record
     MaxAllocBlockCount: Cardinal; // 1024 default
     CurrentVirtualAlloc: Integer; // for this BlockList
@@ -106,15 +112,17 @@ var
   XHeapStatsTotalVirtualAllocSize: Int64;
   XHeapStatsTotalCount: Int64; // under DEFINE XHEAP_STATS2, updated when TXHeap is released
   XHeapStatsTotalSize: Int64;  // under DEFINE XHEAP_STATS2, updated when TXHeap is released
-  MemoryPerCpu : PtrInt; // Amount of memory for every CPU
+  MemoryPerCpu: PtrUInt; // Amount of memory for every CPU
 
 function GetPointerSize(P: Pointer): Integer;
-function XHeapAcquire: PXHeap;
-procedure XHeapRelease(Heap: PXHeap);
+function IsPrivateHeap(P: Pointer): Byte; inline;
+function XHeapAcquire(CPU: Byte): PXHeap;
 function XHeapAlloc(Heap: PXHeap; Size: PtrUInt): Pointer;
+procedure XHeapRelease(Heap: PXHeap);
 function XHeapRealloc(Heap: PXHeap; P: Pointer; NewSize: PtrUInt): Pointer;
+function XHeapStack(Heap: PXHeap): PXHeap;
+function XHeapUnstack(Heap: PXHeap): PXHeap;
 
-function GetHeapStatus: THeapStatus;
 function ToroGetMem(Size: PtrUInt): Pointer;
 function ToroFreeMem(P: Pointer): Integer;
 function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
@@ -140,7 +148,11 @@ const
 //  PRIVATEHEAP_MAX_BLOCKSIZE = 64*1024*1024; // 64MB
 
 var
+{$IFDEF FPC}
 	ToroMemoryManager: TMemoryManager;
+{$ELSE}
+	ToroMemoryManager: TMemoryManagerEx;
+{$ENDIF}
 {$IFDEF HEAP_STATS}
   CurrentVirtualAllocated: Int64;
 {$ENDIF}
@@ -228,13 +240,24 @@ begin
   FlagFree := Header and FLAG_FREE;
 end;
 
-function XHeapAcquire: PXHeap;
+function IsPrivateHeap(P: Pointer): Byte; inline;
+begin
+  Result := PCardinal(PtrUInt(P)-BLOCK_HEADER_SIZE)^ and FLAG_PRIVATE_HEAP;
+end;
+
+// Shared between XHeapAcquire and XHeapStack
+procedure XHeapReset(Heap: PXHeap); inline;
+begin
+  Heap.ChunkIndex := 0;
+  Heap.ChunkOffset := SizeOf(TXHeap);
+  Heap.ChunkCapacity := XHEAP_INITIAL_CAPACITY-SizeOf(TXHeap);
+end;
+
+function XHeapAcquire(CPU: Byte): PXHeap;
 begin
   Result := ToroGetMem(XHEAP_INITIAL_CAPACITY);
-  Result.ChunkIndex := 0;
+  XHeapReset(Result);
   Result.Chunks[0] := Pointer(PtrUInt(Result)+SizeOf(TXHeap));
-  Result.ChunkOffset := SizeOf(TXHeap);
-  Result.ChunkCapacity := XHEAP_INITIAL_CAPACITY-SizeOf(TXHeap);
 {$IFDEF XHEAP_STATS}
   Result.StatsVirtualAllocSize := XHEAP_INITIAL_CAPACITY;
   Inc(XHeapStatsCurrent);
@@ -348,9 +371,49 @@ begin
 {$ENDIF}
   Heap.ChunkIndex := -1;
   Heap.ChunkOffset := 0;
-  // TODO: release in PoolHeaps upto a threshold
   ToroFreeMem(Heap);
 end;
+
+// Heap cannot be nil
+function XHeapStack(Heap: PXHeap): PXHeap;
+var
+  Root: PXHeap;
+begin
+  if Heap.Root = nil then
+    Root := Heap
+  else
+    Root := Heap.Root;
+  Inc(Root.StackHeapIndex);
+  if Root.StackHeapIndex < Root.StackHeapCount then
+  begin
+    Result := Root.StackHeaps[Root.StackHeapIndex];
+    XHeapReset(Result);
+  end else begin
+    if Root.StackHeapIndex = XHEAP_MAX_STACK then
+    begin
+      Result := nil; // this maybe a cause for future memory leak (due to not releasing the whole root Scratch)
+      Exit;
+    end;
+    Result := XHeapAcquire(GetApicID);
+    Root.StackHeaps[Root.StackHeapIndex] := Result;
+    Inc(Root.StackHeapCount);
+    Result.Root := Root;
+  end;
+end;
+
+// Heap cannot be nil
+function XHeapUnstack(Heap: PXHeap): PXHeap;
+var
+  Root: PXHeap;
+begin
+  if Heap.Root = nil then
+    Root := Heap
+  else
+    Root := Heap.Root;
+  Dec(Root.StackHeapIndex);
+  Result := Root.StackHeaps[Root.StackHeapIndex];
+end;
+
 
 // Called by DistributeChunk and FreeMem
 procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
@@ -376,7 +439,7 @@ begin
 end;
 
 // Make an assignation of Chunk to directory every directory
-procedure DistributeChunk(MemoryAllocator: PMemoryAllocator; Chunk: Pointer; ChunkSize: PtrInt);
+procedure DistributeChunk(MemoryAllocator: PMemoryAllocator; Chunk: Pointer; ChunkSize: PtrUInt);
 var
   BlockCount: Cardinal;
   BlockList: PBlockList;
@@ -385,7 +448,8 @@ var
 begin
 {$IFDEF DebugMemory} DebugTrace('DistributeChunk %h %d bytes', 0, PtrUInt(Chunk), ChunkSize); {$ENDIF}
   {$IFDEF HEAP_STATS} BlockCount := 0; {$ENDIF}
-  CPU := GetApicid;
+  SX := 0; // avoid warning when using dcc64
+  CPU := GetApicID;
   while ChunkSize > 0 do
   begin
     // DO NOT use GetSX in this case, since we are locating the lower index and not the upper index
@@ -446,28 +510,29 @@ var
   Amount, Counter: PtrUInt;
   Buff: TMemoryRegion;
   CPU, ID: Cardinal;
+  MemoryAllocator: PMemoryAllocator;
   StartAddress: Pointer;
 begin
   // I am thinking that the regions are sorted
-  // Looking for the first ID avaiable
-  ID:=1;
+  // Looking for the first ID available
+  ID := 1;
   // First Region must start at ALLOC_MEMORY_START
   // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
-  while GetMemoryRegion(ID,@Buff) <> 0 do
+  while GetMemoryRegion(ID, @Buff) <> 0 do
   begin
-    if (Buff.base < ALLOC_MEMORY_START) and (Buff.base+Buff.length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
+    if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
       Break;
     Inc(ID);
   end;
   // free memory on region
-  Amount := Buff.length;
+  Amount := Buff.Length;
   // allocation start here
-  StartAddress := pointer(ALLOC_MEMORY_START);
+  StartAddress := Pointer(ALLOC_MEMORY_START);
   for CPU := 0 to CPU_COUNT-1 do
   begin
-    // that isn't an continuos block of memory
-    MemoryAllocators[CPU].StartAddress := StartAddress;
-    MemoryAllocators[CPU].Size := MemoryPerCPU;
+    MemoryAllocator := @MemoryAllocators[CPU];
+    MemoryAllocator.StartAddress := StartAddress;
+    MemoryAllocator.Size := MemoryPerCPU;
     // assignation per CPU
     Counter := MemoryPerCpu;
     while Counter <> 0 do
@@ -476,51 +541,51 @@ begin
       begin
         Amount := Amount - Counter;
         // the amount is assigned to the directory
-        InitializeDirectory(@MemoryAllocators[CPU], StartAddress, Counter);
+        InitializeDirectory(MemoryAllocator, StartAddress, Counter);
         // same region block
-        StartAddress:= StartAddress + Counter;
-        MemoryAllocators[CPU].EndAddress:=StartAddress;
+        StartAddress:= Pointer(PtrUInt(StartAddress) + Counter);
+        MemoryAllocator.EndAddress := StartAddress;
         // change the cpu
         Counter := 0;
       end else if Amount = Counter then
       begin
-        InitializeDirectory(@MemoryAllocators[CPU], StartAddress, Amount);
-        MemoryAllocators[CPU].EndAddress := StartAddress + Amount;
+        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
+        MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + Amount);
         // change the cpu
         Counter := 0;
         // looking for a free block of memory
         Inc(ID);
-        while GetMemoryRegion(ID,@Buff) <> 0 do
+        while GetMemoryRegion(ID, @Buff) <> 0 do
+        begin
+          if Buff.Flag = MEM_AVAILABLE then
+            Break;
+          Inc(ID);
+        end;
+        // new assignation of memory
+        Amount := Buff.Length;
+        StartAddress := Pointer(Buff.Base)
+      end else if Amount < Counter then
+      begin
+        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
+        Counter := Counter-Amount;
+        // looking for a free block of memory
+        Inc(ID);
+        while GetMemoryRegion(ID, @Buff) <> 0 do
         begin
           if Buff.Flag = MEM_AVAILABLE then
             Break;
           Inc(ID);
         end;
         // new asignation of memory
-        Amount := Buff.length;
-        StartAddress := Pointer(Buff.base)
-      end else if Amount < Counter then
-      begin
-        InitializeDirectory(@MemoryAllocators[CPU], StartAddress, Amount);
-        Counter := Counter-Amount;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID,@Buff) <> 0 do
-        begin
-          if Buff.Flag= MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new asignation of memory
-        Amount := Buff.length;
-        StartAddress := Pointer(Buff.base);
+        Amount := Buff.Length;
+        StartAddress := Pointer(Buff.Base);
       end;
     end;
   end;
 end;
 
 // Reasignation of memory
-function MemoryReassignation(ChuckSize, SX: longint; MemoryAllocator: PMemoryAllocator): Pointer;
+function MemoryReassignation(SX: longint; MemoryAllocator: PMemoryAllocator): Pointer;
 var
   ChunkSX: longint;
   CPU: longint;
@@ -529,7 +594,7 @@ var
   ChunkSize: PtrUInt;
   BlockList: PBlockList;
 begin
-  CPU := GetApicid;
+  CPU := GetApicID;
   BlockList := @MemoryAllocator.Directory[SX];
   if SX < 8 then // if Size < 128 bytes
     ChunkSX := 8 // Avoid loss of too small blocks (<32 bytes)
@@ -579,13 +644,12 @@ var
   SX: Byte;
 begin
   Result := nil;
-  // What are you trying to do?
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory}DebugTrace('ToroGetMem: Size: %d , fail', 0, Size, 0);{$ENDIF}
     Exit;
   end;
-  CPU := GetApicid;
+  CPU := GetApicID;
   MemoryAllocator := @MemoryAllocators[CPU];
   SX := GetSX(Size);
 {$IFDEF HEAP_STATS_REQUESTED_SIZE}
@@ -596,7 +660,7 @@ begin
     if BlockList.Count = 0 then
     begin
       ChunkSize := DirectorySX[SX];
-      Result := MemoryReassignation(ChunkSize, SX, MemoryAllocator);
+      Result := MemoryReassignation(SX, MemoryAllocator);
       ResetFreeFlag(Result);
       if Result = nil then
         Exit;
@@ -713,28 +777,6 @@ begin
   ToroFreeMem(P);
 end;
 
-function GetHeapStatus: THeapStatus;
-var
-  CPU: Byte;
-  MemoryAllocator: PMemoryAllocator;
-begin
-  Result.TotalCommitted := 0;
-  {$IFDEF HEAP_STATS}
-    Result.TotalCommitted := CurrentVirtualAllocated;
-  {$ENDIF}
-  Result.TotalAllocated := 0;
-  for CPU := 0 to CPU_Count-1 do
-  begin
-    MemoryAllocator := @MemoryAllocators[CPU];
-    if MemoryAllocator = nil then
-      Continue;
-    {$IFDEF HEAP_STATS}
-     	Inc(Result.TotalAllocated, MemoryAllocator.CurrentAllocatedSize);
-    {$ENDIF}
-  end;
-end;
-
-
 //
 // User's Memory Cache Manager
 //
@@ -751,7 +793,7 @@ end;
 function SysCacheRegion(Add: Pointer; Size: LongInt): Boolean;
 var
   StartPage, EndPage: Pointer;
-  C: PtrUInt;
+  PageCount, PageStart: PtrUInt;
 begin
   // Can Arch Unit hand a Cache's Memory?
   if not HasCacheHandler then
@@ -759,23 +801,23 @@ begin
     Result := False;
     Exit;
   end;
-  C := 0;
-  while c <= PtrUInt(Add) do
-    C := C+PAGE_SIZE;
-  if C <> 0 then
-    C := C-PAGE_SIZE;
+  PageStart := 0;
+  while PageStart <= PtrUInt(Add) do
+    PageStart := PageStart+PAGE_SIZE;
+  if PageStart <> 0 then
+    PageStart := PageStart-PAGE_SIZE;
   // StartPage is a Page_Size multipler
-  StartPage := Pointer(C);
-  Size := Size + PtrUint(Add) mod PAGE_SIZE;
-  C := Size div PAGE_SIZE;
-  if (Size mod PAGE_SIZE) <> 0 then
-    Inc(C);
-  EndPage := StartPage+ C*PAGE_SIZE;
+  StartPage := Pointer(PageStart);
+  Size := Size + PtrUInt(Add) mod PAGE_SIZE;
+  PageCount := Size div PAGE_SIZE;
+  if Size mod PAGE_SIZE <> 0 then
+    Inc(PageCount);
+  EndPage := Pointer(PtrUInt(StartPage)+ PageCount*PAGE_SIZE);
   // every page is mark it as CACHEABLE
-  while StartPage < EndPage do
+  while PtrUInt(StartPage) < PtrUInt(EndPage) do
   begin
     SetPageCache(StartPage);
-    Inc(StartPage, PAGE_SIZE);
+    StartPage := Pointer(PtrUInt(StartPage) + PAGE_SIZE);
   end;
   Result := True;
 end;
@@ -786,7 +828,7 @@ end;
 function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
 var
   StartPage, EndPage: Pointer;
-  C: PtrUInt;
+  PageCount, PageStart: PtrUInt;
 begin
   // Can Arch Unit hand a Cache's Memory?
   if not HasCacheHandler then
@@ -794,26 +836,26 @@ begin
     Result := False;
     Exit;
   end;
-  C := 0;
-  while c < PtrUInt(Add) do
-    C := C+PAGE_SIZE;
-  if c <> 0 then
-    C := C-PAGE_SIZE;
+  PageStart := 0;
+  while PageStart < PtrUInt(Add) do
+    PageStart := PageStart+PAGE_SIZE;
+  if PageStart <> 0 then
+    PageStart := PageStart-PAGE_SIZE;
   // StartPage is a Page_Size multipler
-  StartPage := Pointer(c);
+  StartPage := Pointer(PageStart);
   Size := Size + PtrUint(Add) mod PAGE_SIZE;
-  C := Size div PAGE_SIZE;
+  PageCount := Size div PAGE_SIZE;
   if (Size mod PAGE_SIZE) <> 0 then
-    C := C+1;
+    Inc(PageCount);
   EndPage := StartPage;
-  Inc(EndPage, C*PAGE_SIZE);
+  EndPage := Pointer(PtrUInt(EndPage) + PageCount*PAGE_SIZE);
   // every page is mark it as CACHEABLE
-  while StartPage < EndPage do
+  while PtrUInt(StartPage) < PtrUInt(EndPage) do
   begin
     RemovePageCache(StartPage);
-    Inc(StartPage,PAGE_SIZE);
+    StartPage := Pointer(PtrUInt(StartPage)+PAGE_SIZE);
   end;
-  Result:=true;
+  Result := True;
 end;
 
 // Initilization of Memory Directory for every Core

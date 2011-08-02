@@ -37,79 +37,68 @@ interface
 uses Arch;
 
 procedure DebugInit;
-procedure DebugPrint(Format: PChar; QArg: Int64; Arg1 , Arg2 : DWORD);
-procedure DebugTrace(Format: PChar; QArg: Int64; Arg1 , Arg2 : DWORD);
+procedure DebugPrint(Format: PXChar; QArg: Int64; Arg1, Arg2 : DWORD);
+procedure DebugTrace(Format: PXChar; QArg: Int64; Arg1, Arg2 : DWORD);
 
 implementation
 
-uses Console,Process;
+uses Console, Process;
 
 var
-	LockDebug: TRTLCriticalSection;
+	LockDebug: UInt64;
 
 // base of serial port of COM1
 const
   BASE_COM_PORT = $3f8;
 
-// send a char to SERIAL devices
-procedure SendChar(C: Char);
+procedure WaitForCompletion;
 var
   lsr: Byte;
 begin
-write_portb(Byte(C), BASE_COM_PORT);
-repeat
- lsr := read_portb(BASE_COM_PORT+5);
-until (lsr and $20) = $20;
+  repeat
+    lsr := read_portb(BASE_COM_PORT+5);
+  until (lsr and $20) = $20;
 end;
 
-
-// Receiv a char from serial device
-procedure ReadChar(var C:Char);
-var
-  lsr: Byte;
+procedure SendChar(C: XChar);
 begin
-repeat
- lsr := read_portb(BASE_COM_PORT+5);
-until (lsr and $1) = $1;
-C:=Char(read_portb(BASE_COM_PORT));
+  write_portb(Byte(C), BASE_COM_PORT);
+  WaitForCompletion;
 end;
 
-
-procedure DebugPrintDecimal(Value: PtrUint);
+procedure DebugPrintDecimal(Value: PtrUInt);
 var
- I, Len: Byte;
- S: string[64];
+  I, Len: Byte;
+  S: string[64];
 begin
-Len := 0;
-I := 10;
-if Value = 0 then
-begin
- SendChar('0');
- end else
- begin
-  while Value <> 0 do
+  Len := 0;
+  I := 10;
+  if Value = 0 then
   begin
-   S[I] := Chr((Value mod 10) + $30);
-   Value := Value div 10;
-   I := I-1;
-   Len := Len+1;
-  end;
-  if (Len <> 10) then
+    SendChar('0');
+  end else
   begin
-   S[0] := chr(Len);
-   for I := 1 to Len do
-   begin
-    S[I] := S[11-Len];
-    Len := Len-1;
-   end;
-   end else
-   begin
-    S[0] := chr(10);
-   end;
-   for I := 1 to ord(S[0]) do
-   begin
-    SendChar(S[I]);
-   end;
+    while Value <> 0 do
+    begin
+      S[I] := XChar((Value mod 10) + $30);
+      Value := Value div 10;
+      Dec(I);
+      Inc(Len);
+    end;
+    if (Len <> 10) then
+    begin
+      S[0] := XChar(Len);
+      for I := 1 to Len do
+      begin
+        S[I] := S[11-Len];
+        Dec(Len);
+      end;
+    end else
+    begin
+      S[0] := XChar(10);
+    end;
+    for I := 1 to ord(S[0]) do
+      SendChar(S[I]);
   end;
 end;
 
@@ -117,10 +106,10 @@ procedure DebugPrintHexa(Value: DWORD);
 var
   I: Byte;
 begin
- SendChar('0');
- SendChar('x');
+  SendChar('0');
+  SendChar('x');
   for I := (sizeof(PtrUint)*2-1) downto 0 do
-   SendChar(HEX_CHAR[(Value shr I*4) and $0F]);
+    SendChar(HEX_CHAR[(Value shr I*4) and $0F]);
 end;
 
 procedure DebugPrintString(const S: shortstring);
@@ -132,7 +121,7 @@ begin
 end;
 
 // No locking. Locking is performed by caller function (DebugTrace or DebugPrint)
-procedure DebugFormat(Format: PChar; QArg: Int64; Arg1 , Arg2 : Dword);
+procedure DebugFormat(Format: PXChar; QArg: Int64; Arg1 , Arg2 : Dword);
 var
   ArgNo: Integer;
   DecimalValue: DWORD;
@@ -203,14 +192,14 @@ end;
 
 // Similar to printk but the Char are send using serial port for debug procedures .
 // Only can send one qword argument . 
-procedure DebugPrint(Format: PChar; QArg: Int64; Arg1,Arg2 : DWORD);
+procedure DebugPrint(Format: PXChar; QArg: Int64; Arg1,Arg2 : DWORD);
 begin
-  CmpChg(3, 4, LockDebug.Flag);
+  SpinLock(3, 4, LockDebug);
   DebugFormat(Format, QArg, Arg1, Arg2);
-  LockDebug.Flag := 3;
+  LockDebug := 3;
 end;
 
-procedure DebugTrace(Format: PChar; QArg: Int64; Arg1,Arg2: DWORD);
+procedure DebugTrace(Format: PXChar; QArg: Int64; Arg1,Arg2: DWORD);
 {$IFDEF DebugThreadInfo}
 var
   CPUI: LongInt;
@@ -218,7 +207,7 @@ var
   Thread: PThread;
 {$ENDIF}
 begin
-  CmpChg(3, 4, LockDebug.Flag);
+  SpinLock(3, 4, LockDebug);
 {$IFDEF DebugThreadInfo}
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
@@ -229,7 +218,7 @@ begin
   DebugFormat(Format, QArg, Arg1,Arg2);
   SendChar(chr(13));
   SendChar(chr(10));
-  LockDebug.Flag := 3;
+  LockDebug := 3;
 end;
 
 // initialize all structures for work of debug .
@@ -240,8 +229,7 @@ begin
   write_portb(0, BASE_COM_PORT+1);
   write_portb(1, BASE_COM_PORT);
   write_portb(3, BASE_COM_PORT+3);
-  LockDebug.short := True;
-  LockDebug.Flag := 3;
+  LockDebug := 3;
   printk_('Mode debug: Enabled, using ... COM1\n',0);
   DebugTrace('Initialization of debugging At Time %q:%d:%d', Int64(StartTime.hour), StartTime.min, StartTime.sec);
 end;

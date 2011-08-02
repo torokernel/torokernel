@@ -1,7 +1,7 @@
 //
 // Process.pas
 //
-// Interruption handler, SMP initilization, protection, scheduler and thread manipulation
+// Interruption handler, SMP initialization, protection, scheduler and thread manipulation
 //
 // Notes :
 // - Stack and tls blocks of memory are not optimize by kmalloc() functions
@@ -9,14 +9,14 @@
 // - This model doesn't need lock protection
 // - MAX_CPU limits the size of cpu array
 // - This units implements routines for the FPC thread manager
-// - the procedure create_init_thread , create the first thread on the system with epi pointer  to PASCALMAIN procedure
+// - the procedure CreateInitThread, create the first thread on the system with epi pointer  to PASCALMAIN procedure
 // - RemoveThreadReady is only used by systhreadkill() function
 //
 // Changes:
 // 27 /03  / 2011 : Renaming Exchange slot to MxSlots.
 // 14 / 10 / 2009 : Bug Fixed In Scheduler.
 // 16 / 05 / 2009 : SMP Initialization was moved to Arch Unit.
-// 21 / 12 / 2008 : Bug fixed in SMP Initilization.
+// 21 / 12 / 2008 : Bug fixed in SMP Initialization.
 // 07 / 08 / 2008 : Bug fixed in Sleep
 // 04 / 06 / 2007 : KW Refactoring, renaming and code formatting
 // 19 / 02 / 2007 : Some modications in SuspendThread procedure.
@@ -54,10 +54,6 @@ uses Arch;
 type
   PThread = ^TThread;
   PCPU = ^TCPU;
-  p_thalloc_block = ^thalloc_block;
-  TLock =  TRTLCriticalSection;
-  PLock = ^TLock ;
-
   TMxSlot = Pointer;
   // MxSlots[SenderID][ReceiverID] can be assigned only if slot is empty (nil)
   TMxSlots = array[0..MAX_CPU-1, 0..MAX_CPU-1] of TMxSlot;
@@ -67,19 +63,18 @@ type
   // 1. a Thread to be dispatched on a remote CPU is queued in CurrentCPU.ThreadsToBeDispatched[RemoteCpuID]
   // 2. Scheduling[CurrentCPU] set threads queue in CpuMxSlots[CurrentCpuID][RemoteCpuID] if empty (nil)
   // 3. Scheduling[RemoteCPU] ForEach CpuMxSlots[][RemoteCpuID] read slot and reset slot (if not empty)
-
   
   // Drivers fill this structure
   IOInfo = record
     DeviceState: ^boolean;
   end;
-  
+
   TThreadFunc = function(Param: Pointer): PtrInt;
   TThread = record // in Toro any task is a Thread
     ThreadID: TThreadID; // thread identificator
     Next: PThread; // Next and Previous are independant of the thread created from the Parent
     Previous: PThread; // and are used for the scheduling to scan all threads for a CPU
-    Parent : PThread; // pointer to father thread
+    Parent : PThread; // pointer to parent thread
     NextSibling: PThread; // Simple tail for ThreadWait procedure
     FirstChild: PThread; // tail of childs
     IOScheduler: IOInfo;
@@ -106,16 +101,7 @@ type
     Apicid: longint;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
-    //ExchangeSlot: TSchedulerExchangeSlot; // structures for emigrate process
     ThreadsToBeDispatched: array[0..MAX_CPU-1] of PThread;
-  end;
-
-  // thread allocator chunk used by LocalAlloc
-  thalloc_block = record
-    add_start: pointer ;
-    add_end: pointer;
-    current_add: pointer;
-    next_thalloc_block: p_thalloc_block;
   end;
 
 const
@@ -128,12 +114,14 @@ const
   
 // Interface function matching common declaration
 function BeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFunction: TThreadFunc; Parameter: Pointer; CreationFlags: DWORD; var ThreadID: TThreadID): TThreadID;
-procedure CreateInitThread(ThreadFunction: TThreadFunc; StackSize: SizeUInt);
+procedure CreateInitThread(ThreadFunction: TThreadFunc; const StackSize: SizeUInt);
 function GetCurrentThread: PThread;
 procedure ProcessInit;
 procedure Sleep(Miliseg: longint);
+procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
+procedure SysThreadSwitch;
 procedure ThreadSuspend;
 procedure ThreadResume(Thread: PThread);
 function ThreadWait(var TerminationCode: PtrInt): TThreadID;
@@ -145,16 +133,16 @@ var
 implementation
 
 uses
-{$IFDEF DEBUG} Debug, {$ENDIF}
-   Console, Memory;
+  {$IFDEF DEBUG} Debug, {$ENDIF}
+  Console, Memory;
 
 const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
-  free_spin = 3 ; // flags register of spin
-  busy_spin = 4 ;
+  SPINLOCK_FREE = 3 ; // flags for spinlock
+  SPINLOCK_BUSY = 4 ;
   tfKill = 1 ; // Thread Flags signals
   EXCEP_TERMINATION = -1 ; // code of termination for exception
-  THREADVAR_BLOCKSIZE: DWORD=0 ; // size of local variables storage for every thread
+  THREADVAR_BLOCKSIZE: DWORD = 0 ; // size of local variables storage for every thread
 
 {  Errno Implementation }
   //MAX_ERROR = 124;
@@ -169,75 +157,77 @@ procedure ThreadMain; forward;
 procedure Signaling; forward;
 
 var
+{$IFDEF FPC}
   ToroThreadManager: TThreadManager;
+{$ENDIF}
   InitialThreadID: TThreadID;  // ThreadID of initial thread
-//
-// Routines to capture all exceptions
-//
 
-// parent thread reads this termination code
+//------------------------------------------------------------------------------
+// Routines to capture all exceptions
+//------------------------------------------------------------------------------
+
+// Parent thread reads the termination code
 procedure ExceptionHandler;
 begin
   EnabledInt;
   ThreadExit(EXCEP_TERMINATION, True);
 end;
 
-procedure Excep_DIVBYZERO; [nostackframe];
+procedure Excep_DIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Division by Zero', 0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_OVERFLOW; [nostackframe];
+procedure Excep_OVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Overflow',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_BOUND; [nostackframe];
+procedure Excep_BOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Bound instruction',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_ILEGALINS; [nostackframe];
+procedure Excep_ILEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Ilegal Instruction',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_DEVNOTAVA; [nostackframe];
+procedure Excep_DEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Device not Available',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_DF; [nostackframe];
+procedure Excep_DF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Double fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_STACKFAULT; [nostackframe];
+procedure Excep_STACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Stack Fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_GENERALP; [nostackframe];
+procedure Excep_GENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-
   {$IFDEF DebugProcess} DebugTrace('Exception : General Protection',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_PAGEFAUL; [nostackframe];
+procedure Excep_PAGEFAUL; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Page Fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_FPUE; [nostackframe];
+procedure Excep_FPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception : Fpu error',  0, 0, 0); {$ENDIF}
   ExceptionHandler
@@ -258,123 +248,107 @@ begin
   CaptureInt(EXC_FPUE,@excep_FPUE);
 end;
 
-
-//
-// Initilization of Every Core in the system.
-//
+// Initialization of every Core in the system
 procedure InitCores;
 var
- j,l: longint;
+  I, J: longint;
 begin
-printk_('Multicore Initilization ...\n',0);
-// cleaning all tables
-for j:= 0 to (Max_CPU-1) do
-begin
- CPU[j].Apicid := 0 ;
- CPU[j].CurrentThread := nil;
- CPU[j].Threads :=nil;
- for l:= 0 to (Max_CPU-1) do
- begin
-  // remove it !
-  // CPU[j].ExchangeSlot.DispatcherArray[l]:= nil;
-  // CPU[j].ExchangeSlot.EmigrateArray[l]:= nil;
-  CPU[j].ThreadsToBeDispatched[l] := nil;
-  CpuMxSlots[j][l] := nil;
- end;
-end;
-// with one cpu we don't need any initilization proc.
-If CPU_COUNT = 1 then
-begin
- printk_('Core#0 ... /VOk\n/n',0);
-end else
-begin
- for j:= 0 to (CPU_COUNT-1) do
- begin
-  if not(Cores[j].CPUBoot) and (Cores[j].present) then
+  PrintK_('Multicore Initialization ...\n',0);
+  // cleaning all table
+  for I := 0 to Max_CPU-1 do
   begin
-   CPU[Cores[j].Apicid].Apicid := Cores[j].Apicid;
-   // core jump to this procedure
-   Cores[j].InitProc := @Scheduling;
-   // initilize the cpu
-   InitCore(Cores[j].Apicid);
-   // information to user.
-   if Cores[j].InitConfirmation then
-    printk_('Core#%d ... /VOk\n/n',Cores[j].Apicid)
-   else
-    printk_('Core#%d ... /RFault\n/n',Cores[j].Apicid);
-  end else if Cores[j].CPUBoot then
-   printk_('Core#0 ... /VOk\n/n',0);
- end;
-end;
-end;
-//
-// Routines to protect concurrent access to shared memory
-//
-
-// internal routine to set a lock
-procedure close_spin(Lock: PLock);
-begin
-  // ??? here i have an error
-  if Lock.short then
+    CPU[I].Apicid := 0 ;
+    CPU[I].CurrentThread := nil;
+    CPU[I].Threads :=nil;
+    for J := 0 to Max_CPU-1 do
+    begin
+      CPU[I].ThreadsToBeDispatched[J] := nil;
+      CpuMxSlots[I][J] := nil;
+    end;
+  end;
+  if CPU_COUNT = 1 then
+  begin // with one cpu we don't need any initialization proc.
+    PrintK_('Core#0 ... /VOk\n/n',0);
+    Exit;
+  end;
+  for I := 0 to CPU_COUNT-1 do
   begin
-    cmpchg(free_spin, busy_spin, Lock.flag)
-    // in the long mode the thread sleep when return the lock operation is execute only one more time
-  end else begin
-     cmpchg(free_spin,busy_spin,lock.flag);
-      ThreadSuspend;
+    if not Cores[I].CPUBoot and Cores[I].present then
+    begin
+      CPU[Cores[I].ApicID].Apicid := Cores[I].ApicID;
+      Cores[I].InitProc := @Scheduling; // core jump to this procedure // !!! KW 20110802 suspect a bug here,
+      // !!! the procedure Scheduling is using a parameter, but Cores[].InitProc has no parameter
+      // !!! I guess this is pure luck that the RCX is nil when starting the first time InitProc
+      // !!! or because the Candidate parameter is not used at first call
+      // !!! it would be safer to change the procedure InitProc to match the signature of Scheduling
+      // !!! this would force to call InitProc with @Candidate=nil
+      InitCore(Cores[I].ApicID); // initialize the CPU
+      if Cores[I].InitConfirmation then
+        PrintK_('Core#%d ... /VOk\n/n', Cores[I].ApicID)
+      else
+        PrintK_('Core#%d ... /RFault\n/n', Cores[I].ApicID);
+    end else if Cores[I].CPUBoot then
+      PrintK_('Core#0 ... /VOk\n/n',0);
   end;
 end;
 
-// internal routine to reset a lock
-procedure open_spin (Lock: PLock);
+{$IFDEF FPC}
+// Manipulation of critical section by Thread Manager of FPC
+procedure SysInitCriticalSection(var CS: TRTLCriticalSection);
 begin
-  if lock.short then
-    lock.flag := free_spin
+  CS.Flag := SPINLOCK_FREE;
+  CS.Short := True;
+end;
+
+procedure SysEnterCriticalSection(var CS: TRTLCriticalSection);
+begin
+  // ??? here i have an error
+  if CS.short then
+  begin
+    SpinLock(SPINLOCK_FREE, SPINLOCK_BUSY, CS.Flag)
+    // in the long mode the thread sleep when return the lock operation is executed only one more time
+  end else
+  begin
+    SpinLock(SPINLOCK_FREE, SPINLOCK_BUSY, CS.Flag);
+    ThreadSuspend;
+  end;
+end;
+
+procedure SysLeaveCriticalSection(var CS: TRTLCriticalSection);
+begin
+  if CS.short then
+    CS.Flag := SPINLOCK_FREE
   else
   begin
     // in long mode the thread schedule next thread
-    lock.flag := free_spin ;
-    ThreadResume(lock.lock_tail);
+    CS.Flag := SPINLOCK_FREE;
+    ThreadResume(CS.lock_tail);
   end;
 end;
+{$ENDIF}
 
-// Manipulation of critical section by Thread Manager of FPC
-procedure SysInitCriticalSection(var cs);
-begin
-  TLock(cs).flag := free_spin;
-  TLock(cs).short := true ;
-end;
-
-procedure SysEnterCriticalSection (var cs);
-begin
-  close_spin(@cs);
-end;
-
-procedure SysLeaveCriticalSection (var cs );
-begin
-  open_spin(@cs);
-end;
-
-//
-// Task queue  manipulation 
-//
+//------------------------------------------------------------------------------
+// Threads list management
+//------------------------------------------------------------------------------
 
 // Adds a thread to ready task queue
 procedure AddThreadReady(Thread: PThread);
+var
+  CPU: PCPU;
 begin
-  if (Thread.CPU.Threads = nil) then
+  CPU := Thread.CPU;
+  if CPU.Threads = nil then
   begin
-    Thread.CPU.Threads := Thread;
+    CPU.Threads := Thread;
     Thread.Next := Thread;
     Thread.Previous := Thread;
     Exit;
   end;
-  Thread.Previous := Thread.CPU.Threads.Previous;
-  Thread.Next := Thread.CPU.Threads;
-  Thread.CPU.Threads.Previous.Next := Thread;
-  Thread.CPU.Threads.Previous := Thread;
+  Thread.Previous := CPU.Threads.Previous;
+  Thread.Next := CPU.Threads;
+  CPU.Threads.Previous.Next := Thread;
+  CPU.Threads.Previous := Thread;
 end;
-
 
 // Removes a thread from ready task queue
 procedure RemoveThreadReady(Thread: PThread);
@@ -444,10 +418,10 @@ begin
 end;
 
 const
-  initth: Boolean = True; // Used only for the first thread to flag if initialized
+  Initialized: Boolean = False; // Used only for the first thread to flag if initialized
 
 // create a new thread, in the CPU and init IP instruction
-function ThreadCreate(StackSize : SizeUInt; CpuID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
+function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
 var
   NewThread: PThread;
   ip_ret: ^THandle;
@@ -467,15 +441,14 @@ begin
     Exit;
   end;
   // Is this the  first thread ?
-  if initth then
+  if not Initialized then
   begin
-    initth := not(initth)
+    Initialized := True
   end else if THREADVAR_BLOCKSIZE <> 0 then
   begin
     NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
     if NewThread.TLS = nil then
-    begin
-      // No more memory, Thread cannot be created
+    begin // Not enough memory, Thread cannot be created
       ToroFreeMem(NewThread.StackAddress);
       ToroFreeMem(NewThread);
       Result := nil;
@@ -484,17 +457,17 @@ begin
   end;
   // Stack initialization
   NewThread.StackSize := StackSize;
-  NewThread.ret_thread_sp := pointer(SizeUInt(NewThread.StackAddress) + StackSize-1);
-  NewThread.sleep_rdtsc := 0 ;
-  NewThread.Flags := 0 ;
+  NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
+  NewThread.sleep_rdtsc := 0;
+  NewThread.Flags := 0;
   NewThread.State := tsReady;
   NewThread.TerminationCode := 0;
-  NewThread.ErrNo := 0 ;
-  NewThread.StartArg := Arg ; // this argument we will read by thread main
+  NewThread.ErrNo := 0;
+  NewThread.StartArg := Arg; // this argument we will read by thread main
   NewThread.ThreadFunc := ThreadFunction;
-  NewThread.PrivateHeap := XHeapAcquire; // Private Heap allocator init
-  NewThread.ThreadID := TThreadID(NewThread); // lock protection there isn't very important
-  NewThread.CPU := @CPU[CpuID];
+  NewThread.PrivateHeap := XHeapAcquire(CPUID); // Private Heap allocator init
+  NewThread.ThreadID := TThreadID(NewThread); // check protection, it is not very important
+  NewThread.CPU := @CPU[CPUID];
   // New thread is added in the child queue of the parent thread (CurrentThread)
   NewThread.FirstChild := nil;
   NewThread.Parent := CPU[GetApicID].CurrentThread; // Note: for the initial thread this is not important
@@ -504,20 +477,19 @@ begin
   // when scheduling() returns (is a procedure!) return to this eip pointer
   // when thread is executed for first time thread_sp_register pointer to stack base (or end)
   ip_ret := NewThread.ret_thread_sp;
-  ip_ret := ip_ret-1;
+  Dec(ip_ret);
   // scheduler return
   ip_ret^ := PtrInt(@ThreadMain);
   // ebp return
-  ip_ret := ip_ret-1;
-  ip_ret^ := PtrInt(NewThread.ret_thread_sp - SizeOf(pointer));
-  NewThread.ret_thread_sp := NewThread.ret_thread_sp-SizeOf(pointer)*2;
-  if CpuID = GetApicID then
+  Dec(ip_ret);
+  ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
+  NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer)*2);
+  if CPUID = GetApicID then
     AddThreadReady(NewThread)
   else
     AddThreadEmigrate(NewThread);
   Result := NewThread;
 end;
-
 
 // free all memory structures of the thread, called after waitpid function.
 // These blocks of memory live in parent thread CPU
@@ -568,7 +540,6 @@ begin
       Exit;
     end;
     ChildThread := ChildThread.FirstChild;
-
     if ChildThread = nil then
     begin
       // No child
@@ -580,19 +551,19 @@ begin
     begin
       // Waiting for me ??
       if ChildThread.State = tsZombie then
-        begin
-         TerminationCode := ChildThread.TerminationCode;
-         Result := ChildThread.ThreadID ;
-         NextSibling := ChildThread.NextSibling ;
-         if PreviousThread <> nil then
+      begin
+        TerminationCode := ChildThread.TerminationCode;
+        Result := ChildThread.ThreadID ;
+        NextSibling := ChildThread.NextSibling ;
+        if PreviousThread <> nil then
           PreviousThread.NextSibling := NextSibling
-         else
+        else
           GetCurrentThread.FirstChild := NextSibling;
-         // stack and tls is allocate from father CPU and must free for father
-         ThreadFree(ChildThread);
-         {$IFDEF DebugProcess} DebugTrace('ThreadWait: ThreadID %d', SizeUint(ThreadID), 0, 0); {$ENDIF}
-         exit;
-        end
+        // stack and tls is allocated from parent CPU and must released by the Parent
+        ThreadFree(ChildThread);
+        {$IFDEF DebugProcess} DebugTrace('ThreadWait: ThreadID %d', SizeUInt(Result), 0, 0); {$ENDIF}
+        Exit;
+      end
       else begin
         PreviousThread := ChildThread ;
         ChildThread := ChildThread.NextSibling;
@@ -623,7 +594,7 @@ begin
     Scheduling(NextThread);
 end;
 
-// The thread(ThreadID) is dead, only father thread can execute this function
+// The thread(ThreadID) is dead, only parent thread can execute this function
 function SysKillThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -664,7 +635,7 @@ begin
   if (Thread = nil) or (CurrentThread.ThreadID = ThreadID) then
   begin
     CurrentThread.state := tsSuspended;
-    ThreadSwitch;
+    SysThreadSwitch;
     {$IFDEF DebugProcess} DebugTrace('SuspendThread: Current Threads was Suspended',0,0,0); {$ENDIF}
   end;
   // only parent thread can perform a SuspendThread
@@ -697,6 +668,7 @@ begin
   begin
     CurrentThread.ErrNo := -ECHILD;
     Result := DWORD(-1);
+    Exit; // added by KW 20110730, I presume this was the intended behavior
   end;
   ThreadResume(Thread);
   Result := 0;
@@ -706,7 +678,7 @@ end;
 // Scheduling model implementation
 //
 
-// Move thread from EmigrateArray of other CPUs to Threads queue of local CPU
+// Import waiting threads from other CPUs to local list of Threads
 procedure Inmigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
@@ -735,7 +707,7 @@ begin
   end;
 end;
 
-// Move threads from Dispatcher array to Emigrate array
+// Move pending threads to remote CPUs waiting list
 procedure Emigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
@@ -752,7 +724,7 @@ begin
 end;
 
 // This is the Scheduler
-// schedule next thread, the current thread must be added in the corresponding tail and have saved its registers
+// Schedule next thread, the current thread must be added in the appropriate list (CPU[].ThreadsToBeDispatched) and have saved its registers
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;
@@ -768,10 +740,10 @@ begin
       while CurrentCPU.Threads = nil do
     		Inmigrating(CurrentCPU);
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
-      {$IFDEF DebugProcess}DebugTrace('Scheduling: Jumping to Current Thread, StackPointer return: %q', PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp), 0, 0);{$ENDIF}
+      {$IFDEF DebugProcess} DebugTrace('Scheduling: Jumping to Current Thread, StackPointer return: %q', PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp), 0, 0); {$ENDIF}
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
-      // jump to thread executation
-      exit;
+      // jump to thread execution
+      Exit;
     end;  
     Emigrating(CurrentCPU); // send new threads to others cpus
     Inmigrating(CurrentCPU); // give new threads to tq_ready of local CPU
@@ -815,7 +787,7 @@ end;
 // Threadvar routines
 //------------------------------------------------------------------------------
 
-// Called by create_init_thread() .
+// Called by CreateInitThread
 procedure SysInitThreadVar(var Offset: DWORD; Size: DWORD);
 begin
   Offset := THREADVAR_BLOCKSIZE;
@@ -823,12 +795,12 @@ begin
 end;
 
 // Returns pointer to offset in the first block of memory of thread allocation
-function SysRelocateThreadvar(Offset: DWORD): pointer;
+function SysRelocateThreadvar(Offset: DWORD): Pointer;
 var
   CurrentThread: PThread;
 begin
   CurrentThread := GetCurrentThread;
-  Result := Pointer(PtrUInt(CurrentThread.tls)+Offset)
+  Result := Pointer(PtrUInt(CurrentThread.TLS)+Offset)
 end;
 
 // Allocates in thread allocation memory for thread local storange . Is only use in the first moment for init thread
@@ -839,37 +811,42 @@ var
 begin
   CpuID := GetApicID;
   CPU[CpuID].CurrentThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
-  {$IFDEF DebugProcess} DebugTrace('SysAllocateThreadVars - pointer: %q , size: %d',SizeUint(CPU[CpuID].CurrentThread.TLS),THREADVAR_BLOCKSIZE,0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('SysAllocateThreadVars - pointer: %q , size: %d',SizeUint(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE, 0); {$ENDIF}
 end;
 
+// called from Kernel.KernelStart
 // All begins here, the user program is executed like the init thread, the init thread can create additional threads.
-procedure CreateInitThread(ThreadFunction: TThreadFunc; StackSize: SizeUInt);
+procedure CreateInitThread(ThreadFunction: TThreadFunc; const StackSize: SizeUInt);
 var
   InitThread: PThread;
   LocalCPU: PCPU;
 begin
+  PrintK_('CreateInitThread\n', 0);
   LocalCPU := @CPU[GetApicID];
   InitThread := ThreadCreate(StackSize, LocalCPU.ApicID, ThreadFunction, nil);
+  if InitThread = nil then
+  begin
+    PrintK_('InitThread = nil\n', 0);
+    hlt;
+  end;
   InitThread.NextSibling := nil ;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
-  if InitThread <> nil then
-    printk_('User Application Initialization ... \n', 0)
-  else
-    hlt;
-  // only for init procedure
-  InitThreadVars(@SysRelocateThreadvar);
+  PrintK_('User Application Initialization ... \n', 0);
+  // only performed explicitely for initialization procedure
+  {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
+  // TODO: InitThreadVars for DELPHI
   {$IFDEF DebugProcess} DebugTrace('CreateInitThread - InitialThreadID: %q', SizeUint(InitialThreadID), 0, 0); {$ENDIF}
   // now we have in the stack ip pointer for ret instruction
-  {$IFDEF FPC} InitThread.ret_thread_sp := InitThread.ret_thread_sp+SizeOf(pointer); {$ENDIF}
-  {$IFDEF DELPHI} InitThread.ret_thread_sp := pointer(SizeUInt(InitThread.ret_thread_sp)+SizeOf(pointer)); {$ENDIF}
+  // TODO: when compiling with DCC, check that previous assertion is correct
+  // TODO: when previous IFDEF is activated, check that DebugTrace is not messing
+  InitThread.ret_thread_sp := Pointer(PtrUInt(InitThread.ret_thread_sp)+SizeOf(Pointer));
   change_sp(InitThread.ret_thread_sp);
-  // the init procedure  "PASCALMAIN"  is executed
+  // the procedure "PASCALMAIN" is executed (this is the ThreadFunction in parameter)
 end;
 
-// The current thread is letting the next thread to run.
 // The current thread is remaining in tq_ready tail and the next thread is scheduled
-procedure SysThreadSwitch ;
+procedure SysThreadSwitch;
 begin
   Scheduling(nil);
   Signaling;
@@ -884,10 +861,11 @@ var
 begin
   CurrentThread := GetCurrentThread ;
   // Open standard IO files, stack checking, iores, etc .
-  InitThread(CurrentThread.stacksize);
-  {$IFDEF DebugProcess} DebugTrace('ThreadMain : Thread: %q',PtrInt(CurrentThread),0,0); {$ENDIF}
+  {$IFDEF FPC} InitThread(CurrentThread.StackSize); {$ENDIF}
+  // TODO: !!! InitThread() for Delphi
+  {$IFDEF DebugProcess} DebugTrace('ThreadMain: #%q', PtrInt(CurrentThread), 0, 0); {$ENDIF}
   ExitCode := CurrentThread.ThreadFunc(CurrentThread.StartArg);
-  // all child must terminate before parent can terminates
+  // waiting for all child to terminate before main thread can terminate
   while CurrentThread.FirstChild <> nil do
     ThreadWait(ChildExitCode);
   if CurrentThread.ThreadID = InitialThreadID then
@@ -897,16 +875,13 @@ end;
 
 // Create new thread and return the thread id  , we don't need save context .
 function SysBeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFunction: TThreadFunc; Parameter: Pointer;
-                         CpuID: DWORD; var ThreadID: TThreadID): TThreadID;
+                         CPU: DWORD; var ThreadID: TThreadID): TThreadID;
 var
   NewThread: PThread;
 begin
-  if (LongInt(CpuID) = CPU_NIL) or (LongInt(CpuID) > CPU_COUNT-1) then
-  begin
-    // Invalid CpuID -> create thread on current CPU
-    CpuID := GetApicID;
-  end;
-  NewThread := ThreadCreate(StackSize, CpuID, ThreadFunction, Parameter);
+  if (LongInt(CPU) = CPU_NIL) or (LongInt(CPU) > CPU_COUNT-1) then
+    CPU := GetApicID; // Invalid CpuID -> create thread on current CPU
+  NewThread := ThreadCreate(StackSize, CPU, ThreadFunction, Parameter);
   if NewThread = nil then
   begin
     ThreadID := 0;
@@ -933,7 +908,7 @@ begin
 end;
 
 // Return the ThreadID of the current running thread
-function SysGetCurrentThreadId : TThreadID;
+function SysGetCurrentThreadID: TThreadID;
 begin
   Result := CPU[GetApicID].CurrentThread.ThreadID;
 end;
@@ -941,7 +916,7 @@ end;
 // When the initial thread exits, the system must be turned off
 procedure SystemExit;
 begin
-  // here is need fs for sync procedures
+  // here is needed fs for sync procedures
   {$IFDEF DebugProcess} DebugPrint('SystemExit\n', 0, 0, 0); {$ENDIF}
   printk_('\nSystem Termination, please turn off or reboot\n', 0);
   {$IFDEF DebugProcess} DebugPrint('SystemExit - Debug end -> hlt\n', 0, 0, 0); {$ENDIF}
@@ -954,9 +929,10 @@ begin
   // initialize the exception and irq
   if HasException then
     InitializeINT;
-  {$IFDEF DebugProcess}DebugTrace('CPU Speed: %d Mhz',0,LocalCpuSpeed,0);{$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('CPU Speed: %d Mhz', 0, LocalCpuSpeed, 0); {$ENDIF}
   InitCores;
   // Functions to manipulate threads. Transparent for pascal programmers
+{$IFDEF FPC}
   with ToroThreadManager do
   begin
     InitManager            := nil;
@@ -970,7 +946,7 @@ begin
     WaitForThreadTerminate := nil;
     ThreadSetPriority      := nil;
     ThreadGetPriority      := nil;
-    GetCurrentThreadId     := @SysgetCurrentThreadid;
+    GetCurrentThreadId     := @SysGetCurrentThreadID;
     InitCriticalSection    := @SysInitCriticalSection;
     DoneCriticalSection    := nil;
     EnterCriticalSection   := @SysEnterCriticalSection ;
@@ -993,6 +969,7 @@ begin
     RTLEventWaitForTimeout := nil;
   end;
   SetThreadManager(ToroThreadManager);
+{$ENDIF}
 end;
 
 end.

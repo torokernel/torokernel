@@ -29,38 +29,42 @@ unit Kernel;
 
 {$I Toro.inc}
 
-
-
-
 interface
 
+{$IFDEF DCC}
+type
+  PtrInt = Int64;
+{$ENDIF}
 // function InitSystem is declared only for compatibility
-{$IFDEF FPC} function InitSystem(notuse: pointer): Ptrint; external name 'PASCALMAIN'; {$ENDIF}
-{$IFDEF DELPHI} function InitSystem(notuse: pointer): Ptrint; external '' name 'PASCALMAIN'; {$ENDIF}
+function InitSystem(notused: pointer): PtrInt; external {$IFDEF DCC} '' {$ENDIF} name 'PASCALMAIN';
 procedure KernelStart;
 
 implementation
 
 uses
 {$IFDEF DEBUG} Debug, {$ENDIF}
-  Arch,Console, Process, Memory, Filesystem, Network;
+  Arch, Console, Process, Memory, FileSystem, Network;
 
-
-// All start here
-procedure KernelStart; {$IFDEF FPC} [public, alias: 'KernelStart']; {$ENDIF}
+// Called from Arch.main
+procedure KernelStart;
 begin
-  CleanConsole;
+  //CleanConsole;
   printk_('/VLoading Toro ...\n/n',0);
   ArchInit;
   {$IFDEF DEBUG} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;
-  FilesystemInit;
+  FileSystemInit;
   NetworkInit;
   ConsoleInit;
   // we will never return from this procedure call
-  CreateInitThread(@InitSystem, 32*1024);
+  {$IFDEF FPC} CreateInitThread(@InitSystem, 32*1024); {$ENDIF}
+  {$IFDEF DCC} CreateInitThread(@InitSystem, 32*1024); {$ENDIF} // replace with @StartExeProc
+  //while True do;
 end;
+
+initialization
+  {$IFDEF DCC} KernelStart; {$ENDIF}
 
 end.
 

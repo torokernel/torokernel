@@ -1,6 +1,6 @@
 //
 // Toro main program
-// Example how to use Toro in User Application.
+// Example how to use Toro in User Application. This example just say "Hello" at port 80 of the virtual machine.
 //
 // Changes :
 // 2011 / 07 / 30 : Some stuff around the resource dedication
@@ -37,6 +37,8 @@ program toro;
 // Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
 
+// They are declared just the necessary units
+// The units used depend the hardware where you are running the application 
 uses
   Kernel in 'rtl\Kernel.pas',
   Process in 'rtl\Process.pas',
@@ -46,15 +48,11 @@ uses
   Filesystem in 'rtl\Filesystem.pas',
   NetWork in 'rtl\Network.pas',
   Console in 'rtl\Drivers\Console.pas',
-  Ext2 in 'rtl\Drivers\Ext2.pas',
-  ne2000 in 'rtl\Drivers\ne2000.pas',
-  e1000 in 'rtl\Drivers\e1000.pas',
-  IdeDisk in 'rtl\Drivers\IdeDisk.pas'
-  ;
+  e1000 in 'rtl\Drivers\e1000.pas';
 
-const
-  Welcome: PChar = 'Aca Toro64'+#13#10;
-  // TCP/IP Configuration
+const 
+  Welcome: PChar = 'Hello from Toro!'+#13#10;
+  // TCP/IP configuration
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
@@ -63,6 +61,7 @@ const
 var
   HttpServer: PSocket;
 
+// Socket initialization
 procedure HttpInit;
 begin
   HttpServer := SysSocket(SOCKET_STREAM);
@@ -79,7 +78,7 @@ begin
   Result := 0;
 end;
 
- // new data received from Socket, we can read the data and return to Network Service thread
+ // New data received from Socket, we can read the data and return to Network Service thread
 function HttpReceive(Socket: PSocket): LongInt;
 begin
   // the socket will dead
@@ -105,7 +104,7 @@ var
   HttpHandler: TNetworkHandler;
 
 begin
-  // dedicate the e1000 network card to local cpu
+  // Dedicate the e1000 network card to local cpu
   DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
   WriteConsole('Listening at port 80\n',[0]);
   // Configuration of Handlers
@@ -114,7 +113,7 @@ begin
   HttpHandler.DoTimeOut := @HttpTimeOut;
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
-  // port 80, service registration
+  // Port 80, service registration
   SysRegisterNetworkService(@HttpHandler);
   while True do
     ThreadSwitch;

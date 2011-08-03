@@ -1,0 +1,6 @@
+*.ppu
+*.o
+test/Toro
+test/build
+*.bin
+*.img

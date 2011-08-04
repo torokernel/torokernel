@@ -32,6 +32,10 @@ clean :
 	rm *.img
 	rm *.o
 	rm *.bin
+	rm ../rtl/*.o
+	rm ../rtl/*.ppu
+	rm ../rtl/drivers/*.o
+	rm ../rtl/drivers/*.ppu
 
 
 

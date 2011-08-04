@@ -583,5 +583,5 @@ begin
 end;
 
 initialization
-PCICardInit;
+	PCICardInit;
 end.

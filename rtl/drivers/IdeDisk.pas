@@ -294,18 +294,6 @@ procedure ATAPrepare(Ctr:PIDEController;Drv: LongInt;Sector: LongInt;count: Long
 var
  lba1, lba2, lba3, lba4: Byte;
 begin
-{
-  asm // TODO: replace this asm code with pascal code
-    xor eax , eax
-    mov eax, Sector
-    mov lba1, al
-    mov lba2, ah
-    shr eax, 16
-    mov lba3, al
-    and ah, $0F
-    mov lba4, ah
-  end;
-}
   lba1 := Sector and $FF;
   lba2 := (Sector shr 8) and $FF;
   lba3 := (Sector shr 16) and $FF;

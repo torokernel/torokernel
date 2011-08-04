@@ -850,37 +850,27 @@ asm
   cli
 end;
 
-procedure Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  db $48
-  db $cf
-end;
-
 // Procedures for capture unhandles interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
-  //Ignore;
-  // asm // TODO: restore if this is critical
-  // db $48
-  // db $cf
-  // end;
+  asm 
+     db $48
+     db $cf
+  end;
 end;
 
 procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
   EOI;
-  //Ignore;
-  //asm // TODO: restore if this is critical
-  // db $48
-  //db $cf
-  //end;
+  asm 
+     db $48
+     db $cf
+  end;
 end;
 
 // PCI bus access
-
 const
  PCI_CONF_PORT_INDEX = $CF8;
  PCI_CONF_PORT_DATA  = $CFC;

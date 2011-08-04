@@ -736,10 +736,10 @@ end;
 
 type
   Int15h_info = record
-    base   : QWord;
-    length : QWord;
+    Base   : QWord;
+    Length : QWord;
     tipe   : DWORD;
-    res    : DWORD;
+    Res    : DWORD;
   end;
   PInt15h_info = ^Int15h_info;
 
@@ -750,18 +750,18 @@ var
   CounterID: LongInt; // starts with CounterID = 1
 
 // Return information about a region of Memory
-function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
+function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
-  desc: PInt15h_info;
+  Desc: PInt15h_info;
 begin
   if ID > CounterID then
     Result :=0
   else
     Result := SizeOf(TMemoryRegion);
-  desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
-  Buffer.Base := desc.Base;
-  Buffer.length := desc.length;
-  Buffer.Flag := desc.tipe;
+  Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
+  Buffer.Base := Desc.Base;
+  Buffer.Length := Desc.Length;
+  Buffer.Flag := Desc.tipe;
 end;
 
 // Initialize Memory table. It uses information from bootloader.
@@ -773,13 +773,13 @@ var
   Desc: PInt15h_info;
 begin
   CounterID:=0;
-  AvailableMemory:=0;
+  AvailableMemory := 0;
   Magic := Pointer(INT15H_TABLE);
   Desc := Pointer(INT15H_TABLE);
   while Magic^ <> $1234 do
   begin
     if (Desc.tipe = 1) and (Desc.Base >= $100000) then
-      AvailableMemory := AvailableMemory + Desc.length;
+      AvailableMemory := AvailableMemory + Desc.Length;
     Inc(Magic);
     Inc(Desc);
   end;
@@ -1173,7 +1173,7 @@ begin
         if (TableHeader.Signature[0] = 'A') and (TableHeader.Signature[1] = 'P')  then
         begin
           madt := Pointer(TableHeader);
-          MadEnd := Pointer(SizeUInt(madt) + TableHeader.length);
+          MadEnd := Pointer(SizeUInt(madt) + TableHeader.Length);
           Entry := Pointer(SizeUInt(madt) + SizeOf(TAcpiMadt));
           while SizeUInt(Entry) < SizeUInt(MadEnd) do
           begin // that 's a new Processor.

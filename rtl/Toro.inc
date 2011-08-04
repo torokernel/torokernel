@@ -12,7 +12,7 @@
 //{$DEFINE CPUX86_64}
 //{$DEFINE DEBUG}
 //{$DEFINE DebugThreadInfo}
-//{$DEFINE DebugFilesystem}
+//{$DEFINE DebugFS}
 //{$DEFINE DebugMemory}
 //{$DEFINE DebugProcess}
 //{$DEFINE DebugProcessEmigrating}

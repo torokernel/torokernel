@@ -169,7 +169,7 @@ begin
   PutC('0');
   PutC('x');
   for I := SizeOf(PtrUInt)*2-1 downto 0 do
-    PutC(HEX_CHAR[(Value shr I*4) and $0F]);
+    PutC(HEX_CHAR[(Value shr (I*4)) and $0F]);
 end;
 
 procedure PrintString(const S: AnsiString);
@@ -536,24 +536,20 @@ end;
 
 procedure EnabledConsole;
 begin
-irq_on(1);
+  irq_on(1);
 end;
 
 procedure DisabledConsole;
 begin
-irq_off(1);
+  irq_off(1);
 end;
 
-//
-// ConsoleInit :
-// Initialization of Console
-//
 procedure ConsoleInit;
 begin
-BufferCount:=1;
-ThreadInKey:=nil;
-LastChar:=1;
-CaptureInt(33,@IrqKeyb);
+  BufferCount := 1;
+  ThreadInKey := nil;
+  LastChar := 1;
+  CaptureInt(33,@IrqKeyb);
 end;
 
 end.

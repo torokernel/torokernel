@@ -427,15 +427,17 @@ var
   ip_ret: ^THandle;
 begin
   NewThread := ToroGetMem(SizeOf(TThread));
+  {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread: %h', PtrUInt(NewThread), 0, 0); {$ENDIF}
   if NewThread = nil then
   begin
+    {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread = nil', 0, 0, 0); {$ENDIF}
     Result := nil;
     Exit;
   end;
-  NewThread.StackAddress := ToroGetMem(StackSize);
-  // no more memory
+  NewThread^.StackAddress := ToroGetMem(StackSize);
   if NewThread.StackAddress = nil  then
   begin
+    {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread.StackAddress = nil', 0, 0, 0); {$ENDIF}
     ToroFreeMem(NewThread);
     Result := nil;
     Exit;
@@ -443,12 +445,14 @@ begin
   // Is this the  first thread ?
   if not Initialized then
   begin
-    Initialized := True
+    {$IFDEF DEBUG} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
+    Initialized := True;
   end else if THREADVAR_BLOCKSIZE <> 0 then
   begin
     NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
     if NewThread.TLS = nil then
     begin // Not enough memory, Thread cannot be created
+      {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
       ToroFreeMem(NewThread.StackAddress);
       ToroFreeMem(NewThread);
       Result := nil;

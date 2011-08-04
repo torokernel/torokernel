@@ -182,6 +182,18 @@ type
   end;
   PNetworkDedicate = ^TNetworkDedicate;
 
+  PSockAddr = ^TSockAddr;
+  TSockAddr = record
+    case Integer of
+      0: (sin_family: Word;
+          sin_port: Word;
+          sin_addr: TIPAddress;
+          sin_zero: array[0..7] of XChar);
+      1: (sa_family: Word;
+          sa_data: array[0..13] of XChar)
+  end;
+  TInAddr = TIPAddress;
+
   // Socket structure
   TSocket = record
     SourcePort,DestPort: LongInt;
@@ -1026,11 +1038,12 @@ var
   Service: PNetworkService;
   Socket: PSocket;
 begin
-  Service:= DedicateNetworks[GetApicid].SocketStream[LocalPort];
+  Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
   if Service.ServerSocket = nil then
-    Result := nil
-  else
   begin
+    Result := nil;
+    Exit;
+  end;
     Socket:= Service.ClientSocket;
     // Is it an duplicate connection ?
     while Socket <> nil do
@@ -1039,12 +1052,10 @@ begin
       begin
         Result := nil;
         Exit;
-      end
-      else
-        Socket:= Socket.next;
+    end else
+      Socket:= Socket.Next;
     end;
     Result := Service.ServerSocket;
-  end;
 end;
 
 // Manipulation of IP Packets, redirect the traffic to Sockets structures
@@ -1419,8 +1430,8 @@ var
   Service: PNetworkService;
   Socket: PSocket;
 begin
-  Service:= GetCurrentThread.NetworkService; // Get Network Service structure
-  NextSocket:= Service.ClientSocket; // Get Client queue
+  Service := GetCurrentThread.NetworkService; // Get Network Service structure
+  NextSocket := Service.ClientSocket; // Get Client queue
   Socket := NextSocket;
   // we will execute a handler for every socket depending of the EVENT
   while NextSocket <> nil do
@@ -1740,7 +1751,6 @@ begin
     end;
   end;
 end;
-
 
 // The Socket waits for notification, and returns when a new event is received
 // External events are REMOTECLOSE, RECEIVE or TIMEOUT

@@ -53,6 +53,8 @@ const
   XHEAP_CHUNK_CAPACITY = 1024*1024; // 1MB
 
 type
+  TBlockHeader = UInt64;
+  PBlockHeader = ^TBlockHeader;
   TPointerArray = array[0..0] of Pointer;
   PPointerArray = ^TPointerArray;
   PXHeap = ^TXHeap;
@@ -136,7 +138,7 @@ const
   INITIAL_ALLOC_SIZE = 1024*1024; // 1MB
   INITIAL_MAXALLOC_BLOCKCOUNT = 1024; // foreach subsequent SX -> div 2
   BLOCKLIST_INITIAL_CAPACITY = 1024; // 1024 items capacity foreach BlockList (BlockList.Count=0)
-  BLOCK_HEADER_SIZE = SizeOf(Cardinal); // the pointer on the block keep track of SX in header PCardinal(Cardinal(P)-BLOCK_HEADER_SIZE)^ = SX
+  BLOCK_HEADER_SIZE = SizeOf(TBlockHeader); // the pointer on the block keep track of SX in header PBlockHeader(TBlockHeader(P)-BLOCK_HEADER_SIZE)^ = SX
   MINIMUM_VIRTUALALLOC_SIZE = 1024*1024+BLOCK_HEADER_SIZE; // 1MB -> this chunk will be splitted in a BlockList
   MAX_BLOCKSIZE = 1024*1024*1024; // Max block size of memory in allocator
   FLAG_FREE = 1;
@@ -168,7 +170,7 @@ function GetSX(Size: PtrUInt): Byte;
 begin
   if Size < MAPSX_COUNT*8 then
   begin
-    Result := MapSX[Size div 8];
+    Result := MapSX[(Size-1) div 8]; // KW 20110804 changed from MapSX[Size div 8]
     Exit;
   end;
   Result := MIN_GETSX;
@@ -178,7 +180,7 @@ end;
 
 function GetPointerSize(P: Pointer): Integer;
 var
-  Header: Cardinal;
+  Header: TBlockHeader;
 begin
   if P = nil then
   begin
@@ -186,7 +188,7 @@ begin
     Exit;
   end;
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  Header := PCardinal(P)^;
+  Header := PBlockHeader(P)^;
   if Header and FLAG_PRIVATE_HEAP = FLAG_PRIVATE_HEAP then
     Result := DirectorySX[Header shr SX_SHIFT]
   else
@@ -199,33 +201,33 @@ end;
 procedure SetHeaderSX(CPU, SX, FlagFree: Byte; P: Pointer);
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  PCardinal(P)^ := FlagFree or (CPU shl CPU_SHIFT) or (SX shl SX_SHIFT);
+  PBlockHeader(P)^ := FlagFree or (CPU shl CPU_SHIFT) or (SX shl SX_SHIFT);
 end;
 
 procedure SetHeaderPrivate(FlagFree: Byte; SizeAlign8: PtrUInt; P: Pointer);
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  PCardinal(P)^ := FlagFree or FLAG_PRIVATE_HEAP or ((SizeAlign8 div 8) shl 2);
+  PBlockHeader(P)^ := FlagFree or FLAG_PRIVATE_HEAP or ((SizeAlign8 div 8) shl 2);
 end;
 
 procedure ResetFreeFlag(P: Pointer);
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  PCardinal(P)^ := PCardinal(P)^ and $FFFFFFFE;
+  PBlockHeader(P)^ := PBlockHeader(P)^ and $FFFFFFFE;
 end;
 
 procedure SetFreeFlag(P: Pointer);
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  PCardinal(P)^ := FLAG_FREE or PCardinal(P)^;
+  PBlockHeader(P)^ := PBlockHeader(P)^ or FLAG_FREE;
 end;
 
 procedure GetHeader(P: Pointer; var CPU, SX, FlagFree, FlagPrivateHeap: Byte; var Size: PtrUInt);
 var
-  Header: Cardinal;
+  Header: TBlockHeader;
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
-  Header := PCardinal(P)^;
+  Header := PBlockHeader(P)^;
   FlagPrivateHeap := Header and FLAG_PRIVATE_HEAP;
   if FlagPrivateHeap <> FLAG_PRIVATE_HEAP then
   begin
@@ -242,7 +244,7 @@ end;
 
 function IsPrivateHeap(P: Pointer): Byte; inline;
 begin
-  Result := PCardinal(PtrUInt(P)-BLOCK_HEADER_SIZE)^ and FLAG_PRIVATE_HEAP;
+  Result := PBlockHeader(PtrUInt(P)-BLOCK_HEADER_SIZE)^ and FLAG_PRIVATE_HEAP;
 end;
 
 // Shared between XHeapAcquire and XHeapStack
@@ -414,7 +416,6 @@ begin
   Result := Root.StackHeaps[Root.StackHeapIndex];
 end;
 
-
 // Called by DistributeChunk and FreeMem
 procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 // var
@@ -423,6 +424,7 @@ procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
   if BlockList.Count >= BlockList.Capacity then
   begin
+    {$IFDEF DebugMemory} DebugTrace('BlockListAdd Capacity has been reached -> Severe corruption will occur', 0, 0, 0); {$ENDIF}
    (* // TODO: Need to handle to realloc BlockList in case the actual capacity is reached 
     NewCapacity := BlockList.Capacity*2;
     NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
@@ -438,15 +440,16 @@ begin
   Inc(BlockList.Count);
 end;
 
-// Make an assignation of Chunk to directory every directory
-procedure DistributeChunk(MemoryAllocator: PMemoryAllocator; Chunk: Pointer; ChunkSize: PtrUInt);
+// Called by ToroGetMem->ObtainFromLargerChunk and by MemoryInit->DistributeMemoryRegions->InitializeDirectory
+// Split large chunk into smaller chunks and distribute these smaller chunk in every directory they belongs
+procedure SplitChunk(MemoryAllocator: PMemoryAllocator; Chunk: Pointer; ChunkSize: PtrUInt);
 var
   BlockCount: Cardinal;
   BlockList: PBlockList;
   CPU: longint;
   SX: Byte;
 begin
-{$IFDEF DebugMemory} DebugTrace('DistributeChunk %h %d bytes', 0, PtrUInt(Chunk), ChunkSize); {$ENDIF}
+  {$IFDEF DebugMemory} DebugTrace('SplitChunk Chunk: %h Size: %d bytes', PtrUInt(Chunk), ChunkSize, 0); {$ENDIF}
   {$IFDEF HEAP_STATS} BlockCount := 0; {$ENDIF}
   SX := 0; // avoid warning when using dcc64
   CPU := GetApicID;
@@ -460,145 +463,22 @@ begin
     SetHeaderSX(CPU, SX, 1, Chunk);
     BlockList := @MemoryAllocator.Directory[SX];
     BlockListAdd(BlockList, Chunk);
+    ChunkSize := ChunkSize-BLOCK_HEADER_SIZE-DirectorySX[SX];
+    {$IFDEF DebugMemory} DebugTrace('SplitChunk Add Block: %h SizeSX: %d Remaining ChunkSize: %d', PtrUInt(Chunk), DirectorySX[SX], ChunkSize); {$ENDIF}
     {$IFDEF HEAP_STATS} Inc(BlockCount); {$ENDIF}
     Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
-    ChunkSize := ChunkSize-BLOCK_HEADER_SIZE-DirectorySX[SX];
   end;
   {$IFDEF HEAP_STATS} Inc(MemoryAllocators[CPU].FreeSize, BlockCount*DirectorySX[SX]); {$ENDIF}
   {$IFDEF HEAP_STATS2} Inc(MemoryAllocators[CPU].FreeCount, BlockCount); {$ENDIF}
 end;
 
-// Initialize MemoryAllocator.Directory splitting the memory chunk reserved for the CPU
-// Do one times per CPU
-// TODO : Maybe the chuck is too small and i haven't memory for pointer's table
-procedure InitializeDirectory(MemoryAllocator: PMemoryAllocator;Chunk:pointer;ChunkSize:PtrUint);
-var
-  BlockList: PBlockList;
-  MaxAllocBlockCount: Integer;
-  SX: Byte;
-begin
-  // this is assignation is only for pointers's tables
-  if not MemoryAllocator.Initialized then
-  begin
-    FillChar(MemoryAllocator.Directory, SizeOf(MemoryAllocator.Directory), 0); // .Capacity=0 .Count=0 .List=nil
-    MaxAllocBlockCount := INITIAL_MAXALLOC_BLOCKCOUNT;
-    // The tables has been initilized
-    MemoryAllocator.Initialized := not (MemoryAllocator.Initialized);
-    // ForEach Directory[SX] entry: reserve BLOCKLIST_INITIAL_CAPACITY items.
-    for SX := 0 to MAX_SX-1 do
-    begin
-      BlockList := @MemoryAllocator.Directory[SX];
-      BlockList.MaxAllocBlockCount := MaxAllocBlockCount;
-      if (MaxAllocBlockCount > 1) and ((SX+1) mod 4 = 0) then
-        MaxAllocBlockCount := MaxAllocBlockCount div 2;
-      BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
-      BlockList.Count := 0;
-      BlockList.List := Chunk;
-      ChunkSize := ChunkSize-BlockList.Capacity*SizeOf(Pointer);
-      {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}
-      {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, BlockList.Capacity); {$ENDIF}
-      Chunk := Pointer(PtrUInt(Chunk)+BlockList.Capacity*SizeOf(Pointer));
-    end;
-  end;
-  DistributeChunk(MemoryAllocator, Chunk, ChunkSize);
-end;
-
-// Distribution of Memory for every core .
-// this procedure is executed only in Initialization
-procedure DistributeMemoryRegions ;
-var
-  Amount, Counter: PtrUInt;
-  Buff: TMemoryRegion;
-  CPU, ID: Cardinal;
-  MemoryAllocator: PMemoryAllocator;
-  StartAddress: Pointer;
-begin
-  // I am thinking that the regions are sorted
-  // Looking for the first ID available
-  ID := 1;
-  // First Region must start at ALLOC_MEMORY_START
-  // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
-  while GetMemoryRegion(ID, @Buff) <> 0 do
-  begin
-    if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
-      Break;
-    Inc(ID);
-  end;
-  // free memory on region
-  Amount := Buff.Length;
-  // allocation start here
-  StartAddress := Pointer(ALLOC_MEMORY_START);
-  for CPU := 0 to CPU_COUNT-1 do
-  begin
-    MemoryAllocator := @MemoryAllocators[CPU];
-    MemoryAllocator.StartAddress := StartAddress;
-    MemoryAllocator.Size := MemoryPerCPU;
-    // assignation per CPU
-    Counter := MemoryPerCpu;
-    while Counter <> 0 do
-    begin
-      if Amount > Counter then
-      begin
-        Amount := Amount - Counter;
-        // the amount is assigned to the directory
-        InitializeDirectory(MemoryAllocator, StartAddress, Counter);
-        // same region block
-        StartAddress:= Pointer(PtrUInt(StartAddress) + Counter);
-        MemoryAllocator.EndAddress := StartAddress;
-        // change the cpu
-        Counter := 0;
-      end else if Amount = Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + Amount);
-        // change the cpu
-        Counter := 0;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new assignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base)
-      end else if Amount < Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        Counter := Counter-Amount;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new asignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base);
-      end;
-    end;
-  end;
-end;
-
-// Reasignation of memory
-function MemoryReassignation(SX: longint; MemoryAllocator: PMemoryAllocator): Pointer;
+function ObtainFromLargerChunk(SX: LongInt; MemoryAllocator: PMemoryAllocator): Pointer;
 var
   ChunkSX: longint;
-  CPU: longint;
   ChunkBlockList: PBlockList;
   Chunk: Pointer;
   ChunkSize: PtrUInt;
-  BlockList: PBlockList;
 begin
-  CPU := GetApicID;
-  BlockList := @MemoryAllocator.Directory[SX];
-  if SX < 8 then // if Size < 128 bytes
-    ChunkSX := 8 // Avoid loss of too small blocks (<32 bytes)
-  else
     ChunkSX := SX+1;
   // looking for free blocks
   while (ChunkSX < MAX_SX) and (MemoryAllocator.Directory[ChunkSX].Count = 0) do
@@ -608,31 +488,12 @@ begin
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
   Dec(ChunkBlockList.Count);
   ChunkSize := DirectorySX[ChunkSX];
+  {$IFDEF HEAP_STATS} Dec(MemoryAllocator.FreeSize, DirectorySX[ChunkSX]); {$ENDIF}
+  {$IFDEF HEAP_STATS2} Dec(MemoryAllocator.FreeCount); {$ENDIF}
   Result := Chunk;
   Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
   ChunkSize := ChunkSize-DirectorySX[SX];
-  // if BlockSize < 64 bytes then add 3 blocks (2 here and 1 in the SX<8 section) of same size as requested in the Directory of free blocks
-  if (SX < 4) and (ChunkSize >= 3*DirectorySX[SX]) then
-  begin
-    // Optimization to avoid getting too small blocks -> force to split 4 blocks of SX in the Chunk
-    SetHeaderSX(CPU, SX, 1, Chunk);
-    BlockListAdd(BlockList, Chunk);
-    Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
-    SetHeaderSX(CPU, SX, 1, Chunk);
-    BlockListAdd(BlockList, Chunk);
-    Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
-    ChunkSize := ChunkSize-2*DirectorySX[SX];
-  end; // DO NOT else on following block this is incremental
-  if (SX < 8) and (ChunkSize >= DirectorySX[SX]) then // if BlockSize < 128 bytes then add a second block of same size as requested in the Directory of free blocks
-  begin
-    // Optimization to avoid getting too small blocks -> force to split 4 blocks of SX in the Chunk
-    Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
-    SetHeaderSX(CPU, SX, 1, Chunk);
-    BlockListAdd(BlockList, Chunk);
-    ChunkSize := ChunkSize-DirectorySX[SX];
-  end;
-  // Any other cases should be handled
-  DistributeChunk(MemoryAllocator, Chunk, ChunkSize);
+  SplitChunk(MemoryAllocator, Chunk, ChunkSize);
 end;
 
 function ToroGetMem(Size: PtrUInt): Pointer;
@@ -646,33 +507,33 @@ begin
   Result := nil;
   if Size > MAX_BLOCKSIZE then
   begin
-    {$IFDEF DebugMemory}DebugTrace('ToroGetMem: Size: %d , fail', 0, Size, 0);{$ENDIF}
+    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Size: %d , fail', 0, Size, 0); {$ENDIF}
     Exit;
   end;
   CPU := GetApicID;
   MemoryAllocator := @MemoryAllocators[CPU];
   SX := GetSX(Size);
-{$IFDEF HEAP_STATS_REQUESTED_SIZE}
+  {$IFDEF HEAP_STATS_REQUESTED_SIZE}
   if Size <= 1024 then
     Inc(DirectoryRequestedSize[Size]);
-{$ENDIF}
+  {$ENDIF}
     BlockList := @MemoryAllocator.Directory[SX];
     if BlockList.Count = 0 then
     begin
       ChunkSize := DirectorySX[SX];
-      Result := MemoryReassignation(SX, MemoryAllocator);
+    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d', 0, Size, ChunkSize); {$ENDIF}
+    Result := ObtainFromLargerChunk(SX, MemoryAllocator);
       ResetFreeFlag(Result);
       if Result = nil then
         Exit;
-      {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, ChunkSize); {$ENDIF}
+    {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
       {$IFDEF HEAP_STATS2}
-        Inc(TotalVirtualAllocated, ChunkSize);
-        Inc(MemoryAllocator.CurrentVirtualAlloc);
-        Inc(MemoryAllocator.TotalVirtualAlloc);
-        Inc(BlockList.CurrentVirtualAlloc);
-        Inc(BlockList.TotalVirtualAlloc);
+      Inc(MemoryAllocator.Current);
+      Inc(MemoryAllocator.Total);
+      Inc(BlockList.Current); // Counters do not need to be under Lock
+      Inc(BlockList.Total);
       {$ENDIF}
-      {$IFDEF DebugMemory}DebugTrace('ToroGetMem: Pointer %q , Size: %d',PtrUint(Result),Size,0);{$ENDIF}
+    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, ChunkSize); {$ENDIF}
       Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -689,7 +550,7 @@ begin
     Inc(BlockList.Current); // Counters do not need to be under Lock
     Inc(BlockList.Total);
   {$ENDIF}
-  {$IFDEF DebugMemory}DebugTrace('ToroGetMem: Pointer %q , Size: %d',PtrUint(Result),DirectorySX[SX],0);{$ENDIF}
+  {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, DirectorySX[SX]); {$ENDIF}
 end;
 
 function ToroFreeMem(P: Pointer): Integer;
@@ -731,12 +592,12 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
-  {$IFDEF DebugMemory}DebugTrace('ToroFreeMem: Pointer %q',PtrUint(P),0,0);{$ENDIF}
+  {$IFDEF DebugMemory} DebugTrace('ToroFreeMem: Pointer %h', PtrUInt(P), 0, 0); {$ENDIF}
   Result := 0;
 end;
 
 // Returns free block of memory filling with zeros
-function ToroAllocMem(Size : PtrUInt): Pointer;
+function ToroAllocMem(Size: PtrUInt): Pointer;
 begin
 	Result := ToroGetMem(Size);
 	if Result <> nil then
@@ -822,8 +683,6 @@ begin
   Result := True;
 end;
 
-
-
 // Set a Memory's Region as NO-CACHEABLE
 function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
 var
@@ -843,9 +702,9 @@ begin
     PageStart := PageStart-PAGE_SIZE;
   // StartPage is a Page_Size multipler
   StartPage := Pointer(PageStart);
-  Size := Size + PtrUint(Add) mod PAGE_SIZE;
+  Size := Size + PtrUInt(Add) mod PAGE_SIZE;
   PageCount := Size div PAGE_SIZE;
-  if (Size mod PAGE_SIZE) <> 0 then
+  if Size mod PAGE_SIZE <> 0 then
     Inc(PageCount);
   EndPage := StartPage;
   EndPage := Pointer(PtrUInt(EndPage) + PageCount*PAGE_SIZE);
@@ -856,6 +715,125 @@ begin
     StartPage := Pointer(PtrUInt(StartPage)+PAGE_SIZE);
   end;
   Result := True;
+end;
+
+// Initialize MemoryAllocator.Directory splitting the memory chunk reserved for the CPU
+// Do one times per CPU
+// TODO : Maybe the chuck is too small and i haven't memory for pointer's table
+procedure InitializeDirectory(MemoryAllocator: PMemoryAllocator; Chunk: Pointer; ChunkSize: PtrUInt);
+var
+  BlockList: PBlockList;
+  MaxAllocBlockCount: Integer;
+  Shift: PtrUInt;
+  SX: Byte;
+begin
+  {$IFDEF DebugMemory} DebugTrace('InitializeDirectory Chunk: %h Size: %d', PtrUInt(Chunk), ChunkSize, 0); {$ENDIF}
+  // this is assignation is only for pointers's tables
+  if not MemoryAllocator.Initialized then
+  begin
+    {$IFDEF DebugMemory} DebugTrace('InitializeDirectory first initialization', 0, 0, 0); {$ENDIF}
+    FillChar(MemoryAllocator.Directory, SizeOf(MemoryAllocator.Directory), 0); // .Capacity=0 .Count=0 .List=nil
+    MaxAllocBlockCount := INITIAL_MAXALLOC_BLOCKCOUNT;
+    MemoryAllocator.Initialized := True;
+    // ForEach Directory[SX] entry: reserve BLOCKLIST_INITIAL_CAPACITY items
+    for SX := 0 to MAX_SX-1 do
+    begin
+      BlockList := @MemoryAllocator.Directory[SX];
+      BlockList.MaxAllocBlockCount := MaxAllocBlockCount;
+      if (MaxAllocBlockCount > 1) and ((SX+1) mod 4 = 0) then
+        MaxAllocBlockCount := MaxAllocBlockCount div 2;
+      BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
+      BlockList.Count := 0;
+      BlockList.List := Chunk;
+      ChunkSize := ChunkSize-BlockList.Capacity*SizeOf(Pointer);
+      {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}
+      {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, BlockList.Capacity); {$ENDIF}
+      Shift := BlockList.Capacity*SizeOf(Pointer);
+      Chunk := Pointer(PtrUInt(Chunk)+Shift);
+    end;
+  end;
+  SplitChunk(MemoryAllocator, Chunk, ChunkSize);
+end;
+
+// Distribution of Memory for every core
+// called by MemoryInit
+procedure DistributeMemoryRegions;
+var
+  Amount, Counter: PtrUInt;
+  Buff: TMemoryRegion;
+  CPU, ID: Cardinal;
+  MemoryAllocator: PMemoryAllocator;
+  StartAddress: Pointer;
+begin
+  // I am thinking that the regions are sorted
+  // Looking for the first ID available
+  ID := 1;
+  // First Region must start at ALLOC_MEMORY_START
+  // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
+  while GetMemoryRegion(ID, @Buff) <> 0 do
+  begin
+    if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.Length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
+      Break;
+    Inc(ID);
+  end;
+  // free memory on region
+  Amount := Buff.Length;
+  // allocation start here
+  StartAddress := Pointer(ALLOC_MEMORY_START);
+  for CPU := 0 to CPU_COUNT-1 do
+  begin
+    MemoryAllocator := @MemoryAllocators[CPU];
+    MemoryAllocator.StartAddress := StartAddress;
+    MemoryAllocator.Size := MemoryPerCPU;
+    // assignation per CPU
+    Counter := MemoryPerCpu;
+    while Counter <> 0 do
+    begin
+      if Amount > Counter then
+      begin
+        Amount := Amount - Counter;
+        // the amount is assigned to the directory
+        InitializeDirectory(MemoryAllocator, StartAddress, Counter);
+        // same region block
+        StartAddress:= Pointer(PtrUInt(StartAddress) + Counter);
+        MemoryAllocator.EndAddress := StartAddress;
+        // change the cpu
+        Counter := 0;
+      end else if Amount = Counter then
+      begin
+        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
+        MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + Amount);
+        // change the cpu
+        Counter := 0;
+        // looking for a free block of memory
+        Inc(ID);
+        while GetMemoryRegion(ID, @Buff) <> 0 do
+        begin
+          if Buff.Flag = MEM_AVAILABLE then
+            Break;
+          Inc(ID);
+        end;
+        // new assignation of memory
+        Amount := Buff.Length;
+        StartAddress := Pointer(Buff.Base)
+      end else if Amount < Counter then
+      begin
+        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
+        Counter := Counter-Amount;
+        // looking for a free block of memory
+        Inc(ID);
+        while GetMemoryRegion(ID, @Buff) <> 0 do
+        begin
+          if Buff.Flag = MEM_AVAILABLE then
+            Break;
+          Inc(ID);
+        end;
+        // new asignation of memory
+        Amount := Buff.Length;
+        StartAddress := Pointer(Buff.Base);
+      end;
+    end;
+  end;
 end;
 
 // Initilization of Memory Directory for every Core
@@ -883,10 +861,10 @@ begin
   end;
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
   // Linear Assignation for every Core
-  MemoryPerCpu := AvailableMemory div CPU_COUNT;
-  printk_('System Memory ... /V%d/n bytes\n',AvailableMemory);
-  printk_('Memory per Core ... /V%d/n bytes\n',MemoryPerCpu);
-  DistributeMemoryRegions; // Initilization of Directory for every Core
+  MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
+  PrintK_('System Memory ... /V%d/n bytes\n', AvailableMemory);
+  PrintK_('Memory per Core ... /V%d/n bytes\n', MemoryPerCpu);
+  DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;
   ToroMemoryManager.AllocMem := @ToroAllocMem;

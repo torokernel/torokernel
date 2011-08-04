@@ -102,14 +102,14 @@ begin
   end;
 end;
 
-procedure DebugPrintHexa(Value: DWORD);
+procedure DebugPrintHexa(const Value: PtrUInt);
 var
   I: Byte;
 begin
   SendChar('0');
   SendChar('x');
-  for I := (sizeof(PtrUint)*2-1) downto 0 do
-    SendChar(HEX_CHAR[(Value shr I*4) and $0F]);
+  for I := SizeOf(PtrUInt)*2-1 downto 0 do
+    SendChar(HEX_CHAR[Value shr (I*4) and $F]);
 end;
 
 procedure DebugPrintString(const S: shortstring);
@@ -121,10 +121,10 @@ begin
 end;
 
 // No locking. Locking is performed by caller function (DebugTrace or DebugPrint)
-procedure DebugFormat(Format: PXChar; QArg: Int64; Arg1 , Arg2 : Dword);
+procedure DebugFormat(Format: PXChar; const QArg: PtrUInt; Arg1 , Arg2 : Dword);
 var
   ArgNo: Integer;
-  DecimalValue: DWORD;
+  DecimalValue: PtrUInt;
   S: ShortString;
 begin
   ArgNo := 0 ;
@@ -135,18 +135,17 @@ begin
       Format := Format+1;
       if Format^ = #0 then
         Exit;
-      if Argno=0 then
-        DecimalValue:=Arg1
+      if ArgNo = 0 then
+        DecimalValue := Arg1
       else
-        DecimalValue :=Arg2;
+        DecimalValue := Arg2;
       case Format^ of
         'h': begin
-               DebugPrintHexa(DecimalValue);
-               ArgNo := ArgNo+1;
+               DebugPrintHexa(QArg);
              end;
      	'd': begin
                DebugPrintDecimal(DecimalValue);
-	       ArgNo := ArgNo+1;
+               Inc(ArgNo);
              end;
      	'q': begin
                Str(QArg, S);
@@ -169,8 +168,8 @@ begin
       	Exit;
       case Format^ of
      		'n': begin
-         			SendChar(chr(13));
-       				SendChar(chr(10));
+         			SendChar(XChar(13));
+       				SendChar(XChar(10));
          			Format := Format+1;
          		end;
      		'\': begin
@@ -192,14 +191,14 @@ end;
 
 // Similar to printk but the Char are send using serial port for debug procedures .
 // Only can send one qword argument . 
-procedure DebugPrint(Format: PXChar; QArg: Int64; Arg1,Arg2 : DWORD);
+procedure DebugPrint(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
 begin
   SpinLock(3, 4, LockDebug);
   DebugFormat(Format, QArg, Arg1, Arg2);
   LockDebug := 3;
 end;
 
-procedure DebugTrace(Format: PXChar; QArg: Int64; Arg1,Arg2: DWORD);
+procedure DebugTrace(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
 {$IFDEF DebugThreadInfo}
 var
   CPUI: LongInt;

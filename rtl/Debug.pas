@@ -37,8 +37,8 @@ interface
 uses Arch;
 
 procedure DebugInit;
-procedure DebugPrint(Format: PXChar; QArg: Int64; Arg1, Arg2 : DWORD);
-procedure DebugTrace(Format: PXChar; QArg: Int64; Arg1, Arg2 : DWORD);
+procedure DebugPrint(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
+procedure DebugTrace(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
 
 implementation
 

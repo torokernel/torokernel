@@ -60,7 +60,6 @@ begin
   // we will never return from this procedure call
   {$IFDEF FPC} CreateInitThread(@InitSystem, 32*1024); {$ENDIF}
   {$IFDEF DCC} CreateInitThread(@InitSystem, 32*1024); {$ENDIF} // replace with @StartExeProc
-  //while True do;
 end;
 
 initialization

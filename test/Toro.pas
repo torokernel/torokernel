@@ -46,7 +46,7 @@ uses
   Debug in 'rtl\Debug.pas',
   Arch in 'rtl\Arch.pas',
   Filesystem in 'rtl\Filesystem.pas',
-  NetWork in 'rtl\Network.pas',
+  Network in 'rtl\Network.pas',
   Console in 'rtl\Drivers\Console.pas',
   E1000 in 'rtl\Drivers\e1000.pas';
 

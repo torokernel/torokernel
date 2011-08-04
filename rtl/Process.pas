@@ -292,41 +292,6 @@ begin
   end;
 end;
 
-{$IFDEF FPC}
-// Manipulation of critical section by Thread Manager of FPC
-procedure SysInitCriticalSection(var CS: TRTLCriticalSection);
-begin
-  CS.Flag := SPINLOCK_FREE;
-  CS.Short := True;
-end;
-
-procedure SysEnterCriticalSection(var CS: TRTLCriticalSection);
-begin
-  // ??? here i have an error
-  if CS.short then
-  begin
-    SpinLock(SPINLOCK_FREE, SPINLOCK_BUSY, CS.Flag)
-    // in the long mode the thread sleep when return the lock operation is executed only one more time
-  end else
-  begin
-    SpinLock(SPINLOCK_FREE, SPINLOCK_BUSY, CS.Flag);
-    ThreadSuspend;
-  end;
-end;
-
-procedure SysLeaveCriticalSection(var CS: TRTLCriticalSection);
-begin
-  if CS.short then
-    CS.Flag := SPINLOCK_FREE
-  else
-  begin
-    // in long mode the thread schedule next thread
-    CS.Flag := SPINLOCK_FREE;
-    ThreadResume(CS.lock_tail);
-  end;
-end;
-{$ENDIF}
-
 //------------------------------------------------------------------------------
 // Threads list management
 //------------------------------------------------------------------------------
@@ -951,10 +916,10 @@ begin
     ThreadSetPriority      := nil;
     ThreadGetPriority      := nil;
     GetCurrentThreadId     := @SysGetCurrentThreadID;
-    InitCriticalSection    := @SysInitCriticalSection;
+    InitCriticalSection    := nil;//@SysInitCriticalSection;
     DoneCriticalSection    := nil;
-    EnterCriticalSection   := @SysEnterCriticalSection ;
-    LeaveCriticalSection   := @SysLeaveCriticalSection;
+    EnterCriticalSection   := nil;//@SysEnterCriticalSection ;
+    LeaveCriticalSection   := nil;//@SysLeaveCriticalSection;
     InitThreadVar          := @SysInitThreadVar;
     RelocateThreadVar      := @SysRelocateThreadVar;
     AllocateThreadVars     := @SysAllocateThreadVars;
@@ -968,7 +933,6 @@ begin
     RTLEventDestroy        := nil;
     RTLEventSetEvent       := nil;
     RTLEventResetEvent     := nil;
-    RTLEventStartWait      := nil;
     RTLEventWaitFor        := nil;
     RTLEventWaitForTimeout := nil;
   end;

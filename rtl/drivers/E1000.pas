@@ -23,7 +23,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-unit e1000;
+unit E1000;
 
 interface
 

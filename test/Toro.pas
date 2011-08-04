@@ -48,7 +48,7 @@ uses
   Filesystem in 'rtl\Filesystem.pas',
   Network in 'rtl\Network.pas',
   Console in 'rtl\Drivers\Console.pas',
-  E1000 in 'rtl\Drivers\e1000.pas';
+  E1000 in 'rtl\Drivers\E1000.pas';
 
 const 
   Welcome: PChar = 'Hello from Toro!'+#13#10;

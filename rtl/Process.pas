@@ -790,7 +790,6 @@ var
   InitThread: PThread;
   LocalCPU: PCPU;
 begin
-  PrintK_('CreateInitThread\n', 0);
   LocalCPU := @CPU[GetApicID];
   InitThread := ThreadCreate(StackSize, LocalCPU.ApicID, ThreadFunction, nil);
   if InitThread = nil then
@@ -916,10 +915,10 @@ begin
     ThreadSetPriority      := nil;
     ThreadGetPriority      := nil;
     GetCurrentThreadId     := @SysGetCurrentThreadID;
-    InitCriticalSection    := nil;//@SysInitCriticalSection;
+    InitCriticalSection    := nil;
     DoneCriticalSection    := nil;
-    EnterCriticalSection   := nil;//@SysEnterCriticalSection ;
-    LeaveCriticalSection   := nil;//@SysLeaveCriticalSection;
+    EnterCriticalSection   := nil;
+    LeaveCriticalSection   := nil;
     InitThreadVar          := @SysInitThreadVar;
     RelocateThreadVar      := @SysRelocateThreadVar;
     AllocateThreadVars     := @SysAllocateThreadVars;

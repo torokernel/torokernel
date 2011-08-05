@@ -45,7 +45,7 @@ const
   EXC_DIVBYZERO = 0;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;
-  EXC_ILEGALINS = 6;
+  EXC_ILLEGALINS = 6;
   EXC_DEVNOTAVA = 7;
   EXC_DF = 8;
   EXC_STACKFAULT = 12;
@@ -133,7 +133,7 @@ procedure EnabledINT;
 procedure DisabledINT;
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
-function PciReadDWORD (const bus, device, func, regnum: UInt32): LongInt;
+function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
@@ -303,14 +303,14 @@ end;
 
 procedure write_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm 
-        mov dx, port
+        mov dx, port // ??? port is already in RDX, why is it necessary to assign it again ???
 	mov rsi, data 
         outsd
 end;
 
 procedure read_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm 
-        mov dx, port
+        mov dx, port // ??? port is already in RDX, why is it necessary to assign it again ???
 	mov rdi, data 
 	insd
 end;
@@ -533,7 +533,7 @@ begin
 end;
 
 
-// This code hes been extracted from DelphineOS <delphineos.sourceforge.net>
+// This code has been extracted from DelphineOS <delphineos.sourceforge.net>
 // Return the CPU speed in Mhz
 function CalculateCpuSpeed: Int64;
 var
@@ -763,7 +763,7 @@ begin
   val := (val and 15) + ((val shr 4) * 10);
 end;
 
-// Now: Return the time from the CMOS .
+// Now: Return the time from the CMOS
 procedure Now(Data: PNow);
 var
   Sec, Min, Hour,
@@ -819,24 +819,37 @@ asm
   cli
 end;
 
-// procedures for capture unhandles interruptions
+procedure AsmDb48CF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+asm
+  {$IFDEF DCC} .noframe {$ENDIF}
+  db $48
+  db $cf
+end;
+
+// procedures to capture unhandle interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
-  asm 
-     db $48
-     db $cf
+  {$IFDEF FPC}
+  asm
+    db $48
+    db $cf
   end;
+  {$ENDIF}
+  {$IFDEF DCC} AsmDb48CF; {$ENDIF}
 end;
 
 procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
   EOI;
-  asm 
-     db $48
-     db $cf
+  {$IFDEF FPC}
+  asm
+    db $48
+    db $cf
   end;
+  {$ENDIF}
+  {$IFDEF DCC} AsmDb48CF; {$ENDIF}
 end;
 
 // PCI bus access
@@ -844,7 +857,7 @@ const
  PCI_CONF_PORT_INDEX = $CF8;
  PCI_CONF_PORT_DATA  = $CFC;
 
-function PciReadDWORD(const bus, device, func, regnum: UInt32): LongInt;
+function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 var
   Send: DWORD;
 begin
@@ -1262,7 +1275,7 @@ begin
   FlushCr3;
 end;
 
-// Architecture's variables initilization
+// Architecture's variables initialization
 procedure ArchInit;
 var
   I: LongInt;
@@ -1287,9 +1300,9 @@ begin
   EnabledINT;
   Now(@StartTime);
   SMPInitialization;
-  // initilization of Floating Point Unit
+  // initialization of Floating Point Unit
   SSEInit;
 end;
 
 end.
-
+

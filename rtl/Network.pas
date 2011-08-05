@@ -1710,7 +1710,7 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek:  %q bytes from port %d to port %d ', PtrUint(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
+    {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek:  %q bytes from port %d to port %d ', PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
     Result := Result + FragLen;
   end;
 end;
@@ -1739,7 +1739,7 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: Receiving %q bytes from port %d to port %d ', PtrUint(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
+    {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: Receiving %q bytes from port %d to port %d ', PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
     Result := Result + FragLen;
     Socket.BufferReader := Socket.BufferReader + FragLen;
     // The buffer was readed , inform to sender that it can send data again

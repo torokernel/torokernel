@@ -499,7 +499,6 @@ end;
 function ToroGetMem(Size: PtrUInt): Pointer;
 var
   BlockList: PBlockList;
-  ChunkSize: Cardinal;
   CPU: Byte;
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
@@ -520,8 +519,7 @@ begin
     BlockList := @MemoryAllocator.Directory[SX];
     if BlockList.Count = 0 then
     begin
-      ChunkSize := DirectorySX[SX];
-    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d', 0, Size, ChunkSize); {$ENDIF}
+    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d', 0, Size, DirectorySX[SX]); {$ENDIF}
     Result := ObtainFromLargerChunk(SX, MemoryAllocator);
       ResetFreeFlag(Result);
       if Result = nil then
@@ -533,7 +531,7 @@ begin
       Inc(BlockList.Current); // Counters do not need to be under Lock
       Inc(BlockList.Total);
       {$ENDIF}
-    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, ChunkSize); {$ENDIF}
+    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, DirectorySX[SX]); {$ENDIF}
       Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -576,7 +574,7 @@ begin
  //    Dec(CurrentHeap.StatsSize, Size);
     {$ENDIF}
     Result := 0;
-    {$IFDEF DebugMemory}DebugTrace('ToroFreeMem: Pointer %q , PRIVATE HEAP is free',PtrUint(P),0,0);{$ENDIF}
+    {$IFDEF DebugMemory} DebugTrace('ToroFreeMem - Pointer: %h PRIVATE HEAP is free', PtrUInt(P), 0, 0); {$ENDIF}
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];

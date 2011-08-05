@@ -658,24 +658,6 @@ end;
 
 // Next procedures aren't atomic
 
-{
-function bit_test(Val: Pointer; pos: QWord): Boolean;
-asm
-  xor rax , rax
-  xor rbx , rbx
-  mov rbx , pos
-  mov rsi , Val
-  bt  [rsi] , rbx
-  jc  @si
-  @no:
-   mov rax , 0
-   jmp @salir
-  @si:
-    mov rax , 1
-  @salir:
-end;
-}
-
 function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm // RCX=Val RDX=Pos
   {$IFDEF DCC} push rsi {$ENDIF}
@@ -754,7 +736,7 @@ end;
 
 // Initialize Memory table. It uses information from bootloader.
 // The bootloader uses INT15h.
-// Usable memory is above 1MB
+// Usable memory is above 1MB.
 procedure MemoryCounterInit;
 var
   Magic: ^DWORD;
@@ -771,7 +753,7 @@ begin
     Inc(Magic);
     Inc(Desc);
   end;
-  // Allocation start at ALLOC_MEMORY_START
+  // allocation start at ALLOC_MEMORY_START
   AvailableMemory := AvailableMemory;
   CounterID := (QWord(Magic)-INT15H_TABLE);
   CounterID := counterId div SizeOf(Int15h_info);
@@ -908,14 +890,13 @@ end;
 var
   // temporary stacks for each cpu
   start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte;
-  // Pointer to Stack for each CPU during SMP Initilization
+  // pointer to Stack for each CPU during SMP Initilization
   esp_tmp: Pointer;
 
 // External Declarations for Initialization
-//procedure KernelStart; external name 'KernelStart';
 procedure boot_confirmation; forward;
 
-// Start stack for Initialization of CPU#0
+// start stack for Initialization of CPU#0
 var
   stack : array[1..5000] of Byte ;
 
@@ -942,8 +923,8 @@ asm
   call boot_confirmation
 end;
 
-// entry point of PE64 EXE
-// the Toro bootloader is starting all CPUs(Cores) with this entry point
+// Entry point of PE64 EXE
+// The Toro bootloader is starting all CPUs(Cores) with this entry point
 // ie: this procedure is executed in parallel by all CPUs when booting
 {$IFDEF FPC}
 procedure main; [public, alias: '_mainCRTStartup']; assembler;
@@ -992,7 +973,7 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// synchronization with bsp CPU
+// Synchronization with bsp CPU
 procedure boot_confirmation;
 var
   CpuID: Byte;
@@ -1003,7 +984,7 @@ begin
   Cores[CPUID].InitProc;
 end;
 
-// detect APICs on MP table
+// Detect APICs on MP table
 procedure mp_apic_detect(table: p_mp_table_header);
 var
   m: ^Byte;
@@ -1256,7 +1237,7 @@ begin
   Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-  // PCD bit is Reset --> Page In Cached
+  // PCD bit is Reset --> Page in cached
   Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
@@ -1267,7 +1248,7 @@ var
 begin
   Page := nil;
   PML4_Table := Pointer(PDADD);
-  // first two Pages aren't Cacheable (0-2*PAGE_SIZE)
+  // first two pages aren't cacheable (0-2*PAGE_SIZE)
   RemovePageCache(Page);
   Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);

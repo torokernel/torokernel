@@ -260,9 +260,12 @@ begin
   begin
     for dev := 0 to MAX_PCIDEV-1 do
     begin
+      {$IFDEF DebugArch} DebugTrace('PciDetect - Bus: %d Dev: %d', 0, Bus, Dev); {$ENDIF}
       for func := 0 to MAX_PCIFUNC-1 do
       begin
+        {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
         Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_VENDOR);
+        {$IFDEF DebugArch} DebugTrace('PciDetect - After PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
         Vendor := Tmp and $FFFF;
         Device := Tmp div 65536;
         // some bug
@@ -273,6 +276,7 @@ begin
         // the device exists
         if (Vendor = $ffff) or (Vendor = 0) then
           Continue;
+        {$IFDEF DebugArch} DebugTrace('PciDetect - func: %d DevInfo := ToroGetMem(SizeOf(TBusDevInfo))', 0, func, 0); {$ENDIF}
         DevInfo := ToroGetMem(SizeOf(TBusDevInfo));
         if DevInfo = nil then
           Exit;
@@ -284,7 +288,12 @@ begin
         for I := 0 to 5 do
         begin
           regnum := PCI_CONFIG_BASE_ADDR_0+I;
+          {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
+          {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword I: %d', 0, I, 0); {$ENDIF}
           Tmp := PciReadDword(Bus, dev, func, regnum);
+          {$IFDEF DebugArch} DebugTrace('PciDetect - After PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
+          {$IFDEF DebugArch} DebugTrace('PciDetect - After PciReadDword I: %d', 0, I, 0); {$ENDIF}
+          {$IFDEF DebugArch} DebugTrace('PciDetect - DevInfo: %h', PtrUInt(DevInfo), 0, 0); {$ENDIF}
           if (Tmp and 1) = 1 then
           begin
             DevInfo.IO[I] := Tmp and $FFFFFFFC // IO port

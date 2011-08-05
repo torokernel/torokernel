@@ -340,9 +340,7 @@ begin
 	        WriteConsole('IdeDisk: /V', []);
           WriteConsole(ATANames[Ctr.Driver.Major], []);
 	        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
-	        {$IFDEF DebugIdeDisk}
-            DebugTrace('IdeDisk: Controller: %q,Disk: %d --> Ok',Int64(Ctr.Driver.Major),Minor+I,0);
-          {$ENDIF}
+	        {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Controller: %q, Disk: %d --> Ok', Int64(Ctr.Driver.Major), Minor+I, 0); {$ENDIF}
         end;
         Inc(Entry);
       end;
@@ -361,7 +359,7 @@ begin
     // The ATA controller is installed?
     if not ATAWork(@ATAControllers[I]) then
       Continue;
-    for Drv:= MASTER to SLAVE do
+    for Drv := MASTER to SLAVE do
     begin
       ATASelectDisk(@ATAControllers[I],Drv*5);
       ATASendCommand(@ATAControllers[I],ATA_IDENTIFY);
@@ -386,7 +384,7 @@ begin
       end
       {$IFDEF DebugIdeDisk}
       else
-        DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Fault',0,I,Drv)
+        DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Fault', 0, I, Drv)
       {$ENDIF}
     end;
     // Registering the Controller and the Resources
@@ -409,9 +407,7 @@ begin
       Continue;
     // The File Descriptor is enqued in Dedicate Filesystem
     DedicateBlockFile(@ATAControllers[Driver.Major].Minors[I].FileDesc,CPUID);
-    {$IFDEF DebugIdeDisk}
-      DebugTrace('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d',Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor),Driver.Major,CPUID);
-    {$ENDIF}
+    {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d', Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor), Driver.Major, CPUID); {$ENDIF}
   end;
 end;
  
@@ -594,12 +590,12 @@ begin
   ATAControllers[0].Driver.Dedicate:= @ATADedicate;
   ATAControllers[0].Driver.ReadBlock := @ATAReadBlock;
   ATAControllers[0].Driver.WriteBlock := @ATAWriteBlock;
-  ATAControllers[0].Driver.next:= nil;
+  ATAControllers[0].Driver.Next := nil;
   // Slave Controller
   ATAControllers[1].IOPort:= $170;
   ATAControllers[1].Irq := 15;
-  ATAControllers[1].IrqHandler:= @ATA1IrqHandler;
-  ATAControllers[1].Driver.WaitOn:= nil;
+  ATAControllers[1].IrqHandler := @ATA1IrqHandler;
+  ATAControllers[1].Driver.WaitOn := nil;
   ATAControllers[1].Driver.Busy := false;
   ATAControllers[1].Driver.name := ATANAMES[1];
   ATAControllers[1].Driver.Major:= 1;
@@ -607,7 +603,7 @@ begin
   ATAControllers[1].Driver.Dedicate := @ATADedicate;
   ATAControllers[1].Driver.ReadBlock := @ATAReadBlock;
   ATAControllers[1].Driver.WriteBlock := @ATAWriteBlock;
-  ATAControllers[1].Driver.next:= nil;
+  ATAControllers[1].Driver.Next := nil;
   ATADetectController;
 end;
 

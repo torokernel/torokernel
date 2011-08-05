@@ -71,7 +71,7 @@ type
 
   TThreadFunc = function(Param: Pointer): PtrInt;
   TThread = record // in Toro any task is a Thread
-    ThreadID: TThreadID; // thread identificator
+    ThreadID: TThreadID; // thread identifier
     Next: PThread; // Next and Previous are independant of the thread created from the Parent
     Previous: PThread; // and are used for the scheduling to scan all threads for a CPU
     Parent : PThread; // pointer to parent thread
@@ -173,79 +173,79 @@ begin
   ThreadExit(EXCEP_TERMINATION, True);
 end;
 
-procedure Excep_DIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Division by Zero', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Division by Zero', 0, 0, 0); {$ENDIF}
+  ExceptionHandler;
+end;
+
+procedure ExceptOVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  {$IFDEF DebugProcess} DebugTrace('Exception: Overflow',  0, 0, 0); {$ENDIF}
+  ExceptionHandler;
+end;
+
+procedure ExceptBOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  {$IFDEF DebugProcess} DebugTrace('Exception: Bound instruction',  0, 0, 0); {$ENDIF}
+  ExceptionHandler;
+end;
+
+procedure ExceptILLEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal Instruction',  0, 0, 0); {$ENDIF}
+  ExceptionHandler;
+end;
+
+procedure ExceptDEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  {$IFDEF DebugProcess} DebugTrace('Exception: Device not Available',  0, 0, 0); {$ENDIF}
+  ExceptionHandler;
+end;
+
+procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  {$IFDEF DebugProcess} DebugTrace('Exception: Double Fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_OVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptSTACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Overflow',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Stack Fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_BOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptGENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Bound instruction',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: General Protection',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_ILEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptPAGEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Ilegal Instruction',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Page Fault',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
-procedure Excep_DEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Device not Available',  0, 0, 0); {$ENDIF}
-  ExceptionHandler
-end;
-
-procedure Excep_DF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Double fault',  0, 0, 0); {$ENDIF}
-  ExceptionHandler
-end;
-
-procedure Excep_STACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Stack Fault',  0, 0, 0); {$ENDIF}
-  ExceptionHandler
-end;
-
-procedure Excep_GENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : General Protection',  0, 0, 0); {$ENDIF}
-  ExceptionHandler
-end;
-
-procedure Excep_PAGEFAUL; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Page Fault',  0, 0, 0); {$ENDIF}
-  ExceptionHandler
-end;
-
-procedure Excep_FPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  {$IFDEF DebugProcess} DebugTrace('Exception : Fpu error',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: FPU Error',  0, 0, 0); {$ENDIF}
   ExceptionHandler
 end;
 
 // more important Exceptions are captured
 procedure InitializeINT;
 begin
-  CaptureInt(EXC_DIVBYZERO,@Excep_DIVBYZERO);
-  CaptureInt(EXC_OVERFLOW,@Excep_OVERFLOW);
-  CaptureInt(EXC_BOUND,@Excep_BOUND);
-  CaptureInt(EXC_ILEGALINS,@Excep_ILEGALINS);
-  CaptureInt(EXC_DEVNOTAVA,@Excep_DEVNOTAVA);
-  CaptureInt(EXC_DF,@excep_DF);
-  CaptureInt(EXC_STACKFAULT,@excep_STACKFAULT);
-  CaptureInt(EXC_GENERALP,@excep_GENERALP);
-  CaptureInt(EXC_PAGEFAUL,@excep_PAGEFAUL);
-  CaptureInt(EXC_FPUE,@excep_FPUE);
+  CaptureInt(EXC_DIVBYZERO, @ExceptDIVBYZERO);
+  CaptureInt(EXC_OVERFLOW, @ExceptOVERFLOW);
+  CaptureInt(EXC_BOUND, @ExceptBOUND);
+  CaptureInt(EXC_ILLEGALINS, @ExceptILLEGALINS);
+  CaptureInt(EXC_DEVNOTAVA, @ExceptDEVNOTAVA);
+  CaptureInt(EXC_DF, @ExceptDF);
+  CaptureInt(EXC_STACKFAULT, @ExceptSTACKFAULT);
+  CaptureInt(EXC_GENERALP, @ExceptGENERALP);
+  CaptureInt(EXC_PAGEFAUL, @ExceptPAGEFAULT);
+  CaptureInt(EXC_FPUE, @ExceptFPUE);
 end;
 
 // Initialization of every Core in the system
@@ -377,9 +377,7 @@ end;
 procedure ThreadResume(Thread: PThread);
 begin
   Thread.State := tsReady;
-  {$IFDEF DebugProcess}
-   DebugTrace('Thread Resume , Thread: %q',Int64(Thread),0,0);
-  {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('ThreadResume - Thread: %h', PtrUInt(Thread), 0, 0); {$ENDIF}
 end;
 
 const
@@ -392,17 +390,17 @@ var
   ip_ret: ^THandle;
 begin
   NewThread := ToroGetMem(SizeOf(TThread));
-  {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread: %h', PtrUInt(NewThread), 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread: %h', PtrUInt(NewThread), 0, 0); {$ENDIF}
   if NewThread = nil then
   begin
-    {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread = nil', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread = nil', 0, 0, 0); {$ENDIF}
     Result := nil;
     Exit;
   end;
   NewThread^.StackAddress := ToroGetMem(StackSize);
   if NewThread.StackAddress = nil  then
   begin
-    {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread.StackAddress = nil', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.StackAddress = nil', 0, 0, 0); {$ENDIF}
     ToroFreeMem(NewThread);
     Result := nil;
     Exit;
@@ -410,14 +408,14 @@ begin
   // Is this the  first thread ?
   if not Initialized then
   begin
-    {$IFDEF DEBUG} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
     Initialized := True;
   end else if THREADVAR_BLOCKSIZE <> 0 then
   begin
     NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
     if NewThread.TLS = nil then
     begin // Not enough memory, Thread cannot be created
-      {$IFDEF DEBUG} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
+      {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
       ToroFreeMem(NewThread.StackAddress);
       ToroFreeMem(NewThread);
       Result := nil;
@@ -434,6 +432,7 @@ begin
   NewThread.ErrNo := 0;
   NewThread.StartArg := Arg; // this argument we will read by thread main
   NewThread.ThreadFunc := ThreadFunction;
+  {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
   NewThread.PrivateHeap := XHeapAcquire(CPUID); // Private Heap allocator init
   NewThread.ThreadID := TThreadID(NewThread); // check protection, it is not very important
   NewThread.CPU := @CPU[CPUID];
@@ -448,7 +447,7 @@ begin
   ip_ret := NewThread.ret_thread_sp;
   Dec(ip_ret);
   // scheduler return
-  ip_ret^ := PtrInt(@ThreadMain);
+  ip_ret^ := PtrUInt(@ThreadMain);
   // ebp return
   Dec(ip_ret);
   ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
@@ -554,11 +553,11 @@ begin
   CurrentThread.TerminationCode := TerminationCode;
   if TerminationCode = EXCEP_TERMINATION then
    printk_('Exception happens on Thread %d\n',PtrUint(CurrentThread));
-  // this is not important if next_sched = curr_th then tq_Ready = nil
+  // this is not important if next_sched = curr_th then Threads = nil
   NextThread := CurrentThread.Next;
   RemoveThreadReady(CurrentThread);
   CurrentThread.State := tsZombie;
-  {$IFDEF DebugProcess} DebugTrace('ThreadExit - ThreadID: %q', CurrentThread.ThreadID, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('ThreadExit - ThreadID: %h', CurrentThread.ThreadID, 0, 0); {$ENDIF}
   if Schedule then  // Go to Scheduling and next exit ??
     Scheduling(NextThread);
 end;
@@ -583,7 +582,7 @@ begin
     Result := DWORD(-1);
     Exit;
   end;
-{$IFDEF DebugProcess} DebugTrace('SysKillThread - sending signal to Thread: %q in CPU: %d \n', ThreadID, Thread.CPU.ApicID,0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('SysKillThread - sending signal to Thread: %h in CPU: %d \n', ThreadID, Thread.CPU.ApicID,0); {$ENDIF}
   Thread.Flags := tfKill;
   Result := 0;
 end;
@@ -709,13 +708,13 @@ begin
       while CurrentCPU.Threads = nil do
     		Inmigrating(CurrentCPU);
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
-      {$IFDEF DebugProcess} DebugTrace('Scheduling: Jumping to Current Thread, StackPointer return: %q', PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp), 0, 0); {$ENDIF}
+      {$IFDEF DebugProcess} DebugTrace('Scheduling: Jumping to Current Thread, StackPointer return: %h', PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp), 0, 0); {$ENDIF}
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
       // jump to thread execution
       Exit;
     end;  
-    Emigrating(CurrentCPU); // send new threads to others cpus
-    Inmigrating(CurrentCPU); // give new threads to tq_ready of local CPU
+    Emigrating(CurrentCPU); // Enqueue newly created threads to others CPUs
+    Inmigrating(CurrentCPU); // Import new threads to CurrentCPU.Threads
     CurrentThread := CurrentCPU.CurrentThread;
     if Candidate = nil then
       Candidate := CurrentThread.Next;
@@ -734,7 +733,7 @@ begin
     if Candidate.State <> tsReady then
       Continue;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess}DebugTrace('Scheduling: Jumping to Current Thread , stack pointer: %q', PtrUInt(Candidate.ret_thread_sp), 0, 0);{$ENDIF}
+    {$IFDEF DebugProcess}DebugTrace('Scheduling: Jumping to Current Thread , stack pointer: %h', PtrUInt(Candidate.ret_thread_sp), 0, 0);{$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     SwitchStack(@CurrentThread.ret_thread_sp, @Candidate.ret_thread_sp);
@@ -780,7 +779,7 @@ var
 begin
   CpuID := GetApicID;
   CPU[CpuID].CurrentThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
-  {$IFDEF DebugProcess} DebugTrace('SysAllocateThreadVars - pointer: %q , size: %d',SizeUint(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('SysAllocateThreadVars - TLS: %h Size: %d', PtrUInt(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE, 0); {$ENDIF}
 end;
 
 // called from Kernel.KernelStart
@@ -790,6 +789,7 @@ var
   InitThread: PThread;
   LocalCPU: PCPU;
 begin
+  {$IFDEF DebugProcess} DebugTrace('CreateInitThread - StackSize: %d', 0, StackSize, 0); {$ENDIF}
   LocalCPU := @CPU[GetApicID];
   InitThread := ThreadCreate(StackSize, LocalCPU.ApicID, ThreadFunction, nil);
   if InitThread = nil then
@@ -804,11 +804,12 @@ begin
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI
-  {$IFDEF DebugProcess} DebugTrace('CreateInitThread - InitialThreadID: %q', SizeUint(InitialThreadID), 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('CreateInitThread - InitialThreadID: %h', InitialThreadID, 0, 0); {$ENDIF}
   // now we have in the stack ip pointer for ret instruction
   // TODO: when compiling with DCC, check that previous assertion is correct
   // TODO: when previous IFDEF is activated, check that DebugTrace is not messing
   InitThread.ret_thread_sp := Pointer(PtrUInt(InitThread.ret_thread_sp)+SizeOf(Pointer));
+  {$IFDEF DebugProcess} DebugTrace('CreateInitThread - InitThread.ret_thread_sp: %h -> change_sp to execute ThreadMain with this stack address', PtrUInt(InitThread.ret_thread_sp), 0, 0); {$ENDIF}
   change_sp(InitThread.ret_thread_sp);
   // the procedure "PASCALMAIN" is executed (this is the ThreadFunction in parameter)
 end;
@@ -831,8 +832,10 @@ begin
   // Open standard IO files, stack checking, iores, etc .
   {$IFDEF FPC} InitThread(CurrentThread.StackSize); {$ENDIF}
   // TODO: !!! InitThread() for Delphi
-  {$IFDEF DebugProcess} DebugTrace('ThreadMain: #%q', PtrInt(CurrentThread), 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('ThreadMain - CurrentThread: #%h', PtrUInt(CurrentThread), 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('ThreadMain - CurrentThread.ThreadFunc: %h', PtrUInt(@CurrentThread.ThreadFunc), 0, 0); {$ENDIF}
   ExitCode := CurrentThread.ThreadFunc(CurrentThread.StartArg);
+  {$IFDEF DebugProcess} DebugTrace('ThreadMain - returning from CurrentThread.ThreadFunc CurrentThread: %h', PtrUInt(CurrentThread), 0, 0); {$ENDIF}
   // waiting for all child to terminate before main thread can terminate
   while CurrentThread.FirstChild <> nil do
     ThreadWait(ChildExitCode);
@@ -859,7 +862,7 @@ begin
     Exit;
   end;
   ThreadID := NewThread.ThreadID;
-  {$IFDEF DebugProcess} DebugTrace('BeginThread - new ThreadID: %q in CPU %d', NewThread.ThreadID, NewThread.CPU.ApicID, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('BeginThread - ThreadID: %h on CPU %d', NewThread.ThreadID, NewThread.CPU.ApicID, 0); {$ENDIF}
   Result := NewThread.ThreadID;
 end;
 

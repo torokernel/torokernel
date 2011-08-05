@@ -115,5 +115,5 @@ begin
   // Port 80, service registration
   SysRegisterNetworkService(@HttpHandler);
   while True do
-    ThreadSwitch;
-end.
+    SysThreadSwitch;
+end.

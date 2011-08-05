@@ -383,15 +383,15 @@ begin
       // looking for ne2000 card
       if (PCIcard.Vendor = $10ec) and (PCIcard.Device = $8029) then
       begin
-      ne2000card.irq:=PCIcard.irq;
-      ne2000card.iobase:=PCIcard.IO[0];
+        ne2000card.irq := PCIcard.irq;
+        ne2000card.iobase := PCIcard.IO[0];
       Net := @ne2000card.Driverinterface;
-      Net.Name:= 'ne2000';
-      Net.MaxPacketSize:= MAX_PACKET_SIZE;
-      Net.start:= @ne2000Start;
-      Net.send:= @ne2000Send;
-      Net.stop:= @ne2000Stop;
-      Net.Reset:= @ne2000Reset;
+        Net.Name := 'ne2000';
+        Net.MaxPacketSize := MAX_PACKET_SIZE;
+        Net.start := @ne2000Start;
+        Net.send := @ne2000Send;
+        Net.stop := @ne2000Stop;
+        Net.Reset := @ne2000Reset;
       Net.TimeStamp := 0;
       WriteConsole('ne2000 network card: /Vdetected/n on PCI bus',[]);
       InitNe2000(@ne2000card);

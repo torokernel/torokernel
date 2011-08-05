@@ -304,9 +304,8 @@ end;
 
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
   {$IFDEF DCC} push rsi {$ENDIF} // it is obvious that rsi should also be saved for FPC
-//  mov dx, port // commented since rdx already contains port
+        mov dx, port
 	mov rsi, data // DX=port
         outsd
   {$IFDEF DCC} pop rsi {$ENDIF}
@@ -314,9 +313,8 @@ end;
 
 procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
   {$IFDEF DCC} push rdi {$ENDIF} // it is obvious that rdi should also be saved for FPC
-//	mov dx, port // commented since rdx already contains port
+	mov dx, port
 	mov rdi, data // DX=port
 	insd
   {$IFDEF DCC} pop rdi {$ENDIF}
@@ -1308,4 +1306,4 @@ begin
 end;
 
 end.
-
+

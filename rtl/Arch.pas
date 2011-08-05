@@ -97,10 +97,10 @@ type
 
   TCore = record
     ApicID: LongInt; // Core Identification
-    Present: Boolean; // Is present?
+    Present: Boolean; // It's present?
     CPUBoot: Boolean;
     InitConfirmation: Boolean; // Synchronization variable between core to INIT-core
-    InitProc: procedure; // Procedure to initialize the core // signature should match Scheduling(Candidate: Pointer)
+    InitProc: procedure; // Procedure to initialize the core
   end;
 
 procedure bit_reset(val: Pointer; pos: QWord);
@@ -187,7 +187,7 @@ const
   Kernel_Code_Sel = $18;
   Kernel_Data_Sel = $10;
 
-  // minimal stack for initialization process, in bytes
+  // minimal stack for initialization procedure, in bytes
   size_start_stack = 700;
 
 type 
@@ -287,25 +287,25 @@ begin
   idt_gates^[Exception].nu := 0 ;
 end;
 
-
+// IO port access
 procedure write_portb(Data: Byte; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-  mov dx, port
-  mov al, data
-  out dx, al
+          mov dx, port
+          mov al, data
+          out dx, al
 end;
 
 function read_portb(port: Word): Byte; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-  mov dx, port
-  in al, dx
+         mov dx, port
+         in al, dx
 end;
 
 procedure write_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm 
         mov dx, port
 	mov rsi, data 
-  outsd
+        outsd
 end;
 
 procedure read_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -325,7 +325,7 @@ begin
 	icrl := Pointer(icrlo_reg);
 	icrh := Pointer(icrhi_reg) ;
 	icrh^ := apicid shl 24 ;
-	// mode : init   , destination no shorthand
+	// mode: init   , destination no shorthand
 	icrl^ := $500;
 end;
 
@@ -338,11 +338,12 @@ begin
   icrl := Pointer(icrlo_reg);
   icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
-  // mode : init   , destination no shorthand
+  // mode: init   , destination no shorthand
   icrl^ := $600 or vector;
 end;
 
 // CmpVal= SPINLOCK_FREE, NewVal= SPINLOCK_BUSY
+// TODO : Check if this procedure works fine
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm // RCX: CmpVal, RDX: NewVal, R8: addval
 @spin:
@@ -413,7 +414,6 @@ asm
   wrmsr
 end;
 
-// some local structure for irq
 const
   Status_Port : array[0..1] of Byte = ($20,$A0);
   Mask_Port : array[0..1] of Byte = ($21,$A1);
@@ -485,7 +485,7 @@ begin
     write_portb(read_portb($21) or pic_mask[irq], $21);
 end;
 
-// send the end of interruption to controllers
+// send the end of interruption
 procedure eoi;
 begin
   write_portb($20, status_port[0]);
@@ -499,7 +499,7 @@ begin
   write_portb($ff, mask_port[1]);
 end;
 
-// simple ,  get the number of irq of master controller 
+// get the irq's number
 function get_irq_master: Byte ;
 begin
   write_portb($b, $20);
@@ -514,26 +514,18 @@ begin
   Result := read_portb($a0);
 end;
 
-// From this procedure never back
-procedure RetOfInterruption; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  pop r15 // IP of  INT Hanlder
-  db $78 // messing IRET for AMD64 !!!
-end;
-
 const 
   cmos_port_reg = $70 ;
   cmos_port_rw  = $71 ;
 
-// write a value of the cmos register
+// write a cmos' register
 procedure cmos_write(Data, Reg: Byte);
 begin
   write_portb(Reg, cmos_port_reg);
   write_portb(Data, cmos_port_rw);
 end;
 
-// read a value for cmos register 
+// read a cmos' register
 function cmos_read(Reg: Byte): Byte;
 begin
 	write_portb(Reg, cmos_port_reg);
@@ -541,8 +533,8 @@ begin
 end;
 
 
-// this code hes been extracted from DelphineOS <delphineos.sourceforge.net>
-// return the CPU speed in MHZ
+// This code hes been extracted from DelphineOS <delphineos.sourceforge.net>
+// Return the CPU speed in Mhz
 function CalculateCpuSpeed: Int64;
 var
   count_lo, count_hi, family: DWORD;
@@ -640,7 +632,6 @@ asm
   pop   bx
   pop   ax
 @CPUS_SKP:
-  //mov LocalCpuSpeed,  rax
 end;
 
 // Stop the execution of CPU
@@ -649,28 +640,22 @@ asm
   hlt
 end;
 
-// get the rdtsc counter // beware of specific code due to qemu x64 which is not handling rdtsc instruction properly
+// Get the rdtsc counter
+// Beware of specific code due to qemu x64 which is not handling rdtsc instruction properly
 function read_rdtsc: Int64;
 var
   lw, hg: DWORD;
 asm
   rdtsc
-  mov lw, eax // following lines are specific code for qemu x64
+  mov lw, eax
   mov hg, edx
   mov eax, hg
   shl rax, 32
   add eax, lw
 end;
-{
-// it should be inplemented as rdtsc instruction,
-// but it looks like there is a bug in qemu x64 which is implementing rdtsc as for x86 (32 bits)
-// placing the result in 2 registers lo part in eax and hi part in edx
-asm
-  rdtsc
-end;
-}
 
-// this procedures doesn't have lock protection
+// Next procedures aren't atomic
+
 function bit_test (Val: Pointer; pos: QWord): Boolean;
 asm
   xor rax , rax
@@ -733,7 +718,7 @@ const
 var
   CounterID: LongInt; // starts with CounterID = 1
 
-// Return information about a region of Memory
+// Return information about Memory Region
 function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
@@ -778,7 +763,7 @@ begin
   val := (val and 15) + ((val shr 4) * 10);
 end;
 
-// Now : Return the actual time from the CMOS .
+// Now: Return the time from the CMOS .
 procedure Now(Data: PNow);
 var
   Sec, Min, Hour,
@@ -823,7 +808,7 @@ begin
 end;
 {$ENDIF}
 
-// simple procedures to manipulate interruptions
+// interruption manipulation
 procedure EnabledINT; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
   sti
@@ -834,7 +819,7 @@ asm
   cli
 end;
 
-// Procedures for capture unhandles interruptions
+// procedures for capture unhandles interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   EnabledINT;
@@ -876,13 +861,13 @@ end;
 procedure SSEInit; assembler;
 asm
   xor rax , rax
-  // Set OSFXSR bit
+  // set OSFXSR bit
   mov rax, cr4
   or ah , 10b
   mov cr4 , rax
   xor rax , rax
   mov rax, cr0
-  // Clear MP and EM bit
+  // clear MP and EM bit
   and al ,11111001b
   mov cr0 , rax
 end;
@@ -891,13 +876,13 @@ end;
 procedure SSEInit; assembler;
 asm
   xor rax , rax
-  // Set OSFXSR bit
+  // set OSFXSR bit
   mov eax, cr4
   or ah , 10b
   mov cr4 , eax
   xor rax , rax
   mov eax, cr0
-  // Clear MP and EM bit
+  // clear MP and EM bit
   and al ,11111001b
   mov cr0 , eax
 end;
@@ -966,7 +951,7 @@ end;
 {$ENDIF}
 
 // Boot CPU using IPI messages.
-// Warning this procedure must be do it just one per CPU
+// Warning this procedure must be do it just one time per CPU
 procedure InitCore(ApicID: Byte);
 var
   Attempt: LongInt;
@@ -994,7 +979,7 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// Simple synchronization with bsp CPU
+// synchronization with bsp CPU
 procedure boot_confirmation;
 var
   CpuID: Byte;
@@ -1026,7 +1011,7 @@ begin
       Cores[cp.Apic_id].ApicID := cp.Apic_id;
       Cores[cp.Apic_id].Present := True;
       m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
-      // Boot core doesn't need initilization
+      // boot core doesn't need initilization
       if (cp.flags and 2 ) = 2 then
         Cores[cp.Apic_id].CpuBoot := True ;
     end else
@@ -1037,7 +1022,7 @@ begin
   end;
 end;
 
-// search and read the Mp configuration table version 1.4  , the begin of search is in $e000 address
+// search and read the Mp configuration table version 1.4, the begin of search is in $e000 address
 procedure mp_table_detect;
 var
   find: p_mp_floating_struct;
@@ -1212,7 +1197,7 @@ end;
 var
   PML4_Table: PDirectoryPage;
 
-// We have to refresh the TLB's Cache
+// Refresh the TLB's Cache
 procedure FlushCr3; assembler;
 asm
   mov rax, PDADD
@@ -1221,7 +1206,7 @@ asm
 end;
 
 // Set Page as cacheable
-// Add is Pointer to page , It's a multiple of 2MB (Page Size)
+// "Add" is Pointer to page, It's a multiple of 2MB (Page Size)
 procedure SetPageCache(Add: Pointer);
 var
   I_PML4,I_PPD,I_PDE: LongInt;
@@ -1237,13 +1222,12 @@ begin
   Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-//  Entry := Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE);
   // PCD bit is Reset --> Page In Cached
   Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
 // Set Page as not-cacheable
-// Add is Pointer to page , It's a multiple of 2MB (Page Size)
+// "Add" is Pointer to page, It's a multiple of 2MB (Page Size)
 procedure RemovePageCache(Add: Pointer);
 var
   I_PML4,I_PPD,I_PDE: LongInt;
@@ -1259,7 +1243,6 @@ begin
   Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-//  Entry := Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE);
   // PCD bit is Reset --> Page In Cached
   Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
@@ -1272,16 +1255,14 @@ begin
   Page := nil;
   PML4_Table := Pointer(PDADD);
   // First two Pages aren't Cacheable (0-2*PAGE_SIZE)
-  // maybe we have ROM-BIOS and other Devices' Memory
   RemovePageCache(Page);
   Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);
-//  Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   // The whole kernel is cacheable from bootloader
   FlushCr3;
 end;
 
-// Initialization of variables about the Architecture
+// Architecture's variables initilization
 procedure ArchInit;
 var
   I: LongInt;
@@ -1291,13 +1272,13 @@ begin
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   RelocateIrqs;
   MemoryCounterInit;
-  // Cache Page structures
+  // cache Page structures
   CacheManagerInit;
   LocalCpuSpeed := CalculateCpuSpeed;
   // increment of RDTSC counter per miliseg
   CPU_CYLES  := LocalCpuSpeed * 100000;
   Irq_On(2);
-  // Hardware Interruptions
+  // hardware Interruptions
   for I := 33 to 47 do
     CaptureInt(I, @IRQ_Ignore);
   // CPU Exceptions
@@ -1306,9 +1287,9 @@ begin
   EnabledINT;
   Now(@StartTime);
   SMPInitialization;
-  // Initilization of Floating Point Unit
+  // initilization of Floating Point Unit
   SSEInit;
 end;
 
 end.
-
+

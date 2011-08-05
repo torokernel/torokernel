@@ -4,3 +4,8 @@ test/Toro
 test/build
 *.bin
 *.img
+rtl/backup
+test/backup
+rtl/drivers/backup
+
+

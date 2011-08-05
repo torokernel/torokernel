@@ -30,10 +30,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-Unit IdeDisk;
+unit IdeDisk;
+
 interface
-
-
 
 {$I ..\Toro.inc}
 //{$DEFINE DebugIdeDisk}
@@ -80,8 +79,7 @@ const
  ATA_DRIVHD= 6;
  ATA_CMD_STATUS= 7;
  
- 
-Type
+type
  PIDEBlockDisk = ^TIDEBlockDisk;
  PIDEController = ^TIDEController;
  PPartitionEntry = ^TPartitionEntry;
@@ -92,18 +90,18 @@ Type
    Size: LongInt;
    FsType: LongInt;
    FileDesc: TFileBlock;
-   next: PIDEBlockDisk;
+    Next: PIDEBlockDisk;
  end;
  
-// IDE Controller Disk
+  // IDE Controller Disk
  TIDEController = record
    IOPort: LongInt;
-   irq: LongInt;
+    IRQ: LongInt;
    // Pool the Irq
    IrqReady: Boolean;
-   IrqHandler: pointer;
-   Driver:TBlockDriver;
-   Minors:array[0..MAX_ATA_MINORS-1] of  TIDEBlockDisk;
+    IrqHandler: Pointer;
+    Driver: TBlockDriver;
+    Minors: array[0..MAX_ATA_MINORS-1] of TIDEBlockDisk;
  end;
  
   // ATA Identify 
@@ -229,48 +227,50 @@ Type
 var
   ATAControllers: array[0..MAX_ATA_CONTROLLER-1] of TIDEController;
 
-procedure ATASelectDisk(Ctr:PIDEController;Drv:LongInt); inline;
+procedure ATASelectDisk(Ctr: PIDEController; Drv: LongInt); inline;
 begin
-  if Drv<5 then
+  if Drv < 5 then
     Drv := $a0
   else
     Drv := $b0;
   write_portb(Drv, Ctr.IOPort+ATA_DRIVHD);
 end;
 
-
 procedure ATASendCommand(Ctr: PIDEController; Cmd: LongInt); inline;
 begin
   write_portb(Cmd, Ctr.IOPort+ATA_CMD_STATUS);
 end;
 
-function ATAWork(Ctr:PIDEController):Boolean; inline;
+function ATAWork(Ctr: PIDEController): Boolean; inline;
 begin
   Result := read_portb(Ctr.IOPort+ATA_CMD_STATUS) <> $ff;
 end;
 
-function ATABusy(Ctr:PIDEController): Boolean; inline;
+function ATABusy(Ctr: PIDEController): Boolean; inline;
 var
   Temp: Byte;
 begin
   Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-  Result := Bit_Test(@Temp, 7);
+//  Result := Bit_Test(@Temp, 7);
+  Result := (Temp and (1 shl 7)) <> 0;
 end;
 
-function ATAError(Ctr:PIDEController): Boolean; inline;
+function ATAError(Ctr: PIDEController): Boolean; inline;
 var
   Temp: Byte;
 begin
   Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-  Result := Bit_Test(@Temp, 0);
+//  Result := Bit_Test(@Temp, 0);
+  Result := (Temp and 1)  <> 0;
 end;
 
 function ATADataReady (Ctr:PIDEController): Boolean; inline;
 var
-  tmp: byte;
+  Temp: Byte;
 begin
-  Tmp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-  Result := Bit_Test(@tmp,3);
+  Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
+//  Result := Bit_Test(@Temp, 3);
+  Result := (Temp and (1 shl 3)) <> 0;
 end;
 
 procedure ATAIn(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
@@ -310,7 +310,7 @@ begin
 end;
 
 // Look for valid Partitions in Device (Device is a NOT_FILESYSTEM block type) .
-procedure ATADetectPartition(Ctr:PIDEController;Minor: LongInt);
+procedure ATADetectPartition(Ctr: PIDEController; Minor: LongInt);
 var 
   I: LongInt;
   Buff: array[0..511] of byte;
@@ -351,47 +351,53 @@ end;
 // Look for Physical Devices
 procedure ATADetectController;
 var 
-  I, Drv: LongInt;
+  ControllerNo, DriveNo: LongInt;
   ATA_Buffer: DriverId;
 begin
-  for I := 0 to 1 do
+  for ControllerNo := 0 to 1 do
   begin
     // The ATA controller is installed?
-    if not ATAWork(@ATAControllers[I]) then
+    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATAWork Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    if not ATAWork(@ATAControllers[ControllerNo]) then
       Continue;
-    for Drv := MASTER to SLAVE do
+    for DriveNo := MASTER to SLAVE do
     begin
-      ATASelectDisk(@ATAControllers[I],Drv*5);
-      ATASendCommand(@ATAControllers[I],ATA_IDENTIFY);
+      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATASelectDisk Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      ATASelectDisk(@ATAControllers[ControllerNo], DriveNo*5);
+      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATASendCommand ATA_IDENTIFY Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      ATASendCommand(@ATAControllers[ControllerNo], ATA_IDENTIFY);
       // Wait for the driver
-      while ATABusy(@ATAControllers[I]) do
+      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ? ATABusy ? Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      while ATABusy(@ATAControllers[ControllerNo]) do
         NOP;
-      if ATADataReady(@ATAControllers[I]) and not ATAError(@ATAControllers[I]) then
+      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ? ATADataReady ? Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      if ATADataReady(@ATAControllers[ControllerNo]) and not ATAError(@ATAControllers[ControllerNo]) then
       begin
-        ATAIn(@ATA_Buffer, ATAControllers[I].IOPort);
-        ATAControllers[I].Minors[Drv*5].StartSector:= 0;
-        ATAControllers[I].Minors[Drv*5].Size:= ATA_Buffer.LBA_Capacity;
-        ATAControllers[I].Minors[Drv*5].FSType:= NOT_FILESYSTEM;
-        ATAControllers[I].Minors[Drv*5].FileDesc.BlockDriver:= @ATAControllers[I].Driver;
-        ATAControllers[I].Minors[Drv*5].FileDesc.Minor:= Drv*5;
-        ATAControllers[I].Minors[Drv*5].FileDesc.BlockSize:= BLKSIZE;
-        ATAControllers[I].Minors[Drv*5].FileDesc.Next:= nil;
-	      {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Ok',0,I,Drv*5); {$ENDIF}
+	    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo); {$ENDIF}
+        ATAIn(@ATA_Buffer, ATAControllers[ControllerNo].IOPort);
+        ATAControllers[ControllerNo].Minors[DriveNo*5].StartSector:= 0;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].Size:= ATA_Buffer.LBA_Capacity;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].FSType:= NOT_FILESYSTEM;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.BlockDriver:= @ATAControllers[ControllerNo].Driver;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Minor:= DriveNo*5;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.BlockSize:= BLKSIZE;
+        ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Next:= nil;
+	    {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo*5); {$ENDIF}
         WriteConsole('IdeDisk: /V', []);
-        WriteConsole(ATANames[ATAControllers[I].Driver.Major], []);
-        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Drv*5,ATA_Buffer.LBA_Capacity div 2048,NOT_FILESYSTEM]);
-        ATADetectPartition(@ATAControllers[I],Drv*5);
+        WriteConsole(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
+        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
+        ATADetectPartition(@ATAControllers[ControllerNo], DriveNo*5);
       end
       {$IFDEF DebugIdeDisk}
       else
-        DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Fault', 0, I, Drv)
+        DebugTrace('IdeDisk: Controller: %d, Disk: %d --> Fault', 0, ControllerNo, DriveNo)
       {$ENDIF}
     end;
     // Registering the Controller and the Resources
-    RegisterBlockDriver(@ATAControllers[I].Driver);
+    RegisterBlockDriver(@ATAControllers[ControllerNo].Driver);
     // Irq Handlers
-    Irq_On(ATAControllers[I].Irq);
-    CaptureInt(ATAControllers[I].Irq+32,ATAControllers[I].IrqHandler);
+    Irq_On(ATAControllers[ControllerNo].IRQ);
+    CaptureInt(ATAControllers[ControllerNo].IRQ+32,ATAControllers[ControllerNo].IrqHandler);
   end;
 end;
 
@@ -579,26 +585,26 @@ begin
   WriteConsole('Looking for ATA-IDE Disk ...\n',[]);
   // Standart ATA interface
   // Master Controller
-  ATAControllers[0].IOPort:= $1f0;
-  ATAControllers[0].Irq:= 14;
-  ATAControllers[0].IrqHandler:= @ATA0IrqHandler;
-  ATAControllers[0].Driver.WaitOn:= nil;
-  ATAControllers[0].Driver.Busy:= false;
-  ATAControllers[0].Driver.name:= ATANAMES[0];
-  ATAControllers[0].Driver.Major:= 0;
-  ATAControllers[0].Driver.CPUID:= -1;
-  ATAControllers[0].Driver.Dedicate:= @ATADedicate;
+  ATAControllers[0].IOPort := $1f0;
+  ATAControllers[0].IRQ := 14;
+  ATAControllers[0].IrqHandler := @ATA0IrqHandler;
+  ATAControllers[0].Driver.WaitOn := nil;
+  ATAControllers[0].Driver.Busy := False;
+  ATAControllers[0].Driver.Name := ATANAMES[0];
+  ATAControllers[0].Driver.Major := 0;
+  ATAControllers[0].Driver.CPUID := -1;
+  ATAControllers[0].Driver.Dedicate := @ATADedicate;
   ATAControllers[0].Driver.ReadBlock := @ATAReadBlock;
   ATAControllers[0].Driver.WriteBlock := @ATAWriteBlock;
   ATAControllers[0].Driver.Next := nil;
   // Slave Controller
   ATAControllers[1].IOPort:= $170;
-  ATAControllers[1].Irq := 15;
+  ATAControllers[1].IRQ := 15;
   ATAControllers[1].IrqHandler := @ATA1IrqHandler;
   ATAControllers[1].Driver.WaitOn := nil;
-  ATAControllers[1].Driver.Busy := false;
-  ATAControllers[1].Driver.name := ATANAMES[1];
-  ATAControllers[1].Driver.Major:= 1;
+  ATAControllers[1].Driver.Busy := False;
+  ATAControllers[1].Driver.Name := ATANAMES[1];
+  ATAControllers[1].Driver.Major := 1;
   ATAControllers[1].Driver.CPUID := -1;
   ATAControllers[1].Driver.Dedicate := @ATADedicate;
   ATAControllers[1].Driver.ReadBlock := @ATAReadBlock;

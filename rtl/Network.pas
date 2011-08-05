@@ -1558,10 +1558,8 @@ begin
   Result := True;
 end;
 
-
-
 // Return a free port from Local Socket Bitmap
-function GetFreePort:LongInt;
+function GetFreePort: LongInt;
 var
   CPUID, J: LongInt;
   Bitmap: Pointer;
@@ -1569,11 +1567,11 @@ begin
   CPUID:= GetApicid;
   Bitmap := @DedicateNetworks[CPUID].SocketStreamBitmap[0];
   // looking for free ports in Bitmap
-  for J:= 0 to MAX_SocketPorts-USER_START_PORT do
+  for J := 0 to MAX_SocketPorts-USER_START_PORT do
   begin
-    if not Bit_Test(bitmap,J) then
+    if not Bit_Test(bitmap, J) then
     begin
-      Bit_Set(bitmap,J);
+      Bit_Set(bitmap, J);
       Result := J + USER_START_PORT;
       Exit;
     end;

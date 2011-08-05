@@ -287,6 +287,7 @@ begin
   idt_gates^[Exception].nu := 0 ;
 end;
 
+
 procedure write_portb(Data: Byte; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
   mov dx, port
@@ -301,36 +302,19 @@ asm
 end;
 
 procedure write_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
-  //mov dx, port
-	mov rsi, data // DX=port
+asm 
+        mov dx, port
+	mov rsi, data 
   outsd
 end;
 
 procedure read_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
-	//mov dx, port
-	mov rdi, data // DX=port
+asm 
+        mov dx, port
+	mov rdi, data 
 	insd
 end;
 
-(*
-function read_portd (port: Word): DWORD; {$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  tmp: DWORD ;
-  P: Pointer;
-begin
-  p := @tmp;
-  asm
-	  mov dx , port
-	  mov rdi , p
-	  insd
-  end;
-  Result := tmp;
-end;
-*)
 
 // Send init interrupt to apicid
 // Used only during initialization procedure

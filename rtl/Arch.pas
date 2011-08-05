@@ -301,20 +301,25 @@ asm
          in al, dx
 end;
 
-procedure write_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm 
-        mov dx, port // ??? port is already in RDX, why is it necessary to assign it again ???
-	mov rsi, data 
+procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm // RCX: data, RDX: port
+//  {$IFDEF DCC} .noframe {$ENDIF}
+  {$IFDEF DCC} push rsi {$ENDIF} // it is obvious that rsi should also be saved for FPC
+//  mov dx, port // commented since rdx already contains port
+	mov rsi, data // DX=port
         outsd
+  {$IFDEF DCC} pop rsi {$ENDIF}
 end;
 
-procedure read_portd(data: Pointer; port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm 
-        mov dx, port // ??? port is already in RDX, why is it necessary to assign it again ???
-	mov rdi, data 
+procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm // RCX: data, RDX: port
+//  {$IFDEF DCC} .noframe {$ENDIF}
+  {$IFDEF DCC} push rdi {$ENDIF} // it is obvious that rdi should also be saved for FPC
+//	mov dx, port // commented since rdx already contains port
+	mov rdi, data // DX=port
 	insd
+  {$IFDEF DCC} pop rdi {$ENDIF}
 end;
-
 
 // Send init interrupt to apicid
 // Used only during initialization procedure
@@ -532,7 +537,6 @@ begin
 	Result := read_portb(cmos_port_rw);
 end;
 
-
 // This code has been extracted from DelphineOS <delphineos.sourceforge.net>
 // Return the CPU speed in Mhz
 function CalculateCpuSpeed: Int64;
@@ -656,7 +660,8 @@ end;
 
 // Next procedures aren't atomic
 
-function bit_test (Val: Pointer; pos: QWord): Boolean;
+{
+function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm
   xor rax , rax
   xor rbx , rbx
@@ -670,6 +675,22 @@ asm
   @si:
     mov rax , 1
   @salir:
+end;
+}
+
+function bit_test(Val: Pointer; pos: QWord): Boolean;
+asm // RCX=Val RDX=Pos
+  {$IFDEF DCC} push rsi {$ENDIF}
+  mov rsi, Val
+  bt  [rsi], rdx
+  jc  @si
+  @no:
+   mov rax , 0
+   jmp @salir
+  @si:
+    mov rax , 1
+  @salir:
+  {$IFDEF DCC} pop rsi {$ENDIF}
 end;
 
 procedure bit_reset(val: Pointer; pos: QWord); assembler;
@@ -819,37 +840,18 @@ asm
   cli
 end;
 
-procedure AsmDb48CF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  db $48
-  db $cf
-end;
-
 // procedures to capture unhandle interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  EnabledINT;
-  {$IFDEF FPC}
-  asm
-    db $48
-    db $cf
-  end;
-  {$ENDIF}
-  {$IFDEF DCC} AsmDb48CF; {$ENDIF}
+asm
+  call EnabledINT;
+  db $48, $cf
 end;
 
 procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  EnabledINT;
-  EOI;
-  {$IFDEF FPC}
-  asm
-    db $48
-    db $cf
-  end;
-  {$ENDIF}
-  {$IFDEF DCC} AsmDb48CF; {$ENDIF}
+asm
+  call EnabledINT;
+  call EOI;
+  db $48, $cf
 end;
 
 // PCI bus access

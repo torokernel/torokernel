@@ -7,5 +7,6 @@ test/build
 rtl/backup
 test/backup
 rtl/drivers/backup
+test/serial.txt
 
 

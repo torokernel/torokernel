@@ -1,14 +1,12 @@
 //
 // Arch.pas
 //
-// Here are declared  functions and procedures for AMD x86-64 processors.
-// The procedures are similar to i386 processor .
-// It is independent of the other Units.
-// It can be implement in others processors.
+// This unit makes possible port Toro kernel to others architectures.
+// The declared procedures here MUST BE the same for all architectures.
 //
 // Changes :
 //
-// 05/08/2011 Fix an important bug in Spinlock().
+// 05/08/2011 Fixed an important bug in Spinlock().
 // 27/10/2009 Cache Managing Implementation.
 // 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
 // 09/05/2009 Size of memory calculated using INT15H.

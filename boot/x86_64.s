@@ -1,11 +1,11 @@
 ;
 ; boot.s
 ;
-; TORO's Bootloader for x86-64 processors, It entries to 64 bits long mode and jump to main of PE file
-; the page directory can manipulate 512 gb of memory at the moment .
-; It boots for HDD and USB-HDD devices  using  Int 13h Extension.
+; TORO's Bootloader for x86-64 processors, It enters in 64 bits long mode and jump to main entry of PE file
+; the page directory can handle 512 gb of memory at this time.
+; It boots for HDD and USB-HDD devices using  Int 13h extension.
 ; 
-; Copyright (c) 2003-2010 Matias Vara <matiasvara@yahoo.com>
+; Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>          
 ; All Rights Reserved
 ;
 ; This program is free software: you can redistribute it and/or modify
@@ -43,7 +43,7 @@ end_sector   dd 0
 add_image    dd 0
 start_sector dd 2  
 
-;Structure used by Int13h Extension
+;Structure used by Int13h extension
 dap1:
 	db	10h		;size of structure
 	db	00		;reserved
@@ -70,7 +70,7 @@ start:
   mov si , msg1
   call print 
   
-  ; Check Extension Present
+  ; Check if extension is present
   mov ax , 4100h
   mov bx , 55AAh
   int 13h
@@ -83,12 +83,12 @@ start:
   mov si , dap1  
   int 13h
   
-  ; We must entry to protect mode and then return to real mode for acces behind 1mb of memory address
+  ; First, enter into protected mode and then return to real mode to have acces upper 1MB memory address
   cli
   call init_paging2M
   call h_a20
   
-  ; Temporal gdt 
+  ; Temp gdt 
   mov   ax , 300h
   mov   es , ax
   xor   di , di
@@ -97,28 +97,28 @@ start:
   rep   movsb  
   lgdt [gdtr]
   
-  ; Jump to protect mode
+  ; Jump to protected mode
   mov ebx,cr0		     
   or  ebx, 1
   mov cr0,ebx	
   mov ax , 20h
   mov es , ax
   
-  ; Return to Unreal-Mode
+  ; Return to "Unreal-Mode"
   and al,0xFE     
   mov  cr0, eax 
   sti
   
-  ; ES has base address to 0
+  ; reset ES base address to 0
   xor ax , ax
   mov es , ax
   
-  ; Load the kernel to the memory
+  ; Load the kernel into memory
   call load_kernel
-  ; Calculate the size of memory
+  ; Calculate the size of memory required
   call memory_size
   
-  ; Entry to protect mode again 
+  ; Enter back to protected mode
   cli
   lidt [idtr]  
 
@@ -126,7 +126,7 @@ start:
   or  ebx, 1
   mov cr0,ebx	
   
-  ; Far jump to protect mode 
+  ; Far jump to protected mode 
   db 66h,0EAh
   dd 7e00h
   dw 8h
@@ -157,14 +157,16 @@ dap2:
 	db	0		; reserved
 	dw  400h	; offset
 	dw	7c0h	; segment
-; I 'll start from 3rd sector
-; we are using just first dword of sector
+
+; Starting from 3rd sector
+; Using only first dword of sector
+
 dapseclow: 	dd	2		
 dapsechigh: dd  0	
-;
-; Load a kernel image to memory from boot driver
-;
+
+; Load kernel image to memory from boot driver
 ; load the kernel in high memory
+
 load_kernel:
   ; reset the driver
   xor ah, ah
@@ -195,7 +197,6 @@ read_loop:
   jnz read_loop
   ret
   
-;	
 ; Print text in ds:si segment only in real mode
 print:
   lodsb                    
@@ -208,7 +209,6 @@ print:
 exit:                           
   ret 
 
-;  
 ;line a20 for memory after 1 MB
 ;from linux code
 h_a20:
@@ -233,7 +233,7 @@ EMPTY_8042 :
   jnz EMPTY_8042
   ret
 
-; temporal GDT 8and IDT
+; Temp GDT and IDT
 gdtr:
   dw fin_gdt - gdt - 1                
   dd 3000H                  	              
@@ -276,7 +276,7 @@ fin_gdt:
 times 446-($-$$) db 0
 ; Toro Image is a valid partition entry
 ; you can install others OS in TORO's partition
-; TODO : Dinamic Size of Toro's Partition .  
+; TODO: Dynamic Size of Toro's Partition.  
 TOROPartitionEntry:
  boots 			db 	80h
  BeginHead 		db 	0
@@ -305,7 +305,7 @@ pm16:
   mov eax , cr4
   bts eax , 5
   mov cr4 , eax
-  ; Load a temporal DP
+  ; Load temp DP
   mov eax ,90000h
   mov cr3 , eax
   mov ecx,0c0000080h 
@@ -316,13 +316,13 @@ pm16:
   mov ebx,cr0                                   
   bts ebx, 31                              
   mov cr0,ebx
+
   db 066h
   db 0eah
   dd boot32+main64
   dw kernel_code64
  
-  
-; Page directory for handle 1 gb of memory is only temporal 
+; Page directory to handle 1GB of memory is only temporary 
 init_paging2M:
  mov ax,ds
  push ax 
@@ -337,8 +337,8 @@ init_paging2M0:
  add esi,8
  dec ecx
  jnz init_paging2M0
- mov [ds:0],dword 90000h + 4096+15
- mov [ds:4096],dword 90000h + 4096*2 +15
+ mov [ds:0], dword 90000h + 4096+15
+ mov [ds:4096], dword 90000h + 4096*2 +15
  xor esi,esi
  mov ecx,15+128 
  mov eax,1 << 21 
@@ -352,9 +352,8 @@ init_paging2M1:
  mov ds,ax
  ret 
 
-;
-; Make a Memory map using INT15h
-; This buffer is readed by the kernel 
+; Create a Memory map using INT15h
+; This buffer is read by the kernel 
 ; 
 memory_size:
  ; Use the same buffer like LoadKernel
@@ -384,13 +383,13 @@ align 8
 main64:
  ; We need to page more memory
  call paging
- ; When send INIT the executation starts  in 2000h address 
+ ; When the signal INIT is sent, the execution starts in 2000h address 
  mov rsi , 2000h
  mov [rsi] , byte 0eah
  xor rax , rax
  mov eax , trampoline_init+boot32
  mov [rsi+1] , eax
- ; New page directory to handle 512 gb
+ ; New page directory to handle 512GB
  mov rax , pagedir
  mov cr3 , rax
  jumpkernel:
@@ -415,10 +414,9 @@ cleanpage:
   mov rsi , pagedir
   mov [rsi],dword pagedir + 4096 + 7
 
-  ; next one page is a PDPE
+  ; next page is a PDPE
   mov rsi , pagedir + 4096
   mov rcx , pagedir + 7 + 4096 * 2
-
   ; Pointer page directory
   PPD:
    mov [rsi] , rcx
@@ -440,11 +438,11 @@ cleanpage:
   ret
 
 [BITS 16]
-; This procedure is executed in SMP Initilization
+; This procedure is executed in SMP Initialization
 trampoline_init: 
   lidt [boot32+idtr]
   lgdt [boot32+gdtr]		     
-  ; Jump to protect mode
+  ; Jump to protected mode
   mov ebx,cr0		     
   or  ebx, 1
   mov cr0,ebx	
@@ -452,10 +450,10 @@ trampoline_init:
   db 66h,0EAh
   dd boot32+trampoline_longmode
   dw 8h
-; Code for jump to Long Mode from others cores
+; Code when jumping to Long Mode from other cores
 trampoline_longmode:
   mov esp , 1000h
-  ; Long mode initilization
+  ; Long mode initialization
   mov eax , cr4
   bts eax , 5
   mov cr4 , eax

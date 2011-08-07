@@ -32,24 +32,27 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-unit ne2000;
+unit Ne2000;
 
 interface
 
-
 {$I ..\Toro.inc}
-{//$DEFINE DebugNE2000}
+//{$DEFINE DebugNe2000}
 
-uses Arch, Console, Debug, Filesystem, Network, Process, Memory;
-
+uses
+  Arch,
+  FileSystem, // Only for PciDetect
+  Console, Network, Process, Memory;
 
 implementation
+
+{$IFDEF DebugNe2000} uses Debug; {$ENDIF}
 
 type
   PNe2000 = ^TNe2000;
   TNe2000 = record
     DriverInterface: TNetworkInterface;
-    irq: LongInt;
+    IRQ: LongInt;
     iobase: LongInt;
     NextPacket: LongInt;
   end;
@@ -101,7 +104,7 @@ const
   //E8390_PAGE0=0;
 
 var
-  Ne2000Card: TNe2000; // Support currently 1 ethernet card
+  NicNE2000: TNe2000; // Support currently 1 ethernet card
 
 // The card starts to work
 procedure Ne2000Start(Net: PNetworkInterface);
@@ -112,11 +115,11 @@ end;
 procedure WritePort(Data: Byte; Port: Word);
 begin
   NOP; NOP; NOP;
-  Write_Portb(Data,Port);
+  Write_Portb(Data, Port);
   NOP; NOP; NOP;
 end;
 
-function ReadPort(Port: Word):byte;
+function ReadPort(Port: Word): Byte;
 begin
   NOP; NOP; NOP;
   Result := Read_Portb(Port);
@@ -142,18 +145,18 @@ begin
   // The first packet is sent
   Packet := Net.OutgoingPackets;
   Size:= Packet.size;
-  WritePort(Size and $ff, Ne2000Card.iobase+REMOTEBYTECOUNT0);
-  WritePort(Size shr 8, Ne2000Card.iobase+REMOTEBYTECOUNT1);
-  WritePort(0, Ne2000Card.iobase+REMOTESTARTADDRESS0);
-  WritePort(TRANSMITBUFFER, Ne2000Card.iobase+REMOTESTARTADDRESS1);
-  WritePort(E8390_RWRITE or E8390_START, Ne2000Card.iobase+COMMAND);
+  WritePort(Size and $ff, NicNE2000.iobase+REMOTEBYTECOUNT0);
+  WritePort(Size shr 8, NicNE2000.iobase+REMOTEBYTECOUNT1);
+  WritePort(0, NicNE2000.iobase+REMOTESTARTADDRESS0);
+  WritePort(TRANSMITBUFFER, NicNE2000.iobase+REMOTESTARTADDRESS1);
+  WritePort(E8390_RWRITE or E8390_START, NicNE2000.iobase+COMMAND);
   Data := Packet.Data;
   for I := 0 to (Size-1) do
-    WritePort(Data^[I], Ne2000Card.iobase+NE_DATA);
-  WritePort(TRANSMITBUFFER, Ne2000Card.iobase+TRANSMITPAGE);
-  WritePort(size, Ne2000Card.iobase+TRANSMITBYTECOUNT0);
-  WritePort(size shr 8, Ne2000Card.iobase+TRANSMITBYTECOUNT1);
-  WritePort(E8390_NODMA or E8390_TRANS or E8390_START, Ne2000Card.iobase+COMMAND);
+    WritePort(Data^[I], NicNE2000.iobase+NE_DATA);
+  WritePort(TRANSMITBUFFER, NicNE2000.iobase+TRANSMITPAGE);
+  WritePort(size, NicNE2000.iobase+TRANSMITBYTECOUNT0);
+  WritePort(size shr 8, NicNE2000.iobase+TRANSMITBYTECOUNT1);
+  WritePort(E8390_NODMA or E8390_TRANS or E8390_START, NicNE2000.iobase+COMMAND);
 end;
 
 // Send a Packet
@@ -307,20 +310,20 @@ var
   Packet: PPacket;
   Status: LongInt;
 begin
-  Status := ReadPort(Ne2000Card.iobase + INTERRUPTSTATUS);
+  Status := ReadPort(NicNE2000.iobase + INTERRUPTSTATUS);
   if Status and 1 <> 0 then
   begin
-    WritePort(Status,Ne2000Card.iobase + INTERRUPTSTATUS);
-    ReadPacket(@Ne2000Card); // Transfer the packet to Packet Cache
-    {$IFDEF DebugNe2000} DebugTrace('Ne2000IrqHandle: Packet readed', 0, 0, 0); {$ENDIF}
+    WritePort(Status,NicNE2000.iobase + INTERRUPTSTATUS);
+    ReadPacket(@NicNE2000); // Transfer the packet to Packet Cache
+    {$IFDEF DebugNe2000} DebugTrace('Ne2000IrqHandle: Packet received', 0, 0, 0); {$ENDIF}
   end else if Status and $A <> 0 then
   begin
-    WritePort(Status, Ne2000Card.iobase + INTERRUPTSTATUS);
+    WritePort(Status, NicNE2000.iobase + INTERRUPTSTATUS);
     Packet := DequeueOutgoingPacket; // Inform Kernel Last packet has been sent, and fetch the next packet to send
     // We have got to send more packet ?
     if Packet <> nil then
-      DoSendPacket(@Ne2000Card.DriverInterface);
-    {$IFDEF DebugNe2000} DebugTrace('Ne2000IrqHandle: Packet Transmited', 0, 0, 0); {$ENDIF}
+      DoSendPacket(@NicNE2000.DriverInterface);
+    {$IFDEF DebugNe2000} DebugTrace('Ne2000IrqHandle: Packet transmitted', 0, 0, 0); {$ENDIF}
   end;
   eoi;
 end;
@@ -363,7 +366,7 @@ asm
   pop rbx
   pop rax
   pop rbp
-  db $48
+  db $48 // iretq
   db $cf
 end;
 
@@ -374,6 +377,7 @@ var
   Net: PNetworkInterface;
   PCIcard: PBusDevInfo;
 begin
+  {$IFDEF DebugNe2000} DebugTrace('Ne2000 - PCICardInit', 0, 0, 0); {$ENDIF}
   PCIcard := PCIDevices;
   while PCIcard <> nil do
   begin
@@ -383,9 +387,10 @@ begin
       // looking for ne2000 card
       if (PCIcard.Vendor = $10ec) and (PCIcard.Device = $8029) then
       begin
-        ne2000card.irq := PCIcard.irq;
-        ne2000card.iobase := PCIcard.IO[0];
-      Net := @ne2000card.Driverinterface;
+        {$IFDEF DebugNe2000} DebugTrace('PCICardInit - ne2000 network card: detected', 0, 0, 0); {$ENDIF}
+        NicNE2000.IRQ := PCIcard.irq;
+        NicNE2000.iobase := PCIcard.IO[0];
+        Net := @NicNE2000.Driverinterface;
         Net.Name := 'ne2000';
         Net.MaxPacketSize := MAX_PACKET_SIZE;
         Net.start := @ne2000Start;
@@ -394,12 +399,13 @@ begin
         Net.Reset := @ne2000Reset;
       Net.TimeStamp := 0;
       WriteConsole('ne2000 network card: /Vdetected/n on PCI bus',[]);
-      InitNe2000(@ne2000card);
-      Irq_On(ne2000card.irq);
-      CaptureInt(32+ne2000card.irq, @ne2000irqhandler);
+        InitNe2000(@NicNE2000);
+        Irq_On(NicNE2000.IRQ);
+        CaptureInt(32+NicNE2000.IRQ, @ne2000irqhandler);
       RegisterNetworkInterface(Net);
       WriteConsole(', MAC:/V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
       Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
+        {$IFDEF DebugNe2000} DebugTrace('Ne2000 - PCICardInit - Done.', 0, 0, 0); {$ENDIF}
       Exit; // Support only 1 NIC in this version
     end;
       end;

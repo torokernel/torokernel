@@ -1,5 +1,5 @@
 //
-// Filesystem.pas
+// FileSystem.pas
 // 
 // Manipulation of Devices and Filesystem .
 // Every Resource is DEDICATE , The programmer must indicate Which CPU can access to the device.
@@ -194,7 +194,7 @@ procedure RegisterFilesystem (Driver: PFileSystemDriver);
 procedure DedicateBlockDriver(const Name: AnsiString; CPUID: LongInt);
 procedure DedicateBlockFile(FBlock: PFileBlock;CPUID: LongInt);
 procedure SysCloseFile(FileHandle: THandle);
-procedure SysMount(const FileSystemName, BlockName: AnsiString; Minor: LongInt);
+procedure SysMount(const FileSystemName, BlockName: AnsiString; const Minor: LongInt);
 function SysOpenFile(Path: PXChar): THandle;
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
@@ -420,9 +420,9 @@ begin
   begin
     if (Dev.Name = Name) and (Dev.CPUID = -1) then
     begin
-      Dev.dedicate(Dev,CPUID);
+      Dev.Dedicate(Dev, CPUID);
       Dev.CPUID := CPUID;
-      {$IFDEF DebugFS} DebugTrace('DedicateBlockDriver: New Driver dedicate to CPU#%d',0,CPUID,0); {$ENDIF}
+      {$IFDEF DebugFS} DebugTrace('DedicateBlockDriver: New Driver dedicated to CPU#%d',0,CPUID,0); {$ENDIF}
       Exit;
     end;
     Dev := Dev.Next;
@@ -447,7 +447,7 @@ var
 begin
   FileBlock := PFileBlock(FileHandle);
   Result := FileBlock.BlockDriver.ReadBlock(FileBlock,Block,Count,Buffer);
-  {$IFDEF DebugFS} DebugTrace('SysReadBlock: Handle %q,Result: %d', Int64(FileHandle), Result, 0); {$ENDIF}
+  {$IFDEF DebugFS} DebugTrace('SysReadBlock: Handle %q, Result: %d', Int64(FileHandle), Result, 0); {$ENDIF}
 end;
 
 function FindBlock(Buffer: PBufferHead; Block, Size: LongInt): PBufferHead;
@@ -748,48 +748,52 @@ begin
   {$IFDEF DebugFS} DebugTrace('RegisterFilesystem: New Driver', 0, 0, 0); {$ENDIF}
 end;
 
-// Mount on current CPU the Filesystem, allocated in BlockName\Minor Device.
-procedure SysMount(const FileSystemName, BlockName: AnsiString; Minor: LongInt);
-var
-  Storage: PStorage;
-  FileBlock: PFileBlock;
-  SuperBlock: PSuperBlock;
-  PFs: PFileSystemDriver;
-label _fail,_domount;
+function FindFileSystemDriver(Storage: PStorage; const FileSystemName, BlockName: AnsiString; const Minor: LongInt; var FileBlock: PFileBlock): PFileSystemDriver;
 begin
-  Storage := @Storages[GetApicID];
+  Result := nil;
   FileBlock := Storage.BlockFiles;
   // Is the Device valid?
-  while (FileBlock <> nil) do
+  while FileBlock <> nil do
   begin
     if (FileBlock.BlockDriver.Name = BlockName) and (FileBlock.Minor = Minor) then
     begin
-      PFs := FileSystemDrivers;
+      Result := FileSystemDrivers;
       // Is the FileSystem valid?
-      while PFs <> nil do
+      while Result <> nil do
       begin
-        if Pfs.Name = FileSystemName then
-          goto _domount;
-        Pfs:= Pfs.Next;
+        if Result.Name = FileSystemName then
+          Exit;
+        Result := Result.Next;
       end;
-      printk_('CPU#%d : MountRoot Fail , unknow filesystem! \n', GetApicID);
-      goto _fail;
     end;
     FileBlock := FileBlock.Next;
   end;
-  printk_('CPU#%d : MountRoot Fail , unknow device! \n', GetApicID);
+end;
 
-_fail:
-  {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem -----> Fail', 0, 0, 0); {$ENDIF}
+// Mount on current CPU the Filesystem, allocated in BlockName\Minor Device.
+procedure SysMount(const FileSystemName, BlockName: AnsiString; const Minor: LongInt);
+var
+  FileBlock: PFileBlock;
+  FileSystem: PFileSystemDriver;
+  Storage: PStorage;
+  SuperBlock: PSuperBlock;
+begin
+  Storage := @Storages[GetApicID];
+  FileSystem := FindFileSystemDriver(Storage, FileSystemName, BlockName, Minor, FileBlock);
+  if FileSystem = nil then
+  begin
+    PrintK_('CPU#%d: SysMount Failed, unknown filesystem!\n', GetApicID);
+    {$IFDEF DebugFS} DebugTrace('CPU#%d: Mounting FileSystem -> Failed', 0, GetApicID, 0); {$ENDIF}
   Exit;
-
-_domount:
-  // I can mount
+  end;
   SuperBlock:= ToroGetMem(SizeOf(TSuperBlock));
-  if SuperBlock=nil then
-    goto _fail;
-  SuperBlock.BlockDevice:= FileBlock;
-  SuperBlock.FileSystemDriver:= PFs;
+  if SuperBlock = nil then
+  begin // not enough memory
+    {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed', 0, 0, 0); {$ENDIF}
+    Exit;
+  end;
+  SuperBlock.BlockDevice := FileBlock;
+  SuperBlock.FileSystemDriver := FileSystem;
   SuperBlock.Dirty:= False;
   SuperBlock.Flags:= 0;
   // Inode-Buffer Initialization
@@ -798,15 +802,16 @@ _domount:
   SuperBlock.InodeCache. FreeInodesCache:= nil;
   // error in read operations
   Storage.FileSystemMounted:= SuperBlock;
-  if Pfs.ReadSuper(SuperBlock)=nil then
+  if FileSystem.ReadSuper(SuperBlock) = nil then
   begin
-    printK_('CPU#%d : Fail Reading SuperBlock\n', GetApicID);
+    printK_('CPU#%d: Fail Reading SuperBlock\n', GetApicID);
     ToroFreeMem(SuperBlock);
     Storage.FileSystemMounted := nil;
-    goto _fail;
+    {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem, Cannot read SuperBlock -> Failed', 0, 0, 0); {$ENDIF}
+    Exit;
   end;
-  {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem -----> Ok', 0, 0, 0); {$ENDIF}
-  printK_('/VCore#%d/n : ROOT-Filesystem /VMounted/n\n', GetApicID);
+  {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem -> Ok', 0, 0, 0); {$ENDIF}
+  PrintK_('/VCPU#%d/n: ROOT-Filesystem /VMounted/n\n', GetApicID);
 end;
 
 // Return the last Inode of path
@@ -859,11 +864,6 @@ begin
   PutInode(Base);
   Result := ino;
 end;
-
-//
-// SysOpenFile :
-// Open Regular File
-//
 
 function SysOpenFile(Path: PXChar): THandle;
 var
@@ -920,7 +920,7 @@ begin
   else
     Result:= FileRegular.Inode.SuperBlock.FileSystemDriver.ReadFile(FileRegular, Count, Buffer);
   FileRegular.FilePos := FileRegular.FilePos + result;
-  {$IFDEF DebugFS} DebugTrace('SysReadFile: %d bytes readed, FilePos: %d', 0, Result, FileRegular.FilePos); {$ENDIF}
+  {$IFDEF DebugFS} DebugTrace('SysReadFile: %d bytes read, FilePos: %d', 0, Result, FileRegular.FilePos); {$ENDIF}
 end;
 
 // Return Inode Information about last file in the path

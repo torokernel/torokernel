@@ -42,7 +42,7 @@ procedure KernelStart;
 implementation
 
 uses
-{$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF DEBUG} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
 
 // Called from Arch.main

@@ -1165,7 +1165,7 @@ var
   r: Int64;
   Net: PNetworkInterface;
 begin
-  Result := 0;
+  {$IFDEF FPC} Result := 0; {$ENDIF}
   Net := DedicateNetworks[GetApicid].NetworkInterface;
   while True do
   begin
@@ -1205,15 +1205,15 @@ begin
   end;
 end;
 
-// Initilization of threads running like services on current CPU
+// Initialization of threads running like services on current CPU
 procedure NetworkServicesInit;
 var
   ThreadID: TThreadID;
 begin
   if PtrUInt(BeginThread(nil, 10*1024, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    printk_('Networks Packets Service .... /VRunning/n\n',0)
+    PrintK_('Networks Packets Service .... /VRunning/n\n',0)
   else
-    printk_('Networks Packets Service .... /VFail!/n\n',0);
+    PrintK_('Networks Packets Service .... /VFailed!/n\n',0);
 end;
 
 // Initialize the dedicated network interface
@@ -1294,7 +1294,7 @@ begin
       printk_('%d.', (Network.Mask shr 8) and $ff);
       printk_('%d.', (Network.Mask shr 16) and $ff);
       printk_('%d\n/n', (Network.Mask shr 24) and $ff);
-      {$IFDEF DebugNetwork} DebugTrace('DedicateNetwork: New Driver dedicate to CPU#%d',0,CPUID,0); {$ENDIF}
+      {$IFDEF DebugNetwork} DebugTrace('DedicateNetwork: New Driver dedicated to CPU#%d',0,CPUID,0); {$ENDIF}
       Exit;
     end;
     Net := Net.Next;
@@ -1740,7 +1740,7 @@ begin
     {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: Receiving %q bytes from port %d to port %d ', PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
     Result := Result + FragLen;
     Socket.BufferReader := Socket.BufferReader + FragLen;
-    // The buffer was readed , inform to sender that it can send data again
+    // The buffer was read, inform sender that it can send data again
     if Socket.BufferReader = (Socket.Buffer+MAX_WINDOW) then
     begin
       {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: TCPSendPacket TCP_ACK', 0, 0, 0); {$ENDIF}

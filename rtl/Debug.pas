@@ -121,7 +121,7 @@ begin
 end;
 
 // No locking. Locking is performed by caller function (DebugTrace or DebugPrint)
-procedure DebugFormat(Format: PXChar; const QArg: PtrUInt; Arg1 , Arg2 : Dword);
+procedure DebugFormat(Format: PXChar; const QArg: PtrUInt; Arg1, Arg2: UInt32);
 var
   ArgNo: Integer;
   DecimalValue: PtrUInt;
@@ -189,8 +189,8 @@ begin
 	end;
 end;
 
-// Similar to printk but the Char are send using serial port for debug procedures .
-// Only can send one qword argument . 
+// Similar to printk but the Char are send using serial port for debug procedures
+// Can format only 1 qword argument
 procedure DebugPrint(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
 begin
   SpinLock(3, 4, LockDebug);
@@ -215,8 +215,8 @@ begin
   DebugFormat('%q CPU%d #%d ', CurrentTime, CPUI, PtrUInt(Thread));
 {$ENDIF}
   DebugFormat(Format, QArg, Arg1,Arg2);
-  SendChar(chr(13));
-  SendChar(chr(10));
+  SendChar(XChar(13));
+  SendChar(XChar(10));
   LockDebug := 3;
 end;
 
@@ -230,7 +230,8 @@ begin
   write_portb(3, BASE_COM_PORT+3);
   LockDebug := 3;
   printk_('Mode debug: Enabled, using ... COM1\n',0);
-  DebugTrace('Initialization of debugging At Time %q:%d:%d', Int64(StartTime.hour), StartTime.min, StartTime.sec);
+  DebugTrace('Initialization of debugging At Time %q:%d:%d', Int64(StartTime.Hour), StartTime.Min, StartTime.Sec);
+  {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 
 end.

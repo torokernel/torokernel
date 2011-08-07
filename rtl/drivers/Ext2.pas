@@ -26,10 +26,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 Unit Ext2;
+
 interface
 
 {$I ..\Toro.inc}
-
 
 //{$DEFINE DebugExt2FS}
 
@@ -259,7 +259,7 @@ begin
   // block where is the inode
   block:= gdp^[desc].inode_table + (((inode.ino-1) mod SbInfo.inodes_per_group * sizeof(ext2_inode))
             shr (SbInfo.log_block_size +10));
-  bh := GetBlock(Inode.SuperBlock.BlockDevice,Block,Inode.SuperBlock.BlockSize);
+  bh := GetBlock(Inode.SuperBlock.BlockDevice, Block, Inode.SuperBlock.BlockSize);
   if bh = nil then
     Exit; // error when was read the inode
   raw_inode := Pointer(PtrUInt(bh.data) + Offset);
@@ -294,7 +294,7 @@ begin
     InoInfo.data[I]:= raw_inode.block[I];
   // return the block to the cache
   PutBlock(Inode.SuperBlock.BlockDevice, bh);
-  {$IFDEF DebugExt2FS} DebugTrace('Ext2FS: Inode %d ,Readed Ok',0,Inode.ino,0); {$ENDIF}
+  {$IFDEF DebugExt2FS} DebugTrace('Ext2FS: Inode %d, Read Ok', 0, Inode.ino, 0); {$ENDIF}
 end;
 
 // Look for Inode name in Directory Inode  and return his inode.

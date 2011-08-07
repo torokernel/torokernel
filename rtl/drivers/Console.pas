@@ -458,7 +458,6 @@ begin
   end;
 end;
 
-
 procedure IrqKeyb; {$IFDEF FPC} [nostackframe]; {$ENDIF} assembler;
 asm
   {$IFDEF DCC} .noframe {$ENDIF}

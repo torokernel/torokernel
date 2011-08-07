@@ -81,7 +81,7 @@ type
     // th_waitpid , th_ready ...
     Flags: Byte;
     State: Byte;
-    PrivateHeap: pointer;
+    PrivateHeap: Pointer;
     TerminationCode: PtrInt; // Value returned by ThreadFunc
     ErrNo: Integer; // return  error in kernel function
     //init  and argument for thread main procedure
@@ -98,7 +98,7 @@ type
   end;
 
   TCPU = record // every CPU have this entry
-    Apicid: longint;
+    ApicID: LongInt;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
     ThreadsToBeDispatched: array[0..MAX_CPU-1] of PThread;
@@ -117,7 +117,7 @@ function BeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFun
 procedure CreateInitThread(ThreadFunction: TThreadFunc; const StackSize: SizeUInt);
 function GetCurrentThread: PThread;
 procedure ProcessInit;
-procedure Sleep(Miliseg: longint);
+procedure Sleep(Miliseg: LongInt);
 procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
@@ -251,13 +251,13 @@ end;
 // Initialization of every Core in the system
 procedure InitCores;
 var
-  I, J: longint;
+  I, J: LongInt;
 begin
   PrintK_('Multicore Initialization ...\n',0);
   // cleaning all table
   for I := 0 to Max_CPU-1 do
   begin
-    CPU[I].Apicid := 0 ;
+    CPU[I].ApicID := 0 ;
     CPU[I].CurrentThread := nil;
     CPU[I].Threads :=nil;
     for J := 0 to Max_CPU-1 do
@@ -275,7 +275,7 @@ begin
   begin
     if not Cores[I].CPUBoot and Cores[I].present then
     begin
-      CPU[Cores[I].ApicID].Apicid := Cores[I].ApicID;
+      CPU[Cores[I].ApicID].ApicID := Cores[I].ApicID;
       Cores[I].InitProc := @Scheduling; // core jump to this procedure // !!! KW 20110802 suspect a bug here,
       // !!! the procedure Scheduling is using a parameter, but Cores[].InitProc has no parameter
       // !!! I guess this is pure luck that the RCX is nil when starting the first time InitProc
@@ -470,7 +470,7 @@ begin
 end;
 
 // Sleep current thread for SleepTime .
-procedure Sleep(Miliseg: Longint);
+procedure Sleep(Miliseg: LongInt);
 var
   CurrentTime,ResumeTime,CountTime,tmp: Int64;
 begin
@@ -552,7 +552,7 @@ begin
   XHeapRelease(CurrentThread.PrivateHeap);
   CurrentThread.TerminationCode := TerminationCode;
   if TerminationCode = EXCEP_TERMINATION then
-   printk_('Exception happens on Thread %d\n',PtrUint(CurrentThread));
+    PrintK_('Exception happens on Thread %h\n', PtrUInt(CurrentThread));
   // this is not important if next_sched = curr_th then Threads = nil
   NextThread := CurrentThread.Next;
   RemoveThreadReady(CurrentThread);

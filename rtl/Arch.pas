@@ -78,10 +78,10 @@ type
   PtrUInt = UInt64;
 {$ENDIF}
   TNow = record
-    sec : LongInt;
-    min: LongInt;
-    hour: LongInt;
-    day: LongInt;
+    Sec : LongInt;
+    Min: LongInt;
+    Hour: LongInt;
+    Day: LongInt;
     Month: LongInt;
     Year: LongInt
   end;
@@ -102,8 +102,8 @@ type
     InitProc: procedure; // Procedure to initialize the core
   end;
 
-procedure bit_reset(val: Pointer; pos: QWord);
-procedure bit_set ( addval : Pointer ; pos : QWord ) ;
+procedure bit_reset(Value: Pointer; Offset: QWord);
+procedure bit_set(AddrVal : Pointer ; Offset : QWord ) ;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 // only used in the debug unit to synchronize access to serial port
@@ -266,13 +266,13 @@ var
 // Put interruption gate in the idt
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
-  idt_gates^[int].handler_0_15 := Word(QWord(handler) and $ffff) ;
+  idt_gates^[int].handler_0_15 := Word(QWord(handler) and $ffff);
   idt_gates^[int].selector := kernel_code_sel;
-  idt_gates^[int].tipe := gate_syst ;
+  idt_gates^[int].tipe := gate_syst;
   idt_gates^[int].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
   idt_gates^[int].handler_32_63 := DWORD(QWord(handler) shr 32);
-  idt_gates^[int].res := 0 ;
-  idt_gates^[int].nu := 0 ;
+  idt_gates^[int].res := 0;
+  idt_gates^[int].nu := 0;
 end;	
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
@@ -357,8 +357,6 @@ asm
   lock cmpxchg addval, rdx
   jz @spin
 end;
-
-
 
 // Get local Apic id
 function GetApicID: Byte; inline;
@@ -468,7 +466,7 @@ asm
     out  0A1h, al
 end;
 
-// hability the irq
+// turn on  the irq
 procedure irq_on(irq: Byte);
 begin
   if irq > 7 then
@@ -658,6 +656,15 @@ end;
 
 function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm // RCX=Val RDX=Pos
+  bt  [rcx], rdx
+  jc  @true
+  @false:
+   mov rax , 0
+   jmp @salir
+  @true:
+    mov rax , 1
+  @salir:
+(* old code
   {$IFDEF DCC} push rsi {$ENDIF}
   mov rsi, Val
   bt  [rsi], rdx
@@ -669,21 +676,28 @@ asm // RCX=Val RDX=Pos
     mov rax , 1
   @salir:
   {$IFDEF DCC} pop rsi {$ENDIF}
+*)
 end;
 
-procedure bit_reset(val: Pointer; pos: QWord); assembler;
-asm
-  mov rbx, pos
-  mov rsi, val
+procedure bit_reset(Value: Pointer; Offset: QWord); assembler;
+asm // RCX=Value RDX=Offset
+  btr [rcx], rdx
+{ old code replaced with single line
+  mov rbx, Offset
+  mov rsi, Value
   btr [rsi], rbx
+}
 end;
 
-procedure bit_set(addval: Pointer; pos: QWord); assembler;
-asm
+procedure bit_set(AddrVal: Pointer; Offset: QWord); assembler;
+asm // RCX=AddrVal RDX=Offset
+  bts [rcx], rdx
+{ old code replaced with single line
   mov rsi, addval
   xor rdx, rdx
   mov rdx, pos
   bts [rsi], rdx
+}
 end;
 
 procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -734,7 +748,7 @@ end;
 
 // Initialize Memory table. It uses information from bootloader.
 // The bootloader uses INT15h.
-// Usable memory is above 1MB.
+// Usable memory is above 1MB
 procedure MemoryCounterInit;
 var
   Magic: ^DWORD;
@@ -751,7 +765,7 @@ begin
     Inc(Magic);
     Inc(Desc);
   end;
-  // allocation start at ALLOC_MEMORY_START
+  // Allocation starts at ALLOC_MEMORY_START
   AvailableMemory := AvailableMemory;
   CounterID := (QWord(Magic)-INT15H_TABLE);
   CounterID := counterId div SizeOf(Int15h_info);
@@ -788,11 +802,11 @@ begin
     Mon := Mon + 12 ;
     Year := Year + 1;
   end;
-  Data.sec := sec;
-  Data.min := min;
-  Data.hour := hour;
+  Data.Sec := sec;
+  Data.Min := min;
+  Data.Hour := hour;
   Data.Month:= Mon;
-  Data.day := Day;
+  Data.Day := Day;
   Data.Year := Year;
   Data.Year := Year;
 end;
@@ -886,15 +900,23 @@ end;
 //------------------------------------------------------------------------------
 
 var
-  // temporary stacks for each cpu
-  start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte;
-  // pointer to Stack for each CPU during SMP Initilization
-  esp_tmp: Pointer;
+  esp_tmp: Pointer; // Pointer to Stack for each CPU during SMP Initilization
+  start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte; // temporary stack for each CPU
 
-// External Declarations for Initialization
-procedure boot_confirmation; forward;
+{$IFDEF FPC}
 
-// start stack for Initialization of CPU#0
+// synchronization with bsp CPU
+procedure boot_confirmation;
+var
+  CpuID: Byte;
+begin
+  CpuID := GetApicID;
+  Cores[CPUID].InitConfirmation := True;
+  // Local Kernel Initialization
+  Cores[CPUID].InitProc;
+end;
+
+// Start stack for Initialization of CPU#0
 var
   stack : array[1..5000] of Byte ;
 
@@ -924,17 +946,10 @@ end;
 // Entry point of PE64 EXE
 // The Toro bootloader is starting all CPUs(Cores) with this entry point
 // ie: this procedure is executed in parallel by all CPUs when booting
-{$IFDEF FPC}
 procedure main; [public, alias: '_mainCRTStartup']; assembler;
 asm
-  {$IFDEF FPC}
-    mov rax, cr3 // Cannot remove this warning! using eax generates error at compile-time.
-    cmp rax, 90000h  // rax = $100000 when executed the first time from the bootloader (debugged once using FPC version)
-  {$ENDIF}
-  {$IFDEF DCC}
-    mov eax, cr3
-    cmp eax, 90000h
-  {$ENDIF}
+  mov rax, cr3 // Cannot remove this warning! using eax generates error at compile-time.
+  cmp rax, 90000h  // rax = $100000 when executed the first time from the bootloader (debugged once using FPC version)
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
@@ -971,17 +986,6 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// Synchronization with bsp CPU
-procedure boot_confirmation;
-var
-  CpuID: Byte;
-begin
-  CpuID := GetApicID;
-  Cores[CPUID].InitConfirmation := True;
-  // local kernel Initialization
-  Cores[CPUID].InitProc;
-end;
-
 // Detect APICs on MP table
 procedure mp_apic_detect(table: p_mp_table_header);
 var
@@ -996,7 +1000,7 @@ begin
   begin
     if (m^  = cpu_type) and (CPU_COUNT < MAX_CPU-1) then
     begin
-    // i must do ^Byte > Pointer > p_mp_processor_entry
+    // I must do ^Byte > Pointer > p_mp_processor_entry
       tmp := m;
       cp := tmp;
       CPU_COUNT:=CPU_COUNT+1;
@@ -1131,7 +1135,7 @@ begin
             if Entry.nType=0 then
             begin
               Processor := Pointer(Entry);
-              // it's the processor enabled ??
+              // Is Processor Enabled ??
               if Processor.flags and 1 = 1 then
               begin
                 Inc(CPU_COUNT);
@@ -1215,7 +1219,7 @@ begin
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
   // PCD bit is Reset --> Page In Cached
-  Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
+  Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE), 4);
 end;
 
 // Set Page as not-cacheable
@@ -1235,7 +1239,7 @@ begin
   Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-  // PCD bit is Reset --> Page in cached
+  // PCD bit is Reset --> Page is cached
   Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
@@ -1250,7 +1254,7 @@ begin
   RemovePageCache(Page);
   Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);
-  // the whole kernel is cacheable from bootloader
+  // The whole kernel is cacheable from bootloader
   FlushCr3;
 end;
 
@@ -1258,7 +1262,6 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
-  r: qword = 3;
 begin
   // the bootloader creates the idt
   idt_gates := Pointer(IDTADDRESS);
@@ -1285,4 +1288,4 @@ begin
 end;
 
 end.
-
+

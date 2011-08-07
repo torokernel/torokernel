@@ -103,7 +103,7 @@ type
   end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord);
-procedure bit_set(AddrVal : Pointer ; Offset : QWord ) ;
+procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 // only used in the debug unit to synchronize access to serial port
@@ -655,8 +655,9 @@ end;
 // Next procedures aren't atomic
 
 function bit_test(Val: Pointer; pos: QWord): Boolean;
-asm // RCX=Val RDX=Pos
-  bt  [rcx], rdx
+asm
+  mov rdx, pos
+  bt  [Val], rdx
   jc  @true
   @false:
    mov rax , 0
@@ -664,40 +665,18 @@ asm // RCX=Val RDX=Pos
   @true:
     mov rax , 1
   @salir:
-(* old code
-  {$IFDEF DCC} push rsi {$ENDIF}
-  mov rsi, Val
-  bt  [rsi], rdx
-  jc  @si
-  @no:
-   mov rax , 0
-   jmp @salir
-  @si:
-    mov rax , 1
-  @salir:
-  {$IFDEF DCC} pop rsi {$ENDIF}
-*)
 end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord); assembler;
-asm // RCX=Value RDX=Offset
-  btr [rcx], rdx
-{ old code replaced with single line
+asm
   mov rbx, Offset
-  mov rsi, Value
-  btr [rsi], rbx
-}
+  btr [Value], rbx
 end;
 
-procedure bit_set(AddrVal: Pointer; Offset: QWord); assembler;
-asm // RCX=AddrVal RDX=Offset
-  bts [rcx], rdx
-{ old code replaced with single line
-  mov rsi, addval
-  xor rdx, rdx
-  mov rdx, pos
-  bts [rsi], rdx
-}
+procedure bit_set(Value: Pointer; Offset: QWord); assembler;
+asm
+  mov rbx, Offset
+  bts [Value], rbx
 end;
 
 procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -708,8 +687,8 @@ end;
 
 procedure SwitchStack(sv: Pointer; ld: Pointer); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-	mov [sv] , rbp
-	mov rbp , [ld]
+  mov [sv] , rbp
+  mov rbp , [ld]
 end;
 
 //------------------------------------------------------------------------------
@@ -1288,4 +1267,4 @@ begin
 end;
 
 end.
-
+

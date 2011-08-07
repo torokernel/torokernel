@@ -1,20 +1,19 @@
 //
 // Arch.pas
 //
-// Here are declared  functions and procedures for AMD x86-64 processors.
-// The procedures are similar to i386 processor .
-// It is independent of the other Units.
-// It can be implement in others processors.
+// This unit makes possible port Toro kernel to others architectures.
+// The declared procedures here MUST BE the same for all architectures.
 //
 // Changes :
 //
-// 27/10/2009 Cache Managing Implementation
-// 10/05/2009 SMP Initialization moved to Arch.pas . Supports Multicore.
-// 09/05/2009 Size of memory calculated using INT15H .
+// 05/08/2011 Fixed an important bug in Spinlock().
+// 27/10/2009 Cache Managing Implementation.
+// 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
+// 09/05/2009 Size of memory calculated using INT15H.
 // 12/10/2008 RelocateApic  is not used for the moment.
-// 12/01/2006 RelocateApic procedure, QEMU does not support the relocation of APIC register
-// 11/01/2006 Some modifications in Main procedure by Matias Vara .
-// 28/12/2006 First version by Matias Vara .
+// 12/01/2006 RelocateApic procedure, QEMU does not support the relocation of APIC register.
+// 11/01/2006 Some modifications in Main procedure by Matias Vara.
+// 28/12/2006 First version by Matias Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -264,7 +263,7 @@ type
 var
   idt_gates: PInterruptGateArray; // Pointer to IDT
 
-// put interruption gate in the idt
+// Put interruption gate in the idt
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
   idt_gates^[int].handler_0_15 := Word(QWord(handler) and $ffff) ;
@@ -303,9 +302,8 @@ end;
 
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
   {$IFDEF DCC} push rsi {$ENDIF} // it is obvious that rsi should also be saved for FPC
-//  mov dx, port // commented since rdx already contains port
+        mov dx, port
 	mov rsi, data // DX=port
         outsd
   {$IFDEF DCC} pop rsi {$ENDIF}
@@ -313,9 +311,8 @@ end;
 
 procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-//  {$IFDEF DCC} .noframe {$ENDIF}
   {$IFDEF DCC} push rdi {$ENDIF} // it is obvious that rdi should also be saved for FPC
-//	mov dx, port // commented since rdx already contains port
+	mov dx, port
 	mov rdi, data // DX=port
 	insd
   {$IFDEF DCC} pop rdi {$ENDIF}
@@ -347,31 +344,30 @@ begin
   icrl^ := $600 or vector;
 end;
 
-// CmpVal= SPINLOCK_FREE, NewVal= SPINLOCK_BUSY
-// TODO : Check if this procedure works fine
+// It implements atomic compare and change
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
-asm // RCX: CmpVal, RDX: NewVal, R8: addval
+asm
 @spin:
   nop
   nop
   nop
   nop
   mov rax, cmpval
-//  mov rdx, newval // already setup in proper register
-//  mov rcx, addval // no need to assign rcx, the addval is in r8
-//  lock cmpxchg [rcx], rdx
-  lock cmpxchg [r8], rdx
-  jnz @spin
+  mov rdx, newval
+  lock cmpxchg addval, rdx
+  jz @spin
 end;
 
-// local APIC
+
+
+// Get local Apic id
 function GetApicID: Byte; inline;
 begin
   Result := PDWORD(apicid_reg)^ shr 24;
 end;
 
-// read the IPI delivery status
-// check Delivery Status register
+// Read the IPI delivery status
+// Check Delivery Status register
 function is_apic_ready: Boolean;{$IFDEF ASMINLINE} inline; {$ENDIF}
 var
   r: PDWORD;
@@ -390,8 +386,8 @@ asm
   nop;
 end;
 
-// wait milisec using the clock bus speed in clock_hz
-// the apic interrupt need the clock_hz
+// Wait milisec using the clock bus speed in clock_hz
+// The apic interrupt need the clock_hz
 procedure Delay(clock_hz: Int64; milisec: LongInt);
 var
   tmp : ^DWORD ;
@@ -660,24 +656,6 @@ end;
 
 // Next procedures aren't atomic
 
-{
-function bit_test(Val: Pointer; pos: QWord): Boolean;
-asm
-  xor rax , rax
-  xor rbx , rbx
-  mov rbx , pos
-  mov rsi , Val
-  bt  [rsi] , rbx
-  jc  @si
-  @no:
-   mov rax , 0
-   jmp @salir
-  @si:
-    mov rax , 1
-  @salir:
-end;
-}
-
 function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm // RCX=Val RDX=Pos
   {$IFDEF DCC} push rsi {$ENDIF}
@@ -756,7 +734,7 @@ end;
 
 // Initialize Memory table. It uses information from bootloader.
 // The bootloader uses INT15h.
-// Usable memory is above 1MB
+// Usable memory is above 1MB.
 procedure MemoryCounterInit;
 var
   Magic: ^DWORD;
@@ -773,7 +751,7 @@ begin
     Inc(Magic);
     Inc(Desc);
   end;
-  // Allocation start at ALLOC_MEMORY_START
+  // allocation start at ALLOC_MEMORY_START
   AvailableMemory := AvailableMemory;
   CounterID := (QWord(Magic)-INT15H_TABLE);
   CounterID := counterId div SizeOf(Int15h_info);
@@ -910,14 +888,13 @@ end;
 var
   // temporary stacks for each cpu
   start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte;
-  // Pointer to Stack for each CPU during SMP Initilization
+  // pointer to Stack for each CPU during SMP Initilization
   esp_tmp: Pointer;
 
 // External Declarations for Initialization
-//procedure KernelStart; external name 'KernelStart';
 procedure boot_confirmation; forward;
 
-// Start stack for Initialization of CPU#0
+// start stack for Initialization of CPU#0
 var
   stack : array[1..5000] of Byte ;
 
@@ -944,8 +921,8 @@ asm
   call boot_confirmation
 end;
 
-// entry point of PE64 EXE
-// the Toro bootloader is starting all CPUs(Cores) with this entry point
+// Entry point of PE64 EXE
+// The Toro bootloader is starting all CPUs(Cores) with this entry point
 // ie: this procedure is executed in parallel by all CPUs when booting
 {$IFDEF FPC}
 procedure main; [public, alias: '_mainCRTStartup']; assembler;
@@ -994,18 +971,18 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// synchronization with bsp CPU
+// Synchronization with bsp CPU
 procedure boot_confirmation;
 var
   CpuID: Byte;
 begin
   CpuID := GetApicID;
   Cores[CPUID].InitConfirmation := True;
-  // Local Kernel Initialization
+  // local kernel Initialization
   Cores[CPUID].InitProc;
 end;
 
-// detect APICs on MP table
+// Detect APICs on MP table
 procedure mp_apic_detect(table: p_mp_table_header);
 var
   m: ^Byte;
@@ -1019,7 +996,7 @@ begin
   begin
     if (m^  = cpu_type) and (CPU_COUNT < MAX_CPU-1) then
     begin
-    // I must do ^Byte > Pointer > p_mp_processor_entry
+    // i must do ^Byte > Pointer > p_mp_processor_entry
       tmp := m;
       cp := tmp;
       CPU_COUNT:=CPU_COUNT+1;
@@ -1154,7 +1131,7 @@ begin
             if Entry.nType=0 then
             begin
               Processor := Pointer(Entry);
-              // Is Processor Enabled ??
+              // it's the processor enabled ??
               if Processor.flags and 1 = 1 then
               begin
                 Inc(CPU_COUNT);
@@ -1258,7 +1235,7 @@ begin
   Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
   PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
   // 2 MB page's entry
-  // PCD bit is Reset --> Page In Cached
+  // PCD bit is Reset --> Page in cached
   Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
@@ -1269,11 +1246,11 @@ var
 begin
   Page := nil;
   PML4_Table := Pointer(PDADD);
-  // First two Pages aren't Cacheable (0-2*PAGE_SIZE)
+  // first two pages aren't cacheable (0-2*PAGE_SIZE)
   RemovePageCache(Page);
   Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);
-  // The whole kernel is cacheable from bootloader
+  // the whole kernel is cacheable from bootloader
   FlushCr3;
 end;
 
@@ -1281,6 +1258,7 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
+  r: qword = 3;
 begin
   // the bootloader creates the idt
   idt_gates := Pointer(IDTADDRESS);
@@ -1307,4 +1285,4 @@ begin
 end;
 
 end.
-
+

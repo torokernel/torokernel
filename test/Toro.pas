@@ -101,8 +101,8 @@ end;
 
 var
   HttpHandler: TNetworkHandler;
-
 begin
+
   // Dedicate the e1000 network card to local cpu
   DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
   WriteConsole('Listening at port 80\n',[0]);
@@ -116,4 +116,4 @@ begin
   SysRegisterNetworkService(@HttpHandler);
   while True do
     SysThreadSwitch;
-end.
+end.

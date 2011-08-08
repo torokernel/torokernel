@@ -6,7 +6,7 @@
 //
 // Changes :
 //
-// 05/08/2011 Fixed an important bug in Spinlock().
+// 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
 // 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
 // 09/05/2009 Size of memory calculated using INT15H.
@@ -121,7 +121,7 @@ function read_portb(port: Word): Byte;
 function read_rdtsc: Int64;
 procedure send_apic_init (apicid : Byte) ;
 procedure send_apic_startup (apicid , vector : Byte );
-function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler; {$IFDEF FPC} inline; {$ENDIF}
+function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 procedure SwitchStack(sv: Pointer; ld: Pointer);
 procedure write_portb(Data: Byte; Port: Word);
 procedure CaptureInt (int: Byte; Handler: Pointer);
@@ -289,7 +289,7 @@ end;
 // IO port access
 procedure write_portb(Data: Byte; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-          mov dx, port
+     {$IFDEF LINUX} mov dx, port {$ENDIF}
           mov al, data
           out dx, al
 end;
@@ -303,7 +303,7 @@ end;
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
   {$IFDEF DCC} push rsi {$ENDIF} // it is obvious that rsi should also be saved for FPC
-        mov dx, port
+  {$IFDEF LINUX} mov dx, port {$ENDIF}
 	mov rsi, data // DX=port
         outsd
   {$IFDEF DCC} pop rsi {$ENDIF}
@@ -312,7 +312,7 @@ end;
 procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
   {$IFDEF DCC} push rdi {$ENDIF} // it is obvious that rdi should also be saved for FPC
-	mov dx, port
+        {$IFDEF LINUX} mov dx, port {$ENDIF}
 	mov rdi, data // DX=port
 	insd
   {$IFDEF DCC} pop rdi {$ENDIF}
@@ -353,9 +353,9 @@ asm
   nop
   nop
   mov rax, cmpval
-  mov rdx, newval
-  lock cmpxchg addval, rdx
-  jz @spin
+  {$IFDEF LINUX} lock cmpxchg [rdx], rsi {$ENDIF}
+  {$IFDEF WINDOWS} lock cmpxchg [r8], rdx {$ENDIF}
+  jnz @spin
 end;
 
 // Get local Apic id
@@ -653,11 +653,11 @@ asm
 end;
 
 // Next procedures aren't atomic
-
+//
 function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm
-  mov rdx, pos
-  bt  [Val], rdx
+  {$IFDEF WINDOWS} bt  [rcx], rdx {$ENDIF}
+  {$IFDEF LINUX} bt [rdi], rsi {$ENDIF}
   jc  @true
   @false:
    mov rax , 0
@@ -669,14 +669,14 @@ end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord); assembler;
 asm
-  mov rbx, Offset
-  btr [Value], rbx
+  {$IFDEF WINDOWS} btr [rcx], rdx {$ENDIF}
+  {$IFDEF LINUX} btr [rdi], rsi {$ENDIF}
 end;
 
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 asm
-  mov rbx, Offset
-  bts [Value], rbx
+  {$IFDEF WINDOWS} bts [rcx], rdx {$ENDIF}
+  {$IFDEF LINUX} bts [rdi], rsi {$ENDIF}
 end;
 
 procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}

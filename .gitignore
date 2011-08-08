@@ -8,5 +8,8 @@ rtl/backup
 test/backup
 rtl/drivers/backup
 test/serial.txt
+test/Toro.compiled
+test/Toro.res
+
 
 

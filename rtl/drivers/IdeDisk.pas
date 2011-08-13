@@ -1,17 +1,17 @@
 //
 // IdeDisk.pas
 //
-// Drivers for IDE Disk . For the moment only detect ATA Drivers.
+// Drivers for IDE Disk. For the moment only detect ATA Drivers.
 //
 // Notes:
-// - PCI-IDE Controllers was not detected.
-// - Only support  drivers with LBA support.
-// - In ATA Mode Supports up to 4 Disk  .
+// PCI-IDE Controllers are not detected.
+// LBA support only.
+// In ATA Mode supports up to 4 Disk.
 //
 // Changes :
 //
 // 07/03/2009 Some bugs Fixed.
-// 22/02/2007 First Version by Matias Vara,
+// 22/02/2007 First Version by Matias Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -42,13 +42,7 @@ uses Console, Arch, FileSystem, Process, Debug;
 implementation
 
 const
- // PCI header identificators
- //PCI_STORAGE_CLASS = 1;
- //PCI_IDE_SUBCLASS = 1;
- //PCI_AHCI_SUBCLASS = 6;
- 
- // Max number of drivers supported
- //MAX_ATA_DISK = 8;
+ // max number of drivers supported
  MAX_ATA_CONTROLLER= 4;
  MAX_SATA_DISK = 32;
  MAX_ATA_MINORS= 10;
@@ -63,10 +57,10 @@ const
  MASTER= 0;
  SLAVE= 1;
  
- // Size of physic blocks
+ // size of physic blocks
  BLKSIZE= 512;
  
- // Interface with User
+ // nameing interface
  ATANAMES : array[0..3] of AnsiString = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
  
  // ATA Ports
@@ -90,15 +84,15 @@ type
    Size: LongInt;
    FsType: LongInt;
    FileDesc: TFileBlock;
-    Next: PIDEBlockDisk;
+   Next: PIDEBlockDisk;
  end;
  
   // IDE Controller Disk
  TIDEController = record
    IOPort: LongInt;
     IRQ: LongInt;
-   // Pool the Irq
-   IrqReady: Boolean;
+   // irq's pool
+    IrqReady: Boolean;
     IrqHandler: Pointer;
     Driver: TBlockDriver;
     Minors: array[0..MAX_ATA_MINORS-1] of TIDEBlockDisk;
@@ -223,7 +217,7 @@ type
     Size: dword;
   end;
 
-// All information about ATA Disk
+// ATA Disk information
 var
   ATAControllers: array[0..MAX_ATA_CONTROLLER-1] of TIDEController;
 
@@ -251,7 +245,6 @@ var
   Temp: Byte;
 begin
   Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-//  Result := Bit_Test(@Temp, 7);
   Result := (Temp and (1 shl 7)) <> 0;
 end;
 
@@ -260,7 +253,6 @@ var
   Temp: Byte;
 begin
   Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-//  Result := Bit_Test(@Temp, 0);
   Result := (Temp and 1)  <> 0;
 end;
 
@@ -269,13 +261,13 @@ var
   Temp: Byte;
 begin
   Temp := read_portb(Ctr.IOPort+ATA_CMD_STATUS);
-//  Result := Bit_Test(@Temp, 3);
   Result := (Temp and (1 shl 3)) <> 0;
 end;
 
 procedure ATAIn(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
 asm // RCX: Buffer, RDX: IOPort
   {$IFDEF DCC} push rdi {$ENDIF}
+  {$IFDEF LINUX} mov rdx, IOPort {$ENDIF}
   mov rdi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256
@@ -286,6 +278,7 @@ end;
 procedure ATAOut(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
 asm // RCX: Buffer, RDX: IOPort
   {$IFDEF DCC} push rsi {$ENDIF}
+  {$IFDEF LINUX} mov rdx, IOPort {$ENDIF}
   mov rsi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256
@@ -339,12 +332,12 @@ begin
           Ctr.Minors[Minor+I].FsType:= Entry.pType;
           Ctr.Minors[Minor+I].FileDesc.BlockDriver:= @Ctr.Driver;
           Ctr.Minors[Minor+I].FileDesc.Minor:=Minor+I;
-	        Ctr.Minors[Minor+I].FileDesc.BlockSize:= BLKSIZE;
+	  Ctr.Minors[Minor+I].FileDesc.BlockSize:= BLKSIZE;
           Ctr.Minors[Minor+I].FileDesc.Next:=nil;
-	        WriteConsole('IdeDisk: /V', []);
+	  WriteConsole('IdeDisk: /V', []);
           WriteConsole(ATANames[Ctr.Driver.Major], []);
-	        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
-	        {$IFDEF DebugIdeDisk} DebugTrace('ATADetectPartition - Controller: %d, Disk: %d --> Ok', 0, Ctr.Driver.Major, Minor+I); {$ENDIF}
+	  WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
+	  {$IFDEF DebugIdeDisk} DebugTrace('ATADetectPartition - Controller: %d, Disk: %d --> Ok', 0, Ctr.Driver.Major, Minor+I); {$ENDIF}
         end;
         Inc(Entry);
       end;
@@ -377,7 +370,7 @@ begin
       {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ? ATADataReady ? Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
       if ATADataReady(@ATAControllers[ControllerNo]) and not ATAError(@ATAControllers[ControllerNo]) then
       begin
-	    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo); {$ENDIF}
+        {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo); {$ENDIF}
         ATAIn(@ATA_Buffer, ATAControllers[ControllerNo].IOPort);
         ATAControllers[ControllerNo].Minors[DriveNo*5].StartSector:= 0;
         ATAControllers[ControllerNo].Minors[DriveNo*5].Size:= ATA_Buffer.LBA_Capacity;
@@ -386,7 +379,7 @@ begin
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Minor:= DriveNo*5;
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.BlockSize:= BLKSIZE;
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Next:= nil;
-	      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo*5); {$ENDIF}
+        {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo*5); {$ENDIF}
         WriteConsole('IdeDisk: /V', []);
         WriteConsole(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
         WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
@@ -417,10 +410,10 @@ var
 begin
   for I := 0 to MAX_ATA_MINORS-1 do
   begin
-    // The driver responded ?
+    // the driver exists?
     if ATAControllers[Driver.Major].Minors[I].FsType = 0 then
       Continue;
-    // The File Descriptor is enqued in Dedicate Filesystem
+    // the file descriptor is enqued in a dedicate filesystem
     DedicateBlockFile(@ATAControllers[Driver.Major].Minors[I].FileDesc,CPUID);
     {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d', Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor), Driver.Major, CPUID); {$ENDIF}
   end;
@@ -537,7 +530,7 @@ begin
   Block := Block + Ctr.Minors[FileDesc.Minor].StartSector;
   ReadCount:= 0;
   Ctr.Driver.WaitOn.state := tsSuspended;
-  // Sending Commands
+  // sending Commands
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_READ);
   repeat
@@ -560,21 +553,21 @@ var
  ncount: LongInt;
  Ctr: PIDEController;
 begin
-  // Always do That , protection from local CPU access
+  // always do That , protection from local CPU access
   GetDevice(FileDesc.BlockDriver);
   Ctr:= @ATAControllers[FileDesc.BlockDriver.Major];
   // for NOT_FILESYSTEM type that is not important because StartSector is equal to 0
   Block := Block + Ctr.Minors[FileDesc.Minor].StartSector;
   ncount := 0;
-  //suspend the thread for wait an irq
+  // suspend the thread for wait an irq
   Ctr.Driver.WaitOn.state := tsSuspended;
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_WRITE);
   // writing
   repeat
     FileDesc.BlockDriver.WaitOn.state := tsSuspended;
- ATAOut(Buffer, Ctr.IOPort);
-    // Waiting the IRQ
+    ATAOut(Buffer, Ctr.IOPort);
+    // waiting the IRQ
     SysThreadSwitch;
     if ATAError(Ctr) then
       Break;
@@ -592,8 +585,8 @@ end;
 procedure IDEInit;
 begin
   WriteConsole('Looking for ATA-IDE Disk ...\n',[]);
-  // Standart ATA interface
-  // Master Controller
+  // standart ATA interface
+  // master controller
   ATAControllers[0].IOPort := $1f0;
   ATAControllers[0].IRQ := 14;
   ATAControllers[0].IrqHandler := @ATA0IrqHandler;
@@ -606,7 +599,7 @@ begin
   ATAControllers[0].Driver.ReadBlock := @ATAReadBlock;
   ATAControllers[0].Driver.WriteBlock := @ATAWriteBlock;
   ATAControllers[0].Driver.Next := nil;
-  // Slave Controller
+  // slave controller
   ATAControllers[1].IOPort:= $170;
   ATAControllers[1].IRQ := 15;
   ATAControllers[1].IrqHandler := @ATA1IrqHandler;
@@ -622,7 +615,7 @@ begin
   ATADetectController;
 end;
 
-// Initialization of Internal Structures.
+// Initialization of internal structures.
 procedure IdeDiskInit;
 var
   I, J: LongInt;
@@ -639,4 +632,4 @@ end;
 initialization
   IdeDiskInit;
 
-end.
+end.

@@ -151,6 +151,7 @@ begin
   WritePort(TRANSMITBUFFER, NicNE2000.iobase+REMOTESTARTADDRESS1);
   WritePort(E8390_RWRITE or E8390_START, NicNE2000.iobase+COMMAND);
   Data := Packet.Data;
+  // TODO : we are not checking if the packet size is longer that the buffer!!
   for I := 0 to (Size-1) do
     WritePort(Data^[I], NicNE2000.iobase+NE_DATA);
   WritePort(TRANSMITBUFFER, NicNE2000.iobase+TRANSMITPAGE);
@@ -416,4 +417,4 @@ end;
 initialization
   PCICardInit;
   
-end.
+end.

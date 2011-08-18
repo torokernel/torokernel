@@ -200,7 +200,6 @@ begin
   // Request EEPROM read.
   E1000WriteRegister(Net, E1000_REG_EERD,(Reg shl Net^.EepromAddrOff) or E1000_REG_EERD_START);
   // Wait until ready.
-  // ojo aca puede haber un error
   while (E1000ReadRegister(Net, E1000_REG_EERD) and Net^.EepromDoneBit) = 1 do ;
   Result := ((E1000ReadRegister(Net, E1000_REG_EERD) and E1000_REG_EERD_DATA)) shr 16;
 end;
@@ -223,32 +222,31 @@ type
 // Internal Job of NetworkSend
 procedure DoSendPacket(Net: PNetworkInterface);
 var
-  {Head, }Tail, I: LongInt;
+  Tail, I: LongInt;
   Desc: PE1000TxDesc;
   Data, P: PByteArray;
 begin
-  // I need protection from Local IRQ
+  // i need protection from Local IRQ
   DisabledINT;
-  {Head := }E1000ReadRegister(@NicE1000, E1000_REG_TDH);
+  E1000ReadRegister(@NicE1000, E1000_REG_TDH);
   Tail := E1000ReadRegister(@NicE1000, E1000_REG_TDT);
   Desc := NicE1000.TxDesc;
   inc(Desc, Tail);
   Data := Pointer(PtrUInt(NicE1000.TxBuffer) + (Tail*E1000_IOBUF_SIZE));
   P := net.OutgoingPackets.data;
-  // Copy bytes to TX queue buffers
-  // maybe it is slowly
+  // copy bytes to TX queue buffers
+  // TODO : we are not checking if the packet size is longer that the buffer!!
+  // suppousin than the size is less than BUFFER_SIZE
   for I:= 0 to  (net.OutgoingPackets.size-1) do
     Data^[I] := P^[I];
-  // Mark this descriptor ready.
+  // mark this descriptor ready
   Desc.Status  := 0;
   Desc.Command := 0;
   Desc.Length  := net.OutgoingPackets.size;
-  //
   // TODO: We are using the Minimun size per packer
   // this marks the end of the packet, maybe I am wrong
   Desc.Command := E1000_TX_CMD_EOP or E1000_TX_CMD_FCS or E1000_TX_CMD_RS;
-  // Increment tail and Start transmission
-  // aca falta algo con respecto a tail
+  // increment tail and Start transmission
   inc(Tail);
   E1000WriteRegister(@NicE1000, E1000_REG_TDT,  Tail);
   EnabledINT;
@@ -259,31 +257,31 @@ procedure e1000Send(Net: PNetworkInterface; Packet: PPacket);
 var
   PacketQueue: PPacket;
 begin
-  // Queue the packet
+  // queue the packet
   PacketQueue := Net.OutgoingPackets;
   if PacketQueue = nil then
   begin
-   // I have to enque it
+   // i have to enque it
     Net.OutgoingPackets := Packet;
-   // Send Directly
+   // send Directly
     DoSendPacket(Net);
   end else
   begin
-  // It is a FIFO queue
+  // it is a FIFO queue
     while PacketQueue.Next <> nil do
       PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
   end;
 end;
 
-// init RX and TX buffers
+// Init RX and TX buffers
 function e1000initbuf(Net: PE1000): Boolean;
 var
   I: LongInt;
   RxBuff: PE1000RxDesc;
   TxBuff: PE1000TxDesc;
 begin
-  // Number of descriptors
+  // number of descriptors
   Net.RxDescCount := E1000_RXDESC_NR;
   Net.TxDescCount := E1000_TXDESC_NR;
   // allocate RX descriptors
@@ -293,21 +291,26 @@ begin
     Result := False;
     Exit;
   end;
-
   // allocate 2048-Byte buffers
   Net.RxBufferSize := E1000_RXDESC_NR * E1000_IOBUF_SIZE;
   Net.RxBuffer := ToroGetMem(Net.RxBufferSize);
-
-  // Setup RX descriptors
+  if Net.RxBuffer = nil then
+  begin // not enough memory
+    ToroFreeMem(Net.RxDesc);
+    Result := False;
+    Exit;
+  end;
+  // setup RX descriptors
   RxBuff := Net.RxDesc;
   for I := 0 to E1000_RXDESC_NR-1 do
     begin
-    RxBuff.Buffer := DWORD(PtrUInt(Net.RxBuffer) + (I * E1000_IOBUF_SIZE)); // ??? KW20110807 this is probably the source of a bug since adding on a 64bits Pointer and retrieving only a 32 bits value
+    RxBuff.Buffer := DWORD(PtrUInt(Net.RxBuffer) + (I * E1000_IOBUF_SIZE));
     inc(RxBuff);
     end;
   Net.TxDesc := ToroGetMem(Net.TxDescCount * SizeOf(TE1000TxDesc));
   if Net.TxDesc = nil then
   begin // not enough memory
+    ToroFreeMem(Net.RxBuffer);
     ToroFreeMem(Net.RxDesc);
     Result := False;
     Exit;
@@ -315,14 +318,21 @@ begin
   // allocate 2048-Byte buffers
   Net.TxBufferSize := E1000_TXDESC_NR * E1000_IOBUF_SIZE;
   Net.TxBuffer := ToroGetMem(Net.TxBufferSize);
+  if Net.TxBuffer = nil then
+  begin // not enough memory
+    ToroFreeMem(Net.TxDesc);
+    ToroFreeMem(Net.RxBuffer);
+    ToroFreeMem(Net.RxDesc);
+    Result := False;
+    Exit;
+  end;
   // Setup TX descriptors
   TxBuff := Net.TxDesc;
   for I := 0 to E1000_TXDESC_NR-1 do
     begin
-    TxBuff.Buffer := DWORD(PtrUInt(Net.TxBuffer) + (I * E1000_IOBUF_SIZE));  // ??? KW20110807 this is probably the source of a bug since adding on a 64bits Pointer and retrieving only a 32 bits value
+    TxBuff.Buffer := DWORD(PtrUInt(Net.TxBuffer) + (I * E1000_IOBUF_SIZE));
     Inc(TxBuff);
     end;
-
   // Setup the receive ring registers.
   E1000WriteRegister(Net, E1000_REG_RDBAL, LongInt(Net.RxDesc) );
   E1000WriteRegister(Net, E1000_REG_RDBAH, 0);
@@ -331,7 +341,6 @@ begin
   E1000WriteRegister(Net, E1000_REG_RDT,   Net.RxDescCount - 1);
   e1000UnsetRegister(Net, E1000_REG_RCTL,  E1000_REG_RCTL_BSIZE);
   E1000SetRegister(Net,   E1000_REG_RCTL,  E1000_REG_RCTL_EN);
-
   // Setup the transmit ring registers.
   E1000WriteRegister(Net, E1000_REG_TDBAL, LongInt(Net.TxDesc));
   E1000WriteRegister(Net, E1000_REG_TDBAH, 0);
@@ -345,13 +354,13 @@ end;
 // Read a packet from net card and enque it to Outgoing Packet list
 procedure ReadPacket(Net: PE1000);
 var
-  {Head, }Tail, Current, I: LongInt;
+  Tail, Current, I: LongInt;
   RxDesc: PE1000RxDesc;
   Packet: PPacket;
   Data, P: PByteArray;
 begin
   // Find the head, tail and current descriptors
-  {Head := }E1000ReadRegister(Net, E1000_REG_RDH);
+  E1000ReadRegister(Net, E1000_REG_RDH);
   Tail := E1000ReadRegister(Net, E1000_REG_RDT);
   Current  := (Tail + 1) mod Net.RxDescCount;
   RxDesc := Net.RxDesc;
@@ -360,19 +369,25 @@ begin
   begin
     // I have to do something here
   end;
-
   // Alloc memory for new packet
   Packet := ToroGetMem(RxDesc.Length+SizeOf(TPacket));
+  // we haven't got memory ---> missing packets
+  if Packet = nil then
+  begin
+   // incrementing the tail
+   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
+   WriteConsole('e1000 /Rmising packets/n\n',[]);
+   exit;
+  end;
   Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
   Packet.size:= RxDesc.Length;
-  // copy to a buffer
-  Data := packet.data;
+  // copying to the buffer
+  Data := Packet.data;
   P := Pointer(RxDesc.Buffer);
-  // maybe it is slowly
   for I:= 0 to RxDesc.Length-1 do
     Data^[I] := P^[I];
   RxDesc.Status := 0;
-  // increment tail
+  // incrementing the tail
   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
   // report to kernel
   EnqueueIncomingPacket(Packet);
@@ -537,4 +552,4 @@ end;
 initialization
 	PCICardInit;
 
-end.
+end.

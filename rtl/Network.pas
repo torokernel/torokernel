@@ -423,8 +423,6 @@ end;
 
 // Return a Valid Checksum Code for IP Packet
 function CalculateChecksum(pip: Pointer; data: Pointer; cnt, pipcnt: word): word;
-//type
-//  PByte = ^Byte;
 var
   pw: ^Word;
   loop: word;
@@ -602,7 +600,7 @@ begin
 end;
 
 // Send a packet using the local Network interface
-// It 's an async API , the packet is send when "ready" register is True
+// It's an async API , the packet is send when "ready" register is True
 procedure SysNetworkSend(Packet: PPacket);
 var
   CPUID: LongInt;
@@ -1189,6 +1187,7 @@ begin
       ETH_FRAME_ARP:
         begin
         {$IFDEF DebugNetwork} DebugTrace('EthernetPacketService: Arriving ARP packet', 0, 0, 0); {$ENDIF}
+          printk_('new arp packet\n',0);
           ProcessARPPacket(Packet);
         end;
       ETH_FRAME_IP:
@@ -1349,15 +1348,15 @@ var
   Buffer: PBufferSender;
   DataLen: UInt32;
 begin
-  // Sender Dispatcher can't send  , we have got to wait for remote host
-  // While The WinFlag is up the timer 'll be refreshed
+  // sender Dispatcher can't send, we have to wait for remote host
+  // while The WinFlag is up the timer 'll be refreshed
   if not Socket.AckFlag and Socket.WinFlag then
   begin
     if CheckTimeOut(Socket.WinCounter, Socket.WinTimeOut) then
     begin
-      // we have got to check if the remote window was refreshed
+      // we have to check if the remote window was refreshed
       TCPSendPacket(TCP_ACK, Socket);
-      // Set the timer again
+      // set the timer again
       Socket.WinCounter := read_rdtsc;
       Socket.WinTimeOut := WAIT_WIN*LocalCPUSpeed*1000;
     end;
@@ -1804,7 +1803,7 @@ begin
     Packet := ToroGetMem(SizeOf(TPacket)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen);
     // we need a new packet structure
     Buffer := ToroGetMem(SizeOf(TBufferSender));
-    // TODO: Maybe the syscall returns nil
+    // TODO : the syscall may retur nil
     Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     Packet.Size := SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen;
     Packet.ready := False;

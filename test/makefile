@@ -24,14 +24,14 @@ prt0.o : prt0.s
 
 toro.img : Toro.pas 
 	fpc $(UNITS) Toro.pas
-	./build 2 Toro boot.o toro.img
+	./build 4 Toro boot.o toro.img
 
 .PHONY : clean
 
 clean : 
 	rm *.img
 	rm *.o
-	rm *.bin
+	rm kernel.bin
 	rm ../rtl/*.o
 	rm ../rtl/*.ppu
 	rm ../rtl/drivers/*.o

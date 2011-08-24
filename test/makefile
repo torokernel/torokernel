@@ -23,7 +23,11 @@ prt0.o : prt0.s
 	as prt0.s -o prt0.o
 
 toro.img : Toro.pas 
+ifeq ($(DEBUG_INFO),1)
+	fpc $(UNITS) Toro.pas -g
+else
 	fpc $(UNITS) Toro.pas
+endif
 	./build 4 Toro boot.o toro.img
 
 .PHONY : clean

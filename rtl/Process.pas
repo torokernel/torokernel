@@ -13,7 +13,7 @@
 // - RemoveThreadReady is only used by systhreadkill() function
 //
 // Changes:
-// 27 /03  / 2011 : Renaming Exchange slot to MxSlots.
+// 27 / 03 / 2011 : Renaming Exchange slot to MxSlots.
 // 14 / 10 / 2009 : Bug Fixed In Scheduler.
 // 16 / 05 / 2009 : SMP Initialization was moved to Arch Unit.
 // 21 / 12 / 2008 : Bug fixed in SMP Initialization.
@@ -175,65 +175,75 @@ end;
 
 procedure ExceptDIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Division by Zero', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Division by zero', 0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RDivision by zero/n\n',0);
   ExceptionHandler;
 end;
 
 procedure ExceptOVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception: Overflow',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /ROverflow/n\n',0);
   ExceptionHandler;
 end;
 
 procedure ExceptBOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
   {$IFDEF DebugProcess} DebugTrace('Exception: Bound instruction',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RBound instruction/n\n',0);
   ExceptionHandler;
 end;
 
 procedure ExceptILLEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal Instruction',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal instruction',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RIllegal instruction/n\n',0);
   ExceptionHandler;
 end;
 
 procedure ExceptDEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Device not Available',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Device not available',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RDevice not available/n\n',0);
   ExceptionHandler;
 end;
 
 procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Double Fault',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Double fault',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RDouble Fault/n\n',0);
   ExceptionHandler
 end;
 
 procedure ExceptSTACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Stack Fault',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Stack fault',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RStack fault/n',0);
   ExceptionHandler
 end;
 
 procedure ExceptGENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: General Protection',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: General protection',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RGeneral protection/n\n',0);
   ExceptionHandler
 end;
 
 procedure ExceptPAGEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Page Fault',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: Page fault',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RPage fault/n\n',0);
   ExceptionHandler
 end;
 
 procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: FPU Error',  0, 0, 0); {$ENDIF}
+  {$IFDEF DebugProcess} DebugTrace('Exception: FPU error',  0, 0, 0); {$ENDIF}
+  PrintK_('Exception: /RFPU error/n\n',0);
   ExceptionHandler
 end;
 
-// more important Exceptions are captured
+// Exceptions are captured
 procedure InitializeINT;
 begin
   CaptureInt(EXC_DIVBYZERO, @ExceptDIVBYZERO);
@@ -542,23 +552,24 @@ begin
   end;
 end;
 
-// actual thread is dead and the status is the termination register in TThread
+// Actual thread is killed and the status is the termination register in TThread
 procedure ThreadExit(TerminationCode: PtrInt; Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
 begin
   CurrentThread := GetCurrentThread ;
-  // Free memory allocated by PrivateHeap
+  // free memory allocated by PrivateHeap
   XHeapRelease(CurrentThread.PrivateHeap);
   CurrentThread.TerminationCode := TerminationCode;
-  if TerminationCode = EXCEP_TERMINATION then
-    PrintK_('Exception happens on Thread %h\n', PtrUInt(CurrentThread));
+  // inform that the main thread is being killed
+  if CurrentThread = PThread(InitialThreadID) then
+   PrintK_('ThreadExit: /Rwarning/n killing MainThread\n',0);
   // this is not important if next_sched = curr_th then Threads = nil
   NextThread := CurrentThread.Next;
   RemoveThreadReady(CurrentThread);
   CurrentThread.State := tsZombie;
   {$IFDEF DebugProcess} DebugTrace('ThreadExit - ThreadID: %h', CurrentThread.ThreadID, 0, 0); {$ENDIF}
-  if Schedule then  // Go to Scheduling and next exit ??
+  if Schedule then  // Try to Schedule a new thread
     Scheduling(NextThread);
 end;
 
@@ -943,4 +954,4 @@ begin
 end;
 
 end.
-
+

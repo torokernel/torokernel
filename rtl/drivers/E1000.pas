@@ -204,13 +204,14 @@ begin
   Result := ((E1000ReadRegister(Net, E1000_REG_EERD) and E1000_REG_EERD_DATA)) shr 16;
 end;
 
-// The card starts to work
+// Kernel starts the card
 procedure e1000Start(net: PNetworkInterface);
 begin
-  // initialize network driver
+  // enable the interruption
+  e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
 end;
 
-// The card stopped to work
+// Kernel stops the card
 procedure e1000Stop(net: PNetworkInterface);
 begin
 end;
@@ -491,7 +492,7 @@ begin
         NicE1000.Regs:= Pointer($0F2020000); //Pointer(PCIcard.io[0])
         // work just for $100e card
         NicE1000.eepromdonebit := 1 shl 4;
-	      NicE1000.eepromaddroff := 8;
+	NicE1000.eepromaddroff := 8;
         // reset network card
         e1000Reset(@NicE1000);
         // initialization procedure as intel say
@@ -532,8 +533,6 @@ begin
         Irq_On(NicE1000.IRQ);
         // capture de interrupt
         CaptureInt(32+NicE1000.IRQ, @e1000irqhandler);
-        // enable interrupts
-        e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
         Net := @NicE1000.Driverinterface;
         Net.Name:= 'e1000';
         Net.MaxPacketSize:= E1000_IOBUF_SIZE;
@@ -543,6 +542,8 @@ begin
         Net.Reset:= @e1000Reset;
         Net.TimeStamp := 0;
         RegisterNetworkInterface(Net);
+        // enable interrupts
+        //e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
         end;
       end;
     PciCard := PciCard.Next;

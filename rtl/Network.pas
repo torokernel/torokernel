@@ -1,7 +1,7 @@
 //
 // Network.pas
 //
-// Manipulation of Packets and Network Interface
+// Manipulation of Packets and Network Interfaces.
 // Implements TCP-IP Stack and socket structures.
 //
 // Notes :
@@ -9,12 +9,12 @@
 // - Only major Sockets Syscalls are implemented at this time
 //
 // Changes :
-// 17 / 08 / 2009 : Multiplex-IO implemented at the level of kernel. First Version.
-//                  by Matias E. Vara.
-// 24 / 03 / 2009 : SysMuxSocketSelect() , Select() with MultiplexIO .
-// 26 / 12 / 2008 : Packet-Cache was removed and replaced with a most simple way.
-//                  Solved bugs in Size of packets and support multiples connections.
-// 31 / 12 / 2007 : First Version by Matias E. Vara
+//
+// 26/08/2011 Important bug fixed around network interface registration.
+// 17/08/2009 Multiplex-IO implemented at the level of kernel. First Version by Matias E. Vara.
+// 24/03/2009 SysMuxSocketSelect() , Select() with MultiplexIO.
+// 26/12/2008 Packet-Cache was removed and replaced with a most simple way. Solved bugs in Size of packets and support multiples connections.
+// 31/12/2007 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -395,9 +395,11 @@ begin
   Result := (Ip[3] shl 24) or (Ip[2] shl 16) or (Ip[1] shl 8) or Ip[0];
 end;
 
-// The interface is added in Network Driver list
+// The new network interface is enqued
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
+  NetInterface.IncomingPackets := nil;
+  NetInterface.OutgoingPackets := nil;
   NetInterface.Next := NetworkInterfaces;
   NetInterface.CPUID := -1;
   NetworkInterfaces := NetInterface;
@@ -1221,12 +1223,12 @@ var
   CPUID, I: LongInt;
 begin
   CPUID:= GetApicID;
-  // cleaning table
+  // cleaning  packet queue
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
-  // Initilization of Services for Packets Manipulation
+  // initilization of Services for Packets Manipulation
   NetworkServicesInit;
-  // Driver internal initilization
+  // driver internal initilization
   DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   // cleaning the Socket table
   for I:= 0 to (MAX_SocketPORTS-1) do

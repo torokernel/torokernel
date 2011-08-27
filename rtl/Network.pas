@@ -796,6 +796,13 @@ var
 begin
   CPUID := GetApicid;
   Packet := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
+  // wrong alarm, the queue is empty
+  If Packet = nil then
+  begin
+    PrintK_('Network: /RNull packet/n sent\n',0);
+    result := nil;
+    exit;
+  end;
   Packet.Ready := True;
   // the packet can be Delete
   if Packet.Delete then
@@ -884,7 +891,7 @@ begin
   begin
     if ArpPacket.TargetIpAddr=DedicateNetworks[CPUID].IpAddress then
     begin
-      // Request of Ip Address
+      // remote host is requesting my IP
       if ArpPacket.OpCode= SwapWORD(ARP_OP_REQUEST) then
       begin
         EthPacket.Destination:= EthPacket.Source;
@@ -894,12 +901,14 @@ begin
         ArpPacket.TargetIpAddr:= ArpPacket.SenderIpAddr;
         ArpPacket.SenderHardAddr:= DedicateNetworks[CPUID].NetworkInterface.HardAddress;
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
+        printk_('ARP: sending my IP\n',0);
         SysNetworkSend(Packet);
-        // Reply Request of Ip Address
+        printk_('ARP: sent my IP\n',0);
+        // reply Request of Ip Address
       end else if ArpPacket.OpCode= SwapWORD(ARP_OP_REPLY) then
       begin
         {$IFDEF DebugNetwork} DebugTrace('ProcessARPPacket: New Machine added to Translation Table',0, 0, 0); {$ENDIF}
-        // Some problems for Spoofing
+        // some problems for Spoofing
         AddTranslateIp(ArpPacket.SenderIPAddr,ArpPacket.SenderHardAddr);
       end;
     end;
@@ -1084,6 +1093,7 @@ begin
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
+          printk_('Answring a ICMP packet\n',0);
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
         end;
         {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving ICMP packet', 0, 0, 0); {$ENDIF}
@@ -1189,7 +1199,6 @@ begin
       ETH_FRAME_ARP:
         begin
         {$IFDEF DebugNetwork} DebugTrace('EthernetPacketService: Arriving ARP packet', 0, 0, 0); {$ENDIF}
-          printk_('new arp packet\n',0);
           ProcessARPPacket(Packet);
         end;
       ETH_FRAME_IP:

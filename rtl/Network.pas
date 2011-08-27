@@ -903,11 +903,9 @@ begin
         ArpPacket.TargetIpAddr:= ArpPacket.SenderIpAddr;
         ArpPacket.SenderHardAddr:= DedicateNetworks[CPUID].NetworkInterface.HardAddress;
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
-        printk_('ARP: sending my IP\n',0);
         // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
         Packet.Delete := true;
         SysNetworkSend(Packet);
-        printk_('ARP: sent my IP\n',0);
         // reply Request of Ip Address
       end else if ArpPacket.OpCode= SwapWORD(ARP_OP_REPLY) then
       begin
@@ -1097,7 +1095,6 @@ begin
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
-          printk_('Answring a ICMP packet\n',0);
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
         end;
         {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving ICMP packet', 0, 0, 0); {$ENDIF}

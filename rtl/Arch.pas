@@ -814,13 +814,11 @@ end;
 // procedures to capture unhandle interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 asm
-  call EnabledINT;
   db $48, $cf
 end;
 
 procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 asm
-  call EnabledINT;
   call EOI;
   db $48, $cf
 end;

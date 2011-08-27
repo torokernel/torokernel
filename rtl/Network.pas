@@ -803,12 +803,14 @@ begin
     result := nil;
     exit;
   end;
-  Packet.Ready := True;
-  // the packet can be Delete
-  if Packet.Delete then
-    ToroFreeMem(Packet);
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := Packet.Next;
   DedicateNetworks[CPUID].NetworkInterface.TimeStamp := read_rdtsc;
+  // the packet must be delete
+  if Packet.Delete then
+    ToroFreeMem(Packet)
+  else
+  // someone is waiting for this packet
+    Packet.Ready := True;
   Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
 end;
 
@@ -902,6 +904,8 @@ begin
         ArpPacket.SenderHardAddr:= DedicateNetworks[CPUID].NetworkInterface.HardAddress;
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
         printk_('ARP: sending my IP\n',0);
+        // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
+        Packet.Delete := true;
         SysNetworkSend(Packet);
         printk_('ARP: sent my IP\n',0);
         // reply Request of Ip Address
@@ -910,10 +914,10 @@ begin
         {$IFDEF DebugNetwork} DebugTrace('ProcessARPPacket: New Machine added to Translation Table',0, 0, 0); {$ENDIF}
         // some problems for Spoofing
         AddTranslateIp(ArpPacket.SenderIPAddr,ArpPacket.SenderHardAddr);
+        ToroFreeMem(Packet);
       end;
-    end;
-  end;
-  ToroFreeMem(Packet);
+    end else ToroFreeMem(Packet);
+  end else ToroFreeMem(Packet);
 end;
 
 // Check the Socket State and enqueue the packet in correct queue

@@ -811,12 +811,13 @@ asm
   cli
 end;
 
-// procedures to capture unhandle interruptions
+// Procedures to capture unhandle interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 asm
   db $48, $cf
 end;
 
+// Ignoring Hardware interruption
 procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 asm
   call EOI;

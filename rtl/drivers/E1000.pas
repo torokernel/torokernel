@@ -191,7 +191,7 @@ end;
 
 procedure E1000Reset(Net: PE1000);
 begin
-  E1000SetRegister(Net, E1000_REG_CTRL, E1000_REG_CTRL_RST);
+   E1000SetRegister(Net, E1000_REG_CTRL, E1000_REG_CTRL_RST);
   //delay(1); // 1 micro
 end;
 
@@ -221,14 +221,15 @@ type
   PByteArray = ^TByteArray;
 
 // Internal Job of NetworkSend
-procedure DoSendPacket(Net: PNetworkInterface);
+procedure DoSendPacket(Net: PNetworkInterface; Isirq: boolean);
 var
   Tail, I: LongInt;
   Desc: PE1000TxDesc;
   Data, P: PByteArray;
 begin
-  // i need protection from Local IRQ
-  DisabledINT;
+  // the kernel is calling, we need protection
+  If not(Isirq) then
+   DisabledINT;
   E1000ReadRegister(@NicE1000, E1000_REG_TDH);
   Tail := E1000ReadRegister(@NicE1000, E1000_REG_TDT);
   Desc := NicE1000.TxDesc;
@@ -244,13 +245,14 @@ begin
   Desc.Status  := 0;
   Desc.Command := 0;
   Desc.Length  := net.OutgoingPackets.size;
-  // TODO: We are using the Minimun size per packer
+  // TODO: We are using just a Buffer per packet
   // this marks the end of the packet, maybe I am wrong
   Desc.Command := E1000_TX_CMD_EOP or E1000_TX_CMD_FCS or E1000_TX_CMD_RS;
   // increment tail and Start transmission
-  inc(Tail);
-  E1000WriteRegister(@NicE1000, E1000_REG_TDT,  Tail);
-  EnabledINT;
+  E1000WriteRegister(@NicE1000, E1000_REG_TDT,  (Tail+1) mod NicE1000.TxDescCount);
+  // Irq on again
+  If not(Isirq) then
+   EnabledINT;
 end;
 
 // Send a packet
@@ -265,13 +267,17 @@ begin
    // i have to enque it
     Net.OutgoingPackets := Packet;
    // send Directly
-    DoSendPacket(Net);
+    DoSendPacket(Net,false);
   end else
   begin
-  // it is a FIFO queue
+    // we need local protection
+    DisabledInt;
+    // it is a FIFO queue
     while PacketQueue.Next <> nil do
       PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
+    EnabledInt;
+  // end protection
   end;
 end;
 
@@ -281,6 +287,7 @@ var
   I: LongInt;
   RxBuff: PE1000RxDesc;
   TxBuff: PE1000TxDesc;
+  r: ^char;
 begin
   // number of descriptors
   Net.RxDescCount := E1000_RXDESC_NR;
@@ -292,6 +299,10 @@ begin
     Result := False;
     Exit;
   end;
+  // fill with zeros
+  r := pointer(Net.RxDesc) ;
+  for I := 0 to   ((Net.RxDescCount*SizeOf(TE1000RxDesc))-1) do
+    r[I] := #0;
   // allocate 2048-Byte buffers
   Net.RxBufferSize := E1000_RXDESC_NR * E1000_IOBUF_SIZE;
   Net.RxBuffer := ToroGetMem(Net.RxBufferSize);
@@ -316,6 +327,10 @@ begin
     Result := False;
     Exit;
   end;
+  // fill with zeros
+  r := pointer(Net.TxDesc) ;
+  for I := 0 to   ((Net.TxDescCount*SizeOf(TE1000RxDesc))-1) do
+   r[I] := #0;
   // allocate 2048-Byte buffers
   Net.TxBufferSize := E1000_TXDESC_NR * E1000_IOBUF_SIZE;
   Net.TxBuffer := ToroGetMem(Net.TxBufferSize);
@@ -394,10 +409,7 @@ begin
   EnqueueIncomingPacket(Packet);
 end;
 
-var
-  R: Boolean = True;
-
-// e1000 Irq Handler
+// E1000 Irq Handler
 procedure e1000Handler;
 var
   Packet: PPacket;
@@ -412,19 +424,16 @@ begin
   begin
     // received packet
     ReadPacket(@NicE1000);
+    printk_('recibido!\n',0);
     {$IFDEF DebugE1000} DebugTrace('e1000Handler - Packet received', 0, 0, 0); {$ENDIF}
   end else if ((cause and E1000_REG_ICR_TXQE) <> 0 ) or ((cause and E1000_REG_ICR_TXDW) <> 0) then
   begin
-    // packet sent
-    // Inform Kernel Last packet has been sent, and fetch the next packet to send
-    if R then
-      R := False
-    else begin
+    // inform the kernel that last packet has been sent, and fetch the next packet to send
     Packet := DequeueOutgoingPacket;
-    // We have got to send more packet ?
+    printk_('Enviado!\n',0);
+    // there are more packets?
     if Packet <> nil then
-        DoSendPacket(@NicE1000.DriverInterface);
-    end;
+        DoSendPacket(@NicE1000.DriverInterface,true);
     end;
   eoi;
 end;
@@ -519,17 +528,17 @@ begin
           NicE1000.Driverinterface.HardAddress[(I*2+1)]:= (wd and $ff00) shr 8;
         end;
         // set receive address
-        e1000WriteRegister(@NicE1000, E1000_REG_RAL, NicE1000.Driverinterface.HardAddress[0]);
-        e1000WriteRegister(@NicE1000, E1000_REG_RAH, NicE1000.Driverinterface.HardAddress[4]);
+        e1000WriteRegister(@NicE1000, E1000_REG_RAL, dword(@NicE1000.Driverinterface.HardAddress[0]));
+        e1000WriteRegister(@NicE1000, E1000_REG_RAH, word(@NicE1000.Driverinterface.HardAddress[4]));
         e1000SetRegister(@NicE1000,   E1000_REG_RAH,   E1000_REG_RAH_AV);
         e1000SetRegister(@NicE1000,   E1000_REG_RCTL,  E1000_REG_RCTL_MPE);
-        WriteConsole('e1000 /Vdetected/n, Irq:%d\n',[PciCard.irq]);
-        WriteConsole('e1000 mac /V%d:%d:%d:%d:%d:%d/n\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]);
+        WriteConsole('e1000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
+        WriteConsole('e1000: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]);
         // buffer initialization
         if e1000initbuf(@NicE1000) then
-         WriteConsole('e1000 buffer init ... /VOk/n\n',[])
+         WriteConsole('e1000: buffer init ... /VOk/n\n',[])
         else
-        WriteConsole('e1000 buffer init ... /RFault/n\n',[]);
+        WriteConsole('e1000: buffer init ... /RFault/n\n',[]);
         Irq_On(NicE1000.IRQ);
         // capture de interrupt
         CaptureInt(32+NicE1000.IRQ, @e1000irqhandler);
@@ -541,9 +550,8 @@ begin
         Net.stop:= @e1000Stop;
         Net.Reset:= @e1000Reset;
         Net.TimeStamp := 0;
+        // regist network driver
         RegisterNetworkInterface(Net);
-        // enable interrupts
-        //e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
         end;
       end;
     PciCard := PciCard.Next;

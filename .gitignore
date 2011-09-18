@@ -1,15 +1,15 @@
 *.ppu
 *.o
-test/Toro
-test/build
+tests/Toro
+tests/build
 *.bin
 *.img
 rtl/backup
-test/backup
+tests/backup
 rtl/drivers/backup
-test/serial.txt
-test/Toro.compiled
-test/Toro.res
+tests/serial.txt
+tests/Toro.compiled
+tests/Toro.res
 
 
 

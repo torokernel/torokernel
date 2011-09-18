@@ -1,17 +1,15 @@
 #
-# Makefile to compile the test files using RTL Toro.
+# Makefile to compile the bootloader and the tools.
 # 
 # Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 # All Rights Reserved
 #
 #
 
-UNITS = -Fu../rtl/ -Fu../rtl/drivers/
-
-# bootloader for x86_64 arch 
+# x86_64 Bootloader
 BOOT = ../boot/x86_64.s
 
-all : boot.o build prt0.o toro.img
+all : boot.o build prt0.o
 
 boot.o : $(BOOT)
 	yasm $(BOOT) -o boot.o
@@ -22,24 +20,13 @@ build : build.pas
 prt0.o : prt0.s
 	as prt0.s -o prt0.o
 
-toro.img : Toro.pas 
-ifeq ($(DEBUG_INFO),1)
-	fpc $(UNITS) Toro.pas -g
-else
-	fpc $(UNITS) Toro.pas
-endif
-	./build 4 Toro boot.o toro.img
-
 .PHONY : clean
 
 clean : 
-	rm *.img
-	rm *.o
-	rm kernel.bin
-	rm ../rtl/*.o
-	rm ../rtl/*.ppu
-	rm ../rtl/drivers/*.o
-	rm ../rtl/drivers/*.ppu
+	rm boot.o
+	rm build
+	rm buildimg.ppu
+	rm prt0.o
 
 
 

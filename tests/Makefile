@@ -16,6 +16,9 @@ boot.o : $(BOOT)
 
 build : build.pas
 	fpc build.pas
+	rm build.o
+	rm buildimg.ppu
+	rm buildimg.o
 	
 prt0.o : prt0.s
 	as prt0.s -o prt0.o
@@ -25,7 +28,6 @@ prt0.o : prt0.s
 clean : 
 	rm boot.o
 	rm build
-	rm buildimg.ppu
 	rm prt0.o
 
 

@@ -1,6 +1,6 @@
 *.ppu
 *.o
-tests/Toro
+tests/ToroHello
 tests/build
 *.bin
 *.img

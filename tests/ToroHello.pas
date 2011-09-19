@@ -4,7 +4,7 @@
 //
 // Changes :
 // 
-// 16/09/2011 First Version.
+// 16/09/2011 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -43,10 +43,11 @@ uses
   Memory in 'rtl\Memory.pas',
   Debug in 'rtl\Debug.pas',
   Arch in 'rtl\Arch.pas',
+  Filesystem in 'rtl\Filesystem.pas',
   Console in 'rtl\Drivers\Console.pas';
 
 begin
-  WriteConsole('/RHellow World!!!\n',[0]);
+  WriteConsole('\c/RHello World, I am TORO!!!\n',[0]);
   while True do
     SysThreadSwitch;
 end.

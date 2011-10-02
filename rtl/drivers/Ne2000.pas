@@ -399,12 +399,12 @@ begin
         Net.stop := @ne2000Stop;
         Net.Reset := @ne2000Reset;
       Net.TimeStamp := 0;
-      WriteConsole('ne2000 network card: /Vdetected/n on PCI bus',[]);
+      WriteConsole('ne2000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
         InitNe2000(@NicNE2000);
         Irq_On(NicNE2000.IRQ);
         CaptureInt(32+NicNE2000.IRQ, @ne2000irqhandler);
       RegisterNetworkInterface(Net);
-      WriteConsole(', MAC:/V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
+      WriteConsole('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
       Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
         {$IFDEF DebugNe2000} DebugTrace('Ne2000 - PCICardInit - Done.', 0, 0, 0); {$ENDIF}
       Exit; // Support only 1 NIC in this version
@@ -417,4 +417,4 @@ end;
 initialization
   PCICardInit;
   
-end.
+end.

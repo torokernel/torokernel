@@ -1,6 +1,7 @@
 *.ppu
 *.o
 tests/ToroNetwork
+tests/ToroNetwork2
 tests/ToroHello
 tests/build
 *.bin

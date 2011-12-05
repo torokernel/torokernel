@@ -573,7 +573,8 @@ begin
     Scheduling(NextThread);
 end;
 
-// The thread(ThreadID) is dead, only parent thread can execute this function
+// Kill the thread given by ThreadID
+// It doesn't need parent dependency
 function SysKillThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -586,14 +587,8 @@ begin
     Result := 0;
     Exit;
   end;
-  // only parent thread can perform a KillThread . Warning: the pointer may be incorrect (corrupted)
-  if Thread.Parent.ThreadID <> CurrentThread.ThreadID then
-  begin
-    CurrentThread.ErrNo := -ECHILD;
-    Result := DWORD(-1);
-    Exit;
-  end;
   {$IFDEF DebugProcess} DebugTrace('SysKillThread - sending signal to Thread: %h in CPU: %d \n', ThreadID, Thread.CPU.ApicID,0); {$ENDIF}
+  // setting the kill flag 
   Thread.Flags := tfKill;
   Result := 0;
 end;
@@ -954,4 +949,4 @@ begin
 end;
 
 end.
-
+

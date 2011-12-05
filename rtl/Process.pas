@@ -123,8 +123,6 @@ function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
-procedure ThreadSuspend;
-procedure ThreadResume(Thread: PThread);
 function ThreadWait(var TerminationCode: PtrInt): TThreadID;
 
 var
@@ -373,22 +371,6 @@ begin
   Result := CPU[GetApicID].CurrentThread;
 end;
 
-// Set thread state to tsSuspended. This procedure is executed in only one CPU
-procedure ThreadSuspend;
-begin
-  GetCurrentThread.State := tsSuspended;
-  {$IFDEF DebugProcess}
-   DebugTrace('Thread Suspended',0,0,0);
-  {$ENDIF}
-  Scheduling(nil);
-end;
-
-// the thread is ready to be scheduled by the scheduler
-procedure ThreadResume(Thread: PThread);
-begin
-  Thread.State := tsReady;
-  {$IFDEF DebugProcess} DebugTrace('ThreadResume - Thread: %h', PtrUInt(Thread), 0, 0); {$ENDIF}
-end;
 
 const
   Initialized: Boolean = False; // Used only for the first thread to flag if initialized

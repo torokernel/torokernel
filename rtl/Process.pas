@@ -431,16 +431,6 @@ begin
   Result := NewThread;
 end;
 
-// Free all memory structures of the thread, called after waitpid function.
-// These blocks of memory live in parent thread CPU
-procedure ThreadFree(Thread: PThread);
-begin
-  if THREADVAR_BLOCKSIZE <> 0 then
-    ToroFreeMem(Thread.TLS);
-  ToroFreeMem (Thread.StackAddress);
-  ToroFreeMem(Thread);
-end;
-
 // Sleep current thread for SleepTime .
 procedure Sleep(Miliseg: LongInt);
 var

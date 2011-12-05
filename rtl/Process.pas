@@ -593,6 +593,8 @@ begin
   Result := 0;
 end;
 
+// Suspend the thread given by ThreadID
+// It doesn't need parent dependency
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -605,26 +607,23 @@ begin
     Result := 0;
     Exit;
   end;
-  // Current Thread is Suspended
   if (Thread = nil) or (CurrentThread.ThreadID = ThreadID) then
   begin
+    // suspending current thread
     CurrentThread.state := tsSuspended;
+    // calling the scheduler
     SysThreadSwitch;
     {$IFDEF DebugProcess} DebugTrace('SuspendThread: Current Threads was Suspended',0,0,0); {$ENDIF}
+  end 
+  else begin
+    // suspending the given thread
+    Thread.State := tsSuspended;
   end;
-  // only parent thread can perform a SuspendThread
-  if Thread.Parent.ThreadID <> CurrentThread.ThreadID then
-  begin
-    CurrentThread.ErrNo := -ECHILD;
-    Result := DWORD(-1);
-    Exit;
-  end;
-  Thread.State := tsSuspended;
   Result := 0;
 end;
 
-// The thread is wake , you must execute thread_resume in this order thread_suspend ---> thread_resume , because the
-// thread can interrupt waiting one irq
+// Wake up the thread given by ThreadID 
+// It doesn't need parent dependency
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -637,14 +636,8 @@ begin
     Result := 0;
     Exit;
   end;
-  // only parent thread can perform a ResumeThread
-  if Thread.Parent.ThreadID <> CurrentThread.ThreadID then
-  begin
-    CurrentThread.ErrNo := -ECHILD;
-    Result := DWORD(-1);
-    Exit; // added by KW 20110730, I presume this was the intended behavior
-  end;
-  ThreadResume(Thread);
+  // set the thread's state as ready
+  Thread.State := tsReady;
   Result := 0;
 end;
 

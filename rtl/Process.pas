@@ -80,7 +80,6 @@ type
     PrivateHeap: Pointer;
     FlagKill: boolean;
     TerminationCode: PtrInt; // Value returned by ThreadFunc
-    ErrNo: Integer; // return  error in kernel function
     //init  and argument for thread main procedure
     StartArg: Pointer;
     ThreadFunc: TThreadFunc;
@@ -138,10 +137,6 @@ const
   EXCEP_TERMINATION = -1 ; // code of termination for exception
   THREADVAR_BLOCKSIZE: DWORD = 0 ; // size of local variables storage for every thread
 
-{  Errno Implementation }
-  //MAX_ERROR = 124;
-  ECHILD		= 10;	{ No child processes }
-  EAGAIN	 	= 11;	{ Try again }
   
 // private procedures 
 procedure SystemExit; forward;
@@ -417,7 +412,6 @@ begin
   NewThread.FlagKill := false;
   NewThread.State := tsReady;
   NewThread.TerminationCode := 0;
-  NewThread.ErrNo := 0;
   NewThread.StartArg := Arg; // this argument we will read by thread main
   NewThread.ThreadFunc := ThreadFunction;
   {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
@@ -773,7 +767,6 @@ begin
   if NewThread = nil then
   begin
     ThreadID := 0;
-    GetCurrentThread.ErrNo := -EAGAIN;
     {$IFDEF DebugProcess} DebugTrace('BeginThread - ThreadCreate Failed', 0, 0, 0); {$ENDIF}
     Result := 0;
     Exit;

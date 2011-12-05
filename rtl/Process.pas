@@ -79,9 +79,9 @@ type
     FirstChild: PThread; // tail of childs
     IOScheduler: IOInfo;
     // th_waitpid , th_ready ...
-    Flags: Byte;
     State: Byte;
     PrivateHeap: Pointer;
+    FlagKill: boolean;
     TerminationCode: PtrInt; // Value returned by ThreadFunc
     ErrNo: Integer; // return  error in kernel function
     //init  and argument for thread main procedure
@@ -121,6 +121,7 @@ procedure Sleep(Miliseg: LongInt);
 procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
+function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
 procedure ThreadSuspend;
 procedure ThreadResume(Thread: PThread);
@@ -140,7 +141,6 @@ const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
   SPINLOCK_FREE = 3 ; // flags for spinlock
   SPINLOCK_BUSY = 4 ;
-  tfKill = 1 ; // Thread Flags signals
   EXCEP_TERMINATION = -1 ; // code of termination for exception
   THREADVAR_BLOCKSIZE: DWORD = 0 ; // size of local variables storage for every thread
 
@@ -436,7 +436,7 @@ begin
   NewThread.StackSize := StackSize;
   NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
   NewThread.sleep_rdtsc := 0;
-  NewThread.Flags := 0;
+  NewThread.FlagKill := false;
   NewThread.State := tsReady;
   NewThread.TerminationCode := 0;
   NewThread.ErrNo := 0;
@@ -589,7 +589,7 @@ begin
   end;
   {$IFDEF DebugProcess} DebugTrace('SysKillThread - sending signal to Thread: %h in CPU: %d \n', ThreadID, Thread.CPU.ApicID,0); {$ENDIF}
   // setting the kill flag 
-  Thread.Flags := tfKill;
+  Thread.FlagKill := true;
   Result := 0;
 end;
 
@@ -750,7 +750,7 @@ end;
 // Controls the execution of current thread flags
 procedure Signaling;
 begin
-  if CPU[GetApicID].CurrentThread.Flags = tfKill then
+  if CPU[GetApicID].CurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} DebugTrace('Signaling - killing CurrentThread', 0, 0, 0); {$ENDIF}
     ThreadExit(0, True);

@@ -13,8 +13,9 @@
 // - RemoveThreadReady is only used by systhreadkill() function
 //
 // Changes:
+// 05 / 12 / 2011 : Removing Threadwait, Errno, and other non-used code.
 // 27 / 03 / 2011 : Renaming Exchange slot to MxSlots.
-// 14 / 10 / 2009 : Bug Fixed In Scheduler.
+// 14 / 10 / 2009 : Bug Fixed in the Scheduler.
 // 16 / 05 / 2009 : SMP Initialization was moved to Arch Unit.
 // 21 / 12 / 2008 : Bug fixed in SMP Initialization.
 // 07 / 08 / 2008 : Bug fixed in Sleep
@@ -72,16 +73,15 @@ type
   TThreadFunc = function(Param: Pointer): PtrInt;
   TThread = record // in Toro any task is a Thread
     ThreadID: TThreadID; // thread identifier
-    Next: PThread; // Next and Previous are independant of the thread created from the Parent
-    Previous: PThread; // and are used for the scheduling to scan all threads for a CPU
+    Next: PThread; 	 // Next and Previous are independant of the thread created from the Parent
+    Previous: PThread;   // and are used for the scheduling to scan all threads for a CPU
     IOScheduler: IOInfo;
-    // th_waitpid , th_ready ...
     State: Byte;
     PrivateHeap: Pointer;
     FlagKill: boolean;
-    TerminationCode: PtrInt; // Value returned by ThreadFunc
-    //init  and argument for thread main procedure
+    // used by ThreadMain to pass argumments
     StartArg: Pointer;
+    // thread main function
     ThreadFunc: TThreadFunc;
     TLS: Pointer;
     StackAddress: Pointer;
@@ -359,9 +359,10 @@ end;
 
 
 const
-  Initialized: Boolean = False; // used only for the first thread to flag if initialized
+  // used only for the first thread to flag if initialized
+  Initialized: Boolean = False; 
 
-// Create a new thread, in the CPU and init IP instruction
+// Create a new thread
 function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
 var
   NewThread: PThread;
@@ -383,7 +384,7 @@ begin
     Result := nil;
     Exit;
   end;
-  // is this the  first thread ?
+  // is this the first thread ?
   if not Initialized then
   begin
     {$IFDEF DebugProcess} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
@@ -735,7 +736,6 @@ procedure ThreadMain;
 var
   CurrentThread: PThread;
   ExitCode: PtrInt;
-  ChildExitCode: PtrInt;
 begin
   CurrentThread := GetCurrentThread ;
   // open standard IO files, stack checking, iores, etc .

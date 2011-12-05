@@ -74,9 +74,6 @@ type
     ThreadID: TThreadID; // thread identifier
     Next: PThread; // Next and Previous are independant of the thread created from the Parent
     Previous: PThread; // and are used for the scheduling to scan all threads for a CPU
-    Parent : PThread; // pointer to parent thread
-    NextSibling: PThread; // Simple tail for ThreadWait procedure
-    FirstChild: PThread; // tail of childs
     IOScheduler: IOInfo;
     // th_waitpid , th_ready ...
     State: Byte;
@@ -427,11 +424,6 @@ begin
   NewThread.PrivateHeap := XHeapAcquire(CPUID); // Private Heap allocator init
   NewThread.ThreadID := TThreadID(NewThread); // check protection, it is not very important
   NewThread.CPU := @CPU[CPUID];
-  // New thread is added in the child queue of the parent thread (CurrentThread)
-  NewThread.FirstChild := nil;
-  NewThread.Parent := CPU[GetApicID].CurrentThread; // Note: for the initial thread this is not important
-  NewThread.NextSibling := NewThread.Parent.FirstChild;
-  NewThread.Parent.FirstChild := NewThread ; // only parent (CurrentThread) can remove or add threads to this list ---> no lock protection required
   // when executing ret_to_thread  this stack is pushed in esp register
   // when scheduling() returns (is a procedure!) return to this eip pointer
   // when thread is executed for first time thread_sp_register pointer to stack base (or end)
@@ -726,7 +718,6 @@ begin
     PrintK_('InitThread = nil\n', 0);
     hlt;
   end;
-  InitThread.NextSibling := nil ;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
   PrintK_('User Application Initialization ... \n', 0);

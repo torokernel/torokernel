@@ -123,7 +123,6 @@ function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
-function ThreadWait(var TerminationCode: PtrInt): TThreadID;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -482,57 +481,6 @@ begin
   {$IFDEF DebugProcess} DebugTrace('Sleep - ResumeTime exiting', 0, 0, 0); {$ENDIF}
 end;
 
-// Parent thread waits for return of child thread, returns the Termination code and the ThreadID of Child.
-// Note: simliar to waitpid function in linux system. Returns TerminationCode value and ThreadID.
-function ThreadWait(var TerminationCode: PtrInt): TThreadID;
-var
-  ChildThread: PThread;
-  NextSibling: PThread;
-  PreviousThread: PThread;
-begin
-  while True do
-  begin
-    // Find in the simple tail of son
-    ChildThread := CPU[GetApicID].CurrentThread;
-    if ChildThread = nil then
-    begin
-      Result := 0;
-      Exit;
-    end;
-    ChildThread := ChildThread.FirstChild;
-    if ChildThread = nil then
-    begin
-      // No child
-      Result := 0;
-      Exit;
-    end;
-    PreviousThread := nil ;
-    while ChildThread <> nil do
-    begin
-      // Waiting for me ??
-      if ChildThread.State = tsZombie then
-      begin
-        TerminationCode := ChildThread.TerminationCode;
-        Result := ChildThread.ThreadID ;
-        NextSibling := ChildThread.NextSibling ;
-        if PreviousThread <> nil then
-          PreviousThread.NextSibling := NextSibling
-        else
-          GetCurrentThread.FirstChild := NextSibling;
-        // stack and tls is allocated from parent CPU and must released by the Parent
-        ThreadFree(ChildThread);
-        {$IFDEF DebugProcess} DebugTrace('ThreadWait: ThreadID %d', SizeUInt(Result), 0, 0); {$ENDIF}
-        Exit;
-      end
-      else begin
-        PreviousThread := ChildThread ;
-        ChildThread := ChildThread.NextSibling;
-      end;
-    end;
-    // wait
-    Scheduling(nil);
-  end;
-end;
 
 // Actual thread is killed and the status is the termination register in TThread
 procedure ThreadExit(TerminationCode: PtrInt; Schedule: Boolean);
@@ -817,9 +765,6 @@ begin
   {$IFDEF DebugProcess} DebugTrace('ThreadMain - CurrentThread.ThreadFunc: %h', PtrUInt(@CurrentThread.ThreadFunc), 0, 0); {$ENDIF}
   ExitCode := CurrentThread.ThreadFunc(CurrentThread.StartArg);
   {$IFDEF DebugProcess} DebugTrace('ThreadMain - returning from CurrentThread.ThreadFunc CurrentThread: %h', PtrUInt(CurrentThread), 0, 0); {$ENDIF}
-  // waiting for all child to terminate before main thread can terminate
-  while CurrentThread.FirstChild <> nil do
-    ThreadWait(ChildExitCode);
   if CurrentThread.ThreadID = InitialThreadID then
     SystemExit; // System is ending !
   ThreadExit(ExitCode, True);

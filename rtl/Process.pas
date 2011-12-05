@@ -247,7 +247,7 @@ begin
   CaptureInt(EXC_FPUE, @ExceptFPUE);
 end;
 
-// Initialization of every Core in the system
+// Initialization of each Core in the system
 procedure InitCores;
 var
   I, J: LongInt;
@@ -275,12 +275,7 @@ begin
     if not Cores[I].CPUBoot and Cores[I].present then
     begin
       CPU[Cores[I].ApicID].ApicID := Cores[I].ApicID;
-      Cores[I].InitProc := @Scheduling; // core jump to this procedure // !!! KW 20110802 suspect a bug here,
-      // !!! the procedure Scheduling is using a parameter, but Cores[].InitProc has no parameter
-      // !!! I guess this is pure luck that the RCX is nil when starting the first time InitProc
-      // !!! or because the Candidate parameter is not used at first call
-      // !!! it would be safer to change the procedure InitProc to match the signature of Scheduling
-      // !!! this would force to call InitProc with @Candidate=nil
+      Cores[I].InitProc := @Scheduling; 
       InitCore(Cores[I].ApicID); // initialize the CPU
       if Cores[I].InitConfirmation then
         PrintK_('Core#%d ... /VOk\n/n', Cores[I].ApicID)
@@ -364,9 +359,9 @@ end;
 
 
 const
-  Initialized: Boolean = False; // Used only for the first thread to flag if initialized
+  Initialized: Boolean = False; // used only for the first thread to flag if initialized
 
-// create a new thread, in the CPU and init IP instruction
+// Create a new thread, in the CPU and init IP instruction
 function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
 var
   NewThread: PThread;
@@ -388,7 +383,7 @@ begin
     Result := nil;
     Exit;
   end;
-  // Is this the  first thread ?
+  // is this the  first thread ?
   if not Initialized then
   begin
     {$IFDEF DebugProcess} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
@@ -397,7 +392,7 @@ begin
   begin
     NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
     if NewThread.TLS = nil then
-    begin // Not enough memory, Thread cannot be created
+    begin // not enough memory, Thread cannot be created
       {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
       ToroFreeMem(NewThread.StackAddress);
       ToroFreeMem(NewThread);
@@ -405,7 +400,7 @@ begin
       Exit;
     end;
   end;
-  // Stack initialization
+  // stack initialization
   NewThread.StackSize := StackSize;
   NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
   NewThread.sleep_rdtsc := 0;
@@ -415,8 +410,8 @@ begin
   NewThread.StartArg := Arg; // this argument we will read by thread main
   NewThread.ThreadFunc := ThreadFunction;
   {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
-  NewThread.PrivateHeap := XHeapAcquire(CPUID); // Private Heap allocator init
-  NewThread.ThreadID := TThreadID(NewThread); // check protection, it is not very important
+  NewThread.PrivateHeap := XHeapAcquire(CPUID); // private heap allocator init
+  NewThread.ThreadID := TThreadID(NewThread);
   NewThread.CPU := @CPU[CPUID];
   // when executing ret_to_thread  this stack is pushed in esp register
   // when scheduling() returns (is a procedure!) return to this eip pointer
@@ -436,7 +431,7 @@ begin
   Result := NewThread;
 end;
 
-// free all memory structures of the thread, called after waitpid function.
+// Free all memory structures of the thread, called after waitpid function.
 // These blocks of memory live in parent thread CPU
 procedure ThreadFree(Thread: PThread);
 begin
@@ -485,7 +480,7 @@ begin
   RemoveThreadReady(CurrentThread);
   CurrentThread.State := tsZombie;
   {$IFDEF DebugProcess} DebugTrace('ThreadExit - ThreadID: %h', CurrentThread.ThreadID, 0, 0); {$ENDIF}
-  if Schedule then  // Try to Schedule a new thread
+  if Schedule then  // try to Schedule a new thread
     Scheduling(NextThread);
 end;
 
@@ -628,7 +623,7 @@ begin
       // jump to thread execution
       Exit;
     end;  
-    Emigrating(CurrentCPU); // Enqueue newly created threads to others CPUs
+    Emigrating(CurrentCPU); // enqueue newly created threads to others CPUs
     Inmigrating(CurrentCPU); // Import new threads to CurrentCPU.Threads
     CurrentThread := CurrentCPU.CurrentThread;
     if Candidate = nil then
@@ -638,7 +633,7 @@ begin
         Break
       else if (Candidate.State = tsIOPending) and not Candidate.IOScheduler.DeviceState^ then
       begin
-        // The device has completed its operation -> Candidate thread is ready to continue its process
+        // the device has completed its operation -> Candidate thread is ready to continue its process
         Candidate.State:= tsReady;
 				Break;
       end else begin
@@ -656,7 +651,7 @@ begin
   end;
 end;
 
-// Controls the execution of current thread flags
+// Controls the execution of thread flags
 procedure Signaling;
 begin
   if CPU[GetApicID].CurrentThread.FlagKill then
@@ -743,7 +738,7 @@ var
   ChildExitCode: PtrInt;
 begin
   CurrentThread := GetCurrentThread ;
-  // Open standard IO files, stack checking, iores, etc .
+  // open standard IO files, stack checking, iores, etc .
   {$IFDEF FPC} InitThread(CurrentThread.StackSize); {$ENDIF}
   // TODO: !!! InitThread() for Delphi
   {$IFDEF DebugProcess} DebugTrace('ThreadMain - CurrentThread: #%h', PtrUInt(CurrentThread), 0, 0); {$ENDIF}
@@ -762,7 +757,7 @@ var
   NewThread: PThread;
 begin
   if (LongInt(CPU) = CPU_NIL) or (LongInt(CPU) > CPU_COUNT-1) then
-    CPU := GetApicID; // Invalid CpuID -> create thread on current CPU
+    CPU := GetApicID; // invalid CpuID -> create thread on current CPU
   NewThread := ThreadCreate(StackSize, CPU, ThreadFunction, Parameter);
   if NewThread = nil then
   begin
@@ -812,7 +807,7 @@ begin
     InitializeINT;
   {$IFDEF DebugProcess} DebugTrace('CPU Speed: %d Mhz', 0, LocalCpuSpeed, 0); {$ENDIF}
   InitCores;
-  // Functions to manipulate threads. Transparent for pascal programmers
+  // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
   with ToroThreadManager do
   begin

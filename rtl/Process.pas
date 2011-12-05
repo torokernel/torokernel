@@ -141,7 +141,7 @@ const
 // private procedures 
 procedure SystemExit; forward;
 procedure Scheduling(Candidate: PThread); forward;
-procedure ThreadExit(TerminationCode: PtrInt; Schedule: Boolean); forward;
+procedure ThreadExit(Schedule: Boolean); forward;
 procedure ThreadMain; forward;
 procedure Signaling; forward;
 
@@ -159,7 +159,7 @@ var
 procedure ExceptionHandler;
 begin
   EnabledInt;
-  ThreadExit(EXCEP_TERMINATION, True);
+  ThreadExit(True);
 end;
 
 procedure ExceptDIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
@@ -407,7 +407,6 @@ begin
   NewThread.sleep_rdtsc := 0;
   NewThread.FlagKill := false;
   NewThread.State := tsReady;
-  NewThread.TerminationCode := 0;
   NewThread.StartArg := Arg; // this argument we will read by thread main
   NewThread.ThreadFunc := ThreadFunction;
   {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
@@ -465,23 +464,28 @@ end;
 
 
 // Actual thread is killed and the status is the termination register in TThread
-procedure ThreadExit(TerminationCode: PtrInt; Schedule: Boolean);
+procedure ThreadExit(Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
 begin
   CurrentThread := GetCurrentThread ;
   // free memory allocated by PrivateHeap
   XHeapRelease(CurrentThread.PrivateHeap);
-  CurrentThread.TerminationCode := TerminationCode;
   // inform that the main thread is being killed
   if CurrentThread = PThread(InitialThreadID) then
    PrintK_('ThreadExit: /Rwarning/n killing MainThread\n',0);
-  // this is not important if next_sched = curr_th then Threads = nil
   NextThread := CurrentThread.Next;
+  // removing from scheduling queue
   RemoveThreadReady(CurrentThread);
-  CurrentThread.State := tsZombie;
+  // free memory allocated by Parent thread
+  // TODO: Posible rice condition, leaving non local memory!
+  if THREADVAR_BLOCKSIZE <> 0 then
+    ToroFreeMem(CurrentThread.TLS);
+  ToroFreeMem (CurrentThread.StackAddress);
+  ToroFreeMem(CurrentThread);
   {$IFDEF DebugProcess} DebugTrace('ThreadExit - ThreadID: %h', CurrentThread.ThreadID, 0, 0); {$ENDIF}
-  if Schedule then  // try to Schedule a new thread
+  if Schedule then  
+    // try to Schedule a new thread
     Scheduling(NextThread);
 end;
 
@@ -658,7 +662,7 @@ begin
   if CPU[GetApicID].CurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} DebugTrace('Signaling - killing CurrentThread', 0, 0, 0); {$ENDIF}
-    ThreadExit(0, True);
+    ThreadExit(True);
   end;
 end;
 
@@ -735,7 +739,6 @@ end;
 procedure ThreadMain;
 var
   CurrentThread: PThread;
-  ExitCode: PtrInt;
 begin
   CurrentThread := GetCurrentThread ;
   // open standard IO files, stack checking, iores, etc .
@@ -747,7 +750,7 @@ begin
   {$IFDEF DebugProcess} DebugTrace('ThreadMain - returning from CurrentThread.ThreadFunc CurrentThread: %h', PtrUInt(CurrentThread), 0, 0); {$ENDIF}
   if CurrentThread.ThreadID = InitialThreadID then
     SystemExit; // System is ending !
-  ThreadExit(ExitCode, True);
+  ThreadExit(True);
 end;
 
 // Create new thread and return the thread id  , we don't need save context .
@@ -780,7 +783,7 @@ end;
 // The thread is dead and ExitCode is set as Termination code in TThread
 procedure SysEndThread(ExitCode: DWORD);
 begin
-  ThreadExit(ExitCode, True);
+  ThreadExit(True);
 end;
 
 // Return the ThreadID of the current running thread

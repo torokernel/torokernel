@@ -5,11 +5,12 @@
 // NOTE: These procedures do not have protection , WriteConsole should not have trouble but ReadConsole may face race condition when running from two CPUS
 // 
 // Changes:
+// 11 / 12 / 2011: Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
 // 27 / 03 / 2009: Adding support for QWORD parameters in Printk_() and WriteConsole().
 // 08 / 02 / 2007: Rename to Console.pas  , new procedures to read and write the console by Matias Vara.
-// The consoles's procedures are only for users , the kernel only need PrintK_()
-// 15 / 07 / 2006 : The code was rewrited  by Matias Vara .
-// 09 / 02 / 2005 :  First Version by Matias Vara .
+// 		   The consoles's procedures are only for users , the kernel only need PrintK_().
+// 15 / 07 / 2006: The code was rewrited  by Matias Vara.
+// 09 / 02 / 2005: First Version by Matias Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -70,6 +71,11 @@ type
 		car: XChar;
 		form: Byte;
 	end;
+
+
+var
+	// Protection for concurrent access
+	LockConsole: UInt64;
 
 procedure PrintString(const S: AnsiString); forward;
 
@@ -287,6 +293,7 @@ var
   Value: QWORD;
   Values: PXChar;
 begin
+  SpinLock(3,4,LockConsole);
   ArgNo := 0 ;
   J := 1;
   while J <= Length(Format) do
@@ -395,6 +402,7 @@ begin
     PutC(Format[J]);
     Inc(J);
   end;
+  LockConsole := 3;
 end;
 
 // Handler the irq of keyboard
@@ -546,6 +554,8 @@ end;
 procedure ConsoleInit;
 begin
   BufferCount := 1;
+  // console lock protection
+  LockConsole := 3;
   ThreadInKey := nil;
   LastChar := 1;
   CaptureInt(33,@IrqKeyb);

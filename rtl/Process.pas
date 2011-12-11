@@ -592,7 +592,7 @@ begin
       RemoteMsgs := CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID];
       While RemoteMsgs <> nil do 
       begin
-       // we invoke TreadCreate with remote paramters but the thread is created localy
+       // we invoke TreadCreate() with remote parameters
        RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
        // wake up the parent
        RemoteMsgs.Parent.state := tsReady;
@@ -773,8 +773,15 @@ function SysBeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; Thread
 var
   NewThread: PThread;
 begin
-  if (LongInt(CPU) = CPU_NIL) or (LongInt(CPU) > CPU_COUNT-1) then
-    CPU := GetApicID; // invalid CpuID -> create thread on current CPU
+  if (LongInt(CPU) = CPU_NIL) then
+    CPU := GetApicID
+  // invalid CPU argument, we return with error
+  else if ((LongInt(CPU) > CPU_COUNT-1) or (not Cores[Longint(CPU)].InitConfirmation)) then  
+  begin
+    ThreadID := 0;
+    Result := 0;
+    Exit;
+  end;
   NewThread := ThreadCreate(StackSize, CPU, ThreadFunction, Parameter);
   if NewThread = nil then
   begin

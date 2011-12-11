@@ -947,19 +947,19 @@ begin
   begin
     // wakeup the remote core with IPI-INIT
     send_apic_init(apicid);
-    Delay(CPU_CYLES, 50);
+    Delay(CPU_CYLES, 100);
     // send the first startup
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYLES  ,50);
+    Delay(CPU_CYLES  ,100);
     // remote CPU read the IPI?
     if not is_apic_ready then
     begin // some problem ?? wait for 2 sec
-      Delay(CPU_CYLES, 200);
+      Delay(CPU_CYLES, 500);
       if not is_apic_ready then
         Exit; // Serious problem -> exit
     end;
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYLES, 50);
+    Delay(CPU_CYLES, 100);
     Dec(Attempt);
   end;
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);

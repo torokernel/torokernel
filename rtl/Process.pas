@@ -6,7 +6,7 @@
 // Notes :
 // - Stack and tls blocks of memory are not optimize by kmalloc() functions
 // - The scheduler is implemented using the Cooperative Threading model approach
-// - This model doesn't need lock protection
+// - This model does not need lock protection
 // - MAX_CPU limits the size of cpu array
 // - This units implements routines for the FPC thread manager
 // - the procedure CreateInitThread, create the first thread on the system with epi pointer  to PASCALMAIN procedure
@@ -266,7 +266,7 @@ begin
     end;
   end;
   if CPU_COUNT = 1 then
-  begin // with one cpu we don't need any initialization proc.
+  begin // with one cpu we do not need any initialization proc.
     PrintK_('Core#0 ... /VOk\n/n',0);
     Exit;
   end;
@@ -453,7 +453,7 @@ begin
 end;
 
 
-// Actual thread is killed and the status is the termination register in TThread
+// Kill current Thread and call to the scheduler if Schedule is true
 procedure ThreadExit(Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
@@ -468,7 +468,7 @@ begin
   // removing from scheduling queue
   RemoveThreadReady(CurrentThread);
   // free memory allocated by Parent thread
-  // TODO: Posible rice condition, leaving non local memory!
+  // TODO: rice condition, leaving non local memory!
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem (CurrentThread.StackAddress);
@@ -480,7 +480,7 @@ begin
 end;
 
 // Kill the thread given by ThreadID
-// It doesn't need parent dependency
+// It does not need parent dependency
 function SysKillThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -500,7 +500,7 @@ begin
 end;
 
 // Suspend the thread given by ThreadID
-// It doesn't need parent dependency
+// It does not need parent dependency
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -529,7 +529,7 @@ begin
 end;
 
 // Wake up the thread given by ThreadID 
-// It doesn't need parent dependency
+// It does not need parent dependency
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -542,7 +542,7 @@ begin
     Result := 0;
     Exit;
   end;
-  // set the thread's state as ready
+  // set the thread state as ready
   Thread.State := tsReady;
   Result := 0;
 end;
@@ -568,7 +568,7 @@ begin
       else
       begin
         EmigrateThreads.Previous.Next := CurrentCPU.Threads;
-	      LastThread := EmigrateThreads.Previous;
+	LastThread := EmigrateThreads.Previous;
         EmigrateThreads.Previous := CurrentCPU.Threads.Previous;
         if CurrentCPU.Threads.Previous <> nil then
           CurrentCPU.Threads.Previous.Next := EmigrateThreads;
@@ -743,7 +743,7 @@ begin
   ThreadExit(True);
 end;
 
-// Create new thread and return the thread id  , we don't need save context .
+// Create new thread and return the thread id  , we do not need save context .
 function SysBeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFunction: TThreadFunc; Parameter: Pointer;
                          CPU: DWORD; var ThreadID: TThreadID): TThreadID;
 var

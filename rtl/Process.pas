@@ -496,7 +496,6 @@ begin
   // removing from scheduling queue
   RemoveThreadReady(CurrentThread);
   // free memory allocated by Parent thread
-  // TODO: rice condition, leaving non local memory!
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem (CurrentThread.StackAddress);

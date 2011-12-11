@@ -6,6 +6,7 @@
 //
 // Changes :
 //
+// 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
 // 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
@@ -987,7 +988,11 @@ begin
       m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
       // boot core doesn't need initilization
       if (cp.flags and 2 ) = 2 then
+      begin
         Cores[cp.Apic_id].CpuBoot := True ;
+        Cores[cp.Apic_id].InitConfirmation := true;
+	Cores[cp.Apic_id].Present := true;
+      end;
     end else
     begin
       m := Pointer(SizeUInt(m)+SizeOf(mp_apic_entry));
@@ -1121,7 +1126,11 @@ begin
                 Cores[Processor.apicid].Present := True;
                 // CPU#0 is a BOOT cpu
                 if Processor.apicid = 0 then
+                begin
                   Cores[Processor.apicid].CPUBoot := True;
+                  Cores[Processor.apicid].InitConfirmation := true;
+		  Cores[Processor.apicid].Present := true;
+                end;
               end;
             end;
             Entry := Pointer(SizeUInt(Entry) + Entry.Length);
@@ -1139,6 +1148,7 @@ procedure SMPInitialization;
 var
   J: LongInt;
 begin
+  // cleaning a bit
   for J :=0 to MAX_CPU-1 do
   begin // clear fields
     Cores[J].Present := False;
@@ -1152,14 +1162,12 @@ begin
   if CPU_COUNT = 0 then
     mp_table_detect; // if cpu_count is zero then use a MP Tables
   if CPU_COUNT = 0 then
-  begin // only one core
     CPU_COUNT := 1;
-    // following settings are not important in the case of single core
-    Cores[0].Present := True;
-    Cores[0].CPUBoot := True;
-    Cores[0].ApicID := GetApicID;
-    Cores[0].InitConfirmation := True;
-  end;
+  // important: setting boot core 
+  Cores[0].Present := True;
+  Cores[0].CPUBoot := True;
+  Cores[0].ApicID := GetApicID;
+  Cores[0].InitConfirmation := True;
   // temporary stack used to initialize every Core
   esp_tmp := @start_stack[MAX_CPU-1][size_start_stack];
 end;
@@ -1266,4 +1274,4 @@ begin
 end;
 
 end.
-
+

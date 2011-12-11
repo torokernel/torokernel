@@ -13,6 +13,7 @@
 // - RemoveThreadReady is only used by systhreadkill() function
 //
 // Changes:
+// 11 / 12 / 2011 : Fixing a critical issue on remote thread create.
 // 05 / 12 / 2011 : Removing Threadwait, Errno, and other non-used code.
 // 27 / 03 / 2011 : Renaming Exchange slot to MxSlots.
 // 14 / 10 / 2009 : Bug Fixed in the Scheduler.
@@ -55,13 +56,14 @@ uses Arch;
 type
   PThread = ^TThread;
   PCPU = ^TCPU;
+  PThreadCreateMsg = ^TThreadCreateMsg; 
   TMxSlot = Pointer;
   // MxSlots[SenderID][ReceiverID] can be assigned only if slot is empty (nil)
   TMxSlots = array[0..MAX_CPU-1, 0..MAX_CPU-1] of TMxSlot;
 
   // Mechanism to transfer data between CPU[SenderID] --> CPU[ReceiverID] without locking mechanism
   // There is 1 global matrix of message passing slots [CPU SenderID x CPU ReceiverID]
-  // 1. a Thread to be dispatched on a remote CPU is queued in CurrentCPU.ThreadsToBeDispatched[RemoteCpuID]
+  // 1. a Thread to be dispatched on a remote CPU is queued in CurrentCPU.MsgsToBeDispatched[RemoteCpuID]
   // 2. Scheduling[CurrentCPU] set threads queue in CpuMxSlots[CurrentCpuID][RemoteCpuID] if empty (nil)
   // 3. Scheduling[RemoteCPU] ForEach CpuMxSlots[][RemoteCpuID] read slot and reset slot (if not empty)
   
@@ -71,10 +73,11 @@ type
   end;
 
   TThreadFunc = function(Param: Pointer): PtrInt;
-  TThread = record // in Toro any task is a Thread
+  TThread = record // in Toro a task is a Thread
     ThreadID: TThreadID; // thread identifier
     Next: PThread; 	 // Next and Previous are independant of the thread created from the Parent
     Previous: PThread;   // and are used for the scheduling to scan all threads for a CPU
+    Parent: Pthread;
     IOScheduler: IOInfo;
     State: Byte;
     PrivateHeap: Pointer;
@@ -93,12 +96,26 @@ type
     CPU: PCPU; // CPU on which is running this thread
   end;
 
-  TCPU = record // every CPU have this entry
+  // each CPU has this entry
+  TCPU = record 
     ApicID: LongInt;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
-    ThreadsToBeDispatched: array[0..MAX_CPU-1] of PThread;
+    MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
   end;
+
+  // Structure used by ThreadCreate in order to pass the arguments to create a remote thread
+  TThreadCreateMsg = record
+    StartArg: pointer;
+    ThreadFunc: TThreadFunc;
+    StackSize: SizeUInt;
+    RemoteResult: Pointer; 
+    Parent: PThread;
+    CPU: PCPU;
+    Next: PThreadCreateMsg;
+  end;
+
+  
 
 const
   // Thread State
@@ -261,7 +278,7 @@ begin
     CPU[I].Threads :=nil;
     for J := 0 to Max_CPU-1 do
     begin
-      CPU[I].ThreadsToBeDispatched[J] := nil;
+      CPU[I].MsgsToBeDispatched[J] := nil;
       CpuMxSlots[I][J] := nil;
     end;
   end;
@@ -327,28 +344,18 @@ begin
   Thread.Previous := nil;
 end;
 
-// Adds a thread to emigrate array
-procedure AddThreadEmigrate(Thread: PThread);
+// Enqueu a New Msg to emigrate array
+procedure AddThreadMsg(Msg: PThreadCreateMsg);
 var
   ApicID: LongInt;
-  FirstThread: PThread;
+  FirstMsg: PThreadCreateMsg;
   CurrentCPU: PCPU;
 begin
   CurrentCPU := @CPU[GetApicID];
-  ApicID := Thread.CPU.ApicID;
-  FirstThread := CurrentCPU.ThreadsToBeDispatched[ApicID];
-  if FirstThread = nil then
-  begin
-    CurrentCPU.ThreadsToBeDispatched[ApicID] := Thread;
-    Thread.Next := Thread;
-    Thread.Previous := Thread;
-  end else begin
-    Thread.Previous := FirstThread.Previous;
-    Thread.Next := FirstThread;
-    if FirstThread.Previous <> nil then
-      FirstThread.Previous.Next := Thread;
-    FirstThread.Previous := Thread ;
-  end;
+  ApicID := Msg.CPU.ApicID;
+  FirstMsg := CurrentCPU.MsgsToBeDispatched[ApicID];
+  Msg.Next := FirstMsg;
+  CurrentCPU.MsgsToBeDispatched[ApicID] := Msg;
 end;
 
 // Returns current Thread pointer running on this CPU
@@ -359,76 +366,97 @@ end;
 
 
 const
-  // used only for the first thread to flag if initialized
+  // Used only by CreateInitThread when the first thread is created
   Initialized: Boolean = False; 
 
 // Create a new thread
 function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
 var
-  NewThread: PThread;
+  NewThread, Current: PThread;
+  NewThreadMsg: TThreadCreateMsg; 
   ip_ret: ^THandle;
 begin
-  NewThread := ToroGetMem(SizeOf(TThread));
-  {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread: %h', PtrUInt(NewThread), 0, 0); {$ENDIF}
-  if NewThread = nil then
+  // creating a local thread
+  if CPUID = GetApicID then
   begin
-    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread = nil', 0, 0, 0); {$ENDIF}
-    Result := nil;
-    Exit;
-  end;
-  NewThread^.StackAddress := ToroGetMem(StackSize);
-  if NewThread.StackAddress = nil  then
-  begin
-    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.StackAddress = nil', 0, 0, 0); {$ENDIF}
-    ToroFreeMem(NewThread);
-    Result := nil;
-    Exit;
-  end;
-  // is this the first thread ?
-  if not Initialized then
-  begin
-    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
-    Initialized := True;
-  end else if THREADVAR_BLOCKSIZE <> 0 then
-  begin
-    NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
-    if NewThread.TLS = nil then
-    begin // not enough memory, Thread cannot be created
-      {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
-      ToroFreeMem(NewThread.StackAddress);
+    NewThread := ToroGetMem(SizeOf(TThread));
+    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread: %h', PtrUInt(NewThread), 0, 0); {$ENDIF}
+    if NewThread = nil then
+    begin
+      {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread = nil', 0, 0, 0); {$ENDIF}
+      Result := nil;
+      Exit;
+    end;
+    NewThread^.StackAddress := ToroGetMem(StackSize);
+    if NewThread.StackAddress = nil  then
+    begin
+      {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.StackAddress = nil', 0, 0, 0); {$ENDIF}
       ToroFreeMem(NewThread);
       Result := nil;
       Exit;
     end;
-  end;
-  // stack initialization
-  NewThread.StackSize := StackSize;
-  NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
-  NewThread.sleep_rdtsc := 0;
-  NewThread.FlagKill := false;
-  NewThread.State := tsReady;
-  NewThread.StartArg := Arg; // this argument we will read by thread main
-  NewThread.ThreadFunc := ThreadFunction;
-  {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
-  NewThread.PrivateHeap := XHeapAcquire(CPUID); // private heap allocator init
-  NewThread.ThreadID := TThreadID(NewThread);
-  NewThread.CPU := @CPU[CPUID];
-  // when executing ret_to_thread  this stack is pushed in esp register
-  // when scheduling() returns (is a procedure!) return to this eip pointer
-  // when thread is executed for first time thread_sp_register pointer to stack base (or end)
-  ip_ret := NewThread.ret_thread_sp;
-  Dec(ip_ret);
-  // scheduler return
-  ip_ret^ := PtrUInt(@ThreadMain);
-  // ebp return
-  Dec(ip_ret);
-  ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
-  NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer)*2);
-  if CPUID = GetApicID then
-    AddThreadReady(NewThread)
-  else
-    AddThreadEmigrate(NewThread);
-  Result := NewThread;
+    // is this the first thread ?
+    if not Initialized then
+    begin
+      {$IFDEF DebugProcess} DebugTrace('ThreadCreate - First Thread -> Initialized=True', 0, 0, 0); {$ENDIF}
+      Initialized := True;
+    end else if THREADVAR_BLOCKSIZE <> 0 then
+    begin
+      NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
+      if NewThread.TLS = nil then
+      begin // not enough memory, Thread cannot be created
+        {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.TLS = nil', 0, 0, 0); {$ENDIF}
+        ToroFreeMem(NewThread.StackAddress);
+        ToroFreeMem(NewThread);
+        Result := nil;
+        Exit;
+      end;
+    end;
+    // stack initialization
+    NewThread.StackSize := StackSize;
+    NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
+    NewThread.sleep_rdtsc := 0;
+    NewThread.FlagKill := false;
+    NewThread.State := tsReady;
+    NewThread.StartArg := Arg; // this argument we will read by thread main
+    NewThread.ThreadFunc := ThreadFunction;
+    {$IFDEF DebugProcess} DebugTrace('ThreadCreate - NewThread.ThreadFunc: %h', PtrUInt(@NewThread.ThreadFunc), 0, 0); {$ENDIF}
+    NewThread.PrivateHeap := XHeapAcquire(CPUID); // private heap allocator init
+    NewThread.ThreadID := TThreadID(NewThread);
+    NewThread.CPU := @CPU[CPUID];
+    NewThread.Parent :=  GetCurrentThread;
+    // when executing ret_to_thread  this stack is pushed in esp register
+    // when scheduling() returns (is a procedure!) return to this eip pointer
+    // when thread is executed for first time thread_sp_register pointer to stack base (or end)
+    ip_ret := NewThread.ret_thread_sp;
+    Dec(ip_ret);
+    // scheduler return
+    ip_ret^ := PtrUInt(@ThreadMain);
+    // ebp return
+    Dec(ip_ret);
+    ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
+    NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer)*2);
+    // enqueu the new thread in the local tail
+    AddThreadReady(NewThread);
+    Result := NewThread
+  end else begin 
+    // We have to send a msg to the remote core using the CpuMxSlot
+    NewThreadMsg.StackSize := StackSize;
+    NewThreadMsg.StartArg := Arg; 
+    NewThreadMsg.ThreadFunc := ThreadFunction;
+    NewThreadMsg.CPU := @CPU[CPUID];
+    Current := GetCurrentThread;
+    NewThreadMsg.Parent := Current; 
+    NewThreadMsg.Next := nil;
+    // the msg in enqueue to be emigrated
+    AddThreadMsg(@NewThreadMsg);
+    // parent thread will sleep
+    Current.State := tsSuspended;
+    // calling the scheduler
+    SysThreadSwitch;
+    // we come back
+    Result := NewThreadMsg.RemoteResult;
+  end;   
 end;
 
 // Sleep current thread for SleepTime .
@@ -551,53 +579,49 @@ end;
 // Scheduling model implementation
 //
 
-// Import waiting threads from other CPUs to local list of Threads
+// Import remote thread create command parameters and execute them
 procedure Inmigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
-  EmigrateThreads: PThread; // tail to threads in emigrate array
-  LastThread: PThread;
+  RemoteMsgs: PThreadCreateMsg; // tail to threads in emigrate array
 begin
   for RemoteCpuID := 0 to CPU_COUNT-1 do
   begin
     if CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] <> nil then
     begin
-      EmigrateThreads := CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID];
-      if CurrentCPU.Threads = nil then
-      	CurrentCPU.Threads := EmigrateThreads
-      else
+      RemoteMsgs := CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID];
+      While RemoteMsgs <> nil do 
       begin
-        EmigrateThreads.Previous.Next := CurrentCPU.Threads;
-	LastThread := EmigrateThreads.Previous;
-        EmigrateThreads.Previous := CurrentCPU.Threads.Previous;
-        if CurrentCPU.Threads.Previous <> nil then
-          CurrentCPU.Threads.Previous.Next := EmigrateThreads;
-        CurrentCPU.Threads.Previous := LastThread;
-      end;
+       // we invoke TreadCreate with remote paramters but the thread is created localy
+       RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
+       // wake up the parent
+       RemoteMsgs.Parent.state := tsReady;
+       RemoteMsgs := RemoteMsgs.Next;
+      end;      
       CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] := nil;
       {$IFDEF DebugProcessInmigrating}DebugTrace('Inmigrating - from CPU %d to LocalCPU %d', 0, RemoteCpuID, CurrentCPU.ApicID);{$ENDIF}
     end;
   end;
 end;
 
-// Move pending threads to remote CPUs waiting list
+// Move pending msg to remote CPUs waiting list
 procedure Emigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
 begin
   for RemoteCpuID := 0 to CPU_COUNT-1 do
   begin
-    if (CurrentCPU.ThreadsToBeDispatched[RemoteCpuID] <> nil) and (CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] = nil) then
+    if (CurrentCPU.MsgsToBeDispatched[RemoteCpuID] <> nil) and (CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] = nil) then
     begin
-      CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] := CurrentCPU.ThreadsToBeDispatched[RemoteCpuID];
-      CurrentCPU.ThreadsToBeDispatched[RemoteCpuID]:= nil;
+      CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] := CurrentCPU.MsgsToBeDispatched[RemoteCpuID];
+      CurrentCPU.MsgsToBeDispatched[RemoteCpuID]:= nil;
       {$IFDEF DebugProcessEmigrating} DebugTrace('Emigrating - Switch Threads of DispatchArray[%d] to EmigrateArray[%d]', 0, CurrentCPU.ApicID, RemoteCpuID); {$ENDIF}
     end;
   end;
 end;
 
 // This is the Scheduler
-// Schedule next thread, the current thread must be added in the appropriate list (CPU[].ThreadsToBeDispatched) and have saved its registers
+// Schedule next thread, the current thread must be added in the appropriate list (CPU[].MsgsToBeDispatched) and have saved its registers
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;

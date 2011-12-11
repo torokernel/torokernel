@@ -1,20 +1,34 @@
 #!/bin/sh
-APP="ToroNetwork2"
-APPSOURCE="$APP.pas"
-APPEXE=$APP
-APPIMG="$APP.img"
-iface=`sudo tunctl -b`
-# If DEBUG is up, we compile the kernel with debug symbols 
-# and we connect GDB with QEMU for step by step emulation
-if [ $1 = "DEBUG" ]; then
-	fpc $APPSOURCE -g -Fu../rtl/ -Fu../rtl/drivers
-	./build 2 $APPEXE boot.o $APPIMG
- 	sudo qemu-system-x86_64 -s -S -m 256 -hda $APPIMG -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface &
-	../../gdb-7.3/gdb/gdb $APPEXE 
-# If it is not, we just compile it and call to qemu
-else 
-	fpc $APPSOURCE -Fu../rtl/ -Fu../rtl/drivers
-	./build 2 $APPEXE boot.o $APPIMG
-	sudo qemu-system-x86_64 -m 256 -hda $APPIMG -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface
+app="ToroNetwork2"
+appsource="$app.pas"
+appexe=$app
+appimg="$app.img"
+debug=false;
+emulate=false;
+# checking the command line
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        -d)  debug=true;;
+ 	-e)  emulate=true;;
+    esac
+    shift
+done
+# making the magic
+if $debug ; then
+	fpc $appsource -g -Fu../rtl/ -Fu../rtl/drivers
+	./build 2 $appexe boot.o $appimg
+ 	sudo qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface &
+        # at this point we need a gdb patched
+	../../gdb-7.3/gdb/gdb $appexe 
+else
+       # calling the compiler
+       fpc $appsource -Fu../rtl/ -Fu../rtl/drivers
+	./build 2 $appexe boot.o $appimg
+       # calling qemu as emulator
+	if $emulate ; then
+                iface=`sudo tunctl -b`
+	 	sudo qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface
+        fi
 fi 
 

@@ -414,6 +414,24 @@ asm
   wrmsr
 end;
 
+procedure EnableLAPIC;
+asm
+  mov ecx, 27
+  rdmsr
+  or eax, $0800
+  wrmsr 
+end;
+
+
+procedure DisableLAPIC;
+asm
+  mov ecx, 27
+  rdmsr
+  and eax, $f7ff;
+  wrmsr
+end;
+
+
 const
   Status_Port : array[0..1] of Byte = ($20,$A0);
   Mask_Port : array[0..1] of Byte = ($21,$A1);
@@ -492,8 +510,8 @@ begin
   write_portb($20, status_port[1]);
 end;
 
-// turn off all irqs
-procedure all_irq_off;
+// turn off irq from 8259 controller
+procedure Disable8259;
 begin
   write_portb($ff, mask_port[0]);
   write_portb($ff, mask_port[1]);
@@ -513,6 +531,62 @@ begin
   NOP;
   Result := read_portb($a0);
 end;
+
+
+type
+ PIOAPIC = ^IOAPIC_entry;
+
+ IOAPIC_entry = record 
+ vector: byte;
+ config: byte;
+ res: array[0..4] of byte;
+ destination: byte;
+ 
+
+procedure write_ioapic_reg(Base: pointer; offset, val: dword);
+var
+ tmp: ^dword;
+begin
+  tmp := Base;
+  tmp^ := offset;
+  tmp := tmp + $10;
+  tmp^ := val;
+end;
+
+function read_ioapic_reg(Base: pointer; offset: dword): dword;
+var
+ tmp: ^dword;
+begin
+ tmp:= Base;
+ tmp^:= offset;
+ tmp := tmp + 10;
+ Result := tmp^;    
+end;
+
+
+
+procedure InitIOAPIC;
+var
+ tmp: dword;
+begin
+  // we'll use the IOAPIC
+  Disable8259;
+  //EnableLAPIC;
+  // just an example to redirect 
+  // write lower half to disable the entry
+  // before we write the upper half
+  tmp :=$10000;  
+  write_ioapic_reg($FEC00000,$12,tmp);
+  // write the upper half first 
+  // select core 1 for this irq
+  tmp := $01000000;
+  Write_ioapic_reg($FEC00000,$13,tmp);
+  // $21 es el vector de interrupcion
+  // que va a saltar en el core #1
+  tmp := $0121;
+  write_ioapic_reg($FEC00000,$12,tmp);
+end;
+
 
 const 
   cmos_port_reg = $70 ;
@@ -919,6 +993,8 @@ asm
   xor rbp, rbp
   sti
   call SSEInit
+  call Disable8259
+  call EnableLAPIC
   call boot_confirmation
 end;
 
@@ -1244,6 +1320,7 @@ begin
   FlushCr3;
 end;
 
+
 // Architecture's variables initialization
 procedure ArchInit;
 var
@@ -1271,6 +1348,7 @@ begin
   SMPInitialization;
   // initialization of Floating Point Unit
   SSEInit;
+  InitIOAPIC;
 end;
 
 end.

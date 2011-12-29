@@ -18,7 +18,7 @@ done
 if $debug ; then
 	fpc $appsource -g -Fu../rtl/ -Fu../rtl/drivers
 	./build 2 $appexe boot.o $appimg
- 	qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 4 &
+ 	qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
         # at this point we need a gdb patched
 	../../gdb-7.3/gdb/gdb $appexe 
 else
@@ -27,7 +27,7 @@ else
 	./build 2 $appexe boot.o $appimg
        # calling qemu as emulator
 	if $emulate ; then
-	 	qemu-system-x86_64 -m 256 -hda $appimg -smp 4
+	 	qemu-system-x86_64 -m 256 -hda $appimg -smp 2
         fi
 fi 
 

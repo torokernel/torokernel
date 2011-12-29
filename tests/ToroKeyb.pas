@@ -1,6 +1,6 @@
 //
 // Toro Hello World Example.
-// Clasical example using a minimal kernel to show "Hello World" 
+// Example that shows the keyboard apis
 //
 // Changes :
 // 
@@ -47,7 +47,8 @@ uses
   Console in 'rtl\Drivers\Console.pas';
 
 begin
-  WriteConsole('\c/RHello World, I am TORO!!!\n',[0]);
+  WriteConsole('\c/vPress a Key ...\n',[0]);
+  EnabledConsole;
   while True do
     SysThreadSwitch;
 end.

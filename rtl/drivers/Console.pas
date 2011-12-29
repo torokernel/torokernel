@@ -411,7 +411,7 @@ var
   key: Byte;
   pbuff: PXChar;
 begin
-  eoi;
+  EOI;
   while (read_portb($64) and 1) = 1 do
   begin
     key:=read_portb($60);
@@ -541,14 +541,17 @@ begin
   end;
 end;
 
+// Enable the Console
 procedure EnabledConsole;
 begin
-  irq_on(1);
+  // IRQ 0 is captured by BSP
+  IrqOn(1);
 end;
 
+// Disable Console
 procedure DisabledConsole;
 begin
-  irq_off(1);
+  IrqOff(1);
 end;
 
 procedure ConsoleInit;

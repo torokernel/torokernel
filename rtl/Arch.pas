@@ -6,6 +6,7 @@
 //
 // Changes :
 //
+// 21/12/2011 IOAPIC and LAPIC supported 
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
@@ -107,15 +108,13 @@ procedure bit_reset(Value: Pointer; Offset: QWord);
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
-// only used in the debug unit to synchronize access to serial port
 procedure Delay(clock_hz: Int64; milisec: LongInt);
-procedure eoi;
+procedure EOI;
 function GetApicID: Byte;
-function get_irq_master: Byte;
-function get_irq_slave: Byte;
 procedure hlt;
-procedure irq_on(irq: Byte);
-procedure irq_off(irq: Byte);
+procedure IrqOn(Irq, CPUID: byte); overload;
+procedure IrqOn(Irq: byte); overload;
+procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
 function read_portb(port: Word): Byte;
@@ -150,7 +149,7 @@ const
   PAGE_SIZE = 2*1024*1024; // 2 MB per Page
   HasCacheHandler: Boolean = True;
   HasException: Boolean = True;
-  HasFloatingPointUnit : Boolean = True;
+  HasFloatingPointUnit : Boolean = True;  
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
@@ -175,6 +174,13 @@ const
   timer_curr_reg = apic_base + $390;
   divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
+  lint0_reg = apic_base + $350;
+  lint1_reg = apic_base + $360;
+  err_reg = apic_base + $370;
+  perf_reg = apic_base + $340;
+  thermal_reg = apic_base + $330;
+  
+  SpuriusInt_reg = apic_base + $f0;
   
   // IDT descriptors
   gate_syst = $8E;
@@ -189,6 +195,8 @@ const
 
   // minimal stack for initialization procedure, in bytes
   size_start_stack = 700;
+
+  INT_Base = 32;
 
 type 
   p_apicid_register = ^apicid_register ;
@@ -360,7 +368,7 @@ asm
 end;
 
 // Get local Apic id
-function GetApicID: Byte; inline;
+function GetApicID: Byte; {$IFDEF ASMINLINE} inline; {$ENDIF}
 begin
   Result := PDWORD(apicid_reg)^ shr 24;
 end;
@@ -385,6 +393,33 @@ asm
   nop;
 end;
 
+// Change the base address of Apic registers
+procedure RelocateAPIC;
+asm
+  mov ecx, 27
+  mov edx, 0
+  mov eax, Apic_Base
+  wrmsr
+end;
+
+// Enable local APIC for accept external IRQ
+procedure EnableAPIC;{$IFDEF ASMINLINE} inline; {$ENDIF}
+var
+  tmp: ^dword;
+begin
+  tmp := pointer(SpuriusInt_reg);
+  tmp^ := $10f;
+end;
+
+// Send end of interruption to Local Apic
+procedure EOIApic;{$IFDEF ASMINLINE} inline; {$ENDIF}
+var
+  tmp : ^DWORD ;
+begin
+  tmp := Pointer(eoi_reg);
+  tmp^ := 0;
+end;
+
 // Wait milisec using the clock bus speed in clock_hz
 // The apic interrupt need the clock_hz
 procedure Delay(clock_hz: Int64; milisec: LongInt);
@@ -401,34 +436,7 @@ begin
     NOP;
   end;
   // send the end of interruption
-  tmp := Pointer(eoi_reg);
-  tmp^ := 0;
-end;
-
-// Change the Address of Apic registers
-procedure RelocateAPIC;
-asm
-  mov ecx, 27
-  mov edx, 0
-  mov eax, Apic_Base
-  wrmsr
-end;
-
-procedure EnableLAPIC;
-asm
-  mov ecx, 27
-  rdmsr
-  or eax, $0800
-  wrmsr 
-end;
-
-
-procedure DisableLAPIC;
-asm
-  mov ecx, 27
-  rdmsr
-  and eax, $f7ff;
-  wrmsr
+  EOIApic
 end;
 
 
@@ -437,7 +445,8 @@ const
   Mask_Port : array[0..1] of Byte = ($21,$A1);
   PIC_MASK: array [0..7] of Byte =(1,2,4,8,16,32,64,128);
   
-// move the irq of 0-15 to 31-46 vectors
+// Move the irq of 0-15 to 31-46 vectors
+// Just used in a system with 8259 controller
 procedure RelocateIrqs ;
 asm
     mov   al , 00010001b
@@ -485,8 +494,8 @@ asm
     out  0A1h, al
 end;
 
-// turn on  the irq
-procedure irq_on(irq: Byte);
+// Turn on  the irq
+procedure irq_on8259(irq: Byte);
 begin
   if irq > 7 then
     write_portb(read_portb($a1) and (not pic_mask[irq-8]), $a1)
@@ -494,8 +503,8 @@ begin
     write_portb(read_portb($21) and (not pic_mask[irq]), $21);
 end;
 
-// turn off the irq
-procedure irq_off(irq: Byte);
+// Turn off the irq
+procedure Irq_off8259(irq: Byte);
 begin
   if irq > 7 then
     write_portb(read_portb($a1) or pic_mask[irq-8], $a1)
@@ -503,88 +512,147 @@ begin
     write_portb(read_portb($21) or pic_mask[irq], $21);
 end;
 
-// send the end of interruption
-procedure eoi;
+// Send the end of interruption
+procedure EOI8259;
 begin
   write_portb($20, status_port[0]);
   write_portb($20, status_port[1]);
 end;
 
-// turn off irq from 8259 controller
+
+// Disable 8259 controller
 procedure Disable8259;
 begin
   write_portb($ff, mask_port[0]);
   write_portb($ff, mask_port[1]);
 end;
 
-// get the irq's number
-function get_irq_master: Byte ;
-begin
-  write_portb($b, $20);
-  NOP;
-  Result := read_portb($20);
-end;
 
-function get_irq_slave : Byte ;
-begin
-  write_portb($b, $a0);
-  NOP;
-  Result := read_portb($a0);
-end;
-
-
-type
- PIOAPIC = ^IOAPIC_entry;
-
- IOAPIC_entry = record 
- vector: byte;
- config: byte;
- res: array[0..4] of byte;
- destination: byte;
- 
-
+// Used for write to ioapic register
 procedure write_ioapic_reg(Base: pointer; offset, val: dword);
 var
  tmp: ^dword;
 begin
-  tmp := Base;
+  tmp := pointer(Base);
   tmp^ := offset;
-  tmp := tmp + $10;
+  tmp := pointer(Base)+ $10;
   tmp^ := val;
 end;
 
+
+// Used for read a ioapic register
 function read_ioapic_reg(Base: pointer; offset: dword): dword;
 var
  tmp: ^dword;
 begin
- tmp:= Base;
- tmp^:= offset;
- tmp := tmp + 10;
- Result := tmp^;    
+  tmp := pointer(Base);
+  tmp^:= offset;
+  tmp := pointer(Base)+ $10;
+  Result := tmp^;    
 end;
 
-
-
-procedure InitIOAPIC;
+// Initialize local APIC
+// Called by each core 
+procedure InitLAPIC;
 var
- tmp: dword;
+ n: ^dword;
 begin
   // we'll use the IOAPIC
   Disable8259;
-  //EnableLAPIC;
-  // just an example to redirect 
+  // setting LINT0 line for ExtINT
+  n := pointer(lint0_reg);
+  n^ := $8700;
+  // mask off error interrupt
+  n := pointer(err_reg);
+  n^ := $10000;
+  // mask off performance interrupt
+  n := pointer(perf_reg);
+  n^ := $1000;
+  // enable using Spurius Int
+  EnableAPIC;
+end;
+
+
+// The IOAPIC only supports 24 external IRQs
+//
+//
+
+
+// Enable an IRQ at a given CPU
+//
+procedure Irq_OnApic(irq, CPU: byte);
+var
+  reg,tmp: dword;
+begin
+  reg := 2*irq + $10;
   // write lower half to disable the entry
   // before we write the upper half
   tmp :=$10000;  
-  write_ioapic_reg($FEC00000,$12,tmp);
+  write_ioapic_reg($FEC00000,reg,tmp);
   // write the upper half first 
   // select core 1 for this irq
-  tmp := $01000000;
-  Write_ioapic_reg($FEC00000,$13,tmp);
-  // $21 es el vector de interrupcion
-  // que va a saltar en el core #1
-  tmp := $0121;
-  write_ioapic_reg($FEC00000,$12,tmp);
+  tmp := CPU shl 24;
+  reg := reg + 1;
+  // setting the rigth core where the int happens
+  write_ioapic_reg($FEC00000,reg,tmp);
+  // setting the int vector
+  // IRQ captured by the LAPIC 
+  if irq < 15 then
+   tmp := $0100+irq+INT_Base
+  else
+  // it's a PCI irq
+   tmp := $A100+irq+INT_Base;
+  reg := reg - 1;
+  write_ioapic_reg($FEC00000,reg,tmp);
+end;
+
+
+// Disable an IRQ
+procedure Irq_OffApic(irq: byte);
+var
+  reg,tmp: dword;
+begin
+  reg := 2*irq + $10;
+  // disable the entry
+  tmp :=$10000;  
+  write_ioapic_reg($FEC00000,reg,tmp);
+end;
+
+// Set the Irq UP, CPUID parammeter is just for multicore environment
+procedure IrqOn(Irq, CPUID: byte);
+begin
+If CPU_COUNT=1 then
+  irq_on8259(Irq)
+ else
+  Irq_OnApic(Irq,CPUID);
+end;
+
+// Set the Irq UP on core #0
+procedure IrqOn(Irq: byte);
+begin
+If CPU_COUNT=1 then
+  irq_on8259(Irq)
+ else
+  Irq_OnApic(Irq,0);
+end;
+
+// Set the IRQ DOWN
+procedure IrqOff(Irq: byte);
+begin
+If CPU_COUNT=1 then
+  irq_on8259(Irq)
+ else
+  Irq_OffApic(Irq);
+end;
+
+
+// End of Int sent to local APIC
+procedure EOI;
+begin
+If CPU_COUNT=1 then
+  EOI8259
+ else
+  EOIApic;
 end;
 
 
@@ -992,9 +1060,9 @@ asm
   {$IFDEF DCC} mov cr3, eax {$ENDIF}
   xor rbp, rbp
   sti
+  // If we are using InitCpu, we're in multicore environment thus we use IOAPIC
+  call InitLAPIC
   call SSEInit
-  call Disable8259
-  call EnableLAPIC
   call boot_confirmation
 end;
 
@@ -1094,7 +1162,7 @@ begin
       end
       else exit;
     end;
-    Inc(find); // := find+1;
+    Inc(find); //
    end;
 end;
 
@@ -1329,14 +1397,12 @@ begin
   // the bootloader creates the idt
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
-  RelocateIrqs;
   MemoryCounterInit;
   // cache Page structures
   CacheManagerInit;
   LocalCpuSpeed := CalculateCpuSpeed;
   // increment of RDTSC counter per miliseg
   CPU_CYLES  := LocalCpuSpeed * 100000;
-  Irq_On(2);
   // hardware Interruptions
   for I := 33 to 47 do
     CaptureInt(I, @IRQ_Ignore);
@@ -1346,9 +1412,15 @@ begin
   EnabledINT;
   Now(@StartTime);
   SMPInitialization;
+  if CPU_COUNT=1 then
+  begin
+    // we must to use 8259 controller
+    RelocateIrqs;
+    Irq_On8259(2)
+  end else 
+    InitLAPIC;
   // initialization of Floating Point Unit
   SSEInit;
-  InitIOAPIC;
 end;
 
 end.

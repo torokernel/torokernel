@@ -6,7 +6,7 @@
 //
 // Changes:
 //
-// 06/03/2011: Fixed bug in the initialization.
+// 06/03/2011: Fixed bug at the initialization.
 // 27/12/2009: Bug Fixed in Initilization process.
 // 24/12/2008: Bug in Read procedure. In One irq I must read all the packets in the internal buffer
 //             of ne2000. It is a circular buffer.Some problems if Buffer Overflow happens .
@@ -108,8 +108,13 @@ var
 
 // The card starts to work
 procedure Ne2000Start(Net: PNetworkInterface);
+var
+ CPU: byte;
 begin
-  // initialize network driver
+   // initialize network driver
+   CPU := GetApicid; 
+   IrqOn(NicNE2000.IRQ, CPU); 
+   WriteConsole('ne2000: /Vstarted/n on Core #%d\n',[CPU]);
 end;
 
 procedure WritePort(Data: Byte; Port: Word);
@@ -312,6 +317,7 @@ var
   Status: LongInt;
 begin
   Status := ReadPort(NicNE2000.iobase + INTERRUPTSTATUS);
+  WriteConsole('ne2000: IRQ captured\n',[]);
   if Status and 1 <> 0 then
   begin
     WritePort(Status,NicNE2000.iobase + INTERRUPTSTATUS);
@@ -326,7 +332,7 @@ begin
       DoSendPacket(@NicNE2000.DriverInterface);
     {$IFDEF DebugNe2000} DebugTrace('Ne2000IrqHandle: Packet transmitted', 0, 0, 0); {$ENDIF}
   end;
-  eoi;
+  EOI;
 end;
 
 // capture ne2000 irq and jump to ne2000Handler
@@ -398,16 +404,15 @@ begin
         Net.send := @ne2000Send;
         Net.stop := @ne2000Stop;
         Net.Reset := @ne2000Reset;
-      Net.TimeStamp := 0;
-      WriteConsole('ne2000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
+        Net.TimeStamp := 0;
+        WriteConsole('ne2000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
         InitNe2000(@NicNE2000);
-        Irq_On(NicNE2000.IRQ);
         CaptureInt(32+NicNE2000.IRQ, @ne2000irqhandler);
-      RegisterNetworkInterface(Net);
-      WriteConsole('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
-      Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
+        RegisterNetworkInterface(Net);
+        WriteConsole('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
+        Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
         {$IFDEF DebugNe2000} DebugTrace('Ne2000 - PCICardInit - Done.', 0, 0, 0); {$ENDIF}
-      Exit; // Support only 1 NIC in this version
+        Exit; // Support only 1 NIC in this version
     end;
       end;
     PCIcard := PCIcard.Next;

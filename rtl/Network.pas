@@ -1252,6 +1252,8 @@ end;
 
 // Dedicate the Network Interface to CPU in CPUID
 // If Handler=nil then the Network Stack is managed by the KERNEL
+// TODO: CPUID as a parameter
+//
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 var
   CPUID: LongInt;
@@ -1859,4 +1861,4 @@ end;
 end.
 
 
-
+

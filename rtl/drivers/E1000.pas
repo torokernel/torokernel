@@ -206,7 +206,11 @@ end;
 
 // Kernel starts the card
 procedure e1000Start(net: PNetworkInterface);
+var
+  CPU: byte;
 begin
+  CPU := GetApicid;
+  IrqOn(NicE1000.IRQ,CPU);
   // enable the interruption
   e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
 end;
@@ -539,7 +543,6 @@ begin
          WriteConsole('e1000: buffer init ... /VOk/n\n',[])
         else
         WriteConsole('e1000: buffer init ... /RFault/n\n',[]);
-        Irq_On(NicE1000.IRQ);
         // capture de interrupt
         CaptureInt(32+NicE1000.IRQ, @e1000irqhandler);
         Net := @NicE1000.Driverinterface;
@@ -561,4 +564,4 @@ end;
 initialization
 	PCICardInit;
 
-end.
+end.

@@ -544,7 +544,7 @@ end;
 // Enable the Console
 procedure EnabledConsole;
 begin
-  // IRQ 0 is captured by BSP
+  // IRQ 1 is captured by BSP
   IrqOn(1);
 end;
 

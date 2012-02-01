@@ -1175,9 +1175,12 @@ var
   EthPacket: PEthHeader;
   r: Int64;
   Net: PNetworkInterface;
+  CPUID: longint;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
-  Net := DedicateNetworks[GetApicid].NetworkInterface;
+  CPUID := GetApicid;
+  // network driver initialization
+  Net := DedicateNetworks[CPUID].NetworkInterface;
   while True do
   begin
     // new packet read
@@ -1230,9 +1233,9 @@ end;
 // Initialize the dedicated network interface
 function LocalNetworkInit: Boolean;
 var
-  CPUID, I: LongInt;
+  I, CPUID: LongInt;
 begin
-  CPUID:= GetApicID;
+  CPUID := GetApicid;
   // cleaning  packet queue
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
@@ -1252,17 +1255,16 @@ end;
 
 // Dedicate the Network Interface to CPU in CPUID
 // If Handler=nil then the Network Stack is managed by the KERNEL
-// TODO: CPUID as a parameter
 //
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 var
-  CPUID: LongInt;
   Net: PNetworkInterface;
   Network: PNetworkDedicate;
   ThreadID: TThreadID;
+  CPUID: Longint;
 begin
   Net := NetworkInterfaces;
-  CPUID := GetApicid;
+  CPUID:= GetApicid;
   while Net <> nil do
   begin
     if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then

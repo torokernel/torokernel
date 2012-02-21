@@ -317,7 +317,6 @@ var
   Status: LongInt;
 begin
   Status := ReadPort(NicNE2000.iobase + INTERRUPTSTATUS);
-  WriteConsole('ne2000: IRQ captured\n',[]);
   if Status and 1 <> 0 then
   begin
     WritePort(Status,NicNE2000.iobase + INTERRUPTSTATUS);

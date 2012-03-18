@@ -39,7 +39,7 @@ else
 			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2
 	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
 			iface=`sudo tunctl -b`
-			qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -net nic,model=e1000 -net tap,ifname=$iface
+			sudo qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -net nic,model=e1000 -net tap,ifname=$iface
 		fi
     fi
 fi

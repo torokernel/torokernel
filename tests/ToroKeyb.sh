@@ -23,7 +23,7 @@ if $debug ; then
 	# calling qemu
 	if [ "$OSTYPE" == "msys" ] ; then
 		qemu-system-x86_64 -s -S -L $qemubios -m 256 -hda $appimg -smp 2 &
-	elif [ "$OSTYPE" == "linux" ] ; then
+	elif [ "$OSTYPE" == "linux-gnu" ] ; then
 		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
 	fi
 	# at this point we need a gdb patched
@@ -36,7 +36,7 @@ else
 	if $emulate ; then
 		if [ "$OSTYPE" == "msys" ] ; then
 			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2
-	    elif [ "$OSTYPE" == "linux" ] ; then
+	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
 			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
 		fi
     fi

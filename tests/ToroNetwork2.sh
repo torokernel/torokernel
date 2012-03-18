@@ -23,7 +23,7 @@ if $debug ; then
 	# calling qemu
 	if [ "$OSTYPE" == "msys" ] ; then
 		qemu-system-x86_64 -s -S -L $qemubios -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 &
-	elif [ "$OSTYPE" == "linux" ] ; then
+	elif [ "$OSTYPE" == "linux-gnu" ] ; then
 		iface=`sudo tunctl -b`
 		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface &
 	fi
@@ -37,7 +37,7 @@ else
 	if $emulate ; then
 		if [ "$OSTYPE" == "msys" ] ; then
 			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2
-	    elif [ "$OSTYPE" == "linux" ] ; then
+	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
 			iface=`sudo tunctl -b`
 			qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -net nic,model=ne2k_pci -net tap,ifname=$iface
 		fi

@@ -13,6 +13,7 @@ rtl/drivers/backup
 tests/serial.txt
 tests/Toro.compiled
 tests/Toro.res
+*.exe
 
 
 

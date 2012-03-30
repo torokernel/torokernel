@@ -588,13 +588,13 @@ begin
   // write lower half to disable the entry
   // before we write the upper half
   tmp :=$10000;  
-  write_ioapic_reg($FEC00000,reg,tmp);
+  write_ioapic_reg(pointer($FEC00000),reg,tmp);
   // write the upper half first 
   // select core 1 for this irq
   tmp := CPU shl 24;
   reg := reg + 1;
   // setting the rigth core where the int happens
-  write_ioapic_reg($FEC00000,reg,tmp);
+  write_ioapic_reg(pointer($FEC00000),reg,tmp);
   // setting the int vector
   // IRQ captured by the LAPIC 
   if irq < 15 then
@@ -603,7 +603,7 @@ begin
   // it's a PCI irq
    tmp := $A100+irq+INT_Base;
   reg := reg - 1;
-  write_ioapic_reg($FEC00000,reg,tmp);
+  write_ioapic_reg(pointer($FEC00000),reg,tmp);
 end;
 
 
@@ -615,7 +615,7 @@ begin
   reg := 2*irq + $10;
   // disable the entry
   tmp :=$10000;  
-  write_ioapic_reg($FEC00000,reg,tmp);
+  write_ioapic_reg(pointer($FEC00000),reg,tmp);
 end;
 
 // Set the Irq UP, CPUID parammeter is just for multicore environment

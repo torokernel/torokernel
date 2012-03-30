@@ -160,7 +160,6 @@ procedure SystemExit; forward;
 procedure Scheduling(Candidate: PThread); forward;
 procedure ThreadExit(Schedule: Boolean); forward;
 procedure ThreadMain; forward;
-procedure Signaling; forward;
 
 var
 {$IFDEF FPC}
@@ -669,16 +668,6 @@ begin
   end;
 end;
 
-// Controls the execution of thread flags
-procedure Signaling;
-begin
-  if CPU[GetApicID].CurrentThread.FlagKill then
-  begin
-    {$IFDEF DebugProcess} DebugTrace('Signaling - killing CurrentThread', 0, 0, 0); {$ENDIF}
-    ThreadExit(True);
-  end;
-end;
-
 //------------------------------------------------------------------------------
 // Threadvar routines
 //------------------------------------------------------------------------------
@@ -745,7 +734,12 @@ end;
 procedure SysThreadSwitch;
 begin
   Scheduling(nil);
-  Signaling;
+  // checking Kill flag
+  if CPU[GetApicID].CurrentThread.FlagKill then
+  begin
+    {$IFDEF DebugProcess} DebugTrace('Signaling - killing CurrentThread', 0, 0, 0); {$ENDIF}
+    ThreadExit(True);
+  end;
 end;
 
 // The execution of threads starts here, global variables are initialized

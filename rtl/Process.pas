@@ -82,6 +82,8 @@ type
     State: Byte;
     PrivateHeap: Pointer;
     FlagKill: boolean;
+    // used for indicate a service thread
+    IsService: boolean;
     // used by ThreadMain to pass argumments
     StartArg: Pointer;
     // thread main function
@@ -865,4 +867,4 @@ begin
 end;
 
 end.
-
+

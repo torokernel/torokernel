@@ -57,6 +57,10 @@ const
   // Regions Memory Types
   MEM_AVAILABLE = 1;
   MEM_RESERVED = 2;
+  // Informing only the registers which could be used for debugging
+  CPU_REGS = 8;
+  // Name's registers
+  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP','CR2');
 
 type
 {$IFDEF UNICODE}
@@ -102,6 +106,13 @@ type
     CPUBoot: Boolean;
     InitConfirmation: Boolean; // Synchronization variable between core to INIT-core
     InitProc: procedure; // Procedure to initialize the core
+  end;
+
+
+  // CPU architecture registers
+  // used when an exception is captured to pass the data toward the kernel
+  TCPURegisters = record
+    regs: array[0..CPU_REGS-1] of QWord;
   end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord);
@@ -967,6 +978,15 @@ asm
   db $48, $cf
 end;
 
+
+procedure ExceptTest; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+
+
+end;
+
 // PCI bus access
 const
  PCI_CONF_PORT_INDEX = $CF8;
@@ -1424,4 +1444,4 @@ begin
 end;
 
 end.
-
+

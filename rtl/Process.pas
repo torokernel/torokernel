@@ -180,10 +180,10 @@ begin
   ThreadExit(True);
 end;
 
-procedure ExceptDIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDIVBYZERO(regs: PCPURegisters);// {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Division by zero', 0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDivision by zero/n\n',0);
+  //{$IFDEF DebugProcess} DebugTrace('Exception: Division by zero', 0, 0, 0); {$ENDIF}
+  WriteConsole('Exception: /RDivision by zero/n, register rax:%d, rbx:%d, rcx:%d, rdx:%d\n', [regs[0], regs[1], regs[2], regs[3]]);
   ExceptionHandler;
 end;
 
@@ -253,16 +253,16 @@ end;
 // Exceptions are captured
 procedure InitializeINT;
 begin
-  CaptureInt(EXC_DIVBYZERO, @ExceptDIVBYZERO);
-  CaptureInt(EXC_OVERFLOW, @ExceptOVERFLOW);
-  CaptureInt(EXC_BOUND, @ExceptBOUND);
-  CaptureInt(EXC_ILLEGALINS, @ExceptILLEGALINS);
-  CaptureInt(EXC_DEVNOTAVA, @ExceptDEVNOTAVA);
-  CaptureInt(EXC_DF, @ExceptDF);
-  CaptureInt(EXC_STACKFAULT, @ExceptSTACKFAULT);
-  CaptureInt(EXC_GENERALP, @ExceptGENERALP);
-  CaptureInt(EXC_PAGEFAUL, @ExceptPAGEFAULT);
-  CaptureInt(EXC_FPUE, @ExceptFPUE);
+  CaptureException(EXC_DIVBYZERO, @ExceptDIVBYZERO);
+  //CaptureInt(EXC_OVERFLOW, @ExceptOVERFLOW);
+  //CaptureInt(EXC_BOUND, @ExceptBOUND);
+  //CaptureInt(EXC_ILLEGALINS, @ExceptILLEGALINS);
+  //CaptureInt(EXC_DEVNOTAVA, @ExceptDEVNOTAVA);
+  //CaptureInt(EXC_DF, @ExceptDF);
+  //CaptureInt(EXC_STACKFAULT, @ExceptSTACKFAULT);
+  //CaptureInt(EXC_GENERALP, @ExceptGENERALP);
+  //CaptureInt(EXC_PAGEFAUL, @ExceptPAGEFAULT);
+  //CaptureInt(EXC_FPUE, @ExceptFPUE);
 end;
 
 // Initialization of each Core in the system
@@ -867,4 +867,4 @@ begin
 end;
 
 end.
-
+

@@ -48,7 +48,7 @@ const
   EXC_BOUND = 5;
   EXC_ILLEGALINS = 6;
   EXC_DEVNOTAVA = 7;
-  EXC_DF = 8;
+  EXC_DF = 10;
   EXC_STACKFAULT = 12;
   EXC_GENERALP = 13;
   EXC_PAGEFAUL = 14;
@@ -58,9 +58,9 @@ const
   MEM_AVAILABLE = 1;
   MEM_RESERVED = 2;
   // Informing only the registers which could be used for debugging
-  CPU_REGS = 8;
+  CPU_REGS = 9;
   // Name's registers
-  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP','CR2');
+  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP', 'EFLAGS','ERR');
 
 type
 {$IFDEF UNICODE}
@@ -92,6 +92,7 @@ type
     Year: LongInt
   end;
   PNow = ^TNow;
+  PCPURegisters = ^TCPURegisters;
 
   TMemoryRegion = record
     Base: QWord;
@@ -111,9 +112,9 @@ type
 
   // CPU architecture registers
   // used when an exception is captured to pass the data toward the kernel
-  TCPURegisters = record
-    regs: array[0..CPU_REGS-1] of QWord;
-  end;
+  //
+  TCPURegisters = array[0..CPU_REGS-1] of QWord;
+  
 
 procedure bit_reset(Value: Pointer; Offset: QWord);
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
@@ -149,6 +150,8 @@ procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 
+
+
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
   RESET_VECTOR = $467; // when the IPI occurs the procesor jumps here
@@ -161,6 +164,7 @@ const
   HasCacheHandler: Boolean = True;
   HasException: Boolean = True;
   HasFloatingPointUnit : Boolean = True;  
+  MAX_EXCEP = 32;
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
@@ -169,6 +173,8 @@ var
   StartTime: TNow;
   CPU_CYLES: Int64;
   Cores: array[0..MAX_CPU-1] of TCore;
+  // Exceptions handlers
+  ExceptionHandler: array[0..MAX_EXCEP-1] of procedure (regs: PCPURegisters);
 
 implementation
 
@@ -297,13 +303,14 @@ end;
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
-  idt_gates^[Exception].handler_0_15 := Word(QWord(handler) and $ffff) ;
-  idt_gates^[Exception].selector := kernel_code_sel;
-  idt_gates^[Exception].tipe := gate_syst ;
-  idt_gates^[Exception].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
-  idt_gates^[Exception].handler_32_63 := DWORD(QWord(handler) shr 32);
-  idt_gates^[Exception].res := 0 ;
-  idt_gates^[Exception].nu := 0 ;
+ ExceptionHandler[Exception] := Handler;
+  //idt_gates^[Exception].handler_0_15 := Word(QWord(handler) and $ffff) ;
+  //idt_gates^[Exception].selector := kernel_code_sel;
+  //idt_gates^[Exception].tipe := gate_syst ;
+  //idt_gates^[Exception].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
+  //idt_gates^[Exception].handler_32_63 := DWORD(QWord(handler) shr 32);
+  //idt_gates^[Exception].res := 0 ;
+  //idt_gates^[Exception].nu := 0 ;
 end;
 
 // IO port access
@@ -979,13 +986,51 @@ asm
 end;
 
 
-procedure ExceptTest; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+//('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP','');
+// DivByZero handler exception
+procedure ExceptDivByZero; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 var
   regs: TCPURegisters;
 begin
-
-
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
 end;
+// invoke kernel handler 
+// kernel will not come back
+ExceptionHandler[EXC_DIVBYZERO](@regs)
+end;
+
+
+
+
+
+  {EXC_DIVBYZERO = 0;
+  EXC_OVERFLOW = 4;
+  EXC_BOUND = 5;
+  EXC_ILLEGALINS = 6;
+  EXC_DEVNOTAVA = 7;
+  EXC_DF = 8;
+  EXC_STACKFAULT = 12;
+  EXC_GENERALP = 13;
+  EXC_PAGEFAUL = 14;
+  EXC_FPUE = 16;}
+
+
+
 
 // PCI bus access
 const
@@ -1427,8 +1472,10 @@ begin
   for I := 33 to 47 do
     CaptureInt(I, @IRQ_Ignore);
   // CPU Exceptions
-  for I := 0 to 32 do
-    CaptureInt(I, @Interruption_Ignore);
+  //for I := 0 to 32 do
+  //  CaptureInt(I, @Interruption_Ignore);
+  // TODO: Capture all exceptions
+  CaptureInt(0,@ExceptDivByZero);
   EnabledINT;
   Now(@StartTime);
   SMPInitialization;
@@ -1444,4 +1491,4 @@ begin
 end;
 
 end.
-
+

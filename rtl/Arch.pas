@@ -986,8 +986,12 @@ asm
 end;
 
 
-//('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP','');
-// DivByZero handler exception
+//
+// Exceptions handlers
+// The exception is caputed by Arch and the kernel is invoked immediatly
+//
+
+
 procedure ExceptDivByZero; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 var
   regs: TCPURegisters;
@@ -1015,19 +1019,244 @@ ExceptionHandler[EXC_DIVBYZERO](@regs)
 end;
 
 
+procedure ExceptOverflow; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_OVERFLOW](@regs)
+end;
 
 
+procedure ExceptBound; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_BOUND](@regs)
+end;
 
-  {EXC_DIVBYZERO = 0;
-  EXC_OVERFLOW = 4;
-  EXC_BOUND = 5;
-  EXC_ILLEGALINS = 6;
-  EXC_DEVNOTAVA = 7;
-  EXC_DF = 8;
-  EXC_STACKFAULT = 12;
-  EXC_GENERALP = 13;
-  EXC_PAGEFAUL = 14;
-  EXC_FPUE = 16;}
+
+procedure ExceptIllegalins; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_ILLEGALINS](@regs)
+end;
+
+procedure ExceptDevnotAva; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_DEVNOTAVA](@regs)
+end;
+
+procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_DF](@regs)
+end;
+
+procedure ExceptStackFault; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_STACKFAULT](@regs)
+end;
+
+procedure ExceptGeneralAp; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_GENERALP](@regs)
+end;
+
+procedure ExceptPageFault; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_PAGEFAUL](@regs)
+end;
+
+
+procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_FPUE ](@regs)
+end;
+
+
 
 
 
@@ -1491,4 +1720,4 @@ begin
 end;
 
 end.
-
+

@@ -6,6 +6,7 @@
 //
 // Changes :
 //
+// 13/05/2012 Moving Exceptions to Arch
 // 21/12/2011 IOAPIC and LAPIC supported 
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
@@ -17,7 +18,7 @@
 // 11/01/2006 Some modifications in Main procedure by Matias Vara.
 // 28/12/2006 First version by Matias Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2012 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -60,7 +61,7 @@ const
   // Informing only the registers which could be used for debugging
   CPU_REGS = 9;
   // Name's registers
-  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('RAX','RBX','RCX', 'RDX', 'RSP', 'RBP','RIP', 'EFLAGS','ERR');
+  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('rax','rbx','rcx', 'rdx', 'rsp', 'rbp','rip', 'eflags','err');
 
 type
 {$IFDEF UNICODE}
@@ -988,7 +989,7 @@ end;
 
 //
 // Exceptions handlers
-// The exception is caputed by Arch and the kernel is invoked immediatly
+// The exception is catched by Arch and the kernel handle is invoked immediatly
 //
 
 
@@ -1720,4 +1721,4 @@ begin
 end;
 
 end.
-
+

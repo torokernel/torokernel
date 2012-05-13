@@ -5,14 +5,14 @@
 // NOTE: These procedures do not have protection , WriteConsole should not have trouble but ReadConsole may face race condition when running from two CPUS
 // 
 // Changes:
-// 11 / 12 / 2011: Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
-// 27 / 03 / 2009: Adding support for QWORD parameters in Printk_() and WriteConsole().
-// 08 / 02 / 2007: Rename to Console.pas  , new procedures to read and write the console by Matias Vara.
-// 		   The consoles's procedures are only for users , the kernel only need PrintK_().
-// 15 / 07 / 2006: The code was rewrited  by Matias Vara.
-// 09 / 02 / 2005: First Version by Matias Vara.
+// 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
+// 27/03/2009 Adding support for QWORD parameters in Printk_() and WriteConsole().
+// 08/02/2007 Rename to Console.pas  , new procedures to read and write the console by Matias Vara.
+//            The consoles's procedures are only for users, the kernel only need PrintK_().
+// 15/07/2006 The code was rewrited  by Matias Vara.
+// 09/02/2005 First Version by Matias Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2012 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -96,12 +96,21 @@ begin
 	write_portb(X, $3D5);
 end;
 
+
+// Flush up the screen
+procedure FlushUp;
+begin
+  X := 0 ;
+  Move(PXChar(VIDEO_OFFSET+160)^, PXChar(VIDEO_OFFSET)^, 24*80*2);
+  FillWord(PXChar(VIDEO_OFFSET+160*24)^, 80, $0720);
+end;
+
 // Put caracter to screen 
 procedure PutC(const Car: XChar);
 begin
   Y := 24;
   if X > 79 then
-  X := 0;
+   FlushUp;
   PConsole := Pointer(VIDEO_OFFSET + (80*2)*Y + (X*2));
   PConsole.form := color;
   PConsole.car := Car;
@@ -121,13 +130,6 @@ begin
 end;
 {$ENDIF}
 
-// Flush up the screen 
-procedure FlushUp;
-begin
-  X := 0 ;
-  Move(PXChar(VIDEO_OFFSET+160)^, PXChar(VIDEO_OFFSET)^, 24*80*2);
-  FillWord(PXChar(VIDEO_OFFSET+160*24)^, 80, $0720);
-end;
 
 // Print in decimal form
 procedure PrintDecimal(Value: PtrUInt);

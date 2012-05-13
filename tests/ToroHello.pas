@@ -48,15 +48,6 @@ uses
 
 begin
   WriteConsole('\c/RHello World, I am TORO!!!\n',[0]);
-  WriteConsole('/RSimuling DIVby0 Exception %d\n',[0]);
-  {$ASMMODE intel}
-  asm
-	mov rbx, 1987
-  	mov rax, 166
-        mov rcx, 0
-        mov rdx, 555
-  	div rcx
-  end;
   while True do
     SysThreadSwitch;
 end.

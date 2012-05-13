@@ -13,22 +13,24 @@
 // - RemoveThreadReady is only used by systhreadkill() function
 //
 // Changes:
-// 11 / 12 / 2011 : Fixing a critical issue on remote thread create.
-// 05 / 12 / 2011 : Removing Threadwait, Errno, and other non-used code.
-// 27 / 03 / 2011 : Renaming Exchange slot to MxSlots.
-// 14 / 10 / 2009 : Bug Fixed in the Scheduler.
-// 16 / 05 / 2009 : SMP Initialization was moved to Arch Unit.
-// 21 / 12 / 2008 : Bug fixed in SMP Initialization.
-// 07 / 08 / 2008 : Bug fixed in Sleep
-// 04 / 06 / 2007 : KW Refactoring, renaming and code formatting
-// 19 / 02 / 2007 : Some modications in SuspendThread procedure.
-// 10 / 02 / 2007 : Some bugs in BootCPU procedure  , now the delay work fine.
-// 08 / 09 / 2006 : Implementation of Toro Thread Manager driver for FPC calls (beginthread, endthread, etc) .
-// 21 / 08 / 2006 : Memory model implement .
-// 12 / 08 / 2006 : New model implement by Matias Vara .
-// 04 / 08 / 2006 : First version by Matias E. Vara .
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// 13/05/2012 Moving Exceptions to Arch, implementing DumpThread.
+// 11/12/2011 Fixing a critical issue on remote thread create.
+// 05/12/2011 Removing Threadwait, Errno, and other non-used code.
+// 27/03/2011 Renaming Exchange slot to MxSlots.
+// 14/10/2009 Bug Fixed in the Scheduler.
+// 16/05/2009 SMP Initialization was moved to Arch Unit.
+// 21/12/2008 Bug fixed in SMP Initialization.
+// 07/08/2008 Bug fixed in Sleep
+// 04/06/2007 KW Refactoring, renaming and code formatting
+// 19/02/2007 Some modications in SuspendThread procedure.
+// 10/02/2007 Some bugs in BootCPU procedure  , now the delay work fine.
+// 08/09/2006 Implementation of Toro Thread Manager driver for FPC calls (beginthread, endthread, etc) .
+// 21/08/2006 Memory model implement .
+// 12/08/2006 New model implement by Matias Vara .
+// 04/08/2006 First version by Matias E. Vara .
+//
+// Copyright (c) 2003-2012 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -180,89 +182,102 @@ begin
   ThreadExit(True);
 end;
 
+// Print on the screen processor's registers
+// TODO: show in hexadecimal
+procedure DumpThread(regs: PCPURegisters);
+var
+I: integer;
+begin
+     for I:= 0 to (CPU_REGS-1) do
+     begin
+          WriteConsole('/V%p/n:%d ', [Qword(CPURegistersName[I]),regs[I]]);
+     end;
+     WriteConsole('\n',[]);
+end;
+
 procedure ExceptDIVBYZERO(regs: PCPURegisters);// {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  //{$IFDEF DebugProcess} DebugTrace('Exception: Division by zero', 0, 0, 0); {$ENDIF}
-  WriteConsole('Exception: /RDivision by zero/n, register rax:%d, rbx:%d, rcx:%d, rdx:%d\n', [regs[0], regs[1], regs[2], regs[3]]);
+  WriteConsole('\c/nException catched: /RDIVBYZERO, /ndumping registers:\n',[]);
+  DumpThread(regs);
   ExceptionHandler;
 end;
 
-procedure ExceptOVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptOVERFLOW(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Overflow',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /ROverflow/n\n',0);
+  WriteConsole('\c/nException catched: /ROverflow, /ndumping registers:\n',[]);
+  DumpThread(regs);
   ExceptionHandler;
 end;
 
-procedure ExceptBOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptBOUND(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Bound instruction',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RBound instruction/n\n',0);
+  WriteConsole('\c/nException catched: /RBound instruction, /ndumping registers:\n',[]);
+  DumpThread(regs);
   ExceptionHandler;
 end;
 
-procedure ExceptILLEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptILLEGALINS(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal instruction',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RIllegal instruction/n\n',0);
+  WriteConsole('\c/nException catched: /RIllegal instruction, /ndumping registers:\n',[]);
+  DumpThread(regs);
   ExceptionHandler;
 end;
 
-procedure ExceptDEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDEVNOTAVA(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Device not available',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDevice not available/n\n',0);
+  WriteConsole('\c/nException catched: /RDevice not AVA, /ndumping registers:\n',[]);
+  DumpThread(regs);
   ExceptionHandler;
 end;
 
-procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDF(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Double fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDouble Fault/n\n',0);
-  ExceptionHandler
+  WriteConsole('\c/nException catched: /RDouble Except, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
 end;
 
-procedure ExceptSTACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptSTACKFAULT(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Stack fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RStack fault/n',0);
-  ExceptionHandler
+  WriteConsole('\c/nException catched: /RStack Fault, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
 end;
 
-procedure ExceptGENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptGENERALP(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: General protection',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RGeneral protection/n\n',0);
-  ExceptionHandler
+  WriteConsole('\c/nException catched: /RGeneral Protection, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
 end;
 
-procedure ExceptPAGEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptPAGEFAULT(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Page fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RPage fault/n\n',0);
-  ExceptionHandler
+  WriteConsole('\c/nException catched: /RPage Fault, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
 end;
 
-procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptFPUE(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: FPU error',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RFPU error/n\n',0);
-  ExceptionHandler
+  WriteConsole('\c/nException catched: /RFPU Error, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
 end;
 
 // Exceptions are captured
 procedure InitializeINT;
 begin
   CaptureException(EXC_DIVBYZERO, @ExceptDIVBYZERO);
-  //CaptureInt(EXC_OVERFLOW, @ExceptOVERFLOW);
-  //CaptureInt(EXC_BOUND, @ExceptBOUND);
-  //CaptureInt(EXC_ILLEGALINS, @ExceptILLEGALINS);
-  //CaptureInt(EXC_DEVNOTAVA, @ExceptDEVNOTAVA);
-  //CaptureInt(EXC_DF, @ExceptDF);
-  //CaptureInt(EXC_STACKFAULT, @ExceptSTACKFAULT);
-  //CaptureInt(EXC_GENERALP, @ExceptGENERALP);
-  //CaptureInt(EXC_PAGEFAUL, @ExceptPAGEFAULT);
-  //CaptureInt(EXC_FPUE, @ExceptFPUE);
+  CaptureException(EXC_OVERFLOW, @ExceptOVERFLOW);
+  CaptureException(EXC_BOUND, @ExceptBOUND);
+  CaptureException(EXC_ILLEGALINS, @ExceptILLEGALINS);
+  CaptureException(EXC_DEVNOTAVA, @ExceptDEVNOTAVA);
+  CaptureException(EXC_DF, @ExceptDF);
+  CaptureException(EXC_STACKFAULT, @ExceptSTACKFAULT);
+  CaptureException(EXC_GENERALP, @ExceptGENERALP);
+  CaptureException(EXC_PAGEFAUL, @ExceptPAGEFAULT);
+  CaptureException(EXC_FPUE, @ExceptFPUE);
 end;
 
 // Initialization of each Core in the system

@@ -10,7 +10,7 @@
 {$ENDIF}
 //{$DEFINE cpui386}
 //{$DEFINE CPUX86_64}
-//{$DEFINE DEBUG}
+{$DEFINE DEBUG}
 //{$DEFINE DebugArch}
 //{$DEFINE DebugThreadInfo}
 //{$DEFINE DebugFS}
@@ -19,4 +19,4 @@
 //{$DEFINE DebugProcessEmigrating}
 //{$DEFINE DebugProcessInmigrating}
 //{$DEFINE DebugNetwork}
-
+

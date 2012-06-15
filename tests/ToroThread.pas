@@ -47,50 +47,68 @@ uses
   Console in 'rtl\Drivers\Console.pas';
 
 
-const
- sBusy = 1;
- sFree = 0;
-
-type
- Pargumment = ^Targumment;
- Targumment = record
- op1 : longint;
- op2 : longint;
- res : longint;
- state: boolean;
-end; 
- 
-// Thread Main procedure
-function ThreadHelloWorld(Param: Pointer):PtrInt;
 var
- parg: Pargumment;
+ tmp: TThreadID;
+ var1, var2, var22, var3: longint;
+ n1: boolean = true;
+ n2: boolean = true;
+ n3: boolean = false;
+ r: boolean = false;
+
+
+function ThreadF2(Param: Pointer):PtrInt;
 begin
-   parg := Param;
-   WriteConsole('Core:#%d, op1= %d, op2= %d\n',[GetApicId, parg.op1, parg.op2]);
+  while true do
+  begin
+   while n2=false do
+    SysThreadSwitch;
+    if r then
+    begin
+      var3:=var2+7;
+    end else var3:=var22+7;
+    n2:=false;
+    n3:=true;
+  end;
+end;
+
+function ThreadF3(Param: Pointer):PtrInt;
+begin
+  while true do
+  begin
+       while (n3=false) do SysThreadSwitch;
+       var1:=var3 mod 11;
+       DebugPrint('%d\n',0,var1,0);//WriteConsole('--%d-',[var1]);
+       n3:=false;
+       n1:= true;
+       n2:=true;
+  end;
 end;
 
 
-var
- th: array[0..MAX_CPU] of TThreadID;
- thArg : array [0..MAX_CPU] of Targumment;
- tmp: TThreadID;
- j: longint;
+
 
 
 begin
   // we create a thread each core
-  for j:= 0 to (CPU_COUNT-1) do
-  begin
-    thArg[j].state := false;
-    thArg[j].op1 := 4 ;
-    thArg[j].op2 := 5 ;
-    thArg[j].res := 0;
-    // passing the argumments
-    th[j]:= BeginThread(nil, 4096, ThreadHelloWorld, @thArg[j], j, tmp);
-    if th[j]= 0 then
-       WriteConsole('/RFail/n: Creating a Thread in core #%d\n', [j]);
-  end;
+  var1:=0;
+  var2:=4;
+  var22:=9;
+  var3:=11;
+
+  tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
+  tmp:= BeginThread(nil, 4096, ThreadF3, nil, 1, tmp);
+
 
   while true do
-   SysThreadSwitch;
+  begin
+   while n1=false do
+      SysThreadSwitch;
+      if r then
+      begin
+       var22:=var1+5;
+      end else var2:=var1+5;
+      r:=not r;
+      n1:=false;
+  end;
+
 end.

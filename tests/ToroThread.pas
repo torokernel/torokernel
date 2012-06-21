@@ -49,41 +49,34 @@ uses
 
 var
  tmp: TThreadID;
- var1, var2, var22, var3: longint;
+ var1, var2, var3: longint;
  n1: boolean = true;
- n2: boolean = true;
+ n2: boolean = false;
  n3: boolean = false;
- r: boolean = false;
 
 
 function ThreadF2(Param: Pointer):PtrInt;
 begin
   while true do
   begin
-   while n2=false do
-    SysThreadSwitch;
-    if r then
-    begin
-      var3:=var2+7;
-    end else var3:=var22+7;
+    while n2=false do SysThreadSwitch;
+    var3:=var2+7;
+    n3:= true;
     n2:=false;
-    n3:=true;
-  end;
+  end
 end;
 
 function ThreadF3(Param: Pointer):PtrInt;
 begin
   while true do
   begin
-       while (n3=false) do SysThreadSwitch;
-       var1:=var3 mod 11;
-       DebugPrint('%d\n',0,var1,0);//WriteConsole('--%d-',[var1]);
-       n3:=false;
-       n1:= true;
-       n2:=true;
+      while n3=false do SysThreadSwitch;
+      var1:=var3 mod 11;
+      WriteConsole('-%d-',[var1]);
+      n1:=true;
+      n3:=false;
   end;
 end;
-
 
 
 
@@ -92,22 +85,17 @@ begin
   // we create a thread each core
   var1:=0;
   var2:=4;
-  var22:=9;
   var3:=11;
 
-  tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
   tmp:= BeginThread(nil, 4096, ThreadF3, nil, 1, tmp);
+  tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
 
 
   while true do
   begin
-   while n1=false do
-      SysThreadSwitch;
-      if r then
-      begin
-       var22:=var1+5;
-      end else var2:=var1+5;
-      r:=not r;
+      while n1=false do SysThreadSwitch;
+      var2:=var1+5;
+      n2:=true;
       n1:=false;
   end;
 

@@ -27,7 +27,7 @@ if $debug ; then
 		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
 	fi
 	# at this point we need a gdb patched
-	$gdbdir/gdb $appbin
+	gdb $appbin
 else
 	# compiling
 	fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
@@ -37,7 +37,7 @@ else
 		if [ "$OSTYPE" == "msys" ] ; then
 			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2
 	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
-			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
+			qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -serial file:nada
 		fi
     fi
 fi

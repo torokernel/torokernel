@@ -1,10 +1,15 @@
 //
 // Toro Multithreading Example
-// Clasical example using a minimal kernel to show "Hello World" 
+//
+// I have implemented three task (T1, T2 and T3), T1 runs in core 0 while T2 and T3 runs in core1.
+// T1 and T2 have a data dependency, hence while T1 runs T2 must not, this was implemented with a few
+// boolean variables like a semaphore. It could be great to implemented at kernel level thus the user has not
+// take in care about that stuff.
+// Besides, this is a good example about static scheduling where we are sure about the execution order previusly.
 //
 // Changes :
 // 
-// 11/12/2011 First Version by Matias E. Vara.
+// 22/06/2012 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
@@ -35,8 +40,8 @@ program ToroThread;
 // Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
 
-// They are declared just the necessary units
-// The units used depend the hardware where you are running the application 
+// they are declared just the necessary units
+// the units used depend the hardware where you are running the application
 uses
   Kernel in 'rtl\Kernel.pas',
   Process in 'rtl\Process.pas',
@@ -47,50 +52,60 @@ uses
   Console in 'rtl\Drivers\Console.pas';
 
 
-const
- sBusy = 1;
- sFree = 0;
-
-type
- Pargumment = ^Targumment;
- Targumment = record
- op1 : longint;
- op2 : longint;
- res : longint;
- state: boolean;
-end; 
- 
-// Thread Main procedure
-function ThreadHelloWorld(Param: Pointer):PtrInt;
 var
- parg: Pargumment;
+ tmp: TThreadID;
+ var1, var2, var3: longint;
+ // sincronization variable to avoid the execution of task2 and task1 at the same time
+ n1: boolean = true;
+ n2: boolean = false;
+
+// task 2
+function ThreadF2(Param: Pointer):PtrInt;
 begin
-   parg := Param;
-   WriteConsole('Core:#%d, op1= %d, op2= %d\n',[GetApicId, parg.op1, parg.op2]);
+  while true do
+  begin
+    while n2=false do SysThreadSwitch;
+    var3:=var2+7;
+    n2:= false;
+    n1:= true ;
+  end
 end;
 
 
-var
- th: array[0..MAX_CPU] of TThreadID;
- thArg : array [0..MAX_CPU] of Targumment;
- tmp: TThreadID;
- j: longint;
+// task3
+function ThreadF3(Param: Pointer):PtrInt;
+begin
+  while true do
+  begin
+      var1:=var3 mod 11;
+      SysThreadSwitch;
+  end;
+end;
 
 
 begin
-  // we create a thread each core
-  for j:= 0 to (CPU_COUNT-1) do
+
+  WriteConsole('\c',[0]);
+  // initial values
+  var1:=0;
+  var2:=4;
+  var3:=11;
+
+  // we create a remote thread
+  tmp:= BeginThread(nil, 4096, ThreadF3, nil, 1, tmp);
+  tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
+   
+  // task1 is implemented using main thread in order to keep the scheduler
+  // as stable as possible
+  while true do
   begin
-    thArg[j].state := false;
-    thArg[j].op1 := 4 ;
-    thArg[j].op2 := 5 ;
-    thArg[j].res := 0;
-    // passing the argumments
-    th[j]:= BeginThread(nil, 4096, ThreadHelloWorld, @thArg[j], j, tmp);
-    if th[j]= 0 then
-       WriteConsole('/RFail/n: Creating a Thread in core #%d\n', [j]);
+      while n1=false do SysThreadSwitch;
+      var2:=var1+5;
+      // this WriteConsole() adds much noise given that it implements atomic operations
+      WriteConsole('%d',[var1]);
+      // syncro flags
+      n1:=false;
+      n2:=true;
   end;
 
-  while true do
-   SysThreadSwitch;
 end.

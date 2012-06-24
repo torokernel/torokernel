@@ -90,11 +90,11 @@ begin
   var1:=0;
   var2:=4;
   var3:=11;
-
+ 
   // we create a remote thread
   tmp:= BeginThread(nil, 4096, ThreadF3, nil, 1, tmp);
   tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
-   
+ 
   // task1 is implemented using main thread in order to keep the scheduler
   // as stable as possible
   while true do

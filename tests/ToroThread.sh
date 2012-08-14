@@ -37,7 +37,7 @@ else
 		if [ "$OSTYPE" == "msys" ] ; then
 			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2
 	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
-			qemu-system-x86_64 -m 256 -hda $appimg -smp 2 -serial file:nada
+			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
 		fi
     fi
 fi

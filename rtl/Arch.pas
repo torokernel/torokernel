@@ -45,6 +45,7 @@ interface
 const
   // Exceptions Types
   EXC_DIVBYZERO = 0;
+  EXC_DOUBLEFAULT = 8;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;
   EXC_ILLEGALINS = 6;
@@ -143,7 +144,6 @@ procedure ArchInit;
 procedure Now (Data: PNow);
 procedure EnabledINT;
 procedure DisabledINT;
-procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
@@ -176,6 +176,7 @@ var
   Cores: array[0..MAX_CPU-1] of TCore;
   // Exceptions handlers
   ExceptionHandler: array[0..MAX_EXCEP-1] of procedure (regs: PCPURegisters);
+  ExceptIgnoreHandler: procedure;
 
 implementation
 
@@ -302,16 +303,11 @@ begin
   idt_gates^[int].nu := 0;
 end;	
 
+// Interface to the kernel to catch exceptions
+// Note: The handler is executed with Interrution disabled.
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
  ExceptionHandler[Exception] := Handler;
-  //idt_gates^[Exception].handler_0_15 := Word(QWord(handler) and $ffff) ;
-  //idt_gates^[Exception].selector := kernel_code_sel;
-  //idt_gates^[Exception].tipe := gate_syst ;
-  //idt_gates^[Exception].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
-  //idt_gates^[Exception].handler_32_63 := DWORD(QWord(handler) shr 32);
-  //idt_gates^[Exception].res := 0 ;
-  //idt_gates^[Exception].nu := 0 ;
 end;
 
 // IO port access
@@ -973,10 +969,13 @@ asm
   cli
 end;
 
-// Procedures to capture unhandle interruptions
-procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-asm
-  db $48, $cf
+// Procedure to capture unhandle exceptions
+procedure Excep_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  ExceptIgnoreHandler;
+  asm
+     db $48, $cf
+  end;
 end;
 
 // Ignoring Hardware interruption
@@ -1257,9 +1256,31 @@ end;
 ExceptionHandler[EXC_FPUE ](@regs)
 end;
 
-
-
-
+procedure ExceptDOUBLEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+var
+  regs: TCPURegisters;
+begin
+asm
+ // save registers
+  mov [regs],    rax
+  mov [regs]+8,  rbx
+  mov [regs]+16, rcx
+  mov [regs]+24, rdx
+  mov [regs]+32, rsp
+  mov [regs]+40, rbp
+  //pop rdx // errcode
+  //pop rax
+  mov rbx, [regs]-8 //errcode
+  mov rax, [regs]-16 //rip
+  mov [regs]+48, rax //rip
+  mov [regs]+56, rbx //errcode
+  mov rax, [regs]-32 // rflags
+  mov [regs]+64,  rax
+end;
+// invoke kernel handler
+// kernel will not come back
+ExceptionHandler[EXC_DOUBLEFAULT](@regs)
+end;
 
 
 // PCI bus access
@@ -1699,15 +1720,27 @@ begin
   // increment of RDTSC counter per miliseg
   CPU_CYLES  := LocalCpuSpeed * 100000;
   // hardware Interruptions
-  for I := 33 to 47 do
+  for I := 32 to 47 do
     CaptureInt(I, @IRQ_Ignore);
   // CPU Exceptions
-  //for I := 0 to 32 do
-  //  CaptureInt(I, @Interruption_Ignore);
-  // TODO: Capture all exceptions
-  CaptureInt(0,@ExceptDivByZero);
-  EnabledINT;
-  Now(@StartTime);
+  // Some exceptions are ignored but this situation is informed to the kernel
+  // through ExcepIgnore procedure
+  for I := 0 to MAX_EXCEP-1 do
+    CaptureInt(I, @Excep_Ignore);
+  // Only a few exceptions have a processing
+  CaptureInt(EXC_DIVBYZERO,@ExceptDivByZero);
+  CaptureInt(EXC_OVERFLOW, @ExceptOverflow);
+  CaptureInt(EXC_BOUND, @ExceptBound);
+  CaptureInt(EXC_ILLEGALINS,@ExceptIllegalins);
+  CaptureInt(EXC_DEVNOTAVA, @ExceptDevnotAva);
+  CaptureInt(EXC_DEVNOTAVA, @ExceptDevnotAva);
+  CaptureInt(EXC_DF, @ExceptDF);
+  CaptureInt(EXC_STACKFAULT, @ExceptStackFault);
+  CaptureInt(EXC_GENERALP, @ExceptGeneralAp);
+  CaptureInt(EXC_PAGEFAUL, @ExceptPageFault);
+  CaptureInt(EXC_FPUE, @ExceptFPUE);
+  CaptureInt(EXC_DOUBLEFAULT, @ExceptDOUBLEFAULT);
+
   SMPInitialization;
   if CPU_COUNT=1 then
   begin
@@ -1716,8 +1749,12 @@ begin
     Irq_On8259(2)
   end else 
     InitLAPIC;
+  // ints're up from now
+  EnabledInt;
+  Now(@StartTime);
   // initialization of Floating Point Unit
   SSEInit;
+
 end;
 
 end.

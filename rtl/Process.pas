@@ -186,7 +186,7 @@ end;
 // TODO: show in hexadecimal
 procedure DumpThread(regs: PCPURegisters);
 var
-I: integer;
+   I: integer;
 begin
      for I:= 0 to (CPU_REGS-1) do
      begin
@@ -265,6 +265,19 @@ begin
   ExceptionHandler;
 end;
 
+procedure ExceptDOUBLEFAULT(regs: PCPURegisters); {$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+  WriteConsole('\c/nException catched: /RDouble Fault, /ndumping registers:\n',[]);
+  DumpThread(regs);
+  ExceptionHandler;
+end;
+
+
+procedure ExceptIgnored;{$IFDEF FPC} [nostackframe]; {$ENDIF}
+begin
+WriteConsole('Holaaaaa\n',[]);
+end;
+
 // Exceptions are captured
 procedure InitializeINT;
 begin
@@ -278,6 +291,9 @@ begin
   CaptureException(EXC_GENERALP, @ExceptGENERALP);
   CaptureException(EXC_PAGEFAUL, @ExceptPAGEFAULT);
   CaptureException(EXC_FPUE, @ExceptFPUE);
+  CaptureException(EXC_DOUBLEFAULT, @ExceptDOUBLEFAULT);
+  // Unexpected exception handler
+  ExceptIgnoreHandler := @ExceptIgnored;
 end;
 
 // Initialization of each Core in the system

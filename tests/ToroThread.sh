@@ -22,9 +22,9 @@ if $debug ; then
 	./build 2 $appbin boot.o $appimg
 	# calling qemu
 	if [ "$OSTYPE" == "msys" ] ; then
-		qemu-system-x86_64 -s -S -L $qemubios -m 256 -hda $appimg -smp 4 &
+		qemu-system-x86_64 -s -S -L $qemubios -m 256 -hda $appimg -smp 2 &
 	elif [ "$OSTYPE" == "linux-gnu" ] ; then
-		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 4 &
+		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
 	fi
 	# at this point we need a gdb patched
 	gdb $appbin
@@ -35,9 +35,9 @@ else
 	# calling qemu
 	if $emulate ; then
 		if [ "$OSTYPE" == "msys" ] ; then
-			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 4
+			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2
 	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
-			qemu-system-x86_64 -m 256 -hda $appimg -smp 4
+			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
 		fi
     fi
 fi

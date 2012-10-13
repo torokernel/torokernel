@@ -6,8 +6,8 @@
 //
 // Changes :
 //
-// 13/05/2012 Moving Exceptions to Arch
-// 21/12/2011 IOAPIC and LAPIC supported 
+// 13/05/2012 Moving Exceptions to Arch.
+// 21/12/2011 IOAPIC and LAPIC supported.
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
@@ -591,6 +591,7 @@ end;
 // The IOAPIC only supports 24 external IRQs
 //
 //
+// TODO : Irqs are not still handled by the LAPICs, must be implemented soon.
 
 
 // Enable an IRQ at a given CPU
@@ -636,38 +637,38 @@ end;
 // Set the Irq UP, CPUID parammeter is just for multicore environment
 procedure IrqOn(Irq, CPUID: byte);
 begin
-If CPU_COUNT=1 then
-  irq_on8259(Irq)
- else
-  Irq_OnApic(Irq,CPUID);
+//If CPU_COUNT=1 then
+  irq_on8259(Irq);
+// else
+//  Irq_OnApic(Irq,CPUID);
 end;
 
 // Set the Irq UP on core #0
 procedure IrqOn(Irq: byte);
 begin
-If CPU_COUNT=1 then
-  irq_on8259(Irq)
- else
-  Irq_OnApic(Irq,0);
+//If CPU_COUNT=1 then
+  irq_on8259(Irq);
+// else
+//  Irq_OnApic(Irq,0);
 end;
 
 // Set the IRQ DOWN
 procedure IrqOff(Irq: byte);
 begin
-If CPU_COUNT=1 then
-  irq_on8259(Irq)
- else
-  Irq_OffApic(Irq);
+//If CPU_COUNT=1 then
+  irq_on8259(Irq);
+// else
+//  Irq_OffApic(Irq);
 end;
 
 
 // End of Int sent to local APIC
 procedure EOI;
 begin
-If CPU_COUNT=1 then
-  EOI8259
- else
-  EOIApic;
+//If CPU_COUNT=1 then
+  EOI8259;
+// else
+//  EOIApic;
 end;
 
 
@@ -1377,7 +1378,8 @@ asm
   xor rbp, rbp
   sti
   // If we are using InitCpu, we're in multicore environment thus we use IOAPIC
-  call InitLAPIC
+  // TODO : Not still implemented.
+  // call InitLAPIC
   call SSEInit
   call boot_confirmation
 end;
@@ -1740,15 +1742,14 @@ begin
   CaptureInt(EXC_PAGEFAUL, @ExceptPageFault);
   CaptureInt(EXC_FPUE, @ExceptFPUE);
   CaptureInt(EXC_DOUBLEFAULT, @ExceptDOUBLEFAULT);
-
   SMPInitialization;
-  if CPU_COUNT=1 then
-  begin
+  //if CPU_COUNT=1 then
+  //begin
     // we must to use 8259 controller
     RelocateIrqs;
-    Irq_On8259(2)
-  end else 
-    InitLAPIC;
+    Irq_On8259(2);
+  //end else 
+    //InitLAPIC;
   // ints're up from now
   EnabledInt;
   Now(@StartTime);
@@ -1758,4 +1759,4 @@ begin
 end;
 
 end.
-
+

@@ -5,7 +5,6 @@ appbin=$app;
 appimg="$app.img";
 debug=false;
 emulate=false;
-qemubios="c:/qemu-1.0/pc-bios/";
 gdbdir="C:/mingw64/1.0/home/gdb-7.1/gdb/";
 # checking the command line
 while [ $# -gt 0 ]
@@ -22,7 +21,7 @@ if $debug ; then
 	./build 2 $appbin boot.o $appimg
 	# calling qemu
 	if [ "$OSTYPE" == "msys" ] ; then
-		qemu-system-x86_64 -s -S -L $qemubios -m 256 -hda $appimg -smp 2 &
+		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
 	elif [ "$OSTYPE" == "linux-gnu" ] ; then
 		qemu-system-x86_64 -s -S -m 256 -hda $appimg -smp 2 &
 	fi
@@ -35,7 +34,7 @@ else
 	# calling qemu
 	if $emulate ; then
 		if [ "$OSTYPE" == "msys" ] ; then
-			qemu-system-x86_64 -L $qemubios -m 256 -hda $appimg -smp 2
+			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
 	    elif [ "$OSTYPE" == "linux-gnu" ] ; then
 			qemu-system-x86_64 -m 256 -hda $appimg -smp 2
 		fi

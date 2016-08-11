@@ -6,8 +6,6 @@
 //
 // Changes :
 //
-// 13/05/2012 Moving Exceptions to Arch.
-// 21/12/2011 IOAPIC and LAPIC supported.
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
@@ -18,7 +16,7 @@
 // 11/01/2006 Some modifications in Main procedure by Matias Vara.
 // 28/12/2006 First version by Matias Vara.
 //
-// Copyright (c) 2003-2012 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -45,12 +43,11 @@ interface
 const
   // Exceptions Types
   EXC_DIVBYZERO = 0;
-  EXC_DOUBLEFAULT = 8;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;
   EXC_ILLEGALINS = 6;
   EXC_DEVNOTAVA = 7;
-  EXC_DF = 10;
+  EXC_DF = 8;
   EXC_STACKFAULT = 12;
   EXC_GENERALP = 13;
   EXC_PAGEFAUL = 14;
@@ -59,10 +56,6 @@ const
   // Regions Memory Types
   MEM_AVAILABLE = 1;
   MEM_RESERVED = 2;
-  // Informing only the registers which could be used for debugging
-  CPU_REGS = 9;
-  // Name's registers
-  CPURegistersName : array[0..CPU_REGS-1] of pchar= ('rax','rbx','rcx', 'rdx', 'rsp', 'rbp','rip', 'eflags','err');
 
 type
 {$IFDEF UNICODE}
@@ -94,7 +87,6 @@ type
     Year: LongInt
   end;
   PNow = ^TNow;
-  PCPURegisters = ^TCPURegisters;
 
   TMemoryRegion = record
     Base: QWord;
@@ -111,23 +103,18 @@ type
     InitProc: procedure; // Procedure to initialize the core
   end;
 
-
-  // CPU architecture registers
-  // used when an exception is captured to pass the data toward the kernel
-  //
-  TCPURegisters = array[0..CPU_REGS-1] of QWord;
-  
-
 procedure bit_reset(Value: Pointer; Offset: QWord);
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
+// only used in the debug unit to synchronize access to serial port
 procedure Delay(clock_hz: Int64; milisec: LongInt);
-procedure EOI;
+procedure eoi;
 function GetApicID: Byte;
+function get_irq_master: Byte;
+function get_irq_slave: Byte;
 procedure hlt;
-procedure IrqOn(Irq, CPUID: byte); overload;
-procedure IrqOn(Irq: byte); overload;
+procedure IrqOn(irq: Byte);
 procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
@@ -144,14 +131,13 @@ procedure ArchInit;
 procedure Now (Data: PNow);
 procedure EnabledINT;
 procedure DisabledINT;
+procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
-
-
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -164,8 +150,7 @@ const
   PAGE_SIZE = 2*1024*1024; // 2 MB per Page
   HasCacheHandler: Boolean = True;
   HasException: Boolean = True;
-  HasFloatingPointUnit : Boolean = True;  
-  MAX_EXCEP = 32;
+  HasFloatingPointUnit : Boolean = True;
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
@@ -174,9 +159,6 @@ var
   StartTime: TNow;
   CPU_CYLES: Int64;
   Cores: array[0..MAX_CPU-1] of TCore;
-  // Exceptions handlers
-  ExceptionHandler: array[0..MAX_EXCEP-1] of procedure (regs: PCPURegisters);
-  ExceptIgnoreHandler: procedure;
 
 implementation
 
@@ -193,13 +175,6 @@ const
   timer_curr_reg = apic_base + $390;
   divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
-  lint0_reg = apic_base + $350;
-  lint1_reg = apic_base + $360;
-  err_reg = apic_base + $370;
-  perf_reg = apic_base + $340;
-  thermal_reg = apic_base + $330;
-  
-  SpuriusInt_reg = apic_base + $f0;
   
   // IDT descriptors
   gate_syst = $8E;
@@ -214,8 +189,6 @@ const
 
   // minimal stack for initialization procedure, in bytes
   size_start_stack = 700;
-
-  INT_Base = 32;
 
 type 
   p_apicid_register = ^apicid_register ;
@@ -303,11 +276,15 @@ begin
   idt_gates^[int].nu := 0;
 end;	
 
-// Interface to the kernel to catch exceptions
-// Note: The handler is executed with Interrution disabled.
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
- ExceptionHandler[Exception] := Handler;
+  idt_gates^[Exception].handler_0_15 := Word(QWord(handler) and $ffff) ;
+  idt_gates^[Exception].selector := kernel_code_sel;
+  idt_gates^[Exception].tipe := gate_syst ;
+  idt_gates^[Exception].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
+  idt_gates^[Exception].handler_32_63 := DWORD(QWord(handler) shr 32);
+  idt_gates^[Exception].res := 0 ;
+  idt_gates^[Exception].nu := 0 ;
 end;
 
 // IO port access
@@ -383,7 +360,7 @@ asm
 end;
 
 // Get local Apic id
-function GetApicID: Byte; {$IFDEF ASMINLINE} inline; {$ENDIF}
+function GetApicID: Byte; inline;
 begin
   Result := PDWORD(apicid_reg)^ shr 24;
 end;
@@ -408,33 +385,6 @@ asm
   nop;
 end;
 
-// Change the base address of Apic registers
-procedure RelocateAPIC;
-asm
-  mov ecx, 27
-  mov edx, 0
-  mov eax, Apic_Base
-  wrmsr
-end;
-
-// Enable local APIC for accept external IRQ
-procedure EnableAPIC;{$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  tmp: ^dword;
-begin
-  tmp := pointer(SpuriusInt_reg);
-  tmp^ := $10f;
-end;
-
-// Send end of interruption to Local Apic
-procedure EOIApic;{$IFDEF ASMINLINE} inline; {$ENDIF}
-var
-  tmp : ^DWORD ;
-begin
-  tmp := Pointer(eoi_reg);
-  tmp^ := 0;
-end;
-
 // Wait milisec using the clock bus speed in clock_hz
 // The apic interrupt need the clock_hz
 procedure Delay(clock_hz: Int64; milisec: LongInt);
@@ -451,17 +401,25 @@ begin
     NOP;
   end;
   // send the end of interruption
-  EOIApic
+  tmp := Pointer(eoi_reg);
+  tmp^ := 0;
 end;
 
+// Change the Address of Apic registers
+procedure RelocateAPIC;
+asm
+  mov ecx, 27
+  mov edx, 0
+  mov eax, Apic_Base
+  wrmsr
+end;
 
 const
   Status_Port : array[0..1] of Byte = ($20,$A0);
   Mask_Port : array[0..1] of Byte = ($21,$A1);
   PIC_MASK: array [0..7] of Byte =(1,2,4,8,16,32,64,128);
   
-// Move the irq of 0-15 to 31-46 vectors
-// Just used in a system with 8259 controller
+// move the irq of 0-15 to 31-46 vectors
 procedure RelocateIrqs ;
 asm
     mov   al , 00010001b
@@ -509,8 +467,8 @@ asm
     out  0A1h, al
 end;
 
-// Turn on  the irq
-procedure irq_on8259(irq: Byte);
+// turn on  the irq
+procedure IrqOn(irq: Byte);
 begin
   if irq > 7 then
     write_portb(read_portb($a1) and (not pic_mask[irq-8]), $a1)
@@ -518,8 +476,8 @@ begin
     write_portb(read_portb($21) and (not pic_mask[irq]), $21);
 end;
 
-// Turn off the irq
-procedure Irq_off8259(irq: Byte);
+// turn off the irq
+procedure IrqOff(irq: Byte);
 begin
   if irq > 7 then
     write_portb(read_portb($a1) or pic_mask[irq-8], $a1)
@@ -527,150 +485,34 @@ begin
     write_portb(read_portb($21) or pic_mask[irq], $21);
 end;
 
-// Send the end of interruption
-procedure EOI8259;
+// send the end of interruption
+procedure eoi;
 begin
   write_portb($20, status_port[0]);
   write_portb($20, status_port[1]);
 end;
 
-
-// Disable 8259 controller
-procedure Disable8259;
+// turn off all irqs
+procedure all_irq_off;
 begin
   write_portb($ff, mask_port[0]);
   write_portb($ff, mask_port[1]);
 end;
 
-
-// Used for write to ioapic register
-procedure write_ioapic_reg(Base: pointer; offset, val: dword);
-var
- tmp: ^dword;
+// get the irq's number
+function get_irq_master: Byte ;
 begin
-  tmp := pointer(Base);
-  tmp^ := offset;
-  tmp := pointer(Base)+ $10;
-  tmp^ := val;
+  write_portb($b, $20);
+  NOP;
+  Result := read_portb($20);
 end;
 
-
-// Used for read a ioapic register
-function read_ioapic_reg(Base: pointer; offset: dword): dword;
-var
- tmp: ^dword;
+function get_irq_slave : Byte ;
 begin
-  tmp := pointer(Base);
-  tmp^:= offset;
-  tmp := pointer(Base)+ $10;
-  Result := tmp^;    
+  write_portb($b, $a0);
+  NOP;
+  Result := read_portb($a0);
 end;
-
-// Initialize local APIC
-// Called by each core 
-procedure InitLAPIC;
-var
- n: ^dword;
-begin
-  // we'll use the IOAPIC
-  Disable8259;
-  // setting LINT0 line for ExtINT
-  n := pointer(lint0_reg);
-  n^ := $8700;
-  // mask off error interrupt
-  n := pointer(err_reg);
-  n^ := $10000;
-  // mask off performance interrupt
-  n := pointer(perf_reg);
-  n^ := $1000;
-  // enable using Spurius Int
-  EnableAPIC;
-end;
-
-
-// The IOAPIC only supports 24 external IRQs
-//
-//
-// TODO : Irqs are not still handled by the LAPICs, must be implemented soon.
-
-
-// Enable an IRQ at a given CPU
-//
-procedure Irq_OnApic(irq, CPU: byte);
-var
-  reg,tmp: dword;
-begin
-  reg := 2*irq + $10;
-  // write lower half to disable the entry
-  // before we write the upper half
-  tmp :=$10000;  
-  write_ioapic_reg(pointer($FEC00000),reg,tmp);
-  // write the upper half first 
-  // select core 1 for this irq
-  tmp := CPU shl 24;
-  reg := reg + 1;
-  // setting the rigth core where the int happens
-  write_ioapic_reg(pointer($FEC00000),reg,tmp);
-  // setting the int vector
-  // IRQ captured by the LAPIC 
-  if irq < 15 then
-   tmp := $0100+irq+INT_Base
-  else
-  // it's a PCI irq
-   tmp := $A100+irq+INT_Base;
-  reg := reg - 1;
-  write_ioapic_reg(pointer($FEC00000),reg,tmp);
-end;
-
-
-// Disable an IRQ
-procedure Irq_OffApic(irq: byte);
-var
-  reg,tmp: dword;
-begin
-  reg := 2*irq + $10;
-  // disable the entry
-  tmp :=$10000;  
-  write_ioapic_reg(pointer($FEC00000),reg,tmp);
-end;
-
-// Set the Irq UP, CPUID parammeter is just for multicore environment
-procedure IrqOn(Irq, CPUID: byte);
-begin
-//If CPU_COUNT=1 then
-  irq_on8259(Irq);
-// else
-//  Irq_OnApic(Irq,CPUID);
-end;
-
-// Set the Irq UP on core #0
-procedure IrqOn(Irq: byte);
-begin
-//If CPU_COUNT=1 then
-  irq_on8259(Irq);
-// else
-//  Irq_OnApic(Irq,0);
-end;
-
-// Set the IRQ DOWN
-procedure IrqOff(Irq: byte);
-begin
-//If CPU_COUNT=1 then
-  irq_on8259(Irq);
-// else
-//  Irq_OffApic(Irq);
-end;
-
-
-// End of Int sent to local APIC
-procedure EOI;
-begin
-//If CPU_COUNT=1 then
-  EOI8259;
-// else
-//  EOIApic;
-end;
-
 
 const 
   cmos_port_reg = $70 ;
@@ -970,13 +812,10 @@ asm
   cli
 end;
 
-// Procedure to capture unhandle exceptions
-procedure Excep_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-begin
-  ExceptIgnoreHandler;
-  asm
-     db $48, $cf
-  end;
+// Procedures to capture unhandle interruptions
+procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+asm
+  db $48, $cf
 end;
 
 // Ignoring Hardware interruption
@@ -985,304 +824,6 @@ asm
   call EOI;
   db $48, $cf
 end;
-
-
-//
-// Exceptions handlers
-// The exception is catched by Arch and the kernel handle is invoked immediatly
-//
-
-
-procedure ExceptDivByZero; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler 
-// kernel will not come back
-ExceptionHandler[EXC_DIVBYZERO](@regs)
-end;
-
-
-procedure ExceptOverflow; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_OVERFLOW](@regs)
-end;
-
-
-procedure ExceptBound; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_BOUND](@regs)
-end;
-
-
-procedure ExceptIllegalins; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_ILLEGALINS](@regs)
-end;
-
-procedure ExceptDevnotAva; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_DEVNOTAVA](@regs)
-end;
-
-procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_DF](@regs)
-end;
-
-procedure ExceptStackFault; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_STACKFAULT](@regs)
-end;
-
-procedure ExceptGeneralAp; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_GENERALP](@regs)
-end;
-
-procedure ExceptPageFault; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_PAGEFAUL](@regs)
-end;
-
-
-procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_FPUE ](@regs)
-end;
-
-procedure ExceptDOUBLEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
-var
-  regs: TCPURegisters;
-begin
-asm
- // save registers
-  mov [regs],    rax
-  mov [regs]+8,  rbx
-  mov [regs]+16, rcx
-  mov [regs]+24, rdx
-  mov [regs]+32, rsp
-  mov [regs]+40, rbp
-  //pop rdx // errcode
-  //pop rax
-  mov rbx, [regs]-8 //errcode
-  mov rax, [regs]-16 //rip
-  mov [regs]+48, rax //rip
-  mov [regs]+56, rbx //errcode
-  mov rax, [regs]-32 // rflags
-  mov [regs]+64,  rax
-end;
-// invoke kernel handler
-// kernel will not come back
-ExceptionHandler[EXC_DOUBLEFAULT](@regs)
-end;
-
 
 // PCI bus access
 const
@@ -1377,9 +918,6 @@ asm
   {$IFDEF DCC} mov cr3, eax {$ENDIF}
   xor rbp, rbp
   sti
-  // If we are using InitCpu, we're in multicore environment thus we use IOAPIC
-  // TODO : Not still implemented.
-  // call InitLAPIC
   call SSEInit
   call boot_confirmation
 end;
@@ -1480,7 +1018,7 @@ begin
       end
       else exit;
     end;
-    Inc(find); //
+    Inc(find); // := find+1;
    end;
 end;
 
@@ -1706,7 +1244,6 @@ begin
   FlushCr3;
 end;
 
-
 // Architecture's variables initialization
 procedure ArchInit;
 var
@@ -1715,48 +1252,26 @@ begin
   // the bootloader creates the idt
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
+  RelocateIrqs;
   MemoryCounterInit;
   // cache Page structures
   CacheManagerInit;
   LocalCpuSpeed := CalculateCpuSpeed;
   // increment of RDTSC counter per miliseg
   CPU_CYLES  := LocalCpuSpeed * 100000;
+  IrqOn(2);
   // hardware Interruptions
-  for I := 32 to 47 do
+  for I := 33 to 47 do
     CaptureInt(I, @IRQ_Ignore);
   // CPU Exceptions
-  // Some exceptions are ignored but this situation is informed to the kernel
-  // through ExcepIgnore procedure
-  for I := 0 to MAX_EXCEP-1 do
-    CaptureInt(I, @Excep_Ignore);
-  // Only a few exceptions have a processing
-  CaptureInt(EXC_DIVBYZERO,@ExceptDivByZero);
-  CaptureInt(EXC_OVERFLOW, @ExceptOverflow);
-  CaptureInt(EXC_BOUND, @ExceptBound);
-  CaptureInt(EXC_ILLEGALINS,@ExceptIllegalins);
-  CaptureInt(EXC_DEVNOTAVA, @ExceptDevnotAva);
-  CaptureInt(EXC_DEVNOTAVA, @ExceptDevnotAva);
-  CaptureInt(EXC_DF, @ExceptDF);
-  CaptureInt(EXC_STACKFAULT, @ExceptStackFault);
-  CaptureInt(EXC_GENERALP, @ExceptGeneralAp);
-  CaptureInt(EXC_PAGEFAUL, @ExceptPageFault);
-  CaptureInt(EXC_FPUE, @ExceptFPUE);
-  CaptureInt(EXC_DOUBLEFAULT, @ExceptDOUBLEFAULT);
-  SMPInitialization;
-  //if CPU_COUNT=1 then
-  //begin
-    // we must to use 8259 controller
-    RelocateIrqs;
-    Irq_On8259(2);
-  //end else 
-    //InitLAPIC;
-  // ints're up from now
-  EnabledInt;
+  for I := 0 to 32 do
+    CaptureInt(I, @Interruption_Ignore);
+  EnabledINT;
   Now(@StartTime);
+  SMPInitialization;
   // initialization of Floating Point Unit
   SSEInit;
-
 end;
 
 end.
-
+

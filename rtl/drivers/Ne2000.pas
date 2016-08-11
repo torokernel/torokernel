@@ -113,7 +113,7 @@ var
 begin
    // initialize network driver
    CPU := GetApicid; 
-   IrqOn(NicNE2000.IRQ, CPU); 
+   IrqOn(NicNE2000.IRQ);
    WriteConsole('ne2000: /Vstarted/n on Core #%d\n',[CPU]);
 end;
 

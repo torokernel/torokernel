@@ -210,7 +210,7 @@ var
   CPU: byte;
 begin
   CPU := GetApicid;
-  IrqOn(NicE1000.IRQ,CPU);
+  IrqOn(NicE1000.IRQ);
   // enable the interruption
   e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
 end;

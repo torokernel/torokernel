@@ -776,7 +776,6 @@ begin
   Bcd_To_Bin(Day);
   Bcd_To_Bin(Mon);
   Bcd_To_Bin(Year);
-  Mon := Mon - 2 ;
   if 0 >= Mon then
   begin
     Mon := Mon + 12 ;

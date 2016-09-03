@@ -860,8 +860,8 @@ begin
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
   // Linear Assignation for every Core
   MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
-  PrintK_('System Memory ... /V%d/n bytes\n', AvailableMemory);
-  PrintK_('Memory per Core ... /V%d/n bytes\n', MemoryPerCpu);
+  PrintK_('System Memory ... /V%d/n MB\n', AvailableMemory div 1024 div 1024);
+  PrintK_('Memory per Core ... /V%d/n MB\n', MemoryPerCpu div 1024 div 1024);
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

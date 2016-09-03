@@ -138,6 +138,8 @@ function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
+procedure ThreadExit(Schedule: Boolean);
+
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -160,7 +162,6 @@ const
 // private procedures 
 procedure SystemExit; forward;
 procedure Scheduling(Candidate: PThread); forward;
-procedure ThreadExit(Schedule: Boolean); forward;
 procedure ThreadMain; forward;
 
 var
@@ -173,85 +174,337 @@ var
 // Routines to capture all exceptions
 //------------------------------------------------------------------------------
 
-// Parent thread reads the termination code
 procedure ExceptionHandler;
 begin
   EnabledInt;
   ThreadExit(True);
 end;
 
-procedure ExceptDIVBYZERO; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+
+procedure ExceptDIVBYZERO;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
   {$IFDEF DebugProcess} DebugTrace('Exception: Division by zero', 0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDivision by zero/n\n',0);
+  WriteConsole('[\t] CPU#%d Exception: /RDivision by zero/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   ExceptionHandler;
 end;
 
-procedure ExceptOVERFLOW; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptOVERFLOW;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Overflow',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /ROverflow/n\n',0);
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Overflow', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /ROverflow/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   ExceptionHandler;
 end;
 
-procedure ExceptBOUND; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptBOUND;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Bound instruction',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RBound instruction/n\n',0);
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Bound Instruction', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RBound Instrucction/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   ExceptionHandler;
 end;
 
-procedure ExceptILLEGALINS; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+
+procedure ExceptILLEGALINS;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal instruction',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RIllegal instruction/n\n',0);
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Illegal Instruction', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RIllegal Instruction /n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   ExceptionHandler;
 end;
 
-procedure ExceptDEVNOTAVA; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDEVNOTAVA; 
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Device not available',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDevice not available/n\n',0);
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Device not available', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RDevice not available/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   ExceptionHandler;
 end;
 
-procedure ExceptDF; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptDF; 
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Double fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RDouble Fault/n\n',0);
-  ExceptionHandler
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Double Fault', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RDouble Fault/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  ExceptionHandler;
 end;
 
-procedure ExceptSTACKFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptSTACKFAULT;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Stack fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RStack fault/n',0);
-  ExceptionHandler
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Stack Fault', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RStack Fault/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  ExceptionHandler;
 end;
 
-procedure ExceptGENERALP; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptGENERALP;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: General protection',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RGeneral protection/n\n',0);
-  ExceptionHandler
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: General Protection', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RGeneral Protection/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  ExceptionHandler;
 end;
 
-procedure ExceptPAGEFAULT; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+
+procedure ExceptPAGEFAULT;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: Page fault',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RPage fault/n\n',0);
-  ExceptionHandler
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: Page Fault', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RPage Fault/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  ExceptionHandler;
 end;
 
-procedure ExceptFPUE; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure ExceptFPUE;
+var rbx_reg: QWord;
+    rcx_reg: QWord;
+    rax_reg: QWord;
+    rdx_reg: QWord;
+    rsp_reg: QWord;
+    rip_reg: QWord;
+    rbp_reg: QWord;
+    errc_reg: QWord;
+    rflags_reg: Qword;
 begin
-  {$IFDEF DebugProcess} DebugTrace('Exception: FPU error',  0, 0, 0); {$ENDIF}
-  PrintK_('Exception: /RFPU error/n\n',0);
-  ExceptionHandler
+asm
+ mov  rbx_reg, rbx
+ mov  rcx_reg, rcx
+ mov  rax_reg, rax
+ mov  rdx_reg, rdx
+ mov  rsp_reg, rsp
+ mov  rbp_reg, rbp
+ mov rax, [rbp] + 8
+ mov rip_reg, rax
+ mov rax, [rbp] + 24
+ mov rflags_reg, rax
+end;
+  {$IFDEF DebugProcess} DebugTrace('Exception: FPU error', 0, 0, 0); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RFPU error/n\n',[GetApicid]);
+  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+  WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+  WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  ExceptionHandler;
 end;
 
-// Exceptions are captured
-procedure InitializeINT;
+
+procedure InitializeExceptions;
 begin
   CaptureInt(EXC_DIVBYZERO, @ExceptDIVBYZERO);
   CaptureInt(EXC_OVERFLOW, @ExceptOVERFLOW);
@@ -508,7 +761,6 @@ begin
 end;
 
 // Kill the thread given by ThreadID
-// It does not need parent dependency
 function SysKillThread(ThreadID: TThreadID): DWORD;
 var
   CurrentThread: PThread;
@@ -823,7 +1075,7 @@ procedure ProcessInit;
 begin
   // initialize the exception and irq
   if HasException then
-    InitializeINT;
+    InitializeExceptions;
   {$IFDEF DebugProcess} DebugTrace('CPU Speed: %d Mhz', 0, LocalCpuSpeed, 0); {$ENDIF}
   InitCores;
   // functions to manipulate threads. Transparent for pascal programmers

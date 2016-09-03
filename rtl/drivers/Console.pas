@@ -294,6 +294,7 @@ var
   I, J: LongInt;
   Value: QWORD;
   Values: PXChar;
+  tmp: TNow;
 begin
   SpinLock(3,4,LockConsole);
   ArgNo := 0 ;
@@ -373,6 +374,22 @@ begin
             end;
             J:=J+1;
           end;
+        't': begin
+               Now(@tmp);
+               PrintDecimal (tmp.Day);
+               PutC('/');
+               PrintDecimal (tmp.Month);
+               PutC('/');
+               PrintDecimal (tmp.Year);
+               PutC('-');
+               PrintDecimal (tmp.Hour);
+               PutC(':');
+               PrintDecimal (tmp.Min);
+               PutC(':');
+               PrintDecimal (tmp.Sec);
+
+             J:=J+1;
+             end;
 				else
        	begin
        		PutC('\');

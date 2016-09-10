@@ -337,7 +337,7 @@ begin
 	  WriteConsole('IdeDisk: /V', []);
           WriteConsole(ATANames[Ctr.Driver.Major], []);
 	  WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
-	  {$IFDEF DebugIdeDisk} DebugTrace('ATADetectPartition - Controller: %d, Disk: %d --> Ok', 0, Ctr.Driver.Major, Minor+I); {$ENDIF}
+	  {$IFDEF DebugIdeDisk} WriteDebug('ATADetectPartition - Controller: %d, Disk: %d --> Ok\n', [Ctr.Driver.Major, Minor+I]); {$ENDIF}
         end;
         Inc(Entry);
       end;
@@ -354,23 +354,23 @@ begin
   for ControllerNo := 0 to 1 do
   begin
     // The ATA controller is installed?
-    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATAWork Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATAWork Controller: %d\n', [ControllerNo]); {$ENDIF}
     if not ATAWork(@ATAControllers[ControllerNo]) then
       Continue;
     for DriveNo := MASTER to SLAVE do
     begin
-      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATASelectDisk Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATASelectDisk Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       ATASelectDisk(@ATAControllers[ControllerNo], DriveNo*5);
-      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ATASendCommand ATA_IDENTIFY Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATASendCommand ATA_IDENTIFY Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       ATASendCommand(@ATAControllers[ControllerNo], ATA_IDENTIFY);
       // Wait for the driver
-      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ? ATABusy ? Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ? ATABusy ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       while ATABusy(@ATAControllers[ControllerNo]) do
         NOP;
-      {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - ? ATADataReady ? Controller: %d Disk: %d ', 0, ControllerNo, DriveNo); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ? ATADataReady ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       if ATADataReady(@ATAControllers[ControllerNo]) and not ATAError(@ATAControllers[ControllerNo]) then
       begin
-        {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo); {$ENDIF}
+        {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo]); {$ENDIF}
         ATAIn(@ATA_Buffer, ATAControllers[ControllerNo].IOPort);
         ATAControllers[ControllerNo].Minors[DriveNo*5].StartSector:= 0;
         ATAControllers[ControllerNo].Minors[DriveNo*5].Size:= ATA_Buffer.LBA_Capacity;
@@ -379,7 +379,7 @@ begin
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Minor:= DriveNo*5;
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.BlockSize:= BLKSIZE;
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Next:= nil;
-        {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Ok',0, ControllerNo, DriveNo*5); {$ENDIF}
+        {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo*5]); {$ENDIF}
         WriteConsole('IdeDisk: /V', []);
         WriteConsole(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
         WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
@@ -387,20 +387,20 @@ begin
       end
       {$IFDEF DebugIdeDisk}
       else
-        DebugTrace('ATADetectController - Controller: %d, Disk: %d --> Fault', 0, ControllerNo, DriveNo)
+        WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Fault\n', [ControllerNo, DriveNo])
       {$ENDIF}
     end;
     // Registering the Controller and the Resources
-    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Before RegisterBlockDriver Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Before RegisterBlockDriver Controller: %d\n', [ControllerNo]); {$ENDIF}
     RegisterBlockDriver(@ATAControllers[ControllerNo].Driver);
-    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - After RegisterBlockDriver Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After RegisterBlockDriver Controller: %d\n', [ControllerNo]); {$ENDIF}
     // Irq Handlers
     Irq_On(ATAControllers[ControllerNo].IRQ);
-    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - After Irq_On Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After Irq_On Controller: %d\n', [ControllerNo]); {$ENDIF}
     CaptureInt(ATAControllers[ControllerNo].IRQ+32, ATAControllers[ControllerNo].IrqHandler);
-    {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - After CaptureInt Controller: %d', 0, ControllerNo, 0); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After CaptureInt Controller: %d\n', [ControllerNo]); {$ENDIF}
   end;
-  {$IFDEF DebugIdeDisk} DebugTrace('ATADetectController - Done.', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Done.\n', []); {$ENDIF}
 end;
 
 // Dedicate Controller to Cpu
@@ -415,7 +415,7 @@ begin
       Continue;
     // the file descriptor is enqued in a dedicate filesystem
     DedicateBlockFile(@ATAControllers[Driver.Major].Minors[I].FileDesc,CPUID);
-    {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d', Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor), Driver.Major, CPUID); {$ENDIF}
+    {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d\n', [Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor), Driver.Major, CPUID]); {$ENDIF}
   end;
 end;
  
@@ -424,7 +424,7 @@ procedure ATAHandler(Controller: LongInt);
 begin
   eoi;
   ATAControllers[Controller].Driver.WaitOn.State := tsReady;
-  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATA0 Irq Captured, Thread Wake Up: #%h', PtrUInt(ATAControllers[Controller].Driver.WaitOn), 0, 0); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATA0 Irq Captured, Thread Wake Up: #%h\n', [PtrUInt(ATAControllers[Controller].Driver.WaitOn)]); {$ENDIF}
 end;
 
 procedure ATA0IrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -544,7 +544,7 @@ begin
   // returns the number of blocks read
   Result := ReadCount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATAReadBlock, Handle: %q, Begin Sector: %d, End Sector: %d', Int64(FileDesc), Block, Block+Ncount); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %q, Begin Sector: %d, End Sector: %d\n', [Int64(FileDesc), Block, Block+Ncount]); {$ENDIF}
 end;
 
 
@@ -578,7 +578,7 @@ begin
   // exiting with numbers of blocks written
   Result := ncount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} DebugTrace('IdeDisk: ATAWriteBlock, Handle: %q, Begin Sector: %d, End Sector: %d', Int64(FileDesc), Block, Block+Ncount); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAWriteBlock, Handle: %q, Begin Sector: %d, End Sector: %d\n', [Int64(FileDesc), Block, Block+Ncount]); {$ENDIF}
 end;
 
 // Detection of IDE devices.

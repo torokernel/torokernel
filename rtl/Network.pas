@@ -282,7 +282,7 @@ implementation
 
 var
   DedicateNetworks: array[0..MAX_CPU-1] of TNetworkDedicate;
-  NetworkInterfaces: PNetworkInterface;
+  NetworkInterfaces: PNetworkInterface = nil;
 
 const
   IPv4_VERSION_LEN = $45;
@@ -545,7 +545,7 @@ begin
   // We have the max number of request for connections
   if Socket.ConnectionsQueueLen = Socket.ConnectionsQueueCount then
   begin
-    {$IFDEF DebugNetwork}DebugTrace('EnqueueTCPRequest: Fail connection to %d Queue is complete', 0, LocalPort, 0);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d Queue is complete\n', [LocalPort]);{$ENDIF}
     ToroFreeMem(Packet);
     Exit;
   end;
@@ -557,7 +557,7 @@ begin
   if ClientSocket=nil then
   begin
    ToroFreeMem(Packet);
-   {$IFDEF DebugNetwork}DebugTrace('EnqueueTCPRequest: Fail connection to %d not memory', 0, LocalPort, 0);{$ENDIF}
+   {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
    Exit;
   end;
 
@@ -567,7 +567,7 @@ begin
   begin
     ToroFreeMem(ClientSocket);
     ToroFreeMem(Packet);
-    {$IFDEF DebugNetwork}DebugTrace('EnqueueTCPRequest: Fail connection to %d not memory', 0, LocalPort, 0);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
     Exit;
   end;
   // Create a new connection
@@ -598,7 +598,7 @@ begin
   // Now , the socket waits in NEGOTIATION State for the confirmation with Remote ACK
   TCPSendPacket(TCP_SYNACK, ClientSocket);
   SetSocketTimeOut(ClientSocket, WAIT_ACK);
-  {$IFDEF DebugNetwork}DebugTrace('EnqueueTCPRequest: New connection to Port %d', 0, LocalPort, 0);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: New connection to Port %d\n', [LocalPort]);{$ENDIF}
 end;
 
 // Send a packet using the local Network interface
@@ -799,7 +799,7 @@ begin
   // wrong alarm, the queue is empty
   If Packet = nil then
   begin
-    PrintK_('Network: /RNull packet/n sent\n',0);
+    WriteConsole('Network: /RNull packet/n sent\n',[]);
     result := nil;
     exit;
   end;
@@ -909,7 +909,7 @@ begin
         // reply Request of Ip Address
       end else if ArpPacket.OpCode= SwapWORD(ARP_OP_REPLY) then
       begin
-        {$IFDEF DebugNetwork} DebugTrace('ProcessARPPacket: New Machine added to Translation Table',0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: New Machine added to Translation Table\n', []); {$ENDIF}
         // some problems for Spoofing
         AddTranslateIp(ArpPacket.SenderIPAddr,ArpPacket.SenderHardAddr);
         ToroFreeMem(Packet);
@@ -964,7 +964,7 @@ begin
           TCPSendPacket(TCP_ACK, Socket);
           // Free Resources in Socket
           FreeSocket(Socket);
-          {$IFDEF DebugNetwork}DebugTrace('SysSocketClose: Socket Free', 0, 0, 0);{$ENDIF}
+          {$IFDEF DebugNetwork}WriteDebug('SysSocketClose: Socket Free\n', []);{$ENDIF}
         end;
         ToroFreeMem(Packet);
       end;
@@ -1097,18 +1097,18 @@ begin
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
         end;
-        {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving ICMP packet', 0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving ICMP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     IP_TYPE_UDP  :
       begin
-        {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving UDP packet', 0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving UDP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     IP_TYPE_TCP  :
       begin
         TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
-        {$IFDEF DebugNetwork} DebugTrace('IPPacketService: Arriving TCP packet', 0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving TCP packet\n', []); {$ENDIF}
         if TCPHeader.Flags=TCP_SYN then
         begin
           // Validate the REQUEST to Server Socket
@@ -1118,16 +1118,16 @@ begin
             EnqueueTCPRequest(Socket, Packet)
           else
             ToroFreeMem(Packet);
-          {$IFDEF DebugNetwork} DebugTrace('IPPacketService: SYN Packet arrived', 0, 0, 0); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('IPPacketService: SYN Packet arrived\n', []); {$ENDIF}
         end else if (TCPHeader.Flags and TCP_ACK = TCP_ACK) then
         begin
           // Validate connection
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
-          {$IFDEF DebugNetwork} DebugTrace('IPPacketService: ACK Packet arrived', 0, 0, 0); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('IPPacketService: ACK Packet arrived\n', []); {$ENDIF}
           if Socket <> nil then
             ProcessTCPSocket(Socket,Packet)
           else begin
-            {$IFDEF DebugNetwork} DebugTrace('IPPacketService: ACK Packet invalid', 0, 0, 0); {$ENDIF}
+            {$IFDEF DebugNetwork} WriteDebug('IPPacketService: ACK Packet invalid\n', []); {$ENDIF}
             ToroFreeMem(Packet);
           end;
           // RST Flags
@@ -1202,17 +1202,17 @@ begin
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
         begin
-        {$IFDEF DebugNetwork} DebugTrace('EthernetPacketService: Arriving ARP packet', 0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving ARP packet\n', []); {$ENDIF}
           ProcessARPPacket(Packet);
         end;
       ETH_FRAME_IP:
         begin
-          {$IFDEF DebugNetwork} DebugTrace('EthernetPacketService: Arriving IP packet', 0, 0, 0); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving IP packet\n', []); {$ENDIF}
           ProcessIPPacket(Packet);
         end;
     else
       begin
-        {$IFDEF DebugNetwork} DebugTrace('EthernetPacketService: Arriving unknow packet', 0, 0, 0); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving unknow packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     end;
@@ -1225,9 +1225,9 @@ var
   ThreadID: TThreadID;
 begin
   if PtrUInt(BeginThread(nil, 10*1024, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    PrintK_('Networks Packets Service .... /VRunning/n\n',0)
+    WriteConsole('Networks Packets Service .... /VRunning/n\n',[])
   else
-    PrintK_('Networks Packets Service .... /VFailed!/n\n',0);
+    WriteConsole('Networks Packets Service .... /VFailed!/n\n',[]);
 end;
 
 // Initialize the dedicated network interface
@@ -1276,10 +1276,10 @@ begin
       if @Handler <> nil then
       begin
         if PtrUInt(BeginThread(nil, 10*1024, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
-          printk_('Network Packets Service .... /VRunning/n\n',0)
+          WriteConsole('Network Packets Service .... /VRunning/n\n',[])
         else
         begin
-          printk_('Network Packets Service .... /VFail!/n\n',0);
+          WriteConsole('Network Packets Service .... /VFail!/n\n',[]);
           exit;
         end;
       end else
@@ -1296,20 +1296,14 @@ begin
       _IPAddress(IP, Network.IpAddress);
       _IPAddress(Gateway, Network.Gateway);
       _IPAddress(Mask, Network.Mask);
-      printk_('Network configuration :\n',0);
-      printk_('Local IP ... /V%d.', Network.Ipaddress and $ff);
-      printk_('%d.', (Network.Ipaddress shr 8) and $ff);
-      printk_('%d.', (Network.Ipaddress shr 16) and $ff);
-      printk_('%d\n', (Network.Ipaddress shr 24) and $ff);
-      printk_('/nGateway ...  /V%d.', Network.Gateway and $ff);
-      printk_('%d.', (Network.Gateway shr 8) and $ff);
-      printk_('%d.', (Network.Gateway shr 16) and $ff);
-      printk_('%d\n', (Network.Gateway shr 24) and $ff);
-      printk_('/nMask ...  /V%d.', Network.Mask and $ff);
-      printk_('%d.', (Network.Mask shr 8) and $ff);
-      printk_('%d.', (Network.Mask shr 16) and $ff);
-      printk_('%d\n/n', (Network.Mask shr 24) and $ff);
-      {$IFDEF DebugNetwork} DebugTrace('DedicateNetwork: New Driver dedicated to CPU#%d',0,CPUID,0); {$ENDIF}
+      WriteConsole('Network configuration :\n', []);
+      WriteConsole('Local IP  ... /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
+	  (Network.Ipaddress shr 8) and $ff, (Network.Ipaddress shr 16) and $ff, (Network.Ipaddress shr 24) and $ff ]);
+      WriteConsole('/nGateway   ... /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
+	  (Network.Gateway shr 8) and $ff, (Network.Gateway shr 16) and $ff, (Network.Gateway shr 24) and $ff ]);
+	  WriteConsole('/nMask      ... /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
+	  (Network.Mask shr 8) and $ff, (Network.Mask shr 16) and $ff, (Network.Mask shr 24) and $ff ]);
+      {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: New Driver dedicated to CPU#%d\n', [CPUID]); {$ENDIF}
       Exit;
     end;
     Net := Net.Next;
@@ -1321,7 +1315,7 @@ procedure NetworkInit;
 var
   I: LongInt;
 begin
-  printK_('Network Tcp-Ip Stack ... /VOk!/n\n',0);
+  WriteConsole('Loading Network Stack ...\n',[]);
   // Clean tables
   for I := 0 to (MAX_CPU-1) do
   begin
@@ -1332,7 +1326,6 @@ begin
     FillChar(DedicateNetworks[I].SocketDatagram, MAX_SocketPORTS*SizeOf(Pointer), 0);
     FillChar(DedicateNetworks[I].SocketStream, MAX_SocketPORTS*SizeOf(Pointer), 0);
   end;
-  NetworkInterfaces := nil;
 end;
 
 
@@ -1561,7 +1554,7 @@ begin
   FillChar(Socket.DestIP, 0, SizeOf(TIPAddress));
   Socket.DestPort := 0 ;
   Result := Socket;
-  {$IFDEF DebugNetwork} DebugTrace('SysSocket: New Socket Type %d', 0, SocketType, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocket: New Socket Type %d\n', [SocketType]); {$ENDIF}
 end;
 
 // Configure the Socket , this is call is not necesary because the user has access to Socket Structure
@@ -1631,7 +1624,7 @@ begin
   // Enqueue the socket
   Socket.Next := Service.ClientSocket;
   Service.ClientSocket := Socket;
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketConnect: Connecting from Port %d to Port %d', 0, Socket.SourcePort, Socket.DestPort); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketConnect: Connecting from Port %d to Port %d\n', [Socket.SourcePort, Socket.DestPort]); {$ENDIF}
   // SYN is sended , request of connection
   Socket.LastAckNumber := 0;
   Socket.LastSequenceNumber := 300;
@@ -1645,7 +1638,7 @@ end;
 // Just for Client Sockets
 procedure SysSocketClose(Socket: PSocket);
 begin
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketClose: Closing Socket in port %d', 0, Socket.SourcePort, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketClose: Closing Socket in port %d\n', [Socket.SourcePort]); {$ENDIF}
   // The connection has been closed from Remote Machine
   if Socket.State = SCK_LOCALCLOSING then
   begin
@@ -1662,7 +1655,7 @@ begin
   // Send ACKFIN to remote host
   TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
   // in Remote Closing the local host wait for remote ACKFIN
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketClose: Socket %d in LocalClosing State', 0, Socket.SourcePort, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketClose: Socket %d in LocalClosing State\n', [Socket.SourcePort]); {$ENDIF}
 end;
 
 // Prepare the Socket for receive connections , the socket is in BLOCKED State
@@ -1696,7 +1689,7 @@ begin
   Socket.ConnectionsQueueCount := 0;
   Socket.DestPort:=0;
   Result := True;
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketListen: Socket installed in Local Port: %d', 0, Socket.SourcePort, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketListen: Socket installed in Local Port: %d\n', [Socket.SourcePort]); {$ENDIF}
 end;
 
 // Read Data from Buffer and save it in Addr , The data continue into the buffer
@@ -1704,12 +1697,11 @@ function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
 var
   FragLen: LongInt;
 begin
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek BufferLength: %d', 0, Socket.BufferLength, 0); {$ENDIF}
-  {$IFDEF DebugNetwork} DebugTrace(PXChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketPeek BufferLength: %d\n', [Socket.BufferLength]); {$ENDIF}
   Result := 0;
   if (Socket.State <> SCK_TRANSMITTING) or (AddrLen=0) or (Socket.Buffer+Socket.BufferLength=Socket.BufferReader) then
   begin
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek -> Exit', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketPeek -> Exit\n', []); {$ENDIF}
     Exit;
   end;
   while (AddrLen > 0) and (Socket.State = SCK_TRANSMITTING) do
@@ -1723,7 +1715,7 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketPeek:  %q bytes from port %d to port %d ', PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketPeek:  %q bytes from port %d to port %d\n', [PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort]); {$ENDIF}
     Result := Result + FragLen;
   end;
 end;
@@ -1733,12 +1725,11 @@ function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): Lo
 var
   FragLen: LongInt;
 begin
-  {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv BufferLength: %d', 0, Socket.BufferLength, 0); {$ENDIF}
-  {$IFDEF DebugNetwork} DebugTrace(PXChar(Socket.Buffer), 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv BufferLength: %d\n', [Socket.BufferLength]); {$ENDIF}
   Result := 0;
   if (Socket.State <> SCK_TRANSMITTING) or (AddrLen=0) or (Socket.Buffer+Socket.BufferLength = Socket.BufferReader) then
   begin
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv -> Exit', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv -> Exit\n', []); {$ENDIF}
     Exit;
   end;
   while (AddrLen > 0) and (Socket.State = SCK_TRANSMITTING) do
@@ -1752,13 +1743,13 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: Receiving %q bytes from port %d to port %d ', PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort); {$ENDIF}
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: Receiving %q bytes from port %d to port %d\n', [PtrUInt(FragLen), Socket.SourcePort, Socket.DestPort]); {$ENDIF}
     Result := Result + FragLen;
     Socket.BufferReader := Socket.BufferReader + FragLen;
     // The buffer was read, inform sender that it can send data again
     if Socket.BufferReader = (Socket.Buffer+MAX_WINDOW) then
     begin
-      {$IFDEF DebugNetwork} DebugTrace('SysSocketRecv: TCPSendPacket TCP_ACK', 0, 0, 0); {$ENDIF}
+      {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: TCPSendPacket TCP_ACK\n', []); {$ENDIF}
       Socket.BufferReader := Socket.Buffer;
       Socket.BufferLength := 0;
     end;

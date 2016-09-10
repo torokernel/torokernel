@@ -37,15 +37,14 @@ interface
 uses Arch;
 
 procedure DebugInit;
-procedure DebugPrint(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
-procedure DebugTrace(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
+procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
 
 implementation
 
 uses Console, Process;
 
 var
-	LockDebug: UInt64;
+	LockDebug: UInt64 = 3;
 
 // base of serial port of COM1
 const
@@ -120,117 +119,153 @@ begin
     SendChar(S[I]);
 end;
 
-// No locking. Locking is performed by caller function (DebugTrace or DebugPrint)
-procedure DebugFormat(Format: PXChar; const QArg: PtrUInt; Arg1, Arg2: UInt32);
+
+procedure WriteSerial(const Format: AnsiString; const Args: array of PtrUInt);
 var
-  ArgNo: Integer;
-  DecimalValue: PtrUInt;
-  S: ShortString;
+  ArgNo: LongInt;
+  I, J: LongInt;
+  Value: QWORD;
+  Values: PXChar;
+  tmp: TNow;
 begin
+
   ArgNo := 0 ;
-  while Format^ <> #0 do
+  J := 1;
+  while J <= Length(Format) do
   begin
-    if (Format^ = '%') and (Argno <> 2) then
+    // we have an argument
+    if (Format[J] = '%') and (High(Args) <> -1) and (High(Args) >= ArgNo) then
     begin
-      Format := Format+1;
-      if Format^ = #0 then
-        Exit;
-      if ArgNo = 0 then
-        DecimalValue := Arg1
-      else
-        DecimalValue := Arg2;
-      case Format^ of
-        'h': begin
-               DebugPrintHexa(QArg);
-             end;
-     	'd': begin
-               DebugPrintDecimal(DecimalValue);
-               Inc(ArgNo);
-             end;
-     	'q': begin
-               Str(QArg, S);
-      	       DebugPrintString(S);
-             end;
-     	'%': SendChar('%');
-        else
-        begin
-      	  Format := Format+1;
-      	  Continue;
-      	end;
+      J:= J+1;
+      if J > Length(Format) then
+      	Exit ;
+      case Format[J] of
+	      'c':
+          begin
+		        SendChar(XChar(args[ArgNo]));
+			    end;
+        'h':
+          begin
+            Value := args[ArgNo];
+          	DebugPrintHexa(Value);
+          end;
+     	  'd':
+          begin
+            Value := args[ArgNo];
+          	DebugPrintDecimal (Value);
+          end;
+     	  '%':
+          begin
+            SendChar('%');
+          end;
+        'p':
+          begin
+            Values := pointer(args[ArgNo]);
+            while Values^ <> #0 do
+            begin
+              SendChar(Values^);
+              Inc(Values);
+            end;
+          end;
+      	else
+      	begin
+        	J:= J+1;
+        	Continue;
+        end;
       end;
-      Format := Format+1;
+      J:= J+1;
+      ArgNo := ArgNo+1;
       Continue;
     end;
-    if Format^ = '\' then
+    if Format[J] = '\' then
     begin
-      Format := Format+1;
-      if Format^ = #0 then
-      	Exit;
-      case Format^ of
-     		'n': begin
-         			SendChar(XChar(13));
-       				SendChar(XChar(10));
-         			Format := Format+1;
-         		end;
-     		'\': begin
-         			SendChar('\');
-         			Format := Format+1;
-         		end;
+    	J:= J+1;
+     	if J > Length(Format) then
+      	Exit ;
+      case Format[J] of
+       	'c': begin
+        	     //CleanConsole;
+           		 J:=J+1;
+            end;
+       	'n': begin
+           		SendChar(XChar(13));
+       			SendChar(XChar(10));
+				J:=J+1;
+            end;
+       	'\': begin
+           		SendChar('\');
+           		J:=J+1;
+            end;
+       	'v':
+          begin
+            I := 1;
+            while I < 10 do
+            begin
+              SendChar(' ');
+              Inc(I);
+            end;
+            J:=J+1;
+          end;
+        't': begin
+               Now(@tmp);
+			   if (tmp.Day < 10) then DebugPrintDecimal  (0);
+               DebugPrintDecimal (tmp.Day);
+               SendChar('/');
+			   if (tmp.Month < 10) then DebugPrintDecimal  (0);
+               DebugPrintDecimal (tmp.Month);
+               SendChar('/');
+               DebugPrintDecimal (tmp.Year);
+               SendChar('-');
+			   if (tmp.Hour < 10) then DebugPrintDecimal  (0);
+               DebugPrintDecimal(tmp.Hour);
+               SendChar(':');
+			   if (tmp.Min < 10) then DebugPrintDecimal  (0);
+               DebugPrintDecimal(tmp.Min);
+               SendChar(':');
+			   if (tmp.Sec < 10) then DebugPrintDecimal  (0);
+               DebugPrintDecimal (tmp.Sec);
+               J:=J+1;
+             end;
 				else
        	begin
        		SendChar('\');
-       		SendChar(Format^);
-       	end;
+        	SendChar(Format[J]);
+      	end;
       end;
-    	Continue;
-  	end;
-  	SendChar(Format^);
-  	Format := Format+1;
-	end;
+      Continue;
+    end;
+
+    SendChar(Format[J]);
+    Inc(J);
+  end;
 end;
 
-// Similar to printk but the Char are send using serial port for debug procedures
-// Can format only 1 qword argument
-procedure DebugPrint(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
-begin
-  SpinLock(3, 4, LockDebug);
-  DebugFormat(Format, QArg, Arg1, Arg2);
-  LockDebug := 3;
-end;
-
-procedure DebugTrace(Format: PXChar; const QArg: PtrUInt; const Arg1, Arg2: DWORD);
-{$IFDEF DebugThreadInfo}
+procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
 var
   CPUI: LongInt;
-  CurrentTime: Int64;
   Thread: PThread;
-{$ENDIF}
 begin
-  SpinLock(3, 4, LockDebug);
-{$IFDEF DebugThreadInfo}
+  SpinLock(3,4,LockDebug);
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
-  // this instruction corrupts the serial port output, on real computer it doesn't happen, only when running on emulator
-  CurrentTime := read_rdtsc;
-  DebugFormat('%q CPU%d #%d ', CurrentTime, CPUI, PtrUInt(Thread));
-{$ENDIF}
-  DebugFormat(Format, QArg, Arg1,Arg2);
-  SendChar(XChar(13));
-  SendChar(XChar(10));
+  WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(Thread)]);
+  WriteSerial (Format, Args);
   LockDebug := 3;
 end;
 
-// initialize all structures for work of debug .
+
+
+// initialize the debuging
 procedure DebugInit;
 begin
   // speed and more registers of serial port
-  write_portb($83, BASE_COM_PORT+3);
-  write_portb(0, BASE_COM_PORT+1);
-  write_portb(1, BASE_COM_PORT);
-  write_portb(3, BASE_COM_PORT+3);
-  LockDebug := 3;
-  printk_('Mode debug: Enabled, using ... COM1\n',0);
-  DebugTrace('Initialization of debugging At Time %q:%d:%d', Int64(StartTime.Hour), StartTime.Min, StartTime.Sec);
+  write_portb ($83, BASE_COM_PORT+3);
+  write_portb (0, BASE_COM_PORT+1);
+  write_portb (1, BASE_COM_PORT);
+  write_portb (3, BASE_COM_PORT+3);
+  WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
+  WriteDebug('Initialization of debuging console.\n',[]);
+  //DebugTrace('Initialization of debugging',0,0,0);
   {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 

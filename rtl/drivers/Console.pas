@@ -2,9 +2,10 @@
 // Console.pas
 //
 // Console Manipulation.
-// NOTE: These procedures do not have protection , WriteConsole should not have trouble but ReadConsole may face race condition when running from two CPUS
 // 
 // Changes:
+// 
+// 04/09/2016 Removing Printk_(), only WriteConsole() is used which is protected. 
 // 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
 // 27/03/2009 Adding support for QWORD parameters in Printk_() and WriteConsole().
 // 08/02/2007 Rename to Console.pas  , new procedures to read and write the console by Matias Vara.
@@ -40,7 +41,6 @@ uses Arch, Process;
 
 procedure CleanConsole;
 procedure PrintDecimal(Value: PtrUInt);
-procedure PrintK_(Format: PXChar; Arg: PtrUInt);
 procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
 procedure ReadConsole(var C: XChar);
 procedure ReadlnConsole(Format: PXChar);
@@ -75,7 +75,7 @@ type
 
 var
 	// Protection for concurrent access
-	LockConsole: UInt64;
+	LockConsole: UInt64 = 3;
 
 procedure PrintString(const S: AnsiString); forward;
 
@@ -83,9 +83,9 @@ var
   PConsole: ^TConsole;
   X, Y: Byte;
   KeyBuffer: array[1..127] of XChar;
-  BufferCount: LongInt;
-  ThreadInKey: PThread;
-  LastChar: LongInt;
+  BufferCount: LongInt = 1 ;
+  ThreadInKey: PThread = nil;
+  LastChar: LongInt = 1;
 	
 // position the cursor in screen 
 procedure SetCursor(X, Y: Byte);
@@ -196,97 +196,6 @@ begin
 	Y := 0;
 end;
 
-// Format: pointer to char
-// args: array of values
-procedure PrintK_(Format: PXChar; Arg: PtrUInt);
-var
-  ArgNo: PtrUInt;
-  I: LongInt;
-begin
-  ArgNo := 0 ;
-  while Format^ <> #0 do
-  begin
-    // we have only one argument
-    if (Format^ = '%') and (Argno = 0)then
-    begin
-      Inc(Format);
-      if Format^ = #0 then
-      	Exit ;
-      case Format^ of
-        'h': PrintHexa(Arg);
-       	'd': PrintDecimal (Arg);
-       	'%': PutC('%');
-        else
-      	  begin
-        	  Format := Format+1;
-          	Continue;
-          end;
-      end;
-      Format := Format+1;
-      ArgNo :=1;
-      Continue;
-    end;
-    if Format^ = '\' then
-    begin
-    	Format := Format+1;
-     	if Format^ = #0 then
-      	Exit ;
-      case Format^ of
-       	'c': begin
-        			 CleanConsole;
-           		 Format := Format+1;
-            end;
-       	'n': begin
-           		 FlushUp;
-           		 Format := Format+1;
-							 x := 0;
-            end;
-       	'\': begin
-           		PutC('\');
-           		Format := Format+1;
-            end;
-       	'v': begin
-           		I := 1;
-              while I < 10 do
-              begin
-              	PutC(' ');
-                Inc(I);
-              end;
-              Format := Format+1;
-           	end;
-				else
-       	begin
-       		PutC('\');
-        	PutC(Format^);
-      	end;
-      end;
-      Continue;
-    end;
-    // Terminal Color indicator
-    if Format^ = '/' then
-    begin
-      Format := Format+1;
-      if Format^=#0 then
-        Exit;
-      case Format^ of
-        'n': color := 7 ;
-        'a': color := 1;
-        'v': color := 2;
-        'V': color := 10;
-        'z': color := $f;
-        'c': color := 3;
-        'r': color := 4;
-        'R': color := 12 ;
-        'N': color := $af;
-      end;
-      Format := Format+1;
-      Continue;
-    end;
-    PutC(Format^);
-    Format := Format+1;
-  end;
-end;
-
 // Print to screen using format
 procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
 var
@@ -376,16 +285,21 @@ begin
           end;
         't': begin
                Now(@tmp);
+			   if (tmp.Day < 10) then PrintDecimal (0);
                PrintDecimal (tmp.Day);
                PutC('/');
+			   if (tmp.Month < 10) then PrintDecimal (0);
                PrintDecimal (tmp.Month);
                PutC('/');
                PrintDecimal (tmp.Year);
                PutC('-');
+			   if (tmp.Hour < 10) then PrintDecimal (0);
                PrintDecimal (tmp.Hour);
                PutC(':');
+			   if (tmp.Min < 10) then PrintDecimal (0);
                PrintDecimal (tmp.Min);
                PutC(':');
+			   if (tmp.Sec < 10) then PrintDecimal (0);
                PrintDecimal (tmp.Sec);
 
              J:=J+1;
@@ -575,11 +489,6 @@ end;
 
 procedure ConsoleInit;
 begin
-  BufferCount := 1;
-  // console lock protection
-  LockConsole := 3;
-  ThreadInKey := nil;
-  LastChar := 1;
   CaptureInt(33,@IrqKeyb);
 end;
 

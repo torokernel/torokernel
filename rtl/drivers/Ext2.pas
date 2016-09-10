@@ -218,11 +218,11 @@ begin
   Super.InodeROOT:= GetInode(2);
   Result := Super;
   {$IFDEF DebugExt2FS}
-    DebugTrace('Ext2FS: Ext2 Super Block Mounted , Information:', 0, 0, 0);
-    DebugTrace('Logic Block Size: %d', 0, SpbInfo.log_block_size, 0);
-    DebugTrace('Inodes per Block: %d', 0, SpbInfo.inodes_per_block, 0);
-    DebugTrace('Inodes Count: %d', 0, SpbInfo.inodes_count, 0);
-    DebugTrace('Block Counts: %d', 0, SpbInfo.blocks_count, 0);
+    WriteDebug('Ext2FS: Ext2 Super Block Mounted , Information:', []);
+    WriteDebug('Logic Block Size: %d\n',  [SpbInfo.log_block_size]);
+    WriteDebug('Inodes per Block: %d\n',  [SpbInfo.inodes_per_block]);
+    WriteDebug('Inodes Count: %d\n', [SpbInfo.inodes_count]);
+    WriteDebug('Block Counts: %d\n',  [SpbInfo.blocks_count]);
   {$ENDIF}
 end; 
  
@@ -267,7 +267,7 @@ begin
   if (raw_inode.mode and $4000 <> $4000) and (raw_inode.mode and $8000 <> $8000) then
   begin
     PutBlock(Inode.SuperBlock.BlockDevice,bh);
-    {$IFDEF DebugExt2FS} DebugTrace('Ext2FS: Inode mode not supported , Inode: %d',0,Inode.ino,0); {$ENDIF}
+    {$IFDEF DebugExt2FS} WriteDebug('Ext2FS: Inode mode not supported , Inode: %d\n', [Inode.ino]); {$ENDIF}
     Exit;
   end;
   Inode.InoInfo:= ToroGetMem(sizeof(ext2_inode_info));
@@ -294,7 +294,7 @@ begin
     InoInfo.data[I]:= raw_inode.block[I];
   // return the block to the cache
   PutBlock(Inode.SuperBlock.BlockDevice, bh);
-  {$IFDEF DebugExt2FS} DebugTrace('Ext2FS: Inode %d, Read Ok', 0, Inode.ino, 0); {$ENDIF}
+  {$IFDEF DebugExt2FS} WriteDebug('Ext2FS: Inode %d, Read Ok\n',[Inode.ino]); {$ENDIF}
 end;
 
 // Look for Inode name in Directory Inode  and return his inode.
@@ -329,14 +329,14 @@ begin
             if entry.name[J] <> name[J+1] then
               goto _next;
           Result:= GetInode(entry.inode); // this is the inode !
-          {$IFDEF DebugFilesystem} DebugTrace('Ext2LookUpInode: Inode found', 0, 0, 0); {$ENDIF}
+          {$IFDEF DebugFilesystem} WriteDebug('Ext2LookUpInode: Inode found\n', []); {$ENDIF}
           PutBlock(Ino.SuperBlock.BlockDevice,bh);
           Exit
         end;
       end;
     end;
   end;
-  {$IFDEF DebugFilesystem} DebugTrace('Ext2LookUpInode: Inode not found',0,0,0); {$ENDIF}
+  {$IFDEF DebugFilesystem} WriteDebug('Ext2LookUpInode: Inode not found\n', []); {$ENDIF}
 end;
 
 type

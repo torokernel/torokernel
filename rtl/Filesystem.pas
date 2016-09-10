@@ -260,12 +260,12 @@ begin
   begin
     for dev := 0 to MAX_PCIDEV-1 do
     begin
-      {$IFDEF DebugArch} DebugTrace('PciDetect - Bus: %d Dev: %d', 0, Bus, Dev); {$ENDIF}
+      {$IFDEF DebugArch} WriteDebug('PciDetect - Bus: %d Dev: %d', [Bus, Dev]); {$ENDIF}
       for func := 0 to MAX_PCIFUNC-1 do
       begin
-        {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
+        {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
         Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_VENDOR);
-        {$IFDEF DebugArch} DebugTrace('PciDetect - PciReadDword PCI_CONFIG_VENDOR func: %d Tmp: %h', Tmp, func, 0); {$ENDIF}
+        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_VENDOR func: %d Tmp: %h', [Tmp, func]); {$ENDIF}
         Vendor := Tmp and $FFFF;
         Device := Tmp div 65536;
         // some bug
@@ -282,17 +282,17 @@ begin
         DevInfo.Device := Device;
         DevInfo.Vendor := Vendor;
         Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_CLASS_REV);
-        {$IFDEF DebugArch} DebugTrace('PciDetect - PciReadDword PCI_CONFIG_CLASS_REV func: %d Tmp: %h', Tmp, func, 0); {$ENDIF}
+        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_CLASS_REV func: %d Tmp: %h', [Tmp, func]); {$ENDIF}
         DevInfo.MainClass := Tmp div 16777216;
         DevInfo.SubClass := (Tmp div 65536) and $ff;
         for I := 0 to 5 do
         begin
           regnum := PCI_CONFIG_BASE_ADDR_0+I;
-          {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
-          {$IFDEF DebugArch} DebugTrace('PciDetect - Before PciReadDword I: %d', 0, I, 0); {$ENDIF}
+          {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
+          {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword I: %d', [I]); {$ENDIF}
           Tmp := PciReadDword(Bus, dev, func, regnum);
-          {$IFDEF DebugArch} DebugTrace('PciDetect - After PciReadDword Bus: %q dev: %d func: %d', Bus, dev, func); {$ENDIF}
-          {$IFDEF DebugArch} DebugTrace('PciDetect - PciReadDword PCI_CONFIG_BASE_ADDR_0+%d, Tmp: %h', Tmp, I, 0); {$ENDIF}
+          {$IFDEF DebugArch} WriteDebug('PciDetect - After PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
+          {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_BASE_ADDR_0+%d, Tmp: %h', [Tmp, I]); {$ENDIF}
           if (Tmp and 1) = 1 then
           begin
             DevInfo.IO[I] := Tmp and $FFFFFFFC // IO port
@@ -301,7 +301,7 @@ begin
           end;
         end;
         Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_INTR);
-        {$IFDEF DebugArch} DebugTrace('PciDetect - PciReadDword PCI_CONFIG_INTR, func: %d, Tmp: %h', Tmp, func, 0); {$ENDIF}
+        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_INTR, func: %d, Tmp: %h', [Tmp, func]); {$ENDIF}
         DevInfo.irq := Tmp and $ff;
         DevInfo.bus := Bus;
         DevInfo.func := func;
@@ -341,7 +341,7 @@ procedure RegisterBlockDriver(Driver: PBlockDriver);
 begin
   Driver.Next := BlockDevices;
   BlockDevices := Driver;
-  {$IFDEF DebugFS} DebugTrace('RegisterBlockDriver: New Driver', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('RegisterBlockDriver: New Driver',[]); {$ENDIF}
 end;
 
 // Protect the device of access from LOCAL CPU .
@@ -356,13 +356,13 @@ begin
     // information for scheduling
     CurrentCPU.CurrentThread.State := tsIOPending;
     CurrentCPU.CurrentThread.IOScheduler.DeviceState:=@Dev.Busy;
-    {$IFDEF DebugFS} DebugTrace('GetDevice: Sleeping', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetDevice: Sleeping',[]); {$ENDIF}
     SysThreadSwitch;
   end;
   CurrentCPU.CurrentThread.IOScheduler.DeviceState:=nil;
   Dev.Busy := True;
   Dev.WaitOn := CurrentCPU.CurrentThread;
-  {$IFDEF DebugFS} DebugTrace('GetDevice: Device in use', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('GetDevice: Device in use',[]); {$ENDIF}
 end;
 
 // Free the use of device.
@@ -370,7 +370,7 @@ procedure FreeDevice(Dev: PBlockDriver);
 begin
   Dev.Busy := False;
   Dev.WaitOn:= nil;
-  {$IFDEF DebugFS} DebugTrace('FreeDevice: Device is Free', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('FreeDevice: Device is Free', []); {$ENDIF}
 end;
 
 // Only called by Driver. Creates a Block file's descriptors in CPUID.
@@ -385,7 +385,7 @@ begin
   FBlock.BufferCache.BuffersInCache := MAX_BUFFERS_IN_CACHE;
   FBlock.BufferCache.BlockCache := nil;
   FBlock.BufferCache.FreeBlocksCache := nil;
-  {$IFDEF DebugFS} DebugTrace('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d', 0, CPUID, FBlock.Minor); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d', [CPUID, FBlock.Minor]); {$ENDIF}
 end;
 
 // Return a Pointer to Block file's descriptor .
@@ -401,13 +401,13 @@ begin
     if (FileBlock.BlockDriver.Name = Name) and (FileBlock.Minor=Minor) then
     begin
       Result := Thandle(FileBlock);
-      {$IFDEF DebugFS} DebugTrace('SysOpenBlock: Handle %q',Int64(result),0,0); {$ENDIF}
+      {$IFDEF DebugFS} WriteDebug('SysOpenBlock: Handle %q\n',[Int64(result)]); {$ENDIF}
       Exit;
     end;
     FileBlock:=FileBlock.Next;
   end;
   Result := 0;
-  {$IFDEF DebugFS} DebugTrace('SysOpenBlock: Fail , Minor: %d',0,Minor,0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysOpenBlock: Fail , Minor: %d\n', [Minor]); {$ENDIF}
 end;
 
 // Dedicate the Driver to CPU in CPUID variable.
@@ -422,12 +422,12 @@ begin
     begin
       Dev.Dedicate(Dev, CPUID);
       Dev.CPUID := CPUID;
-      {$IFDEF DebugFS} DebugTrace('DedicateBlockDriver: New Driver dedicated to CPU#%d',0,CPUID,0); {$ENDIF}
+      {$IFDEF DebugFS} WriteDebug('DedicateBlockDriver: New Driver dedicated to CPU#%d\n', [CPUID]); {$ENDIF}
       Exit;
     end;
     Dev := Dev.Next;
   end;
-  {$IFDEF DebugFS} DebugTrace('DedicateBlockDriver: Driver does not exist',0,0,0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('DedicateBlockDriver: Driver does not exist\n',[]); {$ENDIF}
 end;
 
 // Write operation to Block Device.
@@ -437,7 +437,7 @@ var
 begin
   FileBlock := PFileBlock(FileHandle);
   Result := FileBlock.BlockDriver.WriteBlock(FileBlock,Block,Count,Buffer);
-  {$IFDEF DebugFS} DebugTrace('SysWriteBlock: Handle %q, Result: %d', Int64(FileHandle), Result, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysWriteBlock: Handle %q, Result: %d', [Int64(FileHandle), Result]); {$ENDIF}
 end;
 
 // Read Operation to Block Device
@@ -447,7 +447,7 @@ var
 begin
   FileBlock := PFileBlock(FileHandle);
   Result := FileBlock.BlockDriver.ReadBlock(FileBlock,Block,Count,Buffer);
-  {$IFDEF DebugFS} DebugTrace('SysReadBlock: Handle %q, Result: %d', Int64(FileHandle), Result, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysReadBlock: Handle %q, Result: %d', [Int64(FileHandle), Result]); {$ENDIF}
 end;
 
 function FindBlock(Buffer: PBufferHead; Block, Size: LongInt): PBufferHead;
@@ -511,7 +511,7 @@ begin
   begin
     bh.Count := bh.Count+1;
     Result := bh;
-    {$IFDEF DebugFS} DebugTrace('GetBlock: Block: %d , Size: %d, In use', 0, Block, Size); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In use\n', [Block, Size]); {$ENDIF}
     Exit;
   end;
   // Free Buffers.
@@ -522,7 +522,7 @@ begin
     AddBuffer(FileBlock.BufferCache.BlockCache, bh);
     bh.Count := 1;
     Result := bh;
-    {$IFDEF DebugFS} DebugTrace('GetBlock: Block: %d , Size: %d, In Free Block', 0, Block, Size); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In Free Block\n', [Block, Size]); {$ENDIF}
     Exit;
   end;
   if FileBlock.BufferCache.BuffersInCache=0 then
@@ -575,7 +575,7 @@ begin
   AddBuffer(FileBlock.BufferCache.BlockCache,bh);
   FileBlock.BufferCache.BuffersInCache := FileBlock.BufferCache.BuffersInCache -1;
   Result := bh;
-  {$IFDEF DebugFS} DebugTrace('GetBlock: Block: %d , Size: %d, New in Buffer', 0, Block, Size); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, New in Buffer\n', [Block, Size]); {$ENDIF}
 end;
 
 // Return a block to Buffer Cache in FileBlock descriptor
@@ -655,7 +655,7 @@ begin
   begin
     Ino.Count := Ino.Count+1;
     Result := Ino;
-    {$IFDEF DebugFS} DebugTrace('GetInode: Inode: %d In Inode-Cache', 0, Ino.ino, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   // Is the Inode in Free Tail?
@@ -666,7 +666,7 @@ begin
     AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer, Ino);
     Result := Ino;
     Ino.Count := 1;
-    {$IFDEF DebugFS} DebugTrace('GetInode: Inode: %d In Inode-Cache', 0, Ino.ino, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   // Can i alloc memory for new Inode?
@@ -677,7 +677,7 @@ begin
     if Ino = nil then
     begin
       Result := nil;
-      {$IFDEF DebugFS} DebugTrace('GetInode: Inode Cache is Busy!', 0, 0, 0); {$ENDIF}
+      {$IFDEF DebugFS} WriteDebug('GetInode: Inode Cache is Busy!\n', []); {$ENDIF}
       Exit;
     end;
     // Is a LRU Tail
@@ -690,14 +690,14 @@ begin
     if Ino.Dirty then
     begin
       Result := nil;
-      {$IFDEF DebugFS} DebugTrace('GetInode: Error reading Inode: %d', 0, Inode, 0); {$ENDIF}
+      {$IFDEF DebugFS} WriteDebug('GetInode: Error reading Inode: %d\n', [Inode]); {$ENDIF}
       Exit;
     end;
     Result := Ino;
     // add inode to  List of Inode in Use
     RemoveInode(Storage.FilesystemMounted.InodeCache.FreeInodesCache,Ino);
     AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer,Ino);
-    {$IFDEF DebugFS} DebugTrace('GetInode: Inode: %d In Inode-Cache',0,Ino.ino,0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   // I can alloc more memory to Inode-Cache
@@ -716,13 +716,13 @@ begin
   begin
     ToroFreeMem(Ino);
     Result := nil;
-    {$IFDEF DebugFS} DebugTrace('GetInode: Error reading Inode: %d', 0, Inode, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Error reading Inode: %d\n', [Inode]); {$ENDIF}
     Exit;
   end;
   AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer, Ino);
   Storage.FilesystemMounted.InodeCache.InodesInCache := Storage.FilesystemMounted.InodeCache.InodesInCache-1;
   Result:= Ino;
-  {$IFDEF DebugFS} DebugTrace('GetInode: Inode: %d In Inode-Cache', 0, Ino.ino, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
 end;
 
 // Returns a Inode to Inode-Cache
@@ -737,7 +737,7 @@ begin
   // here , if dirty=True then error in write operations
   RemoveInode(Inode.SuperBlock.InodeCache.InodeBuffer,Inode);
   AddInode(Inode.SuperBlock.InodeCache.FreeInodesCache,Inode);
-  {$IFDEF DebugFS} DebugTrace('PutInode: Inode %d return to Inode-LRU Cache', 0, Inode.ino, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('PutInode: Inode %d return to Inode-LRU Cache\n', [Inode.ino]); {$ENDIF}
 end;
 
 // Register a FileSystem Driver.
@@ -745,7 +745,7 @@ procedure RegisterFilesystem (Driver: PFileSystemDriver);
 begin
   Driver.Next := FileSystemDrivers;
   FileSystemDrivers := Driver;
-  {$IFDEF DebugFS} DebugTrace('RegisterFilesystem: New Driver', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('RegisterFilesystem: New Driver\n', []); {$ENDIF}
 end;
 
 function FindFileSystemDriver(Storage: PStorage; const FileSystemName, BlockName: AnsiString; const Minor: LongInt; var FileBlock: PFileBlock): PFileSystemDriver;
@@ -782,14 +782,14 @@ begin
   FileSystem := FindFileSystemDriver(Storage, FileSystemName, BlockName, Minor, FileBlock);
   if FileSystem = nil then
   begin
-    PrintK_('CPU#%d: SysMount Failed, unknown filesystem!\n', GetApicID);
-    {$IFDEF DebugFS} DebugTrace('CPU#%d: Mounting FileSystem -> Failed', 0, GetApicID, 0); {$ENDIF}
+    WriteConsole('CPU#%d: SysMount Failed, unknown filesystem!\n', [GetApicID]);
+    {$IFDEF DebugFS} WriteDebug('CPU#%d: Mounting FileSystem -> Failed\n', [GetApicID]); {$ENDIF}
   Exit;
   end;
   SuperBlock:= ToroGetMem(SizeOf(TSuperBlock));
   if SuperBlock = nil then
   begin // not enough memory
-    {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []); {$ENDIF}
     Exit;
   end;
   SuperBlock.BlockDevice := FileBlock;
@@ -804,14 +804,14 @@ begin
   Storage.FileSystemMounted:= SuperBlock;
   if FileSystem.ReadSuper(SuperBlock) = nil then
   begin
-    printK_('CPU#%d: Fail Reading SuperBlock\n', GetApicID);
+    WriteConsole('CPU#%d: Fail Reading SuperBlock\n', [GetApicID]);
     ToroFreeMem(SuperBlock);
     Storage.FileSystemMounted := nil;
-    {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem, Cannot read SuperBlock -> Failed', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, Cannot read SuperBlock -> Failed\n', []); {$ENDIF}
     Exit;
   end;
-  {$IFDEF DebugFS} DebugTrace('SysMount: Mounting Root Filesystem -> Ok', 0, 0, 0); {$ENDIF}
-  PrintK_('/VCPU#%d/n: ROOT-Filesystem /VMounted/n\n', GetApicID);
+  {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
+  WriteConsole('/VCPU#%d/n: ROOT-Filesystem /VMounted/n\n', [GetApicID]);
 end;
 
 // Return the last Inode of path
@@ -880,14 +880,14 @@ begin
   if Ino=nil then
   begin
     ToroFreeMem(FileRegular);
-    {$IFDEF DebugFS} DebugTrace('SysOpenFile: File not found', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('SysOpenFile: File not found\n', []); {$ENDIF}
     Exit;
   end;
   FileRegular.FilePos := 0;
   FileRegular.Inode := Ino;
   // the descriptor is not enque in the tail , i don't need this
   Result := THandle(FileRegular);
-  {$IFDEF DebugFS} DebugTrace('SysOpenFile: File Openned', 0, 0, 0); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysOpenFile: File Openned\n', []); {$ENDIF}
 end;
 
 // Changes position of the File. I don't need the FileSystem Driver here.
@@ -920,7 +920,7 @@ begin
   else
     Result:= FileRegular.Inode.SuperBlock.FileSystemDriver.ReadFile(FileRegular, Count, Buffer);
   FileRegular.FilePos := FileRegular.FilePos + result;
-  {$IFDEF DebugFS} DebugTrace('SysReadFile: %d bytes read, FilePos: %d', 0, Result, FileRegular.FilePos); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysReadFile: %d bytes read, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
 end;
 
 // Return Inode Information about last file in the path
@@ -951,7 +951,7 @@ begin
   else
     Result := FileRegular.Inode.SuperBlock.FileSystemDriver.WriteFile(FileRegular, Count, Buffer);
   FileRegular.FilePos := FileRegular.FilePos + Result;
-  {$IFDEF DebugFS} DebugTrace('SysWriteFile: %d bytes written, FilePos: %d', 0, Result, FileRegular.FilePos); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('SysWriteFile: %d bytes written, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
 end;
 
 // Close regular File , very simple only return the inode and free memory
@@ -969,7 +969,7 @@ procedure FileSystemInit;
 var
   I: LongInt;
 begin
-  PrintK_('Virtual FileSystem TORO ... /VOk!/n\n',0);
+  WriteConsole('Loading Virtual FileSystem ...\n',[]);
   for I := 0 to MAX_CPU-1 do
   begin
     Storages[I].BlockFiles := nil;

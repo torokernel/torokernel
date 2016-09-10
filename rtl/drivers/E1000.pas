@@ -428,13 +428,13 @@ begin
   begin
     // received packet
     ReadPacket(@NicE1000);
-    printk_('recibido!\n',0);
-    {$IFDEF DebugE1000} DebugTrace('e1000Handler - Packet received', 0, 0, 0); {$ENDIF}
+    //printk_('recibido!\n',0);
+    {$IFDEF DebugE1000} WriteDebug('e1000Handler - Packet received', []); {$ENDIF}
   end else if ((cause and E1000_REG_ICR_TXQE) <> 0 ) or ((cause and E1000_REG_ICR_TXDW) <> 0) then
   begin
     // inform the kernel that last packet has been sent, and fetch the next packet to send
     Packet := DequeueOutgoingPacket;
-    printk_('Enviado!\n',0);
+    //printk_('Enviado!\n',0);
     // there are more packets?
     if Packet <> nil then
         DoSendPacket(@NicE1000.DriverInterface,true);

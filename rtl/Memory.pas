@@ -424,7 +424,7 @@ procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
   if BlockList.Count >= BlockList.Capacity then
   begin
-    {$IFDEF DebugMemory} DebugTrace('BlockListAdd Capacity has been reached -> Severe corruption will occur', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []); {$ENDIF}
    (* // TODO: Need to handle to realloc BlockList in case the actual capacity is reached 
     NewCapacity := BlockList.Capacity*2;
     NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
@@ -449,7 +449,7 @@ var
   CPU: longint;
   SX: Byte;
 begin
-  {$IFDEF DebugMemory} DebugTrace('SplitChunk Chunk: %h Size: %d bytes', PtrUInt(Chunk), ChunkSize, 0); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('SplitChunk Chunk: %h Size: %d bytes\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   {$IFDEF HEAP_STATS} BlockCount := 0; {$ENDIF}
   SX := 0; // avoid warning when using dcc64
   CPU := GetApicID;
@@ -464,7 +464,7 @@ begin
     BlockList := @MemoryAllocator.Directory[SX];
     BlockListAdd(BlockList, Chunk);
     ChunkSize := ChunkSize-BLOCK_HEADER_SIZE-DirectorySX[SX];
-    {$IFDEF DebugMemory} DebugTrace('SplitChunk Add Block: %h SizeSX: %d Remaining ChunkSize: %d', PtrUInt(Chunk), DirectorySX[SX], ChunkSize); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('SplitChunk Add Block: %h SizeSX: %d Remaining ChunkSize: %d\n', [PtrUInt(Chunk), DirectorySX[SX], ChunkSize]); {$ENDIF}
     {$IFDEF HEAP_STATS} Inc(BlockCount); {$ENDIF}
     Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
   end;
@@ -506,7 +506,7 @@ begin
   Result := nil;
   if Size > MAX_BLOCKSIZE then
   begin
-    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Size: %d , fail', 0, Size, 0); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
     Exit;
   end;
   CPU := GetApicID;
@@ -519,7 +519,7 @@ begin
     BlockList := @MemoryAllocator.Directory[SX];
     if BlockList.Count = 0 then
     begin
-    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d', 0, Size, DirectorySX[SX]); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
     Result := ObtainFromLargerChunk(SX, MemoryAllocator);
       ResetFreeFlag(Result);
       if Result = nil then
@@ -531,7 +531,7 @@ begin
       Inc(BlockList.Current); // Counters do not need to be under Lock
       Inc(BlockList.Total);
       {$ENDIF}
-    {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, DirectorySX[SX]); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
       Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -548,7 +548,7 @@ begin
     Inc(BlockList.Current); // Counters do not need to be under Lock
     Inc(BlockList.Total);
   {$ENDIF}
-  {$IFDEF DebugMemory} DebugTrace('ToroGetMem - Pointer: %h Size: %d SizeSX: %d', PtrUInt(Result), Size, DirectorySX[SX]); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
 end;
 
 function ToroFreeMem(P: Pointer): Integer;
@@ -574,7 +574,7 @@ begin
  //    Dec(CurrentHeap.StatsSize, Size);
     {$ENDIF}
     Result := 0;
-    {$IFDEF DebugMemory} DebugTrace('ToroFreeMem - Pointer: %h PRIVATE HEAP is free', PtrUInt(P), 0, 0); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]); {$ENDIF}
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];
@@ -590,7 +590,7 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
-  {$IFDEF DebugMemory} DebugTrace('ToroFreeMem: Pointer %h', PtrUInt(P), 0, 0); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h\n', [PtrUInt(P)]); {$ENDIF}
   Result := 0;
 end;
 
@@ -725,11 +725,11 @@ var
   Shift: PtrUInt;
   SX: Byte;
 begin
-  {$IFDEF DebugMemory} DebugTrace('InitializeDirectory Chunk: %h Size: %d', PtrUInt(Chunk), ChunkSize, 0); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('InitializeDirectory Chunk: %h Size: %d\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   // this is assignation is only for pointers's tables
   if not MemoryAllocator.Initialized then
   begin
-    {$IFDEF DebugMemory} DebugTrace('InitializeDirectory first initialization', 0, 0, 0); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('InitializeDirectory first initialization\n', []); {$ENDIF}
     FillChar(MemoryAllocator.Directory, SizeOf(MemoryAllocator.Directory), 0); // .Capacity=0 .Count=0 .List=nil
     MaxAllocBlockCount := INITIAL_MAXALLOC_BLOCKCOUNT;
     MemoryAllocator.Initialized := True;
@@ -860,8 +860,8 @@ begin
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
   // Linear Assignation for every Core
   MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
-  PrintK_('System Memory ... /V%d/n MB\n', AvailableMemory div 1024 div 1024);
-  PrintK_('Memory per Core ... /V%d/n MB\n', MemoryPerCpu div 1024 div 1024);
+  WriteConsole('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsole('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

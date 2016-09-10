@@ -45,11 +45,10 @@ uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
 
-// Called from Arch.main
+// Called from Arch.m
 procedure KernelStart;
 begin
-  //CleanConsole;
-  printk_('/VLoading Toro ...\n/n',0);
+  WriteConsole('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   {$IFDEF DEBUG} DebugInit; {$ENDIF}
   ProcessInit;

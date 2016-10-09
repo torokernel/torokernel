@@ -306,7 +306,7 @@ begin
   ImageSize := ImageSize - FileSize(KernelFile) div 512 - 1 ;
   count := FileSize(KernelFile) div 512 + 1;
  end;
- Writeln('Building ToroImage.img ... ');
+ Writeln('Building Image ... ');
  // copying Bootloader
  BlockRead(BootFile, Buffer, SizeOf(Buffer), BytesRead);
  p := @buffer[1];

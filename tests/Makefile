@@ -1,7 +1,7 @@
 #
-# Makefile to compile the bootloader and the tools.
+# Makefile that compiles the bootloader and build.pas
 # 
-# Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+# Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
 #
 #

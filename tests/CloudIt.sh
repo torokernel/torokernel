@@ -20,8 +20,8 @@ appimg="$app.img";
 fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
 ./build 2 $appbin boot.o $appimg
 # calling qemu
-if [ "$OSTYPE" == "msys" ] ; then
+#if [ "$OSTYPE" == "msys" ] ; then
 	qemu-system-x86_64 -m 256 -hda $appimg -smp 2
-	  elif [ "$OSTYPE" == "linux-gnu" ] ; then
-	qemu-system-x86_64 -m 256 -hda $appimg -smp 2
-fi
+#	  elif [ "$OSTYPE" == "linux-gnu" ] ; then
+#	qemu-system-x86_64 -m 256 -hda $appimg -smp 2
+#fi

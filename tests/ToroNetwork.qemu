@@ -1,0 +1,1 @@
+-smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -m 256

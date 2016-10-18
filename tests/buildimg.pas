@@ -145,7 +145,7 @@ begin
   // looking for PE header
   if Magic = PEMAGIC then // searching the PE section
   begin
-   writeln(PEFileName , ' ---> ','PECOFF format');
+   writeln(PEFileName , ': ','Detected PECOFF format');
    // temporal file
    Assign(OutputFile, 'kernel.bin');
    Rewrite(OutputFile,1);
@@ -227,7 +227,7 @@ begin
  begin
   result:=false;
   exit;
- end else writeln(ELFFileName , ' ---> ','ELF64 format');
+ end else writeln(ELFFileName , ': ','Detected ELF64 format');
  // The Sections starts at the end of Program Headers
  FileInit := longint(ElfHeader.e_phoff)+ElfHeader.e_phentsize*ElfHeader.e_phnum;
  // Program Header array

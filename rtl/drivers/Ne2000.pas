@@ -37,7 +37,7 @@ unit Ne2000;
 interface
 
 {$I ..\Toro.inc}
-//{$DEFINE DebugNe2000}
+{$DEFINE DebugNe2000}
 
 uses
   Arch,
@@ -378,12 +378,12 @@ end;
 
 // Look for ne2000 card in PCI bus and register it.
 // Currently support for one NIC
-procedure PCICardInit;
+procedure DetectNicOnPCI;
 var
   Net: PNetworkInterface;
   PCIcard: PBusDevInfo;
 begin
-  {$IFDEF DebugNe2000} WriteDebug('Ne2000 - PCICardInit\n', []); {$ENDIF}
+  {$IFDEF DebugNe2000} WriteDebug('ne2000: starting detection on pci bus\n', []); {$ENDIF}
   PCIcard := PCIDevices;
   while PCIcard <> nil do
   begin
@@ -393,7 +393,7 @@ begin
       // looking for ne2000 card
       if (PCIcard.Vendor = $10ec) and (PCIcard.Device = $8029) then
       begin
-        {$IFDEF DebugNe2000} WriteDebug('PCICardInit - ne2000 network card: detected\n', []); {$ENDIF}
+        {$IFDEF DebugNe2000} WriteDebug('ne2000: new card detected\n', []); {$ENDIF}
         NicNE2000.IRQ := PCIcard.irq;
         NicNE2000.iobase := PCIcard.IO[0];
         Net := @NicNE2000.Driverinterface;
@@ -410,7 +410,7 @@ begin
         RegisterNetworkInterface(Net);
         WriteConsole('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
         Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
-        {$IFDEF DebugNe2000} WriteDebug('Ne2000 - PCICardInit - Done.\n', []); {$ENDIF}
+        {$IFDEF DebugNe2000} WriteDebug('ne2000: detection finished, exiting\n', []); {$ENDIF}
         Exit; // Support only 1 NIC in this version
     end;
       end;
@@ -419,6 +419,6 @@ begin
 end;
 
 initialization
-  PCICardInit;
+  DetectNicOnPCI;
   
 end.

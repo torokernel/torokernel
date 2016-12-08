@@ -197,6 +197,7 @@ begin
 end;
 
 // Print to screen using format
+// It is does not use protection from concurrent access
 procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
 var
   ArgNo: LongInt;
@@ -205,7 +206,7 @@ var
   Values: PXChar;
   tmp: TNow;
 begin
-  SpinLock(3,4,LockConsole);
+//  SpinLock(3,4,LockConsole);
   ArgNo := 0 ;
   J := 1;
   while J <= Length(Format) do
@@ -335,7 +336,7 @@ begin
     PutC(Format[J]);
     Inc(J);
   end;
-  LockConsole := 3;
+  // LockConsole := 3;
 end;
 
 // Handler the irq of keyboard

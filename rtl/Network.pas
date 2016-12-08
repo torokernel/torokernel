@@ -613,6 +613,7 @@ begin
   Packet.Ready := False;
   Packet.Status := False;
   Packet.Next:= nil;
+  {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sending packet %d\n', [Qword(Packet)]);{$ENDIF}
   NetworkInterface.Send(NetworkInterface, Packet);
 end;
 
@@ -905,6 +906,7 @@ begin
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
         // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
         Packet.Delete := true;
+		{$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: Sending my ip\n', []); {$ENDIF}
         SysNetworkSend(Packet);
         // reply Request of Ip Address
       end else if ArpPacket.OpCode= SwapWORD(ARP_OP_REPLY) then
@@ -1097,18 +1099,18 @@ begin
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
         end;
-        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving ICMP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ip: new ICMP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
-    IP_TYPE_UDP  :
+    IP_TYPE_UDP:
       begin
-        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving UDP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ip: new UDP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
-    IP_TYPE_TCP  :
+    IP_TYPE_TCP:
       begin
         TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
-        {$IFDEF DebugNetwork} WriteDebug('IPPacketService: Arriving TCP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ip: new TCP packet\n', []); {$ENDIF}
         if TCPHeader.Flags=TCP_SYN then
         begin
           // Validate the REQUEST to Server Socket
@@ -1118,16 +1120,16 @@ begin
             EnqueueTCPRequest(Socket, Packet)
           else
             ToroFreeMem(Packet);
-          {$IFDEF DebugNetwork} WriteDebug('IPPacketService: SYN Packet arrived\n', []); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ip: SYN Packet arrived\n', []); {$ENDIF}
         end else if (TCPHeader.Flags and TCP_ACK = TCP_ACK) then
         begin
           // Validate connection
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
-          {$IFDEF DebugNetwork} WriteDebug('IPPacketService: ACK Packet arrived\n', []); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet arrived\n', []); {$ENDIF}
           if Socket <> nil then
             ProcessTCPSocket(Socket,Packet)
           else begin
-            {$IFDEF DebugNetwork} WriteDebug('IPPacketService: ACK Packet invalid\n', []); {$ENDIF}
+            {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet invalid\n', []); {$ENDIF}
             ToroFreeMem(Packet);
           end;
           // RST Flags
@@ -1188,13 +1190,14 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin // we have to check if the driver is sending correctly
-      if (Net.TimeStamp <> 0) and (Net.OutgoingPackets <> nil) then
-      begin
-        r := read_rdtsc-Net.TimeStamp;
+	// TODO: Re think how to implement this
+    //  if (Net.TimeStamp <> 0) and (Net.OutgoingPackets <> nil) then
+    //  begin
+    //    r := read_rdtsc-Net.TimeStamp;
         // Maybe the driver is in a loop, we have to inform the driver
-        if (r > MAX_TIME_SENDER*LocalCPUSpeed*1000) then
-          Net.Reset(Net);
-      end;
+    //    if (r > MAX_TIME_SENDER*LocalCPUSpeed*1000) then
+    //      Net.Reset(Net);
+    //  end;
       SysThreadSwitch;
       Continue;
     end;
@@ -1202,17 +1205,17 @@ begin
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
         begin
-        {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving ARP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ethernet: new ARP packet %d\n', [Qword(Packet)]); {$ENDIF}
           ProcessARPPacket(Packet);
         end;
       ETH_FRAME_IP:
         begin
-          {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving IP packet\n', []); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ethernet: new IP packet %d\n', [Qword(Packet)]); {$ENDIF}
           ProcessIPPacket(Packet);
         end;
     else
       begin
-        {$IFDEF DebugNetwork} WriteDebug('EthernetPacketService: Arriving unknow packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ethernet: new unknow packet %d\n', [Qword(Packet)]); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     end;

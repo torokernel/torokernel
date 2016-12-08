@@ -171,16 +171,19 @@ var
   PacketQueue: PPacket;
 begin
   DisabledINT; // Protection from Local Access
+  {$IFDEF DebugNe2000} WriteDebug('ne2000: sending packet %d\n', [Qword(Packet)]); {$ENDIF}
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
   begin
    net.OutgoingPackets := Packet; // Enqueue the packet
    DoSendPacket(net); // Send immediately
+  {$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d is transmitted\n', [Qword(Packet)]); {$ENDIF}
   end else
   begin // It is a FIFO queue
     while PacketQueue.next <> nil do
       PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
+	{$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d enqueued\n', [Qword(Packet)]); {$ENDIF}
   end;
   EnabledINT;
 end;
@@ -317,19 +320,23 @@ var
   Status: LongInt;
 begin
   Status := ReadPort(NicNE2000.iobase + INTERRUPTSTATUS);
+  {$IFDEF DebugNe2000} WriteDebug('ne2000: IRQ handler, status:%d\n',[Status]); {$ENDIF}
+  // we check if there is a new packet
   if Status and 1 <> 0 then
   begin
     WritePort(Status,NicNE2000.iobase + INTERRUPTSTATUS);
     ReadPacket(@NicNE2000); // Transfer the packet to Packet Cache
-    {$IFDEF DebugNe2000} WriteDebug('Ne2000IrqHandle: Packet received\n', []); {$ENDIF}
-  end else if Status and $A <> 0 then
+    //{$IFDEF DebugNe2000} WriteDebug('Ne2000IrqHandle: Packet received\n', []); {$ENDIF}
+  end;
+  // we check if last packet has been sent correctly 
+  if Status and $A <> 0 then
   begin
     WritePort(Status, NicNE2000.iobase + INTERRUPTSTATUS);
+	{$IFDEF DebugNe2000} WriteDebug('ne2000: last packet has been transmitted\n',[]); {$ENDIF}
     Packet := DequeueOutgoingPacket; // Inform Kernel Last packet has been sent, and fetch the next packet to send
     // We have got to send more packet ?
     if Packet <> nil then
       DoSendPacket(@NicNE2000.DriverInterface);
-    {$IFDEF DebugNe2000} WriteDebug('Ne2000IrqHandle: Packet transmitted\n',[]); {$ENDIF}
   end;
   EOI;
 end;

@@ -274,6 +274,8 @@ procedure EnqueueIncomingPacket(Packet: PPacket); // Called by ne2000irqhandler.
 procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
+function GetMacAddress(IP: TIPAddress): PMachine;
+procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
 
 // primitive for programmer to register a NIC
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
@@ -639,17 +641,18 @@ begin
   CPUID:= GetApicid;
   Packet.Data := Pointer(PtrUInt(Packet)+SizeOf(TPacket));
   Packet.Size := SizeOf(TArpHeader)+SizeOf(TEthHeader);
+  // TODO: set packet as not deletable
   ARPPacket := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket := Packet.Data;
   ARPPacket.Hardware := SwapWORD(1);
-  ARPPacket.Protocol := ETH_FRAME_IP;
+  ARPPacket.Protocol := SwapWORD(ETH_FRAME_IP);
   ARPPacket.HardwareAddrLength := SizeOf(THardwareAddress);
   ARPPacket.ProtocolAddrLength := SizeOf(TIPAddress);
   ARPPacket.OpCode:= SwapWORD(ARP_OP_REQUEST);
   ARPPacket.TargetHardAddr := MACZero;
   ARPPacket.TargetIpAddr:= IpAddress;
   ARPPacket.SenderHardAddr:= DedicateNetworks[CpuID].NetworkInterface.HardAddress;
-  ARPPacket.SenderIPAddr := DedicateNetworks[CpuID].IpAddress;;
+  ARPPacket.SenderIPAddr := DedicateNetworks[CpuID].IpAddress;
   // Sending a broadcast packet
   EthPacket.Destination := MACBroadcast;
   EthPacket.Source:= DedicateNetworks[CpuID].NetworkInterface.HardAddress;
@@ -679,6 +682,7 @@ begin
     Machine := LookIp(IP); // MAC already added ?
     if Machine <> nil then
     begin
+	  {$IFDEF DebugNetwork} WriteDebug('ARP: New mac added\n', []); {$ENDIF}
       Result:= Machine;
       Exit;
     end;
@@ -1099,6 +1103,7 @@ begin
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
         end;
+		// TODO: To handle reply icmp packet
         {$IFDEF DebugNetwork} WriteDebug('ip: new ICMP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;

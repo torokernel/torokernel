@@ -14,8 +14,8 @@
 //{$DEFINE DebugArch}
 //{$DEFINE DebugFS}
 //{$DEFINE DebugMemory}
-{$DEFINE DebugProcess}
+//{$DEFINE DebugProcess}
 //{$DEFINE DebugProcessEmigrating}
 //{$DEFINE DebugProcessInmigrating}
-//{$DEFINE DebugNetwork}
+{$DEFINE DebugNetwork}
 

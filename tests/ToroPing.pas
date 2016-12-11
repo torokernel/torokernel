@@ -44,21 +44,19 @@ uses
   Ne2000 in 'rtl\Drivers\Ne2000.pas';
 
 const 
-  Welcome: PChar = 'Hello Toro!'+#13#10;
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
   PingIP: array[0..3] of Byte  = (192, 100, 200, 10);
-  
+  // wait for ping in seconds
+  WAIT_FOR_PING = 2; 
 var  
-  PingMac: PMachine;
   PingIPDword: Dword;
-  PingPacket,Queue: PPacket;
-  PingContent: Pchar = 'abcdefghijklmnopqrstuvwabcdefghi';
+  PingPacket: PPacket;
+  PingContent: Pchar = 'abcdefghijklmtororstuvwabcdefghi';
   seq: word = 90;
   IP: PIPHeader;
   ICMP: PICMPHeader;
-  r: Pointer;
 begin
   // Dedicate the ne2000 network card to local cpu
   DedicateNetwork('ne2000', LocalIP, Gateway, MaskIP, nil);
@@ -67,7 +65,7 @@ begin
   _IPAddress (PingIP, PingIPDword);
   
   // I keep sending ICMP packets and waiting for an answer
-  WriteConsole ('\c\t ToroPing: This test sends ICMP packets every 2s\n',[]);
+  WriteConsole ('\c\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
   while true do 
   begin
    WriteConsole ('\t ToroPing: /Vsending/n ping to %d.%d.%d.%d, seq: %d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3],seq]);
@@ -86,7 +84,7 @@ begin
    seq := seq + 1;
    // I free the packet
    ToroFreeMem(PingPacket);
-   // I wait two seconds
-   sleep (2000);
+   // I wait WAIT_FOR_PING seconds
+   sleep (WAIT_FOR_PING * 1000);
   end; 
 end.

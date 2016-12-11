@@ -720,7 +720,7 @@ var
 begin
   CountTime := 0;
   ResumeTime := Miliseg*LocalCPUSpeed*1000;
-  {$IFDEF DebugProcess} WriteDebug('Sleep - ResumeTime: %q\n', [ResumeTime]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('Sleep - ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
   while CountTime < ResumeTime do
   begin
      CurrentTime:= read_rdtsc;
@@ -885,6 +885,7 @@ begin
     // in the first moment I am here
     if CurrentCPU.Threads = nil then
     begin
+	  {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to loop\n', []); {$ENDIF}
       // spin of init
       while CurrentCPU.Threads = nil do
     		Inmigrating(CurrentCPU);

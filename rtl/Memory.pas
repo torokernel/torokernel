@@ -519,11 +519,16 @@ begin
     BlockList := @MemoryAllocator.Directory[SX];
     if BlockList.Count = 0 then
     begin
-    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
-    Result := ObtainFromLargerChunk(SX, MemoryAllocator);
+      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
+      Result := ObtainFromLargerChunk(SX, MemoryAllocator);
       ResetFreeFlag(Result);
+	  // no more memory
       if Result = nil then
+	  begin
+		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
+	    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
         Exit;
+	  end;
     {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
       {$IFDEF HEAP_STATS2}
       Inc(MemoryAllocator.Current);
@@ -531,7 +536,8 @@ begin
       Inc(BlockList.Current); // Counters do not need to be under Lock
       Inc(BlockList.Total);
       {$ENDIF}
-    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+	  //WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]);
       Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -548,7 +554,8 @@ begin
     Inc(BlockList.Current); // Counters do not need to be under Lock
     Inc(BlockList.Total);
   {$ENDIF}
-  {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+  // WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]);
 end;
 
 function ToroFreeMem(P: Pointer): Integer;
@@ -564,6 +571,7 @@ begin
   if IsFree = FLAG_FREE then // already freed
   begin
     Result := -1; // Invalid pointer operation
+	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
     Exit;
   end;
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
@@ -574,7 +582,7 @@ begin
  //    Dec(CurrentHeap.StatsSize, Size);
     {$ENDIF}
     Result := 0;
-    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]);{$ENDIF}
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];
@@ -590,7 +598,8 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
-  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h\n', [PtrUInt(P)]); {$ENDIF}
+   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h\n', [PtrUInt(P)]); {$ENDIF}
+  //WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), Size]);
   Result := 0;
 end;
 

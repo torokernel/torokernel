@@ -37,7 +37,6 @@ unit Ne2000;
 interface
 
 {$I ..\Toro.inc}
-{$DEFINE DebugNe2000}
 
 uses
   Arch,
@@ -259,9 +258,12 @@ begin
   WritePort(E8390_START or E8390_NODMA or $40 ,Net.iobase+COMMAND);
   curr := ReadPort(Net.iobase+CURRENT);
   WritePort(E8390_START or E8390_NODMA ,Net.iobase+COMMAND);
+  {$IFDEF DebugNe2000} WriteDebug('ne2000: reading packet from reception queue\n', []); {$ENDIF}
+  
   // we must read all the packet in the buffer
   while curr <> Net.NextPacket do
   begin
+    {$IFDEF DebugNe2000} WriteDebug('ne2000: reading packets a loop\n', []); {$ENDIF}
     WritePort(4, Net.iobase+REMOTEBYTECOUNT0);
     WritePort(0, Net.iobase+REMOTEBYTECOUNT1);
     WritePort(0, Net.iobase+REMOTESTARTADDRESS0);
@@ -276,8 +278,17 @@ begin
     begin
       // Alloc memory for new packet
       Packet := ToroGetMem(Len+SizeOf(TPacket));
+	  {$IFDEF DebugNe2000} WriteDebug('ne2000: getting %d bytes in %h\n', [Len+SizeOf(TPacket),PtrUInt(Packet)]); {$ENDIF}
+	  // todo: null memory scenario 
+	  // if Packet = nil then 
+	  // begin
+	  // WriteConsole ('fullll\n',[]);
+	  // end;
       Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
       Packet.Size := Len;
+	  Packet.Next := nil;
+	  Packet.Ready := false;
+	  Packet.Delete := false;
       Data := Packet.Data;
       WritePort(Len, Net.iobase+REMOTEBYTECOUNT0);
       WritePort(Len shr 8, Net.iobase+REMOTEBYTECOUNT1);
@@ -287,6 +298,7 @@ begin
       // read the packet
       for Count:= 0 to Len-1 do
         Data^[Count] := ReadPort(Net.iobase+NE_DATA);
+	  {$IFDEF DebugNe2000} WriteDebug('ne2000: last byte written %h\n', [PtrUInt(@Data[Len-1])]); {$ENDIF}
       WritePort($40, Net.iobase+INTERRUPTSTATUS);
       if Next = PSTOP then
         Net.NextPacket := PSTART
@@ -326,7 +338,7 @@ begin
   begin
     WritePort(Status,NicNE2000.iobase + INTERRUPTSTATUS);
     ReadPacket(@NicNE2000); // Transfer the packet to Packet Cache
-    //{$IFDEF DebugNe2000} WriteDebug('Ne2000IrqHandle: Packet received\n', []); {$ENDIF}
+    {$IFDEF DebugNe2000} WriteDebug('Ne2000IrqHandle: Packet received\n', []); {$ENDIF}
   end;
   // we check if last packet has been sent correctly 
   if Status and $A <> 0 then

@@ -55,7 +55,7 @@ const
   // Max Time that Network Card can be Inactive with packet in a Buffer,  in ms
   // TODO: This TIMER wont be necessary
   MAX_TIME_SENDER = 50;
-
+  WAIT_ICMP = 50;
 type
   PNetworkInterface = ^TNetworkInterface;
   PPacket = ^TPacket;
@@ -276,6 +276,9 @@ function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
 function GetMacAddress(IP: TIPAddress): PMachine;
 procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
+function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: longint; seq, id: word): longint;
+function ICMPPoolPackets: PPacket;
+function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
 
 // primitive for programmer to register a NIC
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
@@ -820,22 +823,33 @@ begin
 end;
 
 // Inform to Kernel that a new Packet has been received
-// Called by ne2000irqhandler.Ne2000Handler.ReadPacket
+// This has to be invoked by disabling interruption to prevent concurrent access
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
+  tmp: PPacket;
 begin
+  {$IFDEF DebugNetwork} WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
   Packet.Next := nil;
   if PacketQueue = nil then
   begin
     DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets:=Packet;
   end else begin
-    // we have packets in the tail
+	// we have packets in the tail
     while PacketQueue.Next <> nil do
-      PacketQueue:=PacketQueue.Next;
+	begin
+	  tmp := PacketQueue.Next;
+      PacketQueue := tmp;
+	 end;
     PacketQueue.Next := Packet;
+	//if PacketQueue = PacketQueue.Next then 
+	//begin
+	//   	  WriteDebug('EnqueueIncomingPacket: big problem %d, %d, %d\n', [PtrUInt(PacketQueue.Next), PtrUInt(Packet), PtrUInt(PacketQueue)]); 
+	//      while true do;
+	//end;
   end;
+  //{$IFDEF DebugNetwork} WriteDebug('EnqueueIncomingPacket: returning\n', []); {$ENDIF}
 end;
 
 // Port is marked free in Local Socket Bitmap
@@ -1075,6 +1089,70 @@ begin
     Result := Service.ServerSocket;
 end;
 
+
+const
+  ICMPPacketLen = SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TICMPHeader) + sizeof(TPacket);
+
+// Send a ECHO Request
+function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: longint; seq, id: word): longint;
+var
+  Packet: PPacket;
+  ICMPHeader: PICMPHeader;
+  Mac: PMachine;
+  PData: Pointer;
+  DataLen: longint;
+begin
+   // I get the mac from the ip
+   Mac := GetMacAddress(IpDest);
+   if (Mac = nil) then
+   begin
+    Result := 1;
+    exit;
+   end;
+   // I get memory for the whole packet plus data
+   Packet := ToroGetMem(ICMPPacketLen + len);
+   If Packet=nil then
+   begin
+     Result := 1;
+    exit;
+   end;
+   Packet.Data := Pointer(PtrUInt(Packet) + sizeof(TPacket));
+   Packet.ready := False;
+   Packet.Status := False;
+   // the packet memory is free after sent
+   Packet.Delete := True;
+   Packet.Next := nil;
+   Packet.size := ICMPPacketLen + len - sizeof(TPacket);
+   ICMPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
+   ICMPHeader.tipe:= ICMP_ECHO_REQUEST;
+   ICMPHeader.checksum :=0 ;
+   ICMPHeader.seq:=  SwapWORD(seq);
+   ICMPHeader.code:= 0;
+   ICMPHeader.id:= SwapWORD(id); 
+   Datalen:= len + sizeof(TICMPHeader);
+   PData := Pointer(PtrUInt(Packet.Data) + ICMPPacketLen - sizeof(TPacket));
+   Move(Data^, PData^, len);
+   ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
+   // the packet is sent
+   IPSendPacket(Packet,IPDest,IP_TYPE_ICMP); 
+   // we exit sucessfully 
+   Result := 0;
+end;
+
+// this points to the last ICMP packet received
+var
+	ICMPPollerBuffer: PPacket = nil; 
+
+// wait for a ICMP packet and returns when it arrives
+// it returns a packet that the user has to free
+function ICMPPoolPackets: PPacket;
+begin
+  if ICMPPollerBuffer = nil then 
+   sleep(WAIT_ICMP);
+  result := ICMPPollerBuffer;
+  ICMPPollerBuffer := nil;
+end;	
+	
 // Manipulation of IP Packets, redirect the traffic to Sockets structures
 // Called by ProcessNetworksPackets
 procedure ProcessIPPacket(Packet: PPacket);
@@ -1097,22 +1175,31 @@ begin
         begin
           Packet.Size := Packet.Size - 4;
           ICMPHeader.tipe:= ICMP_ECHO_REPLY;
-          ICMPHeader.checksum :=0 ;
+          ICMPHeader.checksum:= 0 ;
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
-        end;
-		// TODO: To handle reply icmp packet
-        {$IFDEF DebugNetwork} WriteDebug('ip: new ICMP packet\n', []); {$ENDIF}
-        ToroFreeMem(Packet);
+		  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
+		  ToroFreeMem(Packet);
+        // Ping reply 
+		end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
+		begin
+		 	// we only enqueue the packet if it has been read 
+		    if ICMPPollerBuffer = nil then 
+			 ICMPPollerBuffer := Packet 
+			// otherwise, we free the packet
+			else ToroFreeMem(Packet);
+			{$IFDEF DebugNetwork} WriteDebug('icmp: new ECHO REPLY\n', []); {$ENDIF}
+		// unknow packets are just freed 
+		end else ToroFreeMem(Packet);
       end;
-    IP_TYPE_UDP:
+    IP_TYPE_UDP+2:
       begin
         {$IFDEF DebugNetwork} WriteDebug('ip: new UDP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
-    IP_TYPE_TCP:
+    IP_TYPE_TCP+3:
       begin
         TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
         {$IFDEF DebugNetwork} WriteDebug('ip: new TCP packet\n', []); {$ENDIF}
@@ -1170,7 +1257,10 @@ begin
     Result := nil
   else begin
     DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := Packet.Next;
+    // TODO: to check if it is necessary 
+	Packet.Next := nil;
     Result := Packet;
+	{$IFDEF DebugNetwork} WriteDebug('SysnetworkRead: getting packet: %d\n', [PtrUInt(Packet)]); {$ENDIF}
   end;
   EnabledINT;
 end;

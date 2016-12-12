@@ -47,6 +47,7 @@ const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  // this ip may change depending on windows or linux host
   PingIP: array[0..3] of Byte  = (192, 100, 200, 10);
   // wait for ping in seconds
   WAIT_FOR_PING = 2; 
@@ -73,17 +74,16 @@ begin
    PingPacket := ICMPPoolPackets;
    if (PingPacket <> nil) then 
    begin 
-    IP := Pointer(PtrUInt(PingPacket.Data)+SizeOf(TEthHeader));
+        IP := Pointer(PtrUInt(PingPacket.Data)+SizeOf(TEthHeader));
 	ICMP := Pointer(PtrUInt(PingPacket.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
 	if ((IP.SourceIP = PingIPDword) and (ICMP.seq = SwapWORD(seq))) then
 	begin
 	    WriteConsole ('\t ToroPing: /areceived/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
 	end else WriteConsole ('\t ToroPing: /rwrong/n received ping\n',[]);
+        ToroFreeMem (PingPacket); 
    end else WriteConsole ('\t ToroPing: /rno received/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
    // I increment the seq for next packet
    seq := seq + 1;
-   // I free the packet
-   ToroFreeMem(PingPacket);
    // I wait WAIT_FOR_PING seconds
    sleep (WAIT_FOR_PING * 1000);
   end; 

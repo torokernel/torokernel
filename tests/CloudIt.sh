@@ -22,4 +22,4 @@ fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
 ./build 2 $appbin boot.o $appimg
 
 # we run the application in qemu
-qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg
+sudo qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg -serial stdio

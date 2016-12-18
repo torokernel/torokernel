@@ -16,7 +16,7 @@
 // 26/12/2008 Packet-Cache was removed and replaced with a most simple way. Solved bugs in Size of packets and support multiples connections.
 // 31/12/2007 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //

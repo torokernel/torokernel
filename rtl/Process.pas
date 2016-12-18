@@ -424,13 +424,13 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rax, [rbp] + 16
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbp] + 32
  mov rflags_reg, rax
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: General Protection\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RGeneral Protection/n\n',[GetApicid]);
+  {$IFDEF DebugProcess} WriteDebug('Exception: General Protection Fault\n', []); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RGeneral Protection Fault/n\n',[GetApicid]);
   WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);

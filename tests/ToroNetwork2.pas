@@ -111,7 +111,7 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
   // Port 80, service registration
-  //SysRegisterNetworkService(@HttpHandler);
+  SysRegisterNetworkService(@HttpHandler);
   while True do
     SysThreadSwitch;
 end.

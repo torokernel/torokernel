@@ -5,6 +5,7 @@
 // 
 // Changes:
 // 
+// 18/12/2016 Adding protection to WriteConsole()
 // 04/09/2016 Removing Printk_(), only WriteConsole() is used which is protected. 
 // 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
 // 27/03/2009 Adding support for QWORD parameters in Printk_() and WriteConsole().
@@ -13,7 +14,7 @@
 // 15/07/2006 The code was rewrited  by Matias Vara.
 // 09/02/2005 First Version by Matias Vara.
 //
-// Copyright (c) 2003-2012 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -197,7 +198,6 @@ begin
 end;
 
 // Print to screen using format
-// It is does not use protection from concurrent access
 procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
 var
   ArgNo: LongInt;
@@ -206,7 +206,7 @@ var
   Values: PXChar;
   tmp: TNow;
 begin
-//  SpinLock(3,4,LockConsole);
+  BeginCriticalSection (LockConsole);
   ArgNo := 0 ;
   J := 1;
   while J <= Length(Format) do
@@ -336,7 +336,7 @@ begin
     PutC(Format[J]);
     Inc(J);
   end;
-  // LockConsole := 3;
+  EndCriticalSection(LockConsole);
 end;
 
 // Handler the irq of keyboard

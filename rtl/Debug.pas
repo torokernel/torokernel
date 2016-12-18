@@ -7,6 +7,7 @@
 //
 // Changes :
 //
+// 18/12/2016 Adding protection to WriteDebug()
 // 08/12/2016 Removing spin-locks to prevent deadlocks
 // 06/05/2009 Supports QWORDS parameters.
 // 23/09/2006 First version.
@@ -242,18 +243,17 @@ begin
 end;
 
 // Write debug information through the serial console
-// Note: This procedure does not use inter-process protection 
 procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
 var
   CPUI: LongInt;
   Thread: PThread;
 begin
-  //SpinLock(3,4,LockDebug);
+  BeginCriticalSection (LockDebug);
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
   WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(Thread)]);
   WriteSerial (Format, Args);
-  //LockDebug := 3;
+  EndCriticalSection(LockDebug);
 end;
 
 

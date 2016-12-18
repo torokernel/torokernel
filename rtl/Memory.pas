@@ -540,7 +540,7 @@ var
   CPU: Byte;
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
-  inttmp: Boolean;
+  //inttmp: Boolean;
   {$IFDEF DebugMemory}
    bCPU: Byte;
    bIsFree, bIsPrivateHeap: Byte; 
@@ -548,19 +548,12 @@ var
    bSize: PtrUInt;
   {$ENDIF} 
 begin
-  inttmp := INT;
-  If INT then
-  begin
-    DisabledInt;
-  end;
+  BeginCriticalSection;
   Result := nil;
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
-    If INTtmp then
-    begin
-     EnabledInt;
-    end;
+	EndCriticarSection;
     Exit;
   end;
   CPU := GetApicID;
@@ -580,10 +573,7 @@ begin
 	  begin
 		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
 	    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
-	    If inttmp then
-		begin
-		 EnabledInt;
-		end;
+		EndCriticarSection;
         Exit;
 	  end;
 	  {$IFDEF DebugMemory}
@@ -597,10 +587,7 @@ begin
 		WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
 	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
 		Result := nil; 
-	    If inttmp then
-        begin
-         EnabledInt;
-        end;
+		EndCriticarSection;
 		Exit;
 	  end;
 	  ResetFreeFlag(Result);
@@ -612,11 +599,7 @@ begin
       Inc(BlockList.Total);
      {$ENDIF}
      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	  //WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]);
-      If inttmp then
-	  begin
-	   EnabledInt;
-      end;
+	  EndCriticarSection;
 	  Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -631,10 +614,7 @@ begin
 		WriteConsole('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
 	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
 		Result := nil; 
-	    If inttmp then
-        begin
-         EnabledInt;
-        end;
+		EndCriticarSection;
 		Exit;
 	end;
     ResetFreeFlag(Result);
@@ -651,10 +631,7 @@ begin
     Inc(BlockList.Total);
   {$ENDIF}
   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-    If inttmp then
-    begin
-     EnabledInt;
-    end;
+	EndCriticarSection;
 end;
 
 //
@@ -668,13 +645,8 @@ var
   MemoryAllocator: PMemoryAllocator;
   Size: PtrUInt;
   SX: Byte;
-  inttmp: Boolean;
 begin
-inttmp := INT;
-  If INT then
-  begin
-    DisabledInt;
-  end;
+  BeginCriticalSection;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
   if IsFree = FLAG_FREE then // already free
@@ -682,10 +654,7 @@ inttmp := INT;
     WriteConsole('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
 	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
     Result := -1; // Invalid pointer operation
-	If INTtmp then
-	begin
-     EnabledInt;
-    end;
+	EndCriticarSection;
     Exit;
   end;
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
@@ -697,10 +666,7 @@ inttmp := INT;
     {$ENDIF}
     Result := 0;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]);{$ENDIF}
-	If INTtmp then
-    begin
-     EnabledInt;
-    end;
+	EndCriticarSection;
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];
@@ -717,12 +683,8 @@ inttmp := INT;
     Dec(BlockList.Current);
   {$ENDIF}
    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
-  //WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), Size]);
   Result := 0;
-  If INTtmp then
-  begin
-   EnabledInt;
-  end;
+  EndCriticarSection;
 end;
 
 // Returns free block of memory filling with zeros

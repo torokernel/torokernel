@@ -101,6 +101,8 @@ type
     CPUBoot: Boolean;
     InitConfirmation: Boolean; // Synchronization variable between core to INIT-core
     InitProc: procedure; // Procedure to initialize the core
+    Int: Boolean;  // Int is true if interruptions are enabled
+    OldINT: Boolean; // This is used to restore the value of the interruptions
   end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord);
@@ -138,6 +140,13 @@ function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
+procedure BeginCriticalSection; overload;
+procedure BeginCriticalSection (var addval: UInt64); overload;
+procedure EndCriticarSection; overload;
+procedure EndCriticalSection (var addval: UInt64); overload;
+
+
+
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -162,7 +171,7 @@ var
   
   // todo: this variable should be defined by processor
   // todo: define entry and exit to critical section
-  INT: Boolean = false; 
+  //INT: Boolean = false; 
   
 implementation
 
@@ -804,22 +813,59 @@ begin
 end;
 {$ENDIF}
 
-// interruption manipulation
-procedure EnabledINT;  {$IFDEF ASMINLINE} inline; {$ENDIF}
+// Critical Section Managing 
+//
+// The code inside a critical section is not preemptive 
+
+procedure BeginCriticalSection;overload;
 begin
-INT := true;
-asm
-  sti
-end;
+  If Cores[GetApicID].Int then
+  begin
+     DisabledINT;
+	 Cores[GetApicID].oldInt := true; 
+  end;
 end;
 
+procedure EndCriticarSection;overload;
+begin
+  if Cores[GetApicID].oldINT then 
+	 EnabledINT; 	
+end;
+
+
+procedure BeginCriticalSection (var addval: UInt64);overload;
+begin
+  If Cores[GetApicID].Int then
+  begin
+     DisabledINT;
+	 Cores[GetApicID].oldInt := true; 
+  end;
+  SpinLock(3,4,addval);
+end;
+
+
+procedure EndCriticalSection (var addval: UInt64);overload;
+begin
+  addval := 3;
+  if Cores[GetApicID].oldINT then 
+	 EnabledINT;
+end;
+
+
+procedure EnabledINT; {$IFDEF ASMINLINE} inline; {$ENDIF}
+begin
+  Cores[GetApicID].Int := true;
+  asm
+     sti
+  end;
+end;
 
 procedure DisabledINT; {$IFDEF ASMINLINE} inline; {$ENDIF}
 begin
-INT := false;
-asm
-  cli
-end;
+  Cores[GetApicID].Int := false;
+  asm
+     cli
+  end;
 end;
 
 // Procedures to capture unhandle interruptions
@@ -1166,6 +1212,8 @@ begin
     Cores[J].ApicID := 0;
     Cores[J].InitConfirmation := False;
     Cores[J].InitProc := nil;
+    Cores[J].Int := false;
+	Cores[J].oldInt := false;
   end;
   CPU_COUNT := 0;
   acpi_table_detect; // ACPI detection
@@ -1173,17 +1221,19 @@ begin
     mp_table_detect; // if cpu_count is zero then use a MP Tables
   if CPU_COUNT = 0 then
     CPU_COUNT := 1;
-  // important: setting boot core 
+  // setting boot core
   Cores[0].Present := True;
   Cores[0].CPUBoot := True;
   Cores[0].ApicID := GetApicID;
   Cores[0].InitConfirmation := True;
+  Cores[0].Int := false;
+  Cores[0].oldINT := false;
   // temporary stack used to initialize every Core
   esp_tmp := @start_stack[MAX_CPU-1][size_start_stack];
 end;
 
 //------------------------------------------------------------------------------
-// Pagination and Cache Manager
+// Paging and Cache Manager
 //------------------------------------------------------------------------------
 
 var

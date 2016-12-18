@@ -168,11 +168,7 @@ var
   StartTime: TNow;
   CPU_CYLES: Int64;
   Cores: array[0..MAX_CPU-1] of TCore;
-  
-  // todo: this variable should be defined by processor
-  // todo: define entry and exit to critical section
-  //INT: Boolean = false; 
-  
+    
 implementation
 
 uses Kernel, Console;

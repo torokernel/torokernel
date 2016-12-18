@@ -263,7 +263,7 @@ begin
   // we must read all the packet in the buffer
   while curr <> Net.NextPacket do
   begin
-    {$IFDEF DebugNe2000} WriteDebug('ne2000: reading packets a loop\n', []); {$ENDIF}
+    //{$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: reading packets a loop\n', []); {$ENDIF}
     WritePort(4, Net.iobase+REMOTEBYTECOUNT0);
     WritePort(0, Net.iobase+REMOTEBYTECOUNT1);
     WritePort(0, Net.iobase+REMOTESTARTADDRESS0);
@@ -278,7 +278,7 @@ begin
     begin
       // Alloc memory for new packet
       Packet := ToroGetMem(Len+SizeOf(TPacket));
-	  {$IFDEF DebugNe2000} WriteDebug('ne2000: getting %d bytes in %h\n', [Len+SizeOf(TPacket),PtrUInt(Packet)]); {$ENDIF}
+	  {$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: getting %d bytes in %h\n', [Len+SizeOf(TPacket),PtrUInt(Packet)]); {$ENDIF}
 	  // todo: null memory scenario 
 	  // if Packet = nil then 
 	  // begin
@@ -298,7 +298,7 @@ begin
       // read the packet
       for Count:= 0 to Len-1 do
         Data^[Count] := ReadPort(Net.iobase+NE_DATA);
-	  {$IFDEF DebugNe2000} WriteDebug('ne2000: last byte written %h\n', [PtrUInt(@Data[Len-1])]); {$ENDIF}
+	  //{$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: last byte written %h\n', [PtrUInt(@Data[Len-1])]); {$ENDIF}
       WritePort($40, Net.iobase+INTERRUPTSTATUS);
       if Next = PSTOP then
         Net.NextPacket := PSTART
@@ -315,6 +315,7 @@ begin
     curr := ReadPort(Net.iobase+CURRENT);
     WritePort(E8390_START or E8390_NODMA ,Net.iobase+COMMAND);
   end;
+  //{$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: exiting\n', []); {$ENDIF}
 end;
 
 // Kernel raised some error -> Resend the last packet

@@ -8,11 +8,12 @@
 //
 // Changes :
 //
+// 2016.12.18 Fixed a major bug when a chunk is split 
 // 2009.11.01 CPU Cache's Manager Implementation
 // 2009.06.09 XMLHeapNuma adapted for TORO by Matias Vara (XMLRAD UltimX - http://xmlrad.sourceforge.net)
 // 2009.05.20 Slab allocator is replaced with Cache Allocator
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -214,6 +215,16 @@ procedure ResetFreeFlag(P: Pointer);
 begin
   P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
   PBlockHeader(P)^ := PBlockHeader(P)^ and $FFFFFFFE;
+end;
+
+
+function IsFree (P: Pointer): Byte; inline;
+var
+  Header: TBlockHeader;
+begin
+  P := Pointer(PtrUInt(P)-BLOCK_HEADER_SIZE);
+  Header := PBlockHeader(P)^;
+  Result := Header and FLAG_FREE;
 end;
 
 procedure SetFreeFlag(P: Pointer);
@@ -424,6 +435,7 @@ procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
   if BlockList.Count >= BlockList.Capacity then
   begin
+     WriteConsole('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
     {$IFDEF DebugMemory} WriteDebug('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []); {$ENDIF}
    (* // TODO: Need to handle to realloc BlockList in case the actual capacity is reached 
     NewCapacity := BlockList.Capacity*2;
@@ -435,9 +447,11 @@ begin
 	BlockList.Capacity := NewCapacity;
     BlockList.List := NewList;
    	*)
+	Exit;
   end;
   BlockList.List^[BlockList.Count] := P;
   Inc(BlockList.Count);
+  {$IFDEF DebugMemory} WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
 
 // Called by ToroGetMem->ObtainFromLargerChunk and by MemoryInit->DistributeMemoryRegions->InitializeDirectory
@@ -460,11 +474,11 @@ begin
     while (SX < MAX_SX-2) and (DirectorySX[SX+1]+BLOCK_HEADER_SIZE <= ChunkSize) do
       Inc(SX);
     Chunk := Pointer(PtrUInt(Chunk)+BLOCK_HEADER_SIZE);
-    SetHeaderSX(CPU, SX, 1, Chunk);
+    SetHeaderSX(CPU, SX, FLAG_FREE, Chunk);
     BlockList := @MemoryAllocator.Directory[SX];
     BlockListAdd(BlockList, Chunk);
     ChunkSize := ChunkSize-BLOCK_HEADER_SIZE-DirectorySX[SX];
-    {$IFDEF DebugMemory} WriteDebug('SplitChunk Add Block: %h SizeSX: %d Remaining ChunkSize: %d\n', [PtrUInt(Chunk), DirectorySX[SX], ChunkSize]); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('SplitChunk Add Block (marked as free): %h SizeSX: %d Remaining ChunkSize: %d\n', [PtrUInt(Chunk), DirectorySX[SX], ChunkSize]); {$ENDIF}
     {$IFDEF HEAP_STATS} Inc(BlockCount); {$ENDIF}
     Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
   end;
@@ -478,35 +492,75 @@ var
   ChunkBlockList: PBlockList;
   Chunk: Pointer;
   ChunkSize: PtrUInt;
+  bCPU: Byte;
+  bIsFree, bIsPrivateHeap: Byte; 
+  bSX: byte;
+  bSize: PtrUInt;
+  {$IFDEF DebugMemory}
+	j: longint;
+  {$ENDIF}
 begin
-    ChunkSX := SX+1;
+  ChunkSX := SX+1;
   // looking for free blocks
   while (ChunkSX < MAX_SX) and (MemoryAllocator.Directory[ChunkSX].Count = 0) do
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
-  // taking a block
+  // taking a block from the list 
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
+  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX]]); {$ENDIF}
+  {$IFDEF DebugMemory}
+	for j:= 0 to (ChunkBlockList.Count-1) do
+	begin
+	 WriteDebug('ObtainFromLargerChunk: dump list %h\n', [PtrUInt(ChunkBlockList.List^[j])]);
+	end;
+  {$ENDIF}
   Dec(ChunkBlockList.Count);
   ChunkSize := DirectorySX[ChunkSX];
+  // update the size of block in the header
+  // todo: replace for something simpler
+  GetHeader(Chunk , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
+  bSX := SX;
+  SetHeaderSX(bCPU, bSX, bIsFree, Chunk);
+  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: selected Chunk %h, BlockList: %h, SX: %d\n', [PtrUInt(Chunk),PtrUInt(ChunkBlockList),DirectorySX[bSX]]); {$ENDIF}
   {$IFDEF HEAP_STATS} Dec(MemoryAllocator.FreeSize, DirectorySX[ChunkSX]); {$ENDIF}
   {$IFDEF HEAP_STATS2} Dec(MemoryAllocator.FreeCount); {$ENDIF}
   Result := Chunk;
   Chunk := Pointer(PtrUInt(Chunk)+DirectorySX[SX]);
   ChunkSize := ChunkSize-DirectorySX[SX];
+  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Chunk to split: %h Size: %d\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   SplitChunk(MemoryAllocator, Chunk, ChunkSize);
 end;
 
+//
+// Returns a pointer to a block of memory of len at least equal than Size
+//
 function ToroGetMem(Size: PtrUInt): Pointer;
 var
   BlockList: PBlockList;
   CPU: Byte;
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
+  inttmp: Boolean;
+  {$IFDEF DebugMemory}
+   bCPU: Byte;
+   bIsFree, bIsPrivateHeap: Byte; 
+   bSX: byte;
+   bSize: PtrUInt;
+  {$ENDIF} 
 begin
+  inttmp := INT;
+  If INT then
+  begin
+    DisabledInt;
+  end;
   Result := nil;
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
+    If INTtmp then
+    begin
+     EnabledInt;
+    end;
     Exit;
   end;
   CPU := GetApicID;
@@ -516,31 +570,73 @@ begin
   if Size <= 1024 then
     Inc(DirectoryRequestedSize[Size]);
   {$ENDIF}
-    BlockList := @MemoryAllocator.Directory[SX];
-    if BlockList.Count = 0 then
-    begin
-      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
+  BlockList := @MemoryAllocator.Directory[SX];
+  if BlockList.Count = 0 then
+   begin
+     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
       Result := ObtainFromLargerChunk(SX, MemoryAllocator);
-      ResetFreeFlag(Result);
 	  // no more memory
       if Result = nil then
 	  begin
 		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
 	    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
+	    If inttmp then
+		begin
+		 EnabledInt;
+		end;
         Exit;
 	  end;
-    {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
-      {$IFDEF HEAP_STATS2}
+	  {$IFDEF DebugMemory}
+	   	// This helps to find corruptions in the headers
+		GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
+		WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]); 
+	  {$ENDIF}
+	  // If block is not free, we raise an exception 
+	  if IsFree(Result)=0 then 
+	  begin
+		WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
+	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
+		Result := nil; 
+	    If inttmp then
+        begin
+         EnabledInt;
+        end;
+		Exit;
+	  end;
+	  ResetFreeFlag(Result);
+     {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
+     {$IFDEF HEAP_STATS2}
       Inc(MemoryAllocator.Current);
       Inc(MemoryAllocator.Total);
       Inc(BlockList.Current); // Counters do not need to be under Lock
       Inc(BlockList.Total);
-      {$ENDIF}
-      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+     {$ENDIF}
+     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
 	  //WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]);
-      Exit;
+      If inttmp then
+	  begin
+	   EnabledInt;
+      end;
+	  Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
+   {$IFDEF DebugMemory}
+		// This helps to find corruptions in the headers
+		GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
+		WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]); 
+   {$ENDIF}
+	// If block is not free, we raise an exception 
+	if IsFree(Result)=0 then 
+	begin
+		WriteConsole('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
+	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
+		Result := nil; 
+	    If inttmp then
+        begin
+         EnabledInt;
+        end;
+		Exit;
+	end;
     ResetFreeFlag(Result);
     Dec(BlockList.Count);
   {$IFDEF HEAP_STATS}
@@ -554,10 +650,16 @@ begin
     Inc(BlockList.Current); // Counters do not need to be under Lock
     Inc(BlockList.Total);
   {$ENDIF}
-   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-  // WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]);
+  {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+    If inttmp then
+    begin
+     EnabledInt;
+    end;
 end;
 
+//
+// Free a block on memory based on information in the header
+//
 function ToroFreeMem(P: Pointer): Integer;
 var
   BlockList: PBlockList;
@@ -566,12 +668,24 @@ var
   MemoryAllocator: PMemoryAllocator;
   Size: PtrUInt;
   SX: Byte;
+  inttmp: Boolean;
 begin
-  GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
-  if IsFree = FLAG_FREE then // already freed
+inttmp := INT;
+  If INT then
   begin
-    Result := -1; // Invalid pointer operation
+    DisabledInt;
+  end;
+  GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
+  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
+  if IsFree = FLAG_FREE then // already free
+  begin
+    WriteConsole('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
 	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
+    Result := -1; // Invalid pointer operation
+	If INTtmp then
+	begin
+     EnabledInt;
+    end;
     Exit;
   end;
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
@@ -583,6 +697,10 @@ begin
     {$ENDIF}
     Result := 0;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]);{$ENDIF}
+	If INTtmp then
+    begin
+     EnabledInt;
+    end;
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];
@@ -598,9 +716,13 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
-   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h\n', [PtrUInt(P)]); {$ENDIF}
+   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
   //WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), Size]);
   Result := 0;
+  If INTtmp then
+  begin
+   EnabledInt;
+  end;
 end;
 
 // Returns free block of memory filling with zeros
@@ -764,6 +886,7 @@ end;
 
 // Distribution of Memory for every core
 // called by MemoryInit
+// TODO: to add more debug info here
 procedure DistributeMemoryRegions;
 var
   Amount, Counter: PtrUInt;

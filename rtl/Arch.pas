@@ -159,7 +159,11 @@ var
   StartTime: TNow;
   CPU_CYLES: Int64;
   Cores: array[0..MAX_CPU-1] of TCore;
-
+  
+  // todo: this variable should be defined by processor
+  // todo: define entry and exit to critical section
+  INT: Boolean = false; 
+  
 implementation
 
 uses Kernel, Console;
@@ -801,14 +805,21 @@ end;
 {$ENDIF}
 
 // interruption manipulation
-procedure EnabledINT; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure EnabledINT;  {$IFDEF ASMINLINE} inline; {$ENDIF}
+begin
+INT := true;
 asm
   sti
 end;
+end;
 
-procedure DisabledINT; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+
+procedure DisabledINT; {$IFDEF ASMINLINE} inline; {$ENDIF}
+begin
+INT := false;
 asm
   cli
+end;
 end;
 
 // Procedures to capture unhandle interruptions

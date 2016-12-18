@@ -6,7 +6,7 @@
 // Changes :
 // 2011 / 07 / 30 : Some stuff around the resource dedication
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //

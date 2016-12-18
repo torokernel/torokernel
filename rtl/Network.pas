@@ -644,7 +644,7 @@ begin
   CPUID:= GetApicid;
   Packet.Data := Pointer(PtrUInt(Packet)+SizeOf(TPacket));
   Packet.Size := SizeOf(TArpHeader)+SizeOf(TEthHeader);
-  // TODO: set packet as not deletable
+  Packet.Delete := true; 
   ARPPacket := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket := Packet.Data;
   ARPPacket.Hardware := SwapWORD(1);
@@ -662,7 +662,7 @@ begin
   EthPacket.ProtocolType := SwapWORD(ETH_FRAME_ARP);
   SysNetworkSend(Packet);
   // free the resources
-  ToroFreeMem(Packet);
+  //ToroFreeMem(Packet);
 end;
 
 
@@ -796,7 +796,6 @@ begin
 end;
 
 // Inform the Kernel that the last packet has been sent, returns the next packet to send
-// Called by ne2000irqhandler.Ne2000Handler
 function DequeueOutgoingPacket: PPacket;
 var
   CPUID: LongInt;
@@ -815,10 +814,12 @@ begin
   DedicateNetworks[CPUID].NetworkInterface.TimeStamp := read_rdtsc;
   // the packet must be delete
   if Packet.Delete then
-    ToroFreeMem(Packet)
-  else
+  begin
+	{$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: Freeing packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
+	ToroFreeMem(Packet);
+  end;
   // someone is waiting for this packet
-    Packet.Ready := True;
+  Packet.Ready := True;
   Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
 end;
 
@@ -829,7 +830,7 @@ var
   PacketQueue: PPacket;
   tmp: PPacket;
 begin
-  {$IFDEF DebugNetwork} WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+  //WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); 
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
   Packet.Next := nil;
   if PacketQueue = nil then
@@ -838,18 +839,10 @@ begin
   end else begin
 	// we have packets in the tail
     while PacketQueue.Next <> nil do
-	begin
-	  tmp := PacketQueue.Next;
-      PacketQueue := tmp;
-	 end;
+	 PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
-	//if PacketQueue = PacketQueue.Next then 
-	//begin
-	//   	  WriteDebug('EnqueueIncomingPacket: big problem %d, %d, %d\n', [PtrUInt(PacketQueue.Next), PtrUInt(Packet), PtrUInt(PacketQueue)]); 
-	//      while true do;
-	//end;
   end;
-  //{$IFDEF DebugNetwork} WriteDebug('EnqueueIncomingPacket: returning\n', []); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('EnqueueIncomingPacket: returning\n', []); {$ENDIF}
 end;
 
 // Port is marked free in Local Socket Bitmap
@@ -1155,6 +1148,7 @@ end;
 	
 // Manipulation of IP Packets, redirect the traffic to Sockets structures
 // Called by ProcessNetworksPackets
+// TODO: renable tcp and udp
 procedure ProcessIPPacket(Packet: PPacket);
 var
   IPHeader: PIPHeader;
@@ -1174,14 +1168,17 @@ begin
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
           Packet.Size := Packet.Size - 4;
-          ICMPHeader.tipe:= ICMP_ECHO_REPLY;
+		  // this makes that after the kernel is in charge to 
+		  // to free the packet
+          Packet.Delete := true;
+		  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
           ICMPHeader.checksum:= 0 ;
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
 		  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
-		  ToroFreeMem(Packet);
+		  //ToroFreeMem(Packet);
         // Ping reply 
 		end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
 		begin
@@ -1194,15 +1191,15 @@ begin
 		// unknow packets are just freed 
 		end else ToroFreeMem(Packet);
       end;
-    IP_TYPE_UDP+2:
+    IP_TYPE_UDP:
       begin
         {$IFDEF DebugNetwork} WriteDebug('ip: new UDP packet\n', []); {$ENDIF}
         ToroFreeMem(Packet);
       end;
-    IP_TYPE_TCP+3:
+    IP_TYPE_TCP:
       begin
         TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
-        {$IFDEF DebugNetwork} WriteDebug('ip: new TCP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ip: new tcp packet\n', []); {$ENDIF}
         if TCPHeader.Flags=TCP_SYN then
         begin
           // Validate the REQUEST to Server Socket
@@ -1212,16 +1209,16 @@ begin
             EnqueueTCPRequest(Socket, Packet)
           else
             ToroFreeMem(Packet);
-          {$IFDEF DebugNetwork} WriteDebug('ip: SYN Packet arrived\n', []); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ip: syn packet arrived\n', []); {$ENDIF}
         end else if (TCPHeader.Flags and TCP_ACK = TCP_ACK) then
         begin
           // Validate connection
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
-          {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet arrived\n', []); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ip: ack packet arrived\n', []); {$ENDIF}
           if Socket <> nil then
             ProcessTCPSocket(Socket,Packet)
           else begin
-            {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet invalid\n', []); {$ENDIF}
+            {$IFDEF DebugNetwork} WriteDebug('ip: ack packet invalid\n', []); {$ENDIF}
             ToroFreeMem(Packet);
           end;
           // RST Flags
@@ -1256,11 +1253,12 @@ begin
   if Packet=nil then
     Result := nil
   else begin
+    // TODO: Protection!!!!!
     DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := Packet.Next;
     // TODO: to check if it is necessary 
 	Packet.Next := nil;
     Result := Packet;
-	{$IFDEF DebugNetwork} WriteDebug('SysnetworkRead: getting packet: %d\n', [PtrUInt(Packet)]); {$ENDIF}
+	 WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]);
   end;
   EnabledINT;
 end;
@@ -1284,7 +1282,7 @@ begin
     // and new block of memory is allocated if packet <> the nil
     Packet := SysNetworkRead;
     if Packet = nil then
-    begin // we have to check if the driver is sending correctly
+    begin
 	// TODO: Re think how to implement this
     //  if (Net.TimeStamp <> 0) and (Net.OutgoingPackets <> nil) then
     //  begin
@@ -1300,17 +1298,17 @@ begin
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
         begin
-        {$IFDEF DebugNetwork} WriteDebug('ethernet: new ARP packet %d\n', [Qword(Packet)]); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ethernet: new ARP packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
           ProcessARPPacket(Packet);
         end;
       ETH_FRAME_IP:
         begin
-          {$IFDEF DebugNetwork} WriteDebug('ethernet: new IP packet %d\n', [Qword(Packet)]); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ethernet: new IP packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
           ProcessIPPacket(Packet);
         end;
     else
       begin
-        {$IFDEF DebugNetwork} WriteDebug('ethernet: new unknow packet %d\n', [Qword(Packet)]); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ethernet: new unknow packet %h freeing\n', [PtrUInt(Packet)]); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     end;
@@ -1323,7 +1321,7 @@ var
   ThreadID: TThreadID;
 begin
   if PtrUInt(BeginThread(nil, 10*1024, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    WriteConsole('Networks Packets Service .... /VRunning/n\n',[])
+    WriteConsole('Networks Packets Service .... /VRunning/n on Thread: %d\n',[ThreadID])
   else
     WriteConsole('Networks Packets Service .... /VFailed!/n\n',[]);
 end;

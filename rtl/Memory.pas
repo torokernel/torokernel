@@ -8,6 +8,7 @@
 //
 // Changes :
 //
+// 2016.12.19 Making use of BeginCriticalSection() and EndCriticarSection()
 // 2016.12.18 Fixed a major bug when a chunk is split 
 // 2009.11.01 CPU Cache's Manager Implementation
 // 2009.06.09 XMLHeapNuma adapted for TORO by Matias Vara (XMLRAD UltimX - http://xmlrad.sourceforge.net)

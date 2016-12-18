@@ -6,6 +6,7 @@
 //
 // Changes :
 //
+// 18/12/2016 Adding BeginCriticalSection() and EndCriticalSection()
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.

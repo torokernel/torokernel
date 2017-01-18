@@ -783,6 +783,7 @@ begin
   Packet.Next := nil;
   TcpHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
   FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
+  {$IFDEF DebugNetwork}WriteDebug('TCPSendPacket: filling %h count: %d\n', [PtrUInt(TcpHeader), SizeOf(TTCPHeader) ]);{$ENDIF}
   TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
   TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
   TcpHeader.Flags := Flags;
@@ -1061,6 +1062,7 @@ begin
             Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
             Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
             Move(Source^, Dest^, DataSize);
+			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Moving from %h to %h count: %d\n', [PtrUInt(Source),PtrUInt(Dest),DataSize]); {$ENDIF}
             Socket.BufferLength := Socket.BufferLength + DataSize;
 			// We switch the state only if the dispatcher is waiting for an event 
             if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
@@ -1932,7 +1934,7 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: Receiving %d bytes from port %d to port %d\n', [FragLen, Socket.SourcePort, Socket.DestPort]); {$ENDIF}
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: Receiving from %h to %h count: %d\n', [PtrUInt(Socket.BufferReader), PtrUInt(Addr), FragLen]); {$ENDIF}
     Result := Result + FragLen;
     Socket.BufferReader := Socket.BufferReader + FragLen;
     // The buffer was read, inform sender that it can send data again
@@ -2001,7 +2003,7 @@ begin
     // we need a new packet structure
     Buffer := ToroGetMem(SizeOf(TBufferSender));
     // TODO : the syscall may retur nil
-    Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
+    Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
     Packet.Size := SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen;
     Packet.ready := False;
     Packet.Delete := False;
@@ -2013,7 +2015,6 @@ begin
     Dest := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Moving from %h to %h len %d\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
 	Move(P^, Dest^, FragLen);
-	{$IFDEF DebugSocket} WriteDebug('SysSocketSend: Moved from %h to %h len %d\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
     TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
     TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
     TcpHeader.Flags := TCP_ACKPSH;

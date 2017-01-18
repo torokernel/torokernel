@@ -176,7 +176,7 @@ var
 
 procedure ExceptionHandler;
 begin
-  EnabledInt;
+  EnableInt;
   ThreadExit(True);
 end;
 

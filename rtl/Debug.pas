@@ -248,12 +248,18 @@ var
   CPUI: LongInt;
   Thread: PThread;
 begin
-  BeginCriticalSection (LockDebug);
+  //BeginCriticalSection (LockDebug);
+  DisableInt;
+  SpinLock (3,4,LockDebug);
+  
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
   WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(Thread)]);
   WriteSerial (Format, Args);
-  EndCriticalSection(LockDebug);
+  //EndCriticalSection(LockDebug);
+  
+  LockDebug := 3;
+  RestoreInt;
 end;
 
 

@@ -1238,7 +1238,7 @@ begin
       end;
     IP_TYPE_UDP:
       begin
-        {$IFDEF DebugNetwork} WriteDebug('ip: received UDP packet\n', []); {$ENDIF}
+        {$IFDEF DebugNetwork} WriteDebug('ip: received UDP packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
         ToroFreeMem(Packet);
       end;
     IP_TYPE_TCP:
@@ -1300,7 +1300,7 @@ var
   Packet: PPacket;
 begin
   CPUID := GetApicID;
-  BeginCriticalSection;
+  DisableInt;
   Packet := DedicateNetworks[CPUID].NetworkInterface.IncomingPackets;
   if Packet=nil then
     Result := nil
@@ -1310,7 +1310,7 @@ begin
     Result := Packet;
 	{$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
   end;
-  EndCriticarSection;
+  RestoreInt;
 end;
 
 // Thread function, processing new packets
@@ -1826,7 +1826,7 @@ end;
 // Just for Client Sockets
 procedure SysSocketClose(Socket: PSocket);
 begin
-	BeginCriticalSection;
+	DisableInt;
 	{$IFDEF DebugSocket} WriteDebug('SysSocketClose: Closing Socket %h in port %d, Buffer Sender %h, Dispatcher %d\n', [PtrUInt(Socket),Socket.SourcePort, PtrUInt(Socket.BufferSender),Socket.DispatcherEvent]); {$ENDIF}
 	// is there something to send?
 	if Socket.BufferSender = nil then 
@@ -1844,7 +1844,7 @@ begin
 		Socket.DispatcherEvent := DISP_CLOSING;
 		{$IFDEF DebugSocket} WriteDebug('SysSocketClose: Socket %h in DISP_CLOSING\n', [PtrUInt(Socket)]); {$ENDIF}
 	end;
-	EndCriticarSection;
+	RestoreInt;
 end;
 
 // Prepare the Socket for receive connections , the socket is in BLOCKED State

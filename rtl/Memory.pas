@@ -8,7 +8,7 @@
 //
 // Changes :
 //
-// 2016.12.19 Making use of BeginCriticalSection() and EndCriticarSection()
+// 2017.01.18 Making use of DisableInt() and RestoreInt()
 // 2016.12.18 Fixed a major bug when a chunk is split 
 // 2009.11.01 CPU Cache's Manager Implementation
 // 2009.06.09 XMLHeapNuma adapted for TORO by Matias Vara (XMLRAD UltimX - http://xmlrad.sourceforge.net)
@@ -549,12 +549,12 @@ var
    bSize: PtrUInt;
   {$ENDIF} 
 begin
-  BeginCriticalSection;
+  DisableInt;
   Result := nil;
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
-	EndCriticarSection;
+	RestoreInt;
     Exit;
   end;
   CPU := GetApicID;
@@ -574,7 +574,7 @@ begin
 	  begin
 		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
 	    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
-		EndCriticarSection;
+		RestoreInt;
         Exit;
 	  end;
 	  {$IFDEF DebugMemory}
@@ -588,7 +588,7 @@ begin
 		WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
 	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
 		Result := nil; 
-		EndCriticarSection;
+		RestoreInt;
 		Exit;
 	  end;
 	  ResetFreeFlag(Result);
@@ -600,7 +600,7 @@ begin
       Inc(BlockList.Total);
      {$ENDIF}
      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	  EndCriticarSection;
+	  RestoreInt;
 	  Exit;
     end;
     Result := BlockList.List^[BlockList.Count-1];
@@ -615,7 +615,7 @@ begin
 		WriteConsole('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
 	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
 		Result := nil; 
-		EndCriticarSection;
+		RestoreInt;
 		Exit;
 	end;
     ResetFreeFlag(Result);
@@ -632,7 +632,7 @@ begin
     Inc(BlockList.Total);
   {$ENDIF}
   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	EndCriticarSection;
+	RestoreInt;
 end;
 
 //
@@ -647,15 +647,16 @@ var
   Size: PtrUInt;
   SX: Byte;
 begin
-  BeginCriticalSection;
+  DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
+  
   if IsFree = FLAG_FREE then // already free
   begin
     WriteConsole('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
 	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
     Result := -1; // Invalid pointer operation
-	EndCriticarSection;
+    RestoreInt;
     Exit;
   end;
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
@@ -667,7 +668,7 @@ begin
     {$ENDIF}
     Result := 0;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem - Pointer: %h PRIVATE HEAP is free\n', [PtrUInt(P)]);{$ENDIF}
-	EndCriticarSection;
+    RestoreInt;
     Exit;
   end;
   MemoryAllocator := @MemoryAllocators[CPU];
@@ -683,9 +684,10 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
-   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
+ 
   Result := 0;
-  EndCriticarSection;
+  RestoreInt;
+    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
 end;
 
 // Returns free block of memory filling with zeros

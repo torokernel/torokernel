@@ -6,7 +6,7 @@
 //
 // Changes :
 //
-// 18/12/2016 Adding BeginCriticalSection() and EndCriticalSection()
+// 18/01/2017 Adding DisableInt() and RestoreInt().
 // 11/12/2011 Fixed a bug at boot core initilization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
@@ -132,8 +132,8 @@ procedure CaptureInt (int: Byte; Handler: Pointer);
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 procedure ArchInit;
 procedure Now (Data: PNow);
-procedure EnabledINT;
-procedure DisabledINT;
+//procedure EnabledINT;
+//procedure DisabledINT;
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
@@ -141,10 +141,10 @@ function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
-procedure BeginCriticalSection; overload;
-procedure BeginCriticalSection (var addval: UInt64); overload;
-procedure EndCriticarSection; overload;
-procedure EndCriticalSection (var addval: UInt64); overload;
+//procedure BeginCriticalSection; overload;
+//procedure BeginCriticalSection (var addval: UInt64); overload;
+//procedure EndCriticarSection; overload;
+//procedure EndCriticalSection (var addval: UInt64); overload;
 
 
 
@@ -810,61 +810,6 @@ begin
 end;
 {$ENDIF}
 
-// Critical Section Managing 
-//
-// The code inside a critical section is not preemptive 
-
-procedure BeginCriticalSection;overload;
-begin
-  If Cores[GetApicID].Int then
-  begin
-     DisabledINT;
-	 Cores[GetApicID].oldInt := true; 
-  end;
-end;
-
-procedure EndCriticarSection;overload;
-begin
-  if Cores[GetApicID].oldINT then 
-	 EnabledINT; 	
-end;
-
-
-procedure BeginCriticalSection (var addval: UInt64);overload;
-begin
-  If Cores[GetApicID].Int then
-  begin
-     DisabledINT;
-	 Cores[GetApicID].oldInt := true; 
-  end;
-  SpinLock(3,4,addval);
-end;
-
-
-procedure EndCriticalSection (var addval: UInt64);overload;
-begin
-  addval := 3;
-  if Cores[GetApicID].oldINT then 
-	 EnabledINT;
-end;
-
-
-procedure EnabledINT; {$IFDEF ASMINLINE} inline; {$ENDIF}
-begin
-  Cores[GetApicID].Int := true;
-  asm
-     sti
-  end;
-end;
-
-procedure DisabledINT; {$IFDEF ASMINLINE} inline; {$ENDIF}
-begin
-  Cores[GetApicID].Int := false;
-  asm
-     cli
-  end;
-end;
-
 // Procedures to capture unhandle interruptions
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
 asm
@@ -1323,7 +1268,7 @@ begin
   // CPU Exceptions
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
-  EnabledINT;
+  EnableInt;
   Now(@StartTime);
   SMPInitialization;
   // initialization of Floating Point Unit

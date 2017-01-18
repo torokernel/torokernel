@@ -233,7 +233,7 @@ var
 begin
   // the kernel is calling, we need protection
   If not(Isirq) then
-   DisabledINT;
+   DisableINT;
   E1000ReadRegister(@NicE1000, E1000_REG_TDH);
   Tail := E1000ReadRegister(@NicE1000, E1000_REG_TDT);
   Desc := NicE1000.TxDesc;
@@ -256,7 +256,7 @@ begin
   E1000WriteRegister(@NicE1000, E1000_REG_TDT,  (Tail+1) mod NicE1000.TxDescCount);
   // Irq on again
   If not(Isirq) then
-   EnabledINT;
+   RestoreInt;
 end;
 
 // Send a packet
@@ -275,12 +275,12 @@ begin
   end else
   begin
     // we need local protection
-    DisabledInt;
+    DisableInt;
     // it is a FIFO queue
     while PacketQueue.Next <> nil do
       PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
-    EnabledInt;
+    RestoreInt;
   // end protection
   end;
 end;

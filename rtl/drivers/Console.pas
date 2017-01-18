@@ -206,7 +206,10 @@ var
   Values: PXChar;
   tmp: TNow;
 begin
-  BeginCriticalSection (LockConsole);
+  //BeginCriticalSection (LockConsole);
+  DisableInt;
+  SpinLock (3,4,LockConsole);
+  
   ArgNo := 0 ;
   J := 1;
   while J <= Length(Format) do
@@ -336,7 +339,9 @@ begin
     PutC(Format[J]);
     Inc(J);
   end;
-  EndCriticalSection(LockConsole);
+  //EndCriticalSection(LockConsole);
+  LockConsole := 3;
+  RestoreInt;
 end;
 
 // Handler the irq of keyboard

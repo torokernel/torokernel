@@ -169,7 +169,8 @@ procedure Ne2000Send(net: PNetworkInterface; Packet: PPacket);
 var
   PacketQueue: PPacket;
 begin
-  DisabledINT; // Protection from Local Access
+  //DisabledINT; // Protection from Local Access
+  DisableInt;
   {$IFDEF DebugNe2000} WriteDebug('ne2000: sending packet %d\n', [Qword(Packet)]); {$ENDIF}
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
@@ -184,7 +185,8 @@ begin
     PacketQueue.Next := Packet;
 	{$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d enqueued\n', [Qword(Packet)]); {$ENDIF}
   end;
-  EnabledINT;
+  //EnabledINT;
+  RestoreInt;
 end;
 
 // Configure the card.
@@ -321,9 +323,11 @@ end;
 // Kernel raised some error -> Resend the last packet
 procedure Ne2000Reset(Net: PNetWorkInterface);
 begin
-  DisabledInt;
+  //DisabledInt;
+  DisableInt;
   DoSendPacket(Net);
-  EnabledInt;
+  RestoreInt;
+  //EnabledInt;
 end;
 
 // Ne2000 Irq Handler

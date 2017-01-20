@@ -7,6 +7,7 @@
 //
 // Changes :
 //
+// 20/01/2017 Adding SetBreakPoint()
 // 18/12/2016 Adding protection to WriteDebug()
 // 08/12/2016 Removing spin-locks to prevent deadlocks
 // 06/05/2009 Supports QWORDS parameters.
@@ -40,6 +41,7 @@ uses Arch;
 
 procedure DebugInit;
 procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
+procedure SetBreakPoint(Id: Qword);
 
 implementation
 
@@ -66,6 +68,25 @@ begin
   write_portb(Byte(C), BASE_COM_PORT);
   WaitForCompletion;
 end;
+
+
+function ReadChar: XChar;
+begin
+	  while ((read_portb(BASE_COM_PORT+5) and 1 ) = 0) do;
+	  result := XChar(read_portb(BASE_COM_PORT));
+end;
+
+
+procedure SetBreakPoint(Id: Qword);
+var
+	tmp: char; 
+begin
+	WriteDebug('Debug: Breakpoint %d reached, press any key to continue\n',[Id]);
+	DisableInt;
+		tmp := ReadChar;
+	RestoreInt;
+end;
+
 
 procedure DebugPrintDecimal(Value: PtrUInt);
 var

@@ -103,6 +103,10 @@ type
   PAnsiChar           = PChar;
   PPAnsiChar          = PPChar;
 
+  RawByteString = AnsiString;
+  TSystemCodePage = Word;
+  
+  
   UTF8String          = type ansistring;
   PUTF8String         = ^UTF8String;
 
@@ -168,7 +172,7 @@ type
 
 { procedure type }
   TProcedure  = Procedure;
-
+  
 type
 {$ifdef CPU64}
   THandle = QWord;
@@ -407,8 +411,8 @@ function strlen(p:pchar):longint;external name 'FPC_PCHAR_LENGTH';
 Function  Pos(const substr:shortstring;const s:shortstring):SizeInt;
 Function  Pos(C:Char;const s:shortstring):SizeInt;
 Function  Pos (Const Substr : ShortString; Const Source : AnsiString) : SizeInt;
-Procedure SetString (Var S : Shortstring; Buf : PChar; Len : SizeInt);
-Procedure SetString (Var S : AnsiString; Buf : PChar; Len : SizeInt);
+//Procedure SetString (Var S : Shortstring; Buf : PChar; Len : SizeInt);
+//Procedure SetString (Var S : AnsiString; Buf : PChar; Len : SizeInt);
 Function  upCase(const s:shortstring):shortstring;
 Function  lowerCase(const s:shortstring):shortstring; overload;
 Function  Space(b:byte):shortstring;
@@ -767,10 +771,12 @@ const
    varnull = 1;
    varsmallint = 2;
    varinteger = 3;
+{$ifndef FPUNONE}
    varsingle = 4;
    vardouble = 5;
-   varcurrency = 6;
    vardate = 7;
+{$endif}
+   varcurrency = 6;
    varolestr = 8;
    vardispatch = 9;
    varerror = 10;
@@ -785,14 +791,28 @@ const
    varint64 = 20;
    varqword = 21;
 
-   varstrarg = $48;
+   varrecord = 36;
+
+   { The following values never appear as TVarData.VType, but are used in
+     TCallDesc.Args[] as aliases for compiler-specific types.
+     (since it provides only 1 byte per element, actual values won't fit)
+     The choice of values is pretty much arbitrary. }
+
+   varstrarg = $48;         { maps to varstring }
+   varustrarg = $49;        { maps to varustring }
+
+   { Compiler-specific variant types (not known to COM) are kept in
+    'pseudo-custom' range of $100-$10E. Real custom types start with $10F. }
+
    varstring = $100;
    varany = $101;
+   varustring = $102;
    vartypemask = $fff;
    vararray = $2000;
    varbyref = $4000;
 
    varword64 = varqword;
+   varuint64 = varqword; // Delphi alias
 
 type
    tvartype = word;
@@ -802,16 +822,16 @@ type
    pvararraybound = ^tvararraybound;
    pvararray = ^tvararray;
 
-   tvararraybound = packed record
-     elementcount,lowbound  : SizeInt;
+   tvararraybound = record
+     elementcount,lowbound  : longint;
    end;
 
    tvararrayboundarray = array[0..0] of tvararraybound;
-   tvararraycoorarray = array[0..0] of SizeInt;
+   tvararraycoorarray = array[0..0] of Longint;
 
-   tvararray = packed record
+   tvararray = record
       dimcount,flags : word;
-      elementsize : ptrint;
+      elementsize : longint;
       lockcount : longint;
       data : pointer;
       bounds : tvararrayboundarray;
@@ -822,45 +842,49 @@ type
              opshiftleft,opshiftright,opand,opor,opxor,opcompare,opnegate,
              opnot,opcmpeq,opcmpne,opcmplt,opcmple,opcmpgt,opcmpge,oppower);
 
-	tvardata = packed record
-  	vtype : tvartype;
-    case integer of
-     	0:(res1 : word;
-        case integer of
-           0:
-             (res2,res3 : word;
-              case word of
-                 varsmallint : (vsmallint : smallint);
-                 varinteger : (vinteger : longint);
-                 varsingle : (vsingle : single);
-                 vardouble : (vdouble : double);
-                 varcurrency : (vcurrency : currency);
-                 vardate : (vdate : tdatetime);
-//                     varolestr : (volestr : pwidechar);
-                 vardispatch : (vdispatch : pointer);
-                 varerror : (verror : hresult);
-                 varboolean : (vboolean : wordbool);
-                 varunknown : (vunknown : pointer);
-                 // vardecimal : ( : );
-                 varshortint : (vshortint : shortint);
-                 varbyte : (vbyte : byte);
-                 varword : (vword : word);
-                 varlongword : (vlongword : dword);
-                 varint64 : (vint64 : int64);
-                 varqword : (vqword : qword);
-                 varword64 : (vword64 : qword);
-                 varstring : (vstring : pointer);
-                 varany :  (vany : pointer);
-                 vararray : (varray : pvararray);
-                 varbyref : (vpointer : pointer);
-             );
-           1:
-             (vlongs : array[0..2] of longint);
-       );
-     	1:(vwords : array[0..6] of word);
-     	2:(vbytes : array[0..13] of byte);
-	end;
-  pvardata = ^tvardata;
+   tvardata = packed record
+      vtype : tvartype;
+      case integer of
+         0:(res1 : word;
+            case integer of
+               0:
+                 (res2,res3 : word;
+                  case word of
+                     varsmallint : (vsmallint : smallint);
+                     varinteger : (vinteger : longint);
+{$ifndef FPUNONE}
+                     varsingle : (vsingle : single);
+                     vardouble : (vdouble : double);
+                     vardate : (vdate : tdatetime);
+{$endif}
+                     varcurrency : (vcurrency : currency);
+                     //varolestr : (volestr : pwidechar);
+                     vardispatch : (vdispatch : pointer);
+                     varerror : (verror : hresult);
+                     varboolean : (vboolean : wordbool);
+                     varunknown : (vunknown : pointer);
+                     // vardecimal : ( : );
+                     varshortint : (vshortint : shortint);
+                     varbyte : (vbyte : byte);
+                     varword : (vword : word);
+                     varlongword : (vlongword : dword);
+                     varint64 : (vint64 : int64);
+                     varqword : (vqword : qword);
+                     varword64 : (vword64 : qword);
+                     varstring : (vstring : pointer);
+                     varany :  (vany : pointer);
+                     vararray : (varray : pvararray);
+                     varbyref : (vpointer : pointer);
+                     { unused so far, only to fill up space }
+                     varrecord : (vrecord : pointer;precinfo : pointer);
+                );
+               1:
+                 (vlongs : array[0..2] of longint);
+           );
+         1:(vwords : array[0..6] of word);
+         2:(vbytes : array[0..13] of byte);
+      end;
+   pvardata = ^tvardata;
 
    pcalldesc = ^tcalldesc;
    tcalldesc = packed record
@@ -871,6 +895,7 @@ type
    pdispdesc = ^tdispdesc;
    tdispdesc = packed record
       dispid : longint;
+      { not used by fpc }
       restype : byte;
       calldesc : tcalldesc;
    end;
@@ -880,24 +905,35 @@ type
       vartoint64 : function(const v : variant) : int64;
       vartoword64 : function(const v : variant) : qword;
       vartobool : function(const v : variant) : boolean;
+{$ifndef FPUNONE}
       vartoreal : function(const v : variant) : extended;
       vartotdatetime : function(const v : variant) : tdatetime;
+{$endif}
       vartocurr : function(const v : variant) : currency;
       vartopstr : procedure(var s ;const v : variant);
       vartolstr : procedure(var s : ansistring;const v : variant);
-     vartointf : procedure(var intf : iinterface;const v : variant);
+      vartowstr : procedure(var s : widestring;const v : variant);
+      vartointf : procedure(var intf : iinterface;const v : variant);
+      //vartodisp : procedure(var disp : idispatch;const v : variant);
+      vartodynarray : procedure(var dynarr : pointer;const v : variant;
+         typeinfo : pointer);
 
       varfrombool : procedure(var dest : variant;const source : Boolean);
       varfromint : procedure(var dest : variant;const source,Range : longint);
       varfromint64 : procedure(var dest : variant;const source : int64);
       varfromword64 : procedure(var dest : variant;const source : qword);
+{$ifndef FPUNONE}
       varfromreal : procedure(var dest : variant;const source : extended);
       varfromtdatetime : procedure(var dest : Variant;const source : TDateTime);
+{$endif}
       varfromcurr : procedure(var dest : Variant;const source : Currency);
       varfrompstr: procedure(var dest : variant; const source : ShortString);
       varfromlstr: procedure(var dest : variant; const source : ansistring);
+      varfromwstr: procedure(var dest : variant; const source : WideString);
       varfromintf: procedure(var dest : variant;const source : iinterface);
-     olevarfrompstr: procedure(var dest : olevariant; const source : shortstring);
+      //varfromdisp: procedure(var dest : variant;const source : idispatch);
+      varfromdynarray: procedure(var dest : variant;const source : pointer; typeinfo: pointer);
+      olevarfrompstr: procedure(var dest : olevariant; const source : shortstring);
       olevarfromlstr: procedure(var dest : olevariant; const source : ansistring);
       olevarfromvar: procedure(var dest : olevariant; const source : variant);
       olevarfromint: procedure(var dest : olevariant; const source : longint;const range : shortint);
@@ -916,13 +952,13 @@ type
       varcast : procedure(var dest : variant;const source : variant;vartype : longint);
       varcastole : procedure(var dest : variant; const source : variant;vartype : longint);
 
-      dispinvoke: procedure(dest : pvardata;const source : tvardata;
+      dispinvoke: procedure(dest : pvardata;var source : tvardata;
         calldesc : pcalldesc;params : pointer);cdecl;
 
       vararrayredim : procedure(var a : variant;highbound : SizeInt);
-      vararrayget : function(const a : variant;indexcount : SizeInt;indices : PSizeInt) : variant;cdecl;
+      vararrayget : function(const a : variant;indexcount : SizeInt;indices : plongint) : variant;cdecl;
       vararrayput: procedure(var a : variant; const value : variant;
-        indexcount : SizeInt;indices : PSizeInt);cdecl;
+        indexcount : SizeInt;indices : plongint);cdecl;
       writevariant : function(var t : text;const v : variant;width : longint) : Pointer;
       write0Variant : function(var t : text;const v : Variant) : Pointer;
    end;
@@ -1240,7 +1276,8 @@ Function fpc_Val_int64_AnsiStr (Const S : AnsiString; Var Code : ValSInt): Int64
 
 Procedure fpc_AnsiStr_Decr_Ref (Var S : Pointer); compilerproc;
 Procedure fpc_AnsiStr_Incr_Ref (S : Pointer); compilerproc;
-Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer); compilerproc;
+//Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer); compilerproc;
+Procedure fpc_AnsiStr_Assign (Var DestS : Pointer;S2 : Pointer); compilerproc;
 Procedure fpc_AnsiStr_Concat (Var DestS : Ansistring;const S1,S2 : AnsiString); compilerproc;
 procedure fpc_AnsiStr_Concat_multi (var DestS:ansistring;const sarr:array of Ansistring); compilerproc;
 Procedure fpc_ansistr_append_char(Var S : AnsiString;c : char); compilerproc;
@@ -1259,7 +1296,9 @@ Function fpc_AnsiStr_Compare(const S1, S2: AnsiString): SizeInt; compilerproc;
 Function fpc_AnsiStr_Compare_equal(const S1,S2 : AnsiString): SizeInt; compilerproc;
 Procedure fpc_AnsiStr_CheckZero(p : pointer); compilerproc;
 Procedure fpc_AnsiStr_CheckRange(len,index : SizeInt); compilerproc;
-Procedure fpc_AnsiStr_SetLength (Var S : AnsiString; l : SizeInt); compilerproc;
+Procedure fpc_AnsiStr_SetLength (Var S : RawByteString; l : SizeInt{$ifdef FPC_HAS_CPSTRING};cp : TSystemCodePage{$endif FPC_HAS_CPSTRING}); compilerproc;
+
+//Procedure fpc_AnsiStr_SetLength (Var S : AnsiString; l : SizeInt); compilerproc;
 {$ifdef EXTRAANSISHORT}
 Function fpc_AnsiStr_ShortStr_Compare (Var S1 : Pointer; Var S2 : ShortString): SizeInt; compilerproc;
 {$endif EXTRAANSISHORT}
@@ -1269,8 +1308,8 @@ Function fpc_AnsiStr_ShortStr_Compare (Var S1 : Pointer; Var S2 : ShortString): 
 Function fpc_ansistr_Unique(Var S : Pointer): Pointer; compilerproc;
 
 procedure fpc_variant_copy(d,s : pointer);compilerproc;
-procedure fpc_vararray_get(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
-procedure fpc_vararray_put(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
+//procedure fpc_vararray_get(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
+procedure fpc_vararray_put(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
 
 {$ifdef FPC_INCLUDE_SOFTWARE_MOD_DIV}
 function fpc_div_dword(n,z : dword) : dword; compilerproc;
@@ -1383,7 +1422,8 @@ type
     Freemem             : function(p:pointer):ptrint;
     FreememSize         : function(p:pointer;Size:ptrint):ptrint;
     AllocMem            : function(Size:ptrint):Pointer;
-    ReAllocMem          : function(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+    //ReAllocMem          : function(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+	ReAllocMem          : Function(var p:pointer;Size:ptruint):Pointer;
     MemSize             : function(p:pointer):ptrint;
   end;
 
@@ -1406,7 +1446,8 @@ Function  SysGetmem(Size:ptrint): Pointer;
 Function  SysFreeMem(P: Pointer): PtrInt;
 Function  SysFreememSize(p:pointer;Size:ptrint):ptrint;
 Function  SysAllocMem(Size: PtrInt): Pointer;
-function SysReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+//function SysReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+Function  SysReAllocMem(var p:pointer;size:ptruint):Pointer;
 
 { Tp7 functions }
 Procedure GetMem(Var p:pointer;Size:ptrint);
@@ -1416,7 +1457,7 @@ Procedure FreeMem(P: Pointer; Size: PtrInt);
 { Delphi functions }
 function GetMem(Size: PtrInt): Pointer;
 function FreeMem(P: Pointer): PtrInt;
-function ReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 
 
 {*****************************************************************************
@@ -1509,6 +1550,7 @@ Function SetThreadManager(Const NewTM : TThreadManager) : Boolean;
 procedure InitThreadVars(RelocProc : Pointer);
 procedure InitThread(stklen:cardinal);
 
+procedure fpc_variant_clear (var v : tvardata);compilerproc;
 {-------------------------------------------------------------------------------
                          Multithread Handling
 -------------------------------------------------------------------------------}
@@ -1589,7 +1631,7 @@ var
 	argc: LongInt;
   argv: PPChar;
   envp: PPChar;
-
+  DefaultSystemCodePage: TSystemCodePage;
 // this calls are not implement in thread manager
 
 implementation
@@ -2050,18 +2092,18 @@ asm
 end;
 
 
-function InterLockedCompareExchange64(var Target: int64; NewValue, Comperand : int64): int64; assembler;
-asm
-{$ifdef win64}
-        movq            %rdx,%rax
-        lock
-        cmpxchgq        %r8d,(%rcx)
-{$else win64}
-        movq            %rsi,%rax
-        lock
-        cmpxchgq        %rdx,(%rdi)
-{$endif win64}
-end;
+//function InterLockedCompareExchange64(var Target: int64; NewValue, Comperand : int64): int64; assembler;
+//asm
+//{$ifdef win64}
+//        movq            %rdx,%rax
+//        lock
+//        cmpxchgq        %r8d,(%rcx)
+//{$else win64}
+//        movq            %rsi,%rax
+//        lock
+//        cmpxchgq        %rdx,(%rdi)
+//{$endif win64}
+//end;
 
 
 {****************************************************************************
@@ -4306,7 +4348,7 @@ fpc_Val_Real_ShortStr:=fpc_Val_Real_ShortStr*10+(ord(s[code])-ord('0'));
 end;
 
 
-Procedure SetString (Var S : Shortstring; Buf : PChar; Len : SizeInt);
+{Procedure SetString (Var S : Shortstring; Buf : PChar; Len : SizeInt);
 begin
   If Len > High(S) then
     Len := High(S);
@@ -4315,7 +4357,7 @@ begin
     begin
       Move (Buf[0],S[1],Len);
     end;
-end;
+end;}
 
 
 {$Q- no overflow checking }
@@ -4720,13 +4762,19 @@ end;
 
 Type
   PAnsiRec = ^TAnsiRec;
-  TAnsiRec = Packed Record
-    Ref,
-    Len   : SizeInt; // Should add capacity support to avoid to realloc too many times
-    First : Char;
+  TAnsiRec = Record
+    CodePage    : TSystemCodePage;
+    ElementSize : Word;
+{$ifdef CPU64}	
+    { align fields  }
+	Dummy       : DWord;
+{$endif CPU64}
+    Ref         : SizeInt;
+    Len         : SizeInt;
   end;
 
 Const
+  AnsiFirstOff = SizeOf(TAnsiRec);
   AnsiRecLen = SizeOf(TAnsiRec);
   FirstOff   = SizeOf(TAnsiRec)-1;
 
@@ -4746,13 +4794,15 @@ Var
   P : Pointer;
 begin
   { request a multiple of 16 because the heap manager alloctes anyways chunks of 16 bytes }
-  GetMem(P,Len+AnsiRecLen);
+  GetMem(P,Len+(AnsiFirstOff+sizeof(char)));
   If P<>Nil then
    begin
      PAnsiRec(P)^.Ref:=1;         { Set reference count }
      PAnsiRec(P)^.Len:=0;         { Initial length }
-     PAnsiRec(P)^.First:=#0;      { Terminating #0 }
-     inc(p,firstoff);             { Points to string now }
+     PAnsiRec(P)^.CodePage:=DefaultSystemCodePage;
+     PAnsiRec(P)^.ElementSize:=SizeOf(AnsiChar);
+     inc(p,AnsiFirstOff);         { Points to string now }
+     PAnsiChar(P)^:=#0;           { Terminating #0 }
    end;
   NewAnsiString:=P;
 end;
@@ -4808,22 +4858,45 @@ end;
 { also define alias which can be used inside the system unit }
 Procedure fpc_AnsiStr_Incr_Ref (S : Pointer); [external name 'FPC_ANSISTR_INCR_REF'];
 
-Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer);[Public,Alias:'FPC_ANSISTR_ASSIGN'];  compilerproc;
+//Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer);[Public,Alias:'FPC_ANSISTR_ASSIGN'];  compilerproc;
+//{
+//  Assigns S2 to S1 (S1:=S2), taking in account reference counts./
+//}
+//begin
+//  If S2<>nil then
+//    If PAnsiRec(S2-FirstOff)^.Ref>0 then
+//      inclocked(PAnsiRec(S2-FirstOff)^.ref);
+  { Decrease the reference count on the old S1 }
+//  fpc_ansistr_decr_ref (S1);
+  { And finally, have S1 pointing to S2 (or its copy) }
+//  S1:=S2;
+//end;
+
+{ alias for internal use }
+//Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer);[external name 'FPC_ANSISTR_ASSIGN'];
+
+//{$define FPC_HAS_ANSISTR_ASSIGN}
+Procedure fpc_AnsiStr_Assign (Var DestS : Pointer;S2 : Pointer);[Public,Alias:'FPC_ANSISTR_ASSIGN'];  compilerproc;
 {
   Assigns S2 to S1 (S1:=S2), taking in account reference counts.
 }
 begin
+  if DestS=S2 then
+    exit;
   If S2<>nil then
-    If PAnsiRec(S2-FirstOff)^.Ref>0 then
-      inclocked(PAnsiRec(S2-FirstOff)^.ref);
+    If PAnsiRec(S2-AnsiFirstOff)^.Ref>0 then
+      inclocked(PAnsiRec(S2-AnsiFirstOff)^.Ref);
   { Decrease the reference count on the old S1 }
-  fpc_ansistr_decr_ref (S1);
-  { And finally, have S1 pointing to S2 (or its copy) }
-  S1:=S2;
+  fpc_ansistr_decr_ref (DestS);
+  { And finally, have DestS pointing to S2 (or its copy) }
+  DestS:=S2;
 end;
+//{$endif FPC_HAS_ANSISTR_ASSIGN}
+
 
 { alias for internal use }
 Procedure fpc_AnsiStr_Assign (Var S1 : Pointer;S2 : Pointer);[external name 'FPC_ANSISTR_ASSIGN'];
+
 
 procedure fpc_AnsiStr_Concat (var DestS:ansistring;const S1,S2 : AnsiString); compilerproc;
 Var
@@ -5079,7 +5152,80 @@ begin
     result:=Length(S1)-Length(S2);
 end;
 
-Function fpc_AnsiStr_Compare_equal(const S1,S2 : AnsiString): SizeInt;[Public,Alias : 'FPC_ANSISTR_COMPARE_EQUAL'];  compilerproc;
+{ some values which are used in RTL for TSystemCodePage type }
+const
+  CP_ACP     = 0;     // default to ANSI code page
+  CP_OEMCP   = 1;     // default to OEM (console) code page
+
+function TranslatePlaceholderCP(cp: TSystemCodePage): TSystemCodePage; {$ifdef SYSTEMINLINE}inline;{$endif}
+begin
+  TranslatePlaceholderCP:=cp;
+  case cp of
+    CP_OEMCP,
+    CP_ACP:
+      TranslatePlaceholderCP:=DefaultSystemCodePage;
+  end;
+end;
+
+procedure InternalSetCodePage(var s : RawByteString; CodePage : TSystemCodePage; Convert : Boolean = True);
+  begin
+    if Convert then
+      begin
+//{$ifdef FPC_HAS_CPSTRING}
+//        s:=fpc_AnsiStr_To_AnsiStr(s,CodePage);
+//{$else FPC_HAS_CPSTRING}
+       // UniqueString(s);
+   //     PAnsiRec(pointer(s)-AnsiFirstOff)^.CodePage:=CodePage;
+//{$endif FPC_HAS_CPSTRING}
+      end
+    else
+      begin
+     //   UniqueString(s);
+        PAnsiRec(pointer(s)-AnsiFirstOff)^.CodePage:=CodePage;
+      end;
+  end;
+
+
+procedure SetCodePage(var s : RawByteString; CodePage : TSystemCodePage; Convert : Boolean = True);
+  var
+    OrgCodePage,
+    TranslatedCodePage,
+    TranslatedCurrentCodePage: TSystemCodePage;
+  begin
+    if (S='') then
+      exit;
+    { if the codepage are identical, we don't have to do anything (even if the
+      string has multiple references) }
+    OrgCodePage:=PAnsiRec(pointer(S)-AnsiFirstOff)^.CodePage;
+    if OrgCodePage=CodePage then
+      exit;
+    { if we're just replacing a placeholder code page with its actual value or
+      vice versa, we don't have to perform any conversion }
+    TranslatedCurrentCodePage:=TranslatePlaceholderCP(OrgCodePage);
+    TranslatedCodePage:=TranslatePlaceholderCP(CodePage);
+    Convert:=Convert and
+      (TranslatedCurrentCodePage<>TranslatedCodePage);
+    if not Convert and (PAnsiRec(pointer(S)-AnsiFirstOff)^.Ref=1) then
+      PAnsiRec(pointer(S)-AnsiFirstOff)^.CodePage:=CodePage
+    else
+      InternalSetCodePage(S,CodePage,Convert);
+  end;
+  
+
+
+function StringCodePage(const S: RawByteString): TSystemCodePage; overload;
+  begin
+//{$ifdef FPC_HAS_CPSTRING}
+//    if assigned(Pointer(S)) then
+//      Result:=PAnsiRec(pointer(S)-AnsiFirstOff)^.CodePage
+ //   else
+//{$endif FPC_HAS_CPSTRING}
+      Result:=DefaultSystemCodePage;
+  end;
+
+
+
+Function fpc_AnsiStr_Compare_equal(const S1,S2 : RawByteString): SizeInt;[Public,Alias : 'FPC_ANSISTR_COMPARE_EQUAL'];  compilerproc;
 {
   Compares 2 AnsiStrings for equality/inequality only;
   The result is
@@ -5088,18 +5234,50 @@ Function fpc_AnsiStr_Compare_equal(const S1,S2 : AnsiString): SizeInt;[Public,Al
 }
 Var
   MaxI,Temp : SizeInt;
+  cp1,cp2 : TSystemCodePage;
+  r1,r2 : RawByteString;
 begin
   if pointer(S1)=pointer(S2) then
     begin
       result:=0;
       exit;
     end;
-  Maxi:=Length(S1);
-  temp:=Length(S2);
-  Result := Maxi - temp;
-  if Result = 0 then
-    if MaxI>0 then
-      result := CompareByte(S1[1],S2[1],MaxI);
+  { don't compare strings if one of them is empty }
+  if (pointer(S1)=nil) then
+    begin
+      result:=-1;
+      exit;
+    end;
+  if (pointer(S2)=nil) then
+    begin
+      result:=1;
+      exit;
+    end;
+  cp1:=TranslatePlaceholderCP(StringCodePage(S1));
+  cp2:=TranslatePlaceholderCP(StringCodePage(S2));
+  if cp1=cp2 then
+    begin
+      Maxi:=Length(S1);
+      temp:=Length(S2);
+      Result := Maxi - temp;
+      if Result = 0 then
+        if MaxI>0 then
+          result:=CompareByte(S1[1],S2[1],MaxI);
+    end
+  else
+    begin
+      r1:=S1;
+      r2:=S2;
+      //convert them to utf8 then compare
+      SetCodePage(r1,65001);
+      SetCodePage(r2,65001);
+      Maxi:=Length(r1);
+      temp:=Length(r2);
+      Result := Maxi - temp;
+      if Result = 0 then
+        if MaxI>0 then
+          result:=CompareByte(r1[1],r2[1],MaxI);
+    end;
 end;
 
 Procedure fpc_AnsiStr_CheckZero(p : pointer);[Public,Alias : 'FPC_ANSISTR_CHECKZERO'];  compilerproc;
@@ -5115,56 +5293,62 @@ begin
     HandleErrorFrame(201,get_frame);
 end;
 
-Procedure fpc_AnsiStr_SetLength (Var S : AnsiString; l : SizeInt);[Public,Alias : 'FPC_ANSISTR_SETLENGTH'];  compilerproc;
+Procedure fpc_AnsiStr_SetLength (Var S : RawByteString; l : SizeInt{$ifdef FPC_HAS_CPSTRING};cp : TSystemCodePage{$endif FPC_HAS_CPSTRING});[Public,Alias : 'FPC_ANSISTR_SETLENGTH'];  compilerproc;
 {
   Sets The length of string S to L.
   Makes sure S is unique, and contains enough room.
 }
 Var
   Temp : Pointer;
+  lens, lena,
   movelen : SizeInt;
 begin
   if (l>0) then
     begin
       if Pointer(S)=nil then
-       begin
-         { Need a complete new string...}
-         Pointer(s):=NewAnsiString(l);
-       end
-      else if (PAnsiRec(Pointer(S)-FirstOff)^.Ref = 1) then
         begin
-          Dec(Pointer(S),FirstOff);
-//          if AnsiRecLen+L > MemSize(Pointer(s)) then
-          if AnsiRecLen+L > PAnsiRec(S)^.Len+AnsiRecLen then
-            ReallocMem(pointer(S), PAnsiRec(S)^.Len+AnsiRecLen, AnsiRecLen+L);
-          Inc(Pointer(S),FirstOff);
+          Pointer(S):=NewAnsiString(L);
+{$ifdef FPC_HAS_CPSTRING}
+          //cp:=TranslatePlaceholderCP(cp);
+          PAnsiRec(Pointer(S)-AnsiFirstOff)^.CodePage:=cp;
+{$else}
+          PAnsiRec(Pointer(S)-AnsiFirstOff)^.CodePage:=DefaultSystemCodePage;
+{$endif FPC_HAS_CPSTRING}
+        end
+      else if PAnsiRec(Pointer(S)-AnsiFirstOff)^.Ref=1 then
+        begin
+          Temp:=Pointer(s)-AnsiFirstOff;
+          //lens:=MemSize(Temp);
+		  lens := PAnsiRec(Temp)^.Len+AnsiRecLen;
+          lena:=AnsiFirstOff+L+sizeof(AnsiChar);
+          { allow shrinking string if that saves at least half of current size }
+          if (lena>lens) or ((lens>32) and (lena<=(lens div 2))) then
+            begin
+              reallocmem(Temp,lena);
+              Pointer(S):=Temp+AnsiFirstOff;
+            end;
         end
       else
         begin
           { Reallocation is needed... }
-          Temp:=Pointer(NewAnsiString(L));
-          if Length(S)>0 then
-            begin
-              if l < succ(length(s)) then
-                movelen := l
-              { also move terminating null }
-              else movelen := succ(length(s));
-              Move(Pointer(S)^,Temp^,movelen);
-            end;
-          fpc_ansistr_decr_ref(Pointer(S));
+          Temp:=NewAnsiString(L);
+          PAnsiRec(Pointer(Temp)-AnsiFirstOff)^.CodePage:=PAnsiRec(Pointer(S)-AnsiFirstOff)^.CodePage;
+          { also move terminating null }
+          lens:=succ(length(s));
+          if l<lens then
+            movelen:=l
+          else
+            movelen:=lens;
+          Move(Pointer(S)^,Temp^,movelen);
+          fpc_ansistr_decr_ref(Pointer(s));
           Pointer(S):=Temp;
-       end;
+        end;
       { Force nil termination in case it gets shorter }
       PByte(Pointer(S)+l)^:=0;
-      PAnsiRec(Pointer(S)-FirstOff)^.Len:=l;
+      PAnsiRec(Pointer(S)-AnsiFirstOff)^.Len:=l;
     end
-  else
-    begin
-      { Length=0 }
-      if Pointer(S)<>nil then
-       fpc_ansistr_decr_ref (Pointer(S));
-      Pointer(S):=Nil;
-    end;
+  else  { length=0, deallocate the string }
+    fpc_ansistr_decr_ref (Pointer(S));
 end;
 
 {$ifdef EXTRAANSISHORT}
@@ -5487,14 +5671,14 @@ begin
   FillChar(Pointer(StringOfChar)^,Length(StringOfChar),c);
 end;
 
-Procedure SetString (Var S : AnsiString; Buf : PChar; Len : SizeInt);
+{Procedure SetString (Var S : AnsiString; Buf : PChar; Len : SizeInt);
 begin
   SetLength(S,Len);
   If (Buf<>Nil) then
     begin
       Move (Buf[0],S[1],Len);
     end;
-end;
+end;}
 
 function upcase(const s : ansistring) : ansistring;
 var
@@ -6348,7 +6532,8 @@ begin
      if (framecount>=framebufsize) then
        begin
          inc(framebufsize,16);
-         ReallocMem(frames, (framebufsize-16)*sizeof(pointer), framebufsize*sizeof(pointer));
+         //ReallocMem(frames, (framebufsize-16)*sizeof(pointer), framebufsize*sizeof(pointer));
+		 ReallocMem(frames, framebufsize*sizeof(pointer))
        end;
      frames[framecount]:=caller_addr;
      inc(framecount);
@@ -6586,13 +6771,14 @@ procedure variant_init(var v : tvardata);[Public,Alias:'FPC_VARIANT_INIT'];
   end;
 
 
-procedure variant_clear(var v : tvardata);[Public,Alias:'FPC_VARIANT_CLEAR'];
+procedure fpc_variant_clear (var v : tvardata);[Public,Alias:'FPC_VARIANT_CLEAR'];compilerproc;
   begin
     if assigned(VarClearProc) then
       VarClearProc(v);
   end;
 
-
+procedure variant_clear(var v: tvardata); external name 'FPC_VARIANT_CLEAR';
+	
 procedure variant_addref(var v : tvardata);[Public,Alias:'FPC_VARIANT_ADDREF'];
   begin
     if assigned(VarAddRefProc) then
@@ -6607,13 +6793,13 @@ procedure fpc_variant_copy(d,s : pointer);compilerproc;
   end;
 
 
-procedure fpc_vararray_get(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
-begin
-  d:=variantmanager.vararrayget(s,len,indices);
-end;
+//procedure fpc_vararray_get(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
+//begin
+//  d:= variantmanager.vararrayget(s,len,indices);
+//end;
 
 
-procedure fpc_vararray_put(var d : variant;const s : variant;indices : psizeint;len : sizeint);compilerproc;
+procedure fpc_vararray_put(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
 begin
   variantmanager.vararrayput(d,s,len,indices);
 end;
@@ -6950,111 +7136,111 @@ operator :=(const source : variant) dest : error;{$ifdef SYSTEMINLINE}inline;{$e
 
 operator or(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+//     dest:=op1;
      variantmanager.varop(dest,op2,opor);
   end;
 
 operator and(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+    // dest:=op1;
      variantmanager.varop(dest,op2,opand);
   end;
 
 operator xor(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+  //   dest:=op1;
      variantmanager.varop(dest,op2,opxor);
   end;
 
 operator not(const op : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op;
+ //    dest:=op;
      variantmanager.varnot(dest);
   end;
 
 operator shl(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opshiftleft);
   end;
 
 operator shr(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opshiftright);
   end;
 
 operator +(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opadd);
   end;
 
 operator -(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opsubtract);
   end;
 
 operator *(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+    // dest:=op1;
      variantmanager.varop(dest,op2,opmultiply);
   end;
 
 operator /(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+    // dest:=op1;
      variantmanager.varop(dest,op2,opdivide);
   end;
 
 operator **(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,oppower);
   end;
 
 operator div(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opintdivide);
   end;
 
 operator mod(const op1,op2 : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op1;
+   //  dest:=op1;
      variantmanager.varop(dest,op2,opmodulus);
   end;
 
 operator -(const op : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=op;
+    // dest:=op;
      variantmanager.varneg(dest);
   end;
 
 operator =(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=variantmanager.cmpop(op1,op2,opcmpeq);
+    // dest:=variantmanager.cmpop(op1,op2,opcmpeq);
   end;
 
 operator <(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=variantmanager.cmpop(op1,op2,opcmplt);
+  //   dest:=variantmanager.cmpop(op1,op2,opcmplt);
   end;
 
 operator >(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=variantmanager.cmpop(op1,op2,opcmpgt);
+    // dest:=variantmanager.cmpop(op1,op2,opcmpgt);
   end;
 
 operator >=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=variantmanager.cmpop(op1,op2,opcmpge);
+    // dest:=variantmanager.cmpop(op1,op2,opcmpge);
   end;
 
 operator <=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
-     dest:=variantmanager.cmpop(op1,op2,opcmplt);
+   //  dest:=variantmanager.cmpop(op1,op2,opcmplt);
   end;
 
 procedure VarArrayRedim(var A: Variant; HighBound: SizeInt);
@@ -7777,22 +7963,22 @@ type
   end;
   TInitFinalTable=record
     TableCount,
-    InitCount  : longint;
+    InitCount  : QWord;
     Procs      : array[1..maxunits] of TInitFinalRec;
   end;
-
+{$asmmode intel}
 var
   InitFinalTable : TInitFinalTable;external name 'INITFINAL';
 
 procedure fpc_InitializeUnits;[public,alias:'FPC_INITIALIZEUNITS']; compilerproc;
 var
-  i : longint;
+  i : QWord;
 begin
   { call cpu/fpu initialisation routine }
   // boot FPU
   with InitFinalTable do
    begin
-     for i:=1 to TableCount do
+     for i:=1 to QWord(TableCount) do
       begin
         if assigned(Procs[i].InitProc) then
          Procs[i].InitProc();
@@ -7803,7 +7989,7 @@ begin
     TProcedure(InitProc)();
 end;
 
-
+{$asmmode GAS}
 procedure FinalizeUnits;[public,alias:'FPC_FINALIZEUNITS'];
 begin
   with InitFinalTable do
@@ -8160,7 +8346,7 @@ procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'F
 {****************************************************************************}
 { Memory manager }
 
-const
+{const
   MemoryManager: TMemoryManager = (
     NeedLock: true;
     GetMem: @SysGetMem;
@@ -8171,74 +8357,74 @@ const
     MemSize: nil;
   );
 
-
+}
 {*****************************************************************************
                              Memory Manager
 *****************************************************************************}
 
 procedure GetMemoryManager(var MemMgr:TMemoryManager);
 begin
-	MemMgr := MemoryManager;
+	//MemMgr := MemoryManager;
 end;
 
 
 procedure SetMemoryManager(const MemMgr:TMemoryManager);
 begin
-	MemoryManager := MemMgr;
+	//MemoryManager := MemMgr;
 end;
 
 
 function IsMemoryManagerSet:Boolean;
 begin
-	IsMemoryManagerSet := (MemoryManager.GetMem<>@SysGetMem) or (MemoryManager.FreeMem<>@SysFreeMem);
+	//IsMemoryManagerSet := (MemoryManager.GetMem<>@SysGetMem) or (MemoryManager.FreeMem<>@SysFreeMem);
 end;
 
 
 procedure GetMem(var P: Pointer; Size: PtrInt);
 begin
-	P := MemoryManager.GetMem(Size);
+	//P := MemoryManager.GetMem(Size);
 end;
 
 
 
 procedure FreeMem(P: Pointer; Size: PtrInt);
 begin
-	MemoryManager.FreeMemSize(p,Size);
+	//MemoryManager.FreeMemSize(p,Size);
 end;
 
 { Delphi style }
 function FreeMem(P: Pointer): PtrInt;
 begin
-	Freemem := MemoryManager.FreeMem(P);
+	//Freemem := MemoryManager.FreeMem(P);
 end;
 
 
 function GetMem(Size: PtrInt): Pointer;
 begin
-	Result := MemoryManager.GetMem(Size);
+	//Result := MemoryManager.GetMem(Size);
 end;
 
 function GetMemory(size:ptrint):pointer;
 
 begin
- GetMemory := Getmem(size);
+ //GetMemory := Getmem(size);
 end;
 
-function ReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 begin
-	Result := MemoryManager.ReAllocMem(P, OldSize, NewSize);
+	//Result := MemoryManager.g(P, NewSize);
 end;
 
 { Needed for calls from Assembler }
 function fpc_getmem(size:ptrint):pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
-	Result := MemoryManager.GetMem(size);
+	//Result := MemoryManager.GetMem(size);
 end;
 
 procedure fpc_freemem(p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];
 begin
-	if p <> nil then
-  	MemoryManager.FreeMem(p);
+//	if p <> nil then
+  //	MemoryManager.FreeMem(p);
 end;
 
 function SysGetMem(size : ptrint):pointer;
@@ -8263,12 +8449,12 @@ end;
 
 function SysAllocMem(Size: PtrInt): Pointer;
 begin
-  Result := MemoryManager.GetMem(size);
-  if Result <> nil then
-    FillChar(Result^, MemoryManager.MemSize(Result), 0);
+ // Result := MemoryManager.GetMem(size);
+ // if Result <> nil then
+ //   FillChar(Result^, MemoryManager.MemSize(Result), 0);
 end;
 
-function SysReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
+function SysReAllocMem(var p: pointer; size: ptruint):pointer;
 begin
   Result := nil;
 end;

@@ -808,16 +808,28 @@ end;
 procedure nolose2; [public, alias: 'FPC_EMPTYINTF'];
 begin
 end;
+
+procedure nolose3;  [public, alias: '__FPC_specific_handler'];
+begin
+
+end;
+
+procedure nolose4;  [public, alias: 'FPC_DONEEXCEPTION'];
+begin
+
+end;
+
+
 {$ENDIF}
 
 // Procedures to capture unhandle interruptions
-procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
 asm
   db $48, $cf
 end;
 
 // Ignoring Hardware interruption
-procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; {$ENDIF}
+procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
 asm
   call EOI;
   db $48, $cf

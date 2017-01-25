@@ -39,12 +39,16 @@ type
 function InitSystem(notused: pointer): PtrInt; external {$IFDEF DCC} '' {$ENDIF} name 'PASCALMAIN';
 procedure KernelStart;
 
+ procedure r ; external name '_$KERNEL$_Ld1';
+
 implementation
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
 
+  procedure no; external name '_$KERNEL$_Ld1';
+  
 // Called from Arch.m
 procedure KernelStart;
 begin

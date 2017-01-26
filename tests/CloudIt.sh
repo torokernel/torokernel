@@ -48,7 +48,14 @@ fi
 
 # we compile the application
 fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
-./build 2 $appbin boot.o $appimg
+
+# we build the image
+if [ -f boot.o ]; then 
+	./build 2 $appbin boot.o $appimg
+else
+	echo "ERROR: boot.o not found, run make first"
+	exit 
+fi
 
 # we execute the post compilation script
 if [ -f $postfile ]; then

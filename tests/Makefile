@@ -15,7 +15,7 @@ boot.o : $(BOOT)
 	yasm $(BOOT) -o boot.o
 
 build : build.pas
-	ppcrossx64 build.pas
+	fpc build.pas
 	rm build.o
 	rm buildimg.ppu
 	rm buildimg.o

@@ -47,7 +47,7 @@ if [ -f $prefile ]; then
 fi
 
 # we compile the application
-ppcrossx64.exe $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
+fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
 ./build 2 $appbin boot.o $appimg
 
 # we execute the post compilation script

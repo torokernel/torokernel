@@ -58,7 +58,17 @@ begin
   end;
   ImageSize := StrToIntDef(ParamStr(1), 1);
   EFFileName := ParamStr(2);
+  if not(FileExists(EFFileName)) then
+  begin
+	Writeln('Error: <Executable file> does not exist');
+	Exit;
+  end;
   BootFileName := ParamStr(3);
+  if not(FileExists(BootFileName)) then
+  begin
+	Writeln('Error: <boot.bin> does not exist');
+	Exit;
+  end;
   OutFileName := ParamStr(4);
   BuildBootableImage(ImageSize, EFFileName, BootFileName, OutFileName);
 end.

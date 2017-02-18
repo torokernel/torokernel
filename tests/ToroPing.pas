@@ -4,7 +4,7 @@
 // Changes :
 // 08 / 12 / 2016 : First Version by Matias Vara
 //
-// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,15 @@ program ToroPing;
  {$mode delphi}
 {$ENDIF}
 
-// Adding support for FPC 2.0.4 ;)
+
+// Configuring the RUN for Lazarus
+{$IFDEF WIN64}
+          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
+{$ELSE}
+         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
+{$ENDIF}
+{%RunFlags BUILD-}
+
 {$IMAGEBASE 4194304}
 
 // They are declared just the necessary units

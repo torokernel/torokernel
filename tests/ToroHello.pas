@@ -1,14 +1,13 @@
 //
 // Toro Hello World Example.
-// Clasical example using a minimal kernel to show "Hello World" 
+// Clasical example using a minimal kernel to print "Hello World"
 //
 // Changes :
 // 
 // 16/09/2011 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-//
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,25 +25,30 @@
 
 program ToroHello;
 
-
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-
-// Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
 
+// Configuring the RUN for Lazarus
+{$IFDEF WIN64}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
+{$ELSE}
+         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
+{$ENDIF}
+{%RunFlags BUILD-}
+
 // They are declared just the necessary units
-// The units used depend the hardware where you are running the application 
+// The needed units depend on the hardware where you are running the application
 uses
-  Kernel in 'rtl\Kernel.pas',
-  Process in 'rtl\Process.pas',
-  Memory in 'rtl\Memory.pas',
-  Debug in 'rtl\Debug.pas',
-  Arch in 'rtl\Arch.pas',
-  Filesystem in 'rtl\Filesystem.pas',
-  Console in 'rtl\Drivers\Console.pas';
+  Kernel in '..\rtl\Kernel.pas',
+  Process in '..\rtl\Process.pas',
+  Memory in '..\rtl\Memory.pas',
+  Debug in '..\rtl\Debug.pas',
+  Arch in '..\rtl\Arch.pas',
+  Filesystem in '..\rtl\Filesystem.pas',
+  Console in '..\rtl\Drivers\Console.pas';
 
 begin
   WriteConsole('\c/RHello World, I am TORO!!!\n',[0]);

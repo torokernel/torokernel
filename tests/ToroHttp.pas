@@ -33,8 +33,14 @@ program ToroHttp;
  {$mode delphi}
 {$ENDIF}
 
+// Configuring the RUN for Lazarus
+{$IFDEF WIN64}
+          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroHttp.img}
+{$ELSE}
+         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroHttp.img}
+{$ENDIF}
+{%RunFlags BUILD-}
 
-// Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
 
 // They are declared just the necessary units

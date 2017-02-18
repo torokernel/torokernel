@@ -7,7 +7,6 @@
       <Flags>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
-        <UseDefaultCompilerOptions Value="True"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
@@ -36,7 +35,6 @@
       <Unit0>
         <Filename Value="ToroKeyb.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="ToroHello"/>
       </Unit0>
     </Units>
   </ProjectOptions>
@@ -68,7 +66,9 @@
     </Linking>
     <Other>
       <ExecuteBefore>
-        <CompileReasons Compile="False" Build="False" Run="False"/>
+        <Command Value="fpc build.pas"/>
+        <ShowAllMessages Value="True"/>
+        <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
         <Command Value="build.exe 2 ToroKeyb boot.o ToroKeyb.img"/>

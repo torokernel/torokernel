@@ -68,7 +68,8 @@
     <Other>
       <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
-        <CompileReasons Compile="False" Build="False" Run="False"/>
+        <Command Value="fpc build.pas"/>
+        <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
         <Command Value="build.exe 2 ToroHello boot.o ToroHello.img"/>

@@ -1,12 +1,12 @@
 //
-// Toro Hello World Example.
+// ToroKeyb
 // Example that shows the keyboard apis
 //
 // Changes :
 // 
 // 16/09/2011 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -24,16 +24,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program ToroHello;
+program ToroKeyb;
 
 
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-
-// Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
+
+// Configuring the RUN for Lazarus
+{$IFDEF WIN64}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroKeyb.img}
+{$ELSE}
+         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroKeyb.img}
+{$ENDIF}
+{%RunFlags BUILD-}
 
 // They are declared just the necessary units
 // The units used depend the hardware where you are running the application 

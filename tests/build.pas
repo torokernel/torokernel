@@ -3,7 +3,7 @@
 //
 // <image size> : Size of image in MB .
 // <PE file>    : Executable File. Formats supported : ELF-X86-64 and PECOFF64
-// <boot.bin>   : path of bootloader's file.
+// <boot.o>   : path of bootloader's file.
 //
 // From Executable file returns a image for boot .
 //
@@ -53,7 +53,7 @@ var
 begin
   if (Paramcount < 4) then
   begin
-  	Writeln('usage: build.exe <image size in MB> <Executable file> <boot.bin> <Output file>');
+  	Writeln('usage: build.exe <image size in MB> <Executable file> <boot.o> <Output file>');
    	Exit;
   end;
   ImageSize := StrToIntDef(ParamStr(1), 1);
@@ -66,7 +66,7 @@ begin
   BootFileName := ParamStr(3);
   if not(FileExists(BootFileName)) then
   begin
-	Writeln('Error: <boot.bin> does not exist');
+	Writeln('Error: <boot.o> does not exist');
 	Exit;
   end;
   OutFileName := ParamStr(4);

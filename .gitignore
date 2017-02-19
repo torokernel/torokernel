@@ -7,7 +7,7 @@ tests/ToroNetwork
 tests/ToroNetwork2
 tests/ToroHello
 tests/build
-*.bin
+kernel.bin
 *.img
 rtl/backup
 tests/backup

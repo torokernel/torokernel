@@ -5,7 +5,7 @@
 // 
 // 24.8.2016 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -30,6 +30,13 @@ program ToroException;
  {$mode delphi}
 {$ENDIF}
 
+// Configuring the RUN for Lazarus
+{$IFDEF WIN64}
+          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -drive format=raw,file=ToroException.img}
+{$ELSE}
+         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ToroException.img}
+{$ENDIF}
+{%RunFlags BUILD-}
 
 // Adding support for FPC 2.0.4 ;)
 {$IMAGEBASE 4194304}
@@ -65,7 +72,10 @@ end;
 procedure MyOwnHandler;
 begin
   WriteConsole('Hello from My Handler!\n',[]);
-  EnabledInt;
+  // enable interruptions
+  asm
+     sti
+  end;
   ThreadExit(True);
 end;
 
@@ -82,7 +92,7 @@ begin
     asm
   	mov rbx, 1987
     	mov rax, 166
-       mov rcx, 0
+        mov rcx, 0
         mov rdx, 555
   	div rcx
    end;

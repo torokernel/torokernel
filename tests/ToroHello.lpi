@@ -29,7 +29,6 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <WorkingDirectory Value="C:\Users\Matias\Desktop\torokernel\torokernel-lazarus\torokernel\tests"/>
       </local>
     </RunParams>
     <Units Count="1">

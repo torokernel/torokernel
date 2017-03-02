@@ -341,7 +341,7 @@ procedure RegisterBlockDriver(Driver: PBlockDriver);
 begin
   Driver.Next := BlockDevices;
   BlockDevices := Driver;
-  {$IFDEF DebugFS} WriteDebug('RegisterBlockDriver: New Driver',[]); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('RegisterBlockDriver: New Driver\n',[]); {$ENDIF}
 end;
 
 // Protect the device of access from LOCAL CPU .
@@ -356,13 +356,13 @@ begin
     // information for scheduling
     CurrentCPU.CurrentThread.State := tsIOPending;
     CurrentCPU.CurrentThread.IOScheduler.DeviceState:=@Dev.Busy;
-    {$IFDEF DebugFS} WriteDebug('GetDevice: Sleeping',[]); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetDevice: Sleeping\n',[]); {$ENDIF}
     SysThreadSwitch;
   end;
   CurrentCPU.CurrentThread.IOScheduler.DeviceState:=nil;
   Dev.Busy := True;
   Dev.WaitOn := CurrentCPU.CurrentThread;
-  {$IFDEF DebugFS} WriteDebug('GetDevice: Device in use',[]); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('GetDevice: Device in use\n',[]); {$ENDIF}
 end;
 
 // Free the use of device.
@@ -370,7 +370,7 @@ procedure FreeDevice(Dev: PBlockDriver);
 begin
   Dev.Busy := False;
   Dev.WaitOn:= nil;
-  {$IFDEF DebugFS} WriteDebug('FreeDevice: Device is Free', []); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('FreeDevice: Device is Free\n', []); {$ENDIF}
 end;
 
 // Only called by Driver. Creates a Block file's descriptors in CPUID.
@@ -385,7 +385,7 @@ begin
   FBlock.BufferCache.BuffersInCache := MAX_BUFFERS_IN_CACHE;
   FBlock.BufferCache.BlockCache := nil;
   FBlock.BufferCache.FreeBlocksCache := nil;
-  {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d', [CPUID, FBlock.Minor]); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d\n', [CPUID, FBlock.Minor]); {$ENDIF}
 end;
 
 // Return a Pointer to Block file's descriptor .
@@ -790,6 +790,7 @@ begin
   if SuperBlock = nil then
   begin // not enough memory
     {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []); {$ENDIF}
+     WriteConsole('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []);
     Exit;
   end;
   SuperBlock.BlockDevice := FileBlock;
@@ -811,11 +812,11 @@ begin
     Exit;
   end;
   {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
-  WriteConsole('/VCPU#%d/n: ROOT-Filesystem /VMounted/n\n', [GetApicID]);
+  WriteConsole('SysMount: Filesystem /Vmounted/n on CPU#%d\n', [GetApicID]);
 end;
 
 // Return the last Inode of path
-function NameI(Path: PAnsiChar): PInode;
+function NameI(Path:  PAnsiChar): PInode;
 var 
   Base: PInode;
   Count: LongInt;
@@ -828,9 +829,9 @@ begin
   Count := 1;
   Result := nil;
   SetLength(Name, 0);
-  while Path^ <> #0 do
+  while PtrUint(Path^) <> 0 do
   begin
-    if Path^ = '/' then
+    if PtrUint(Path^) = 12 then
     begin
       // only inode dir please!
       if Base.Mode= INODE_DIR then
@@ -875,6 +876,7 @@ begin
   // we don't have memory!
   if FileRegular=nil then
     Exit;
+  {$IFDEF DebugFS} WriteDebug('SysOpenFile: opening path: %p\n', [PtrUInt(Path)]); {$ENDIF}
   Ino:= NameI(Path);
   // looking for the inode from the path
   if Ino=nil then

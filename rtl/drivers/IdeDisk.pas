@@ -35,7 +35,7 @@ unit IdeDisk;
 interface
 
 {$I ..\Toro.inc}
-//{$DEFINE DebugIdeDisk}
+{$DEFINE DebugIdeDisk}
 
 uses Console, Arch, FileSystem, Process, Debug;
 
@@ -232,7 +232,9 @@ end;
 
 procedure ATASendCommand(Ctr: PIDEController; Cmd: LongInt); inline;
 begin
-  write_portb(Cmd, Ctr.IOPort+ATA_CMD_STATUS);
+  DisableInt;
+   write_portb(Cmd, Ctr.IOPort+ATA_CMD_STATUS);
+  RestoreInt;
 end;
 
 function ATAWork(Ctr: PIDEController): Boolean; inline;
@@ -291,6 +293,7 @@ procedure ATAPrepare(Ctr:PIDEController;Drv: LongInt;Sector: LongInt;count: Long
 var
  lba1, lba2, lba3, lba4: Byte;
 begin
+  DisableInt;
   lba1 := Sector and $FF;
   lba2 := (Sector shr 8) and $FF;
   lba3 := (Sector shr 16) and $FF;
@@ -304,6 +307,7 @@ begin
   else
     Drv := $b0;
   write_portb(lba4 or byte(drv) or $40,Ctr.IOPort+ATA_DRIVHD);
+  RestoreInt;
 end;
 
 // Look for valid Partitions in Device (Device is a NOT_FILESYSTEM block type) .
@@ -395,7 +399,7 @@ begin
     RegisterBlockDriver(@ATAControllers[ControllerNo].Driver);
     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After RegisterBlockDriver Controller: %d\n', [ControllerNo]); {$ENDIF}
     // Irq Handlers
-    Irq_On(ATAControllers[ControllerNo].IRQ);
+    IrqOn(ATAControllers[ControllerNo].IRQ);
     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After Irq_On Controller: %d\n', [ControllerNo]); {$ENDIF}
     CaptureInt(ATAControllers[ControllerNo].IRQ+32, ATAControllers[ControllerNo].IrqHandler);
     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After CaptureInt Controller: %d\n', [ControllerNo]); {$ENDIF}
@@ -533,18 +537,22 @@ begin
   // sending Commands
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_READ);
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: prepared and commands sent, Block:%d, Count:%d\n', [Block,Count]); {$ENDIF}
   repeat
     SysThreadSwitch; // wait for the irq
     if not ATADataReady(Ctr) or ATAError(Ctr) then
       Break; // error in operation
+    DisableInt;
     ATAIn(Buffer, Ctr.IOPort);
     Buffer := Pointer(PtrUInt(Buffer) + 512);
     Inc(ReadCount);
+    Ctr.Driver.WaitOn.state := tsSuspended;
+    RestoreInt;
   until ReadCount = Count;
   // returns the number of blocks read
   Result := ReadCount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %q, Begin Sector: %d, End Sector: %d\n', [Int64(FileDesc), Block, Block+Ncount]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + Count]); {$ENDIF}
 end;
 
 
@@ -632,4 +640,4 @@ end;
 initialization
   IdeDiskInit;
 
-end.
+end.

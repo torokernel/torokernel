@@ -1,10 +1,13 @@
 //
-// Toro Hello World Example.
-// Clasical example using a minimal kernel to print "Hello World"
+// TorowithFilesystem.pas
+//
+// This is a simple example that shows how toro can be used to read files from ext2 filesystem.
+// In this example, we first read a file named index.html and then we wait for connections on port
+// 80. When a connection arrives, we send the content of the file and we close the conection.
 //
 // Changes :
 // 
-// 16/09/2011 First Version by Matias E. Vara.
+// 04/03/2017 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -77,7 +80,7 @@ end;
 // callback when a new connection arrives
 function HttpAccept(Socket: PSocket): LongInt;
 begin
-  WriteConsole('New connection on port 80\n',[0]);
+  WriteConsole('\t /VToroWebServer/n: Socket: %d --> new connection\n',[PtrUInt(@Socket)]);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 500000);
   Result := 0;
@@ -88,8 +91,9 @@ function HttpReceive(Socket: PSocket): LongInt;
 begin
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
-  SysSocketSend(Socket, @p[0], 178, 0);
-  WriteConsole ('Closing conection\n',[]);
+  // we send the all file
+  SysSocketSend(Socket, @p[0], count, 0);
+  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> sent and closing\n',[PtrUInt(@Socket)]);
   // todo: this can close the socket two times!!!!!
   SysSocketClose(Socket);
   Result := 0;
@@ -98,7 +102,7 @@ end;
  // Peer socket disconnected
 function HttpClose(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('Remote Host Closed the conection\n',[]);
+  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> remote host closed\n',[PtrUInt(@Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -106,7 +110,7 @@ end;
  // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('Closing connection for timeout\n',[]);
+  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> closing for timeout\n',[PtrUInt(@Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -127,14 +131,15 @@ begin
 
   // we open the file which is used as main page for the webserver
   tmp := SysOpenFile('/web/index.html');
+
   // we read the whole file first
   while SysReadFile(tmp,1,@p[count]) <> 0 do count := count +1;
   // by closing we free resources
   SysCloseFile(tmp);
 
-  // we register the web service so we start to listening at port 80
+  // we register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
-  WriteConsole('\c/VToroWebServer/n: listening at port 80\n',[0]);
+  WriteConsole('\c\t /VToroWebServer/n: listening ...\n',[]);
   while True do
     SysThreadSwitch;
 end.

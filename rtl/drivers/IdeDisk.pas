@@ -368,10 +368,10 @@ begin
       {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATASendCommand ATA_IDENTIFY Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       ATASendCommand(@ATAControllers[ControllerNo], ATA_IDENTIFY);
       // Wait for the driver
-      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ? ATABusy ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATABusy Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       while ATABusy(@ATAControllers[ControllerNo]) do
         NOP;
-      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ? ATADataReady ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATADataReady ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       if ATADataReady(@ATAControllers[ControllerNo]) and not ATAError(@ATAControllers[ControllerNo]) then
       begin
         {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo]); {$ENDIF}

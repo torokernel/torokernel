@@ -31,7 +31,7 @@ interface
 
 {$I ..\Toro.inc}
 
-//{$DEFINE DebugExt2FS}
+{$DEFINE DebugExt2FS}
 
 uses Console,Arch,FileSystem,Process,Debug,Memory;
 
@@ -126,11 +126,11 @@ type
 
    P_Ext2_Dir_Entry = ^Ext2_Dir_Entry;
    ext2_dir_entry = record
-      inode     : longint;
+      inode     : dword;
       rec_len   : word;
       name_len  : byte;
       file_type : byte;   // Not used
-      name      : array [0..254] of XChar;
+      name      : array [0..254] of Char;
    end;   
  
 
@@ -218,7 +218,7 @@ begin
   Super.InodeROOT:= GetInode(2);
   Result := Super;
   {$IFDEF DebugExt2FS}
-    WriteDebug('Ext2FS: Ext2 Super Block Mounted , Information:', []);
+    WriteDebug('Ext2FS: Ext2 Super Block Mounted , Information:\n', []);
     WriteDebug('Logic Block Size: %d\n',  [SpbInfo.log_block_size]);
     WriteDebug('Inodes per Block: %d\n',  [SpbInfo.inodes_per_block]);
     WriteDebug('Inodes Count: %d\n', [SpbInfo.inodes_count]);
@@ -316,11 +316,14 @@ begin
     begin
       bh := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[I], Ino.SuperBlock.BlockSize);
       if bh = nil then
+      begin
+        {$IFDEF DebugFS} WriteDebug('Ext2LookUpInode: error when reading a block\n', []); {$ENDIF}
         Exit; // error in read operations
+      end;
       Offset:= 0;
       while Offset < Ino.SuperBlock.BlockSize do
       begin
-      _next:
+        _next:
         entry:= Pointer(PtrUInt(bh.data)+Offset);
         Offset := Offset+entry.rec_len;
         if entry.name_len = Length(name) then
@@ -329,14 +332,14 @@ begin
             if entry.name[J] <> name[J+1] then
               goto _next;
           Result:= GetInode(entry.inode); // this is the inode !
-          {$IFDEF DebugFilesystem} WriteDebug('Ext2LookUpInode: Inode found\n', []); {$ENDIF}
+          {$IFDEF DebugFS} WriteDebug('Ext2LookUpInode: Inode found\n', []); {$ENDIF}
           PutBlock(Ino.SuperBlock.BlockDevice,bh);
           Exit
         end;
       end;
     end;
   end;
-  {$IFDEF DebugFilesystem} WriteDebug('Ext2LookUpInode: Inode not found\n', []); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('Ext2LookUpInode: Inode not found\n', []); {$ENDIF}
 end;
 
 type
@@ -381,7 +384,10 @@ var
   bh : PBufferHead;
 begin
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
+  begin
+    {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: reading after end, pos:%d, size:%d\n', [FileDesc.FilePos, FileDesc.Inode.Size ]); {$ENDIF}
     Count:= FileDesc.Inode.Size - FileDesc.FilePos;
+  end;
   blocksize := Filedesc.Inode.SuperBlock.Blocksize;
   nb_block := Count div blocksize;
   initoff := FileDesc.FilePos mod Blocksize;
@@ -390,6 +396,7 @@ begin
     nb_block:= nb_block +1;
   //file_ofs:= FileDesc.filepos;
   Len := Count;
+   {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: reading Count:%d, Len:%d, StartBlock: %d, EndBlock: %d\n', [PtrUInt(Count),PtrUInt(Len),start_block,start_block+nb_block-1 ]); {$ENDIF}
   // reading
   for I := start_block to (start_block+nb_block-1) do
   begin
@@ -415,12 +422,13 @@ begin
     end;
   end;
   Result := Count-Len;
+  {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: Result: %d, Filepos: %d\n', [Result, FileDesc.FilePos]); {$ENDIF}
 end;
 
 // Initialization of Ext2 Filesystem
 
 initialization
-  WriteConsole('Ext2 VFS Driver ... /VOk!/n\n',[]);
+  WriteConsole('Ext2 driver ... /Vinstalled/n\n',[]);
   Ext2Driver.name := 'ext2';
   Ext2Driver.ReadSuper := @Ext2ReadSuper;
   Ext2Driver.CreateInode := nil;

@@ -4836,10 +4836,10 @@ Begin
   { check for constant strings ...}
   l:=@PAnsiRec(S-FirstOff)^.Ref;
   If l^<0 then exit;
-
   { declocked does a MT safe dec and returns true, if the counter is 0 }
-  If declocked(l^) then
+  //If declocked(l^) then
     { Ref count dropped to zero }
+    // TODO: to fix it properly
     DisposeAnsiString (S);        { Remove...}
 end;
 
@@ -5309,7 +5309,7 @@ begin
         begin
           Pointer(S):=NewAnsiString(L);
 {$ifdef FPC_HAS_CPSTRING}
-          //cp:=TranslatePlaceholderCP(cp);
+          cp:=TranslatePlaceholderCP(cp);
           PAnsiRec(Pointer(S)-AnsiFirstOff)^.CodePage:=cp;
 {$else}
           PAnsiRec(Pointer(S)-AnsiFirstOff)^.CodePage:=DefaultSystemCodePage;
@@ -5319,7 +5319,6 @@ begin
         begin
           Temp:=Pointer(s)-AnsiFirstOff;
           //lens:=MemSize(Temp);
-		  lens := PAnsiRec(Temp)^.Len+AnsiRecLen;
           lena:=AnsiFirstOff+L+sizeof(AnsiChar);
           { allow shrinking string if that saves at least half of current size }
           if (lena>lens) or ((lens>32) and (lena<=(lens div 2))) then
@@ -5393,18 +5392,7 @@ Var
   L    : SizeInt;
 begin
   pointer(result) := pointer(s);
-  If Pointer(S)=Nil then
-    exit;
-  if PAnsiRec(Pointer(S)-Firstoff)^.Ref<>1 then
-   begin
-     L:=PAnsiRec(Pointer(S)-FirstOff)^.len;
-     SNew:=NewAnsiString (L);
-     Move (Pointer(S)^,SNew^,L+1);
-     PAnsiRec(SNew-FirstOff)^.len:=L;
-     fpc_ansistr_decr_ref (Pointer(S));  { Thread safe }
-     pointer(S):=SNew;
-     pointer(result):=SNew;
-   end;
+  // todo: to check this
 end;
 
 Procedure fpc_ansistr_append_char(Var S : AnsiString;c : char); [Public,Alias : 'FPC_ANSISTR_APPEND_CHAR']; compilerproc;
@@ -8346,7 +8334,7 @@ procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'F
 {****************************************************************************}
 { Memory manager }
 
-{const
+const
   MemoryManager: TMemoryManager = (
     NeedLock: true;
     GetMem: @SysGetMem;
@@ -8357,20 +8345,20 @@ procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'F
     MemSize: nil;
   );
 
-}
+
 {*****************************************************************************
                              Memory Manager
 *****************************************************************************}
 
 procedure GetMemoryManager(var MemMgr:TMemoryManager);
 begin
-	//MemMgr := MemoryManager;
+	MemMgr := MemoryManager;
 end;
 
 
 procedure SetMemoryManager(const MemMgr:TMemoryManager);
 begin
-	//MemoryManager := MemMgr;
+	MemoryManager := MemMgr;
 end;
 
 
@@ -8382,7 +8370,8 @@ end;
 
 procedure GetMem(var P: Pointer; Size: PtrInt);
 begin
-	//P := MemoryManager.GetMem(Size);
+        //  P := nil;
+	P := MemoryManager.GetMem(Size);
 end;
 
 
@@ -8401,6 +8390,7 @@ end;
 
 function GetMem(Size: PtrInt): Pointer;
 begin
+         Result := nil;
 	//Result := MemoryManager.GetMem(Size);
 end;
 
@@ -8418,7 +8408,8 @@ end;
 { Needed for calls from Assembler }
 function fpc_getmem(size:ptrint):pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
-	//Result := MemoryManager.GetMem(size);
+     Result := nil;
+     //Result := MemoryManager.GetMem(size);
 end;
 
 procedure fpc_freemem(p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];

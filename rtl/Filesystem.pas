@@ -820,7 +820,7 @@ function NameI(Path:  PAnsiChar): PInode;
 var 
   Base: PInode;
   Count: LongInt;
-  Name: AnsiString;
+  Name: String;
   ino: PInode;
 begin
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
@@ -831,7 +831,8 @@ begin
   SetLength(Name, 0);
   while PtrUint(Path^) <> 0 do
   begin
-    if PtrUint(Path^) = 12 then
+    // ascii code of '/'
+    if PtrUint(Path^) = 47 then
     begin
       // only inode dir please!
       if Base.Mode= INODE_DIR then
@@ -921,7 +922,6 @@ begin
     Result:=0
   else
     Result:= FileRegular.Inode.SuperBlock.FileSystemDriver.ReadFile(FileRegular, Count, Buffer);
-  FileRegular.FilePos := FileRegular.FilePos + result;
   {$IFDEF DebugFS} WriteDebug('SysReadFile: %d bytes read, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
 end;
 

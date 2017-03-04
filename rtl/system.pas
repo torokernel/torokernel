@@ -4836,10 +4836,10 @@ Begin
   { check for constant strings ...}
   l:=@PAnsiRec(S-FirstOff)^.Ref;
   If l^<0 then exit;
-
   { declocked does a MT safe dec and returns true, if the counter is 0 }
-  If declocked(l^) then
+  //If declocked(l^) then
     { Ref count dropped to zero }
+    // TODO: to fix it properly
     DisposeAnsiString (S);        { Remove...}
 end;
 

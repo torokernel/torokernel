@@ -326,12 +326,6 @@ begin
         _next:
         entry:= Pointer(PtrUInt(bh.data)+Offset);
         Offset := Offset+entry.rec_len;
-
-        // TODO: remove after testing
-        // for J:= 0 to (entry.name_len-1) do
-        // WriteConsole('%c',[PtrUInt(entry.name[J])]);
-        // WriteConsole('\n',[]);
-
         if entry.name_len = Length(name) then
         begin // any size ?
           for J:= 0 to (entry.name_len-1) do
@@ -390,7 +384,10 @@ var
   bh : PBufferHead;
 begin
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
+  begin
+    {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: reading after end, pos:%d, size:%d\n', [FileDesc.FilePos, FileDesc.Inode.Size ]); {$ENDIF}
     Count:= FileDesc.Inode.Size - FileDesc.FilePos;
+  end;
   blocksize := Filedesc.Inode.SuperBlock.Blocksize;
   nb_block := Count div blocksize;
   initoff := FileDesc.FilePos mod Blocksize;
@@ -399,6 +396,7 @@ begin
     nb_block:= nb_block +1;
   //file_ofs:= FileDesc.filepos;
   Len := Count;
+   {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: reading Count:%d, Len:%d, StartBlock: %d, EndBlock: %d\n', [PtrUInt(Count),PtrUInt(Len),start_block,start_block+nb_block-1 ]); {$ENDIF}
   // reading
   for I := start_block to (start_block+nb_block-1) do
   begin
@@ -424,6 +422,7 @@ begin
     end;
   end;
   Result := Count-Len;
+  {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: Result: %d, Filepos: %d\n', [Result, FileDesc.FilePos]); {$ENDIF}
 end;
 
 // Initialization of Ext2 Filesystem

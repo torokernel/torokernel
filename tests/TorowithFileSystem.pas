@@ -7,7 +7,8 @@
 //
 // Changes :
 // 
-// 04/03/2017 First Version by Matias E. Vara.
+// 12 / 02 / 2017 Adding SysCreateFile().
+// 04 / 03 / 2017 v1.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -36,7 +37,7 @@ program TorowithFileSystem;
 
 // Configuring the RUN for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=ne2k_pci -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=ne2k_pci -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles2.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -64,10 +65,15 @@ const
 var
   HttpServer: PSocket;
   Buffer: char;
-  p: array[0..500] of char;
-  tmp: THandle;
+  buff: array[0..500] of char;
+  tmp, log: THandle;
   HttpHandler: TNetworkHandler;
   count: longint = 0;
+
+procedure DebugWrite(msg: pchar);
+begin
+  SysWriteFile(log,strlen(msg),msg);
+end;
 
 // Socket initialization
 procedure HttpInit;
@@ -79,8 +85,12 @@ end;
 
 // callback when a new connection arrives
 function HttpAccept(Socket: PSocket): LongInt;
+var
+  tmpPing: array[0..3] of byte;
 begin
-  WriteConsole('\t /VToroWebServer/n: Socket: %d --> new connection\n',[PtrUInt(@Socket)]);
+  _IPAddresstoArray (Socket.DestIp, tmpPing);
+  WriteConsole('\t /VToroWebServer/n: new connection from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
+  DebugWrite('ToroWebServer: New connection');
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 500000);
   Result := 0;
@@ -88,12 +98,15 @@ end;
 
 // New data received from Socket, we can read the data and return to Network Service thread
 function HttpReceive(Socket: PSocket): LongInt;
+var
+  tmpPing: array[0..3] of byte;
 begin
+  _IPAddresstoArray (Socket.DestIp, tmpPing);
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
   // we send the all file
-  SysSocketSend(Socket, @p[0], count, 0);
-  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> sent and closing\n',[PtrUInt(@Socket)]);
+  SysSocketSend(Socket, @buff[0], count, 0);
+  WriteConsole ('\t /VToroWebServer/n: sending to %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
   // todo: this can close the socket two times!!!!!
   SysSocketClose(Socket);
   Result := 0;
@@ -101,8 +114,11 @@ end;
 
  // Peer socket disconnected
 function HttpClose(Socket: PSocket): LongInt;
+var
+  tmpPing: array[0..3] of byte;
 begin
-  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> remote host closed\n',[PtrUInt(@Socket)]);
+  _IPAddresstoArray (Socket.DestIp, tmpPing);
+  WriteConsole ('\t /VToroWebServer/n: remote host from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -116,12 +132,16 @@ begin
 end;
 
 begin
+
   // Dedicate the ne2000 network card to local cpu
   DedicateNetwork('ne2000', LocalIP, Gateway, MaskIP, nil);
+
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
+
   // we mount locally
   SysMount('ext2','ATA0',6);
+
   // we set the call backs used by the kernel
   HttpHandler.DoInit := @HttpInit;
   HttpHandler.DoAccept := @HttpAccept;
@@ -129,17 +149,39 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
 
+  // we create/open the file for logs
+  log := SysCreateDir('/nada');
+  log := SysCreateFile('/nada/logs');
+  if log = 0 then
+  begin
+    log := SysOpenFile ('/nada/logs');
+    if log = 0 then
+    begin
+     WriteConsole ('logs not found\n',[]);
+    end else
+    begin
+      // end of file
+      SysSeekFile(log,0,SeekEof);
+    end;
+  end;
+  DebugWrite('holaaa');
+  SysCloseFile(log);
+
   // we open the file which is used as main page for the webserver
   tmp := SysOpenFile('/web/index.html');
 
-  // we read the whole file first
-  while SysReadFile(tmp,1,@p[count]) <> 0 do count := count +1;
-  // by closing we free resources
-  SysCloseFile(tmp);
+  if (tmp <> 0) then
+  begin
+    // we read the whole file first
+    count := SysReadFile(tmp,sizeof(buff),@buff);
+    // we close the file
+    SysCloseFile(tmp);
+  end else
+      WriteConsole ('index.html not found\n',[]);
 
   // we register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
-  WriteConsole('\c\t /VToroWebServer/n: listening ...\n',[]);
+  WriteConsole('\t /VToroWebServer/n: listening ...\n',[]);
   while True do
     SysThreadSwitch;
 end.

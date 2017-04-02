@@ -277,6 +277,7 @@ function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
 function GetMacAddress(IP: TIPAddress): PMachine;
 procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
+procedure _IPAddresstoArray(const Ip: TIPAddress; var Result: array of Byte);
 function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: longint; seq, id: word): longint;
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
@@ -400,6 +401,14 @@ end;
 procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
 begin
   Result := (Ip[3] shl 24) or (Ip[2] shl 16) or (Ip[1] shl 8) or Ip[0];
+end;
+
+procedure _IPAddresstoArray(const Ip: TIPAddress; var Result: array of Byte);
+begin
+  Result[0] := Ip and $ff;
+  Result[1] := (Ip and $ff00) shr 8;
+  Result[2] := Ip and $ff0000 shr 16;
+  Result[3] := Ip and $ff000000 shr 24;
 end;
 
 // The new network interface is enqued

@@ -1,14 +1,16 @@
 //
 // FileSystem.pas
 // 
-// Manipulation of Devices and Filesystem .
-// Every Resource is DEDICATE , The programmer must indicate Which CPU can access to the device.
+// This Unit deals with the access to block and char devices and filesystems.
+// Resources as devices and filesystems are dedicated to a core. Thus, only such
+// a core can access to the devices.
 //
 // Changes :
 // 
-// 17/02/2006 First Version by Matias E. Vara.
+// 12 / 03 / 2017 Adding SysCreateFile().
+// 17 / 02 / 2006 v1.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // 
@@ -155,6 +157,7 @@ type
     ReadInode: procedure (Ino: PInode);
     WriteInode: procedure (Ino: Pinode);
     CreateInode: function (Ino: PInode;name: AnsiString): PInode;
+    CreateInodeDir: function (Ino: PInode;name: AnsiString): PInode;
     RemoveInode: function (Ino:PInode;name: AnsiString): LongInt;
     LookupInode: function (Ino: PInode;name: AnsiString): PInode;
     // SuperBlock operations
@@ -196,6 +199,7 @@ procedure DedicateBlockFile(FBlock: PFileBlock;CPUID: LongInt);
 procedure SysCloseFile(FileHandle: THandle);
 procedure SysMount(const FileSystemName, BlockName: AnsiString; const Minor: LongInt);
 function SysOpenFile(Path: PXChar): THandle;
+function SysCreateDir(Path: PAnsiChar): Longint;
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
 function SysReadFile(FileHandle: THandle; Count: LongInt;Buffer:Pointer): LongInt;
@@ -207,6 +211,8 @@ function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
 procedure PutBlock(FileBlock: PFileBlock; Bh: PBufferHead);
 function GetInode(Inode: LongInt): PInode;
 procedure PutInode(Inode: PInode);
+procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
+function SysCreateFile(Path:  PAnsiChar): THandle;
 
 var
   PCIDevices: PBusDevInfo; // List of Devices in PCI Bus .
@@ -585,11 +591,22 @@ begin
   if Bh.Count = 0 then
   begin
     if Bh.Dirty then
-      FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block, 1, bh.data); // TODO: Test write operations
+    begin
+      FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block *(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data);
+      {$IFDEF DebugFS} WriteDebug('PutBlock: Writing Block: %d\n', [Bh.Block]); {$ENDIF}
+    end;
     Bh.Dirty := False;
     RemoveBuffer(FileBlock.BufferCache.BlockCache, bh);
     AddBuffer(FileBlock.BufferCache.FreeBlocksCache, bh);
   end;
+  {$IFDEF DebugFS} WriteDebug('PutBlock: Block: %d\n', [Bh.Block]); {$ENDIF}
+end;
+
+// write a block to the disk and unmarked as dirty
+procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
+begin
+  FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block *(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data);
+  Bh.Dirty:= false;
 end;
 
 function FindInode(Buffer: PInode;Inode: LongInt): PInode;
@@ -867,6 +884,162 @@ begin
   Result := ino;
 end;
 
+// Create a new directory in the given path
+function SysCreateDir(Path: PAnsiChar): Longint;
+var
+  Base: PInode;
+  Count: LongInt;
+  Name: String;
+  ino: PInode;
+  SPath: PChar;
+begin
+  Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  Base.Count := Base.Count+1;
+  SPath := Path;
+  Path := Path+1;
+  Count := 1;
+  Result := 0;
+  SetLength(Name, 0);
+  {$IFDEF DebugFS} WriteDebug('SysCreateDir: creating directoy %p\n', [PtrUInt(SPath)]); {$ENDIF}
+  while PtrUint(Path^) <> 0 do
+  begin
+    // ascii code of '/'
+    if PtrUint(Path^) = 47 then
+    begin
+      // only inode dir please!
+      if Base.Mode= INODE_DIR then
+        ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name)
+      else
+      begin
+        PutInode(Base);
+        Exit;
+      end;
+      PutInode(Base);
+      // error in operation
+      if ino = nil then
+        Exit;
+      SetLength(Name, 0);
+      Base := ino;
+      Path := Path+1;
+      count := 1;
+    end else begin
+      SetLength(Name, Length(Name)+1);
+      Name[count] := Path^;
+      Inc(Count);
+      Inc(Path);
+    end;
+  end;
+  // TODO: to verify this
+  if Name[count] = '/' then
+  begin
+    Name[count]:= #0;
+    SetLength(Name, Length(Name)-1);
+  end;
+  ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name);
+
+  // if already exists we fail
+  if (ino <> nil) then
+  begin
+      {$IFDEF DebugFS} WriteDebug('SysCreateDir: dir %p exists, exiting\n', [PtrUInt(SPath)]); {$ENDIF}
+      PutInode(Base);
+      Exit;
+  end;
+  // we create the directory inode entry
+  ino := Base.SuperBlock.FileSystemDriver.CreateInodeDir(Base, Name);
+  if (ino = nil) then
+  begin
+     {$IFDEF DebugFS} WriteDebug('SysCreateDir: creating %p failed\n', [PtrUInt(SPath)]); {$ENDIF}
+      PutInode(Base);
+  end else
+  begin
+    PutInode(ino);
+    PutInode(Base);
+    Result := 1;
+    {$IFDEF DebugFS} WriteDebug('SysCreateDir: new directory created at %p\n', [PtrUInt(SPath)]); {$ENDIF}
+  end;
+end;
+
+// Create a new file in the given path
+//
+function SysCreateFile(Path: PAnsiChar): THandle;
+var
+  Base: PInode;
+  Count: LongInt;
+  Name: String;
+  ino: PInode;
+  SPath: PChar;
+begin
+  {$IFDEF DebugFS} WriteDebug('SysCreateFile: creating file %p\n', [PtrUInt(SPath)]); {$ENDIF}
+  Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  Base.Count := Base.Count+1;
+  SPath := Path;
+  Path := Path+1;
+  Count := 1;
+  Result := 0;
+  SetLength(Name, 0);
+  while PtrUint(Path^) <> 0 do
+  begin
+    // ascii code of '/'
+    if PtrUint(Path^) = 47 then
+    begin
+      // only inode dir please!
+      if Base.Mode= INODE_DIR then
+        ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name)
+      else
+      begin
+        PutInode(Base);
+        {$IFDEF DebugFS} WriteDebug('SysCreateFile: failing bad path %p\n', [PtrUInt(SPath)]); {$ENDIF}
+        Exit;
+      end;
+      PutInode(Base);
+      // error in operation
+      if ino = nil then
+      begin
+        {$IFDEF DebugFS} WriteDebug('SysCreateFile: failing in LookUpInode\n', []); {$ENDIF}
+        Exit;
+      end;
+      SetLength(Name, 0);
+      Base := ino;
+      Path := Path+1;
+      count := 1;
+    end else begin
+      SetLength(Name, Length(Name)+1);
+      Name[count] := Path^;
+      Inc(Count);
+      Inc(Path);
+    end;
+  end;
+  // TODO: to verify this
+  if Name[count] = '/' then
+  begin
+    Name[count]:= #0;
+    SetLength(Name, Length(Name)-1);
+  end;
+  ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name);
+
+  // if already exists we fail
+  if (ino <> nil) then
+  begin
+      {$IFDEF DebugFS} WriteDebug('SysCreateFile: file %p exists, exiting\n', [PtrUInt(SPath)]); {$ENDIF}
+      PutInode(Base);
+      Exit;
+  end;
+
+  ino := Base.SuperBlock.FileSystemDriver.CreateInode(Base, Name);
+
+  if (ino = nil) then
+  begin
+     {$IFDEF DebugFS} WriteDebug('SysCreateFile: creating %p failed\n', [PtrUInt(SPath)]); {$ENDIF}
+      PutInode(Base);
+  end else
+  begin
+    PutInode(ino);
+    PutInode(Base);
+    Result:= SysOpenFile(SPath);
+    {$IFDEF DebugFS} WriteDebug('SysCreateFile: new file created in %p, THandle: %d\n', [PtrUInt(SPath), PtrUInt(Result)]); {$ENDIF}
+  end;
+end;
+
 function SysOpenFile(Path: PXChar): THandle;
 var
   FileRegular: PFileRegular;
@@ -893,7 +1066,7 @@ begin
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: File Openned\n', []); {$ENDIF}
 end;
 
-// Changes position of the File. I don't need the FileSystem Driver here.
+// Changes position of the File. I don't need the driver.
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 var
   FileRegular: PFileRegular;
@@ -917,8 +1090,9 @@ function SysReadFile(FileHandle: THandle; Count: LongInt; Buffer: Pointer): Long
 var
   FileRegular: PFileRegular;
 begin
-  FileRegular:= PFileRegular(FileHandle);
-  if FileRegular.Inode.Mode = INODE_DIR then
+ FileRegular:= PFileRegular(FileHandle);
+ {$IFDEF DebugFS} WriteDebug('SysReadFile: File: %d, Count: %d, FilePos: %d\n', [PtrUInt(FileHandle), Count, FileRegular.FilePos]); {$ENDIF}
+ if FileRegular.Inode.Mode = INODE_DIR then
     Result:=0
   else
     Result:= FileRegular.Inode.SuperBlock.FileSystemDriver.ReadFile(FileRegular, Count, Buffer);
@@ -952,7 +1126,6 @@ begin
     Result := 0
   else
     Result := FileRegular.Inode.SuperBlock.FileSystemDriver.WriteFile(FileRegular, Count, Buffer);
-  FileRegular.FilePos := FileRegular.FilePos + Result;
   {$IFDEF DebugFS} WriteDebug('SysWriteFile: %d bytes written, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
 end;
 
@@ -962,6 +1135,7 @@ var
   FileRegular: PFileRegular;
 begin
   FileRegular := PFileRegular(FileHandle);
+  {$IFDEF DebugFS} WriteDebug('SysCloseFile: Closing file %d\n', [PtrUInt(FileHandle)]); {$ENDIF}
   PutInode(FileRegular.inode);
   ToroFreeMem(FileRegular);
 end;

@@ -151,21 +151,23 @@ begin
 
   // we create/open the file for logs
   log := SysCreateDir('/nada');
-  log := SysCreateFile('/nada/logs');
-  if log = 0 then
-  begin
-    log := SysOpenFile ('/nada/logs');
-    if log = 0 then
-    begin
-     WriteConsole ('logs not found\n',[]);
-    end else
-    begin
+  //log := SysCreateDir('/nada/logs');
+  //log := SysCreateDir('/nada2');
+  //log := SysCreateFile('/nada/logs');
+ // if log = 0 then
+ // begin
+ //   log := SysOpenFile ('/nada/logs');
+ //   if log = 0 then
+  //  begin
+  //   WriteConsole ('logs not found\n',[]);
+  //  end else
+ //   begin
       // end of file
-      SysSeekFile(log,0,SeekEof);
-    end;
-  end;
-  DebugWrite('holaaa');
-  SysCloseFile(log);
+ //     SysSeekFile(log,0,SeekEof);
+ //   end;
+ // end;
+ // DebugWrite('holaaa');
+  //SysCloseFile(log);
 
   // we open the file which is used as main page for the webserver
   tmp := SysOpenFile('/web/index.html');

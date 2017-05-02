@@ -90,7 +90,7 @@ var
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsole('\t /VToroWebServer/n: new connection from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
-  DebugWrite('ToroWebServer: New connection');
+  DebugWrite('ToroWebServer: New connection'#13#10);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 500000);
   Result := 0;
@@ -149,32 +149,28 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
 
-  // we create/open the file for logs
-  log := SysCreateDir('/nada');
-  //log := SysCreateDir('/nada/logs');
-  //log := SysCreateDir('/nada2');
-  //log := SysCreateFile('/nada/logs');
- // if log = 0 then
- // begin
- //   log := SysOpenFile ('/nada/logs');
- //   if log = 0 then
-  //  begin
-  //   WriteConsole ('logs not found\n',[]);
-  //  end else
- //   begin
+  // we first try to create the file for logs
+  log := SysCreateFile('/log');
+  if log = 0 then
+  begin
+    // if it exists we just open it
+    log := SysOpenFile ('/log');
+    if log = 0 then
+    begin
+      WriteConsole ('logs not found\n',[]);
+    end else
+    begin
       // end of file
- //     SysSeekFile(log,0,SeekEof);
- //   end;
- // end;
- // DebugWrite('holaaa');
-  //SysCloseFile(log);
+      SysSeekFile(log,0,SeekEof);
+    end;
+  end;
 
   // we open the file which is used as main page for the webserver
   tmp := SysOpenFile('/web/index.html');
 
   if (tmp <> 0) then
   begin
-    // we read the whole file first
+    // we read the whole file
     count := SysReadFile(tmp,sizeof(buff),@buff);
     // we close the file
     SysCloseFile(tmp);

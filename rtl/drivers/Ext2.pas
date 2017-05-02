@@ -6,6 +6,7 @@
 //
 // Changes :
 //
+// 09 / 04 / 2017 Adding SysCreateDir()
 // 12 / 03 / 2017 Adding writting support.
 // 31 / 03 / 2007 v1.
 //
@@ -160,6 +161,9 @@ const
   Ext2_Dir_Mode = Ext2_All_Right;
   Ext2_File_Mode = Ext2_Mode_Irusr or Ext2_Mode_Iwusr or Ext2_Mode_Irgrp or Ext2_Mode_Iroth;
 
+  // const used to set up times in inodes
+  Ext2Date : TNow = ( Sec:0 ; Min:0 ; Hour:0 ; Day: 1 ; Month: 1; Year: 1970 );
+
 function AddFreeBlocktoInode (Inode: PInode; I: longint): Boolean;forward;
 function AddFiletoInodeDir(Ino: PInode; const Name: AnsiString; Inode: longint): Boolean;forward;
 function InitializeInodeDir(Ino: PInode; Inode: longint): Boolean;forward;
@@ -167,6 +171,14 @@ function AddDirtoInodeDir(Ino: PInode; const Name: AnsiString; Inode: longint): 
 var
  Ext2Driver: TFilesystemDriver;
 
+// Returns the number of seconds between Now and Ext2Date
+function Ext2GetSeconds: Longint;
+var
+ ANow: TNow;
+begin
+  Now(@ANow);
+  Result:= SecondsBetween(ANow, Ext2Date);
+end;
 
 // Ext2WriteSuper:
 // Update SuperBlock structure in disk
@@ -233,6 +245,14 @@ begin
     1: Super.BlockSize:= 2048;
     2: Super.BlockSize:= 4096;
   end;
+
+  {$IFDEF DebugExt2FS}
+  if SuperExt2.state = 2 then
+  begin
+     WriteDebug('Ext2ReadSuper: Ext2 superblock was not cleaned unmounted\n', []);
+  end;
+  {$ENDIF}
+
   SpbInfo:= ToroGetMem(sizeof(Ext2_Sb_Info));
   if SpbInfo=nil then
   begin
@@ -325,11 +345,12 @@ begin
   // block where is the inode
   block:= gdp^[desc].inode_table + (((inode.ino-1) mod SbInfo.inodes_per_group * sizeof(ext2_inode))
             shr (SbInfo.log_block_size +10));
-
   bh := GetBlock(Inode.SuperBlock.BlockDevice, Block, Inode.SuperBlock.BlockSize);
 
+  // error when it was reading the inode
   if bh = nil then
-    Exit; // error when was read the inode
+    Exit;
+
   raw_inode := Pointer(PtrUInt(bh.data) + Offset);
   //
   // TODO: to update the mode??
@@ -343,7 +364,10 @@ begin
   // we update the number of blocks and the links_count
   raw_inode.blocks:= InoInfo.blocks;
   raw_inode.links_count:= InoInfo.links_count;
-  // TODO: to update the access time
+
+  // we update the access and modification time
+  raw_inode.atime:= Inode.ATime;
+  raw_inode.mtime:= Inode.MTime;
   bh.Dirty:= true;
   PutBlock (Inode.SuperBlock.BlockDevice, bh);
   {$IFDEF DebugExt2FS} WriteDebug('Ext2WriteInode: updating Inode: %d, blocks: %d, links_count: %d\n', [Inode.ino,raw_inode.blocks,raw_inode.links_count]); {$ENDIF}
@@ -388,12 +412,12 @@ begin
     Exit; // error when was read the inode
   raw_inode := Pointer(PtrUInt(bh.data) + Offset);
 
-  // TODO: correct times
   with Inode^ do
   begin
     Size:= 0;
-    ATime:= 0;
-    CTime:= 0;
+    ATime:= Ext2GetSeconds;
+    MTime:= ATime;
+    CTime:= ATime;
     DTime:= 0;
     Mode:= cache_mode;
     Dirty:= false;
@@ -416,10 +440,10 @@ begin
   FillChar(raw_Inode^,sizeof(Ext2_Inode),0);
   with raw_Inode^ do
   begin
-    // TODO: set the right value
     dtime:= 0;
-    atime:= 0;
-    ctime:= 0;
+    atime:= Inode^.ATime;
+    ctime:= atime;
+    mtime:= atime;
     mode:= i_mode;
     if cache_mode = INODE_DIR then
        links_count:= 2
@@ -430,7 +454,7 @@ begin
   // the block that contains the inode is marked as dirty
   bh.Dirty:= true;
   PutBlock (Inode.SuperBlock.BlockDevice, bh);
-  {$IFDEF DebugExt2FS} WriteDebug('Ext2InitInode: initializing Inode: %d\n', [Inode.ino]); {$ENDIF}
+  {$IFDEF DebugExt2FS} WriteDebug('Ext2InitInode: initializing Inode: %d, Inode.atime: %d\n', [Inode.ino, raw_Inode^.atime]); {$ENDIF}
 end;
 
 // Ext2CreateInode:
@@ -487,7 +511,7 @@ begin
       begin
         // we mark it as busy
         p[j div 8] := p[j div 8] or (1 shl (j mod 8));
-        nr_inode := SbInfo.inodes_per_group * block_group + k*(Inode.SuperBlock.BlockSize * 8) + j;
+        nr_inode := SbInfo.inodes_per_group * block_group + k*(Inode.SuperBlock.BlockSize * 8) + j + 1;
         {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: free Inode: %d\n', [nr_inode]); {$ENDIF}
         gdp^[desc].free_inodes_count := gdp^[desc].free_inodes_count -1;
         // descriptor block is marked as dirty
@@ -790,7 +814,6 @@ begin
     bh.Dirty := true;
     PutBlock (Ino.SuperBlock.BlockDevice, bh);
     // we increment the links count of the dir inode
-    InoInfo.links_count:= InoInfo.links_count + 1;
     Ino.Dirty:= true;
     Result:= true;
 end;
@@ -1270,7 +1293,15 @@ begin
     bh.Dirty:= true;
     PutBlock(FileDesc.Inode.SuperBlock.BlockDevice,bh);
   end;
+
   Result := Len;
+
+  // if we write something
+  // we modify the modification access time
+  if Result <> 0 then
+  begin
+     FileDesc.Inode.MTime:= Ext2GetSeconds;
+  end;
 
   // TODO: It updates the inode only if size increments, is that right?
   if FileDesc.FilePos > FileDesc.Inode.Size then

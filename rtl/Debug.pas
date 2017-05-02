@@ -284,14 +284,13 @@ end;
 // initialize the debuging
 procedure DebugInit;
 begin
-  // speed and more registers of serial port
+  // setting up serial port registers
   write_portb ($83, BASE_COM_PORT+3);
   write_portb (0, BASE_COM_PORT+1);
   write_portb (1, BASE_COM_PORT);
   write_portb (3, BASE_COM_PORT+3);
   WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
   WriteDebug('Initialization of debuging console.\n',[]);
-  //DebugTrace('Initialization of debugging',0,0,0);
   {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 

@@ -7,6 +7,7 @@
 //
 // Changes :
 // 
+// 09 / 04 / 2017 Adding SysCreateDir()
 // 12 / 03 / 2017 Adding SysCreateFile().
 // 17 / 02 / 2006 v1.
 //
@@ -884,7 +885,9 @@ begin
   Result := ino;
 end;
 
-// Create a new directory in the given path
+// SysCreateDir:
+//
+// Create a new directory in the path
 function SysCreateDir(Path: PAnsiChar): Longint;
 var
   Base: PInode;
@@ -959,8 +962,9 @@ begin
   end;
 end;
 
-// Create a new file in the given path
+// SysCreatePath:
 //
+// Create a new file in the path
 function SysCreateFile(Path: PAnsiChar): THandle;
 var
   Base: PInode;
@@ -1040,6 +1044,10 @@ begin
   end;
 end;
 
+//
+// SysOpenFile
+//
+// Open the last file in path. Fails if it is a directory.
 function SysOpenFile(Path: PXChar): THandle;
 var
   FileRegular: PFileRegular;
@@ -1066,7 +1074,7 @@ begin
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: File Openned\n', []); {$ENDIF}
 end;
 
-// Changes position of the File. I don't need the driver.
+// Changes position of the File
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 var
   FileRegular: PFileRegular;
@@ -1129,7 +1137,7 @@ begin
   {$IFDEF DebugFS} WriteDebug('SysWriteFile: %d bytes written, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
 end;
 
-// Close regular File , very simple only return the inode and free memory
+// Close regular File
 procedure SysCloseFile(FileHandle: THandle);
 var
   FileRegular: PFileRegular;

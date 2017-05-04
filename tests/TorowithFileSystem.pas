@@ -3,10 +3,12 @@
 //
 // This is a simple example that shows how toro can be used to read files from ext2 filesystem.
 // In this example, we first read a file named index.html and then we wait for connections on port
-// 80. When a connection arrives, we send the content of the file and we close the conection.
+// 80. When a connection arrives, we send the content of the file and we close the conection. The example
+// also logs into a file name /web/logs to show writting operations to ext2.
 //
 // Changes :
-// 
+//
+// 04 / 05 / 2017 v2.
 // 12 / 02 / 2017 Adding SysCreateFile().
 // 04 / 03 / 2017 v1.
 //
@@ -37,7 +39,7 @@ program TorowithFileSystem;
 
 // Configuring the RUN for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=ne2k_pci -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles2.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=ne2k_pci -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -70,6 +72,7 @@ var
   HttpHandler: TNetworkHandler;
   count: longint = 0;
 
+// Simple logger for the webserver
 procedure DebugWrite(msg: pchar);
 begin
   SysWriteFile(log,strlen(msg),msg);
@@ -102,12 +105,13 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
+  DebugWrite('ToroWebServer: Receiving Data'#13#10);
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
   // we send the all file
   SysSocketSend(Socket, @buff[0], count, 0);
-  WriteConsole ('\t /VToroWebServer/n: sending to %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
-  // todo: this can close the socket two times!!!!!
+  DebugWrite('ToroWebServer: Sending Data'#13#10);
+  WriteConsole ('\t /VToroWebServer/n: sending to %d.%d.%d.%d and closing connection\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -118,8 +122,9 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole ('\t /VToroWebServer/n: remote host from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
+  WriteConsole ('\t /VToroWebServer/n: closed from remote host from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
   SysSocketClose(Socket);
+  DebugWrite('ToroWebServer: Closing connection'#13#10);
   Result := 0;
 end;
 
@@ -149,12 +154,15 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
 
+  // try to create the logs directory
+  SysCreateDir('/web/logs');
+
   // we first try to create the file for logs
-  log := SysCreateFile('/log');
+  log := SysCreateFile('/web/logs/log');
   if log = 0 then
   begin
     // if it exists we just open it
-    log := SysOpenFile ('/log');
+    log := SysOpenFile ('/web/logs/log');
     if log = 0 then
     begin
       WriteConsole ('logs not found\n',[]);

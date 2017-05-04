@@ -132,8 +132,6 @@ procedure CaptureInt (int: Byte; Handler: Pointer);
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 procedure ArchInit;
 procedure Now (Data: PNow);
-//procedure EnabledINT;
-//procedure DisabledINT;
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
@@ -141,10 +139,7 @@ function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
-//procedure BeginCriticalSection; overload;
-//procedure BeginCriticalSection (var addval: UInt64); overload;
-//procedure EndCriticarSection; overload;
-//procedure EndCriticalSection (var addval: UInt64); overload;
+function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 
 
 
@@ -796,8 +791,29 @@ begin
   Data.Hour := hour;
   Data.Month:= Mon;
   Data.Day := Day;
-  Data.Year := Year;
-  Data.Year := Year;
+  if (Year < 90) then
+      Data.Year := 2000 + Year
+  else
+      Data.Year := 1900 + Year;
+end;
+
+// Calculate the number of seconds between two dates
+function SecondsBetween(const ANow: TNow;const AThen: TNow): Longint;
+var
+  julnow, julthen, a1, a2: longint;
+  NowYear, NowMonth: longint;
+  ThenYear, ThenMonth: longint;
+begin
+  a1 := (14 - ANow.Month) div 12;
+  a2 := (14 - AThen.Month) div 12;
+  NowMonth:= ANow.Month + 12 * a1 - 3;
+  ThenMonth:= AThen.Month + 12 * a2 - 3;
+  NowYear:=  ANow.Year + 4800 - a1;
+  ThenYear:=  AThen.Year + 4800 - a2;
+  // we first calculate the julian date
+  julnow := ANow.Day + ((153 * NowMonth+2) div 5) + 365*NowYear + (NowYear div 4) - (NowYear div 100) + (NowYear div 400);
+  julthen := AThen.Day + ((153*ThenMonth+2) div 5) + 365*ThenYear + (ThenYear div 4) - (ThenYear div 100) + (ThenYear div 400);
+  Result := (julnow - julthen ) * 3600 * 24 + Abs(ANow.Hour - AThen.Hour) * 3600 + Abs (ANow.Min -  AThen.Min) * 60 + Abs(ANow.Sec - AThen.Sec);
 end;
 
 {$IFDEF FPC}

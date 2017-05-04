@@ -10,10 +10,11 @@
 //
 // Changes :
 //
-// 07/03/2009 Some bugs Fixed.
-// 22/02/2007 First Version by Matias Vara.
+// 12 / 03 / 2017 Major bugs fixed.
+// 07 / 03 / 2009 Major bugs fixed.
+// 22 / 02 / 2007 v1.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -371,7 +372,7 @@ begin
       {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATABusy Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       while ATABusy(@ATAControllers[ControllerNo]) do
         NOP;
-      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATADataReady ? Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - ATADataReady: Controller: %d Disk: %d\n', [ControllerNo, DriveNo]); {$ENDIF}
       if ATADataReady(@ATAControllers[ControllerNo]) and not ATAError(@ATAControllers[ControllerNo]) then
       begin
         {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo]); {$ENDIF}
@@ -537,7 +538,7 @@ begin
   // sending Commands
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_READ);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: prepared and commands sent, Block:%d, Count:%d\n', [Block,Count]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: prepared and commands sent, Block:%d, Count:%d\n', [Block, Count]); {$ENDIF}
   repeat
     SysThreadSwitch; // wait for the irq
     if not ATADataReady(Ctr) or ATAError(Ctr) then
@@ -552,7 +553,7 @@ begin
   // returns the number of blocks read
   Result := ReadCount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + Count]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + ReadCount]); {$ENDIF}
 end;
 
 
@@ -573,20 +574,24 @@ begin
   ATASendCommand(Ctr,ATA_WRITE);
   // writing
   repeat
+    DisableInt;
     FileDesc.BlockDriver.WaitOn.state := tsSuspended;
     ATAOut(Buffer, Ctr.IOPort);
-    // waiting the IRQ
+    RestoreInt;
+    // wait IRQ
     SysThreadSwitch;
     if ATAError(Ctr) then
+    begin
+      {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAWriteBlock, error writting Block %d\n', [Block+ncount]); {$ENDIF}
       Break;
+    end;
     Buffer:= Pointer(PtrUInt(Buffer)+512);
     Inc(ncount);
-    Inc(Block);
   until ncount = Count;
   // exiting with numbers of blocks written
   Result := ncount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAWriteBlock, Handle: %q, Begin Sector: %d, End Sector: %d\n', [Int64(FileDesc), Block, Block+Ncount]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAWriteBlock, Handle: %d, Begin Sector: %d, End Sector: %d\n', [PtrUInt(FileDesc), Block, Block+Ncount]); {$ENDIF}
 end;
 
 // Detection of IDE devices.

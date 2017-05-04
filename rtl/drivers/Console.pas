@@ -206,7 +206,6 @@ var
   Values: PXChar;
   tmp: TNow;
 begin
-  //BeginCriticalSection (LockConsole);
   DisableInt;
   SpinLock (3,4,LockConsole);
   
@@ -339,7 +338,6 @@ begin
     PutC(Format[J]);
     Inc(J);
   end;
-  //EndCriticalSection(LockConsole);
   LockConsole := 3;
   RestoreInt;
 end;

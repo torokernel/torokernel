@@ -7,13 +7,13 @@
 //
 // Changes :
 //
-// 20/01/2017 Adding SetBreakPoint()
-// 18/12/2016 Adding protection to WriteDebug()
-// 08/12/2016 Removing spin-locks to prevent deadlocks
-// 06/05/2009 Supports QWORDS parameters.
-// 23/09/2006 First version.
+// 20 / 01 / 2017 Adding SetBreakPoint().
+// 18 / 12 / 2016 Adding protection to WriteDebug().
+// 08 / 12 / 2016 Removing spin-locks to prevent deadlocks.
+// 06 / 05 / 2009 Supports QWORDS parameters.
+// 23 / 09 / 2006 v1.
 //
-// Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -284,14 +284,13 @@ end;
 // initialize the debuging
 procedure DebugInit;
 begin
-  // speed and more registers of serial port
+  // setting up serial port registers
   write_portb ($83, BASE_COM_PORT+3);
   write_portb (0, BASE_COM_PORT+1);
   write_portb (1, BASE_COM_PORT);
   write_portb (3, BASE_COM_PORT+3);
   WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
   WriteDebug('Initialization of debuging console.\n',[]);
-  //DebugTrace('Initialization of debugging',0,0,0);
   {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 

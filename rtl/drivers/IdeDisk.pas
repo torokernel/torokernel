@@ -10,8 +10,8 @@
 //
 // Changes :
 //
-// 12 / 03 / 2017 Major bugs fixed.
-// 07 / 03 / 2009 Major bugs fixed.
+// 12 / 03 / 2017 v3.
+// 07 / 03 / 2009 v2.
 // 22 / 02 / 2007 v1.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>

@@ -37,7 +37,7 @@ program TorowithFileSystem;
 
 {$IMAGEBASE 4194304}
 
-// Configuring the RUN for Lazarus
+// Configuring the run for Lazarus
 {$IFDEF WIN64}
           {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=ne2k_pci -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
@@ -137,7 +137,6 @@ begin
 end;
 
 begin
-
   // Dedicate the ne2000 network card to local cpu
   DedicateNetwork('ne2000', LocalIP, Gateway, MaskIP, nil);
 
@@ -145,7 +144,7 @@ begin
   DedicateBlockDriver('ATA0',0);
 
   // we mount locally
-  SysMount('ext2','ATA0',6);
+  SysMount('ext2','ATA0',5);
 
   // we set the call backs used by the kernel
   HttpHandler.DoInit := @HttpInit;

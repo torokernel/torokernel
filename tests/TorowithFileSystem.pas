@@ -52,6 +52,7 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
+  Pci in '..\rtl\Drivers\Pci.pas',
   Ide in '..\rtl\drivers\IdeDisk.pas',
   ext2 in '..\rtl\drivers\ext2.pas',
   Console in '..\rtl\Drivers\Console.pas',

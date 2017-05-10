@@ -1,13 +1,10 @@
 //
-// Toro Hello World Test.
-// 
-// Simple test that only print Hello to the serial console. 
-// The serial console must be redirected to a file in order to
-// verify that the application has run correctly.
+// Toro Hello World Example.
+// Clasical example using a minimal kernel to print "Hello World"
 //
 // Changes :
 // 
-// 19/05/2017 v1.0.0
+// 16/09/2011 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -55,8 +52,7 @@ uses
   Console in '..\rtl\Drivers\Console.pas';
 
 begin
-  WriteDebug('Hello World!\n',[]);
-  // TODO: turn off VM
+  WriteConsole('\c/RHello World, I am TORO!!!\n',[0]);
   while True do
     SysThreadSwitch;
 end.

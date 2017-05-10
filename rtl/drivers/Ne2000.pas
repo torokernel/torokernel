@@ -40,7 +40,7 @@ interface
 
 uses
   Arch,
-  FileSystem, // Only for PciDetect
+  Pci,
   Console, Network, Process, Memory;
 
 implementation

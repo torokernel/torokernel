@@ -46,15 +46,16 @@ program ToroHttp;
 // They are declared just the necessary units
 // The units used depend the hardware where you are running the application 
 uses
-  Kernel in 'rtl\Kernel.pas',
-  Process in 'rtl\Process.pas',
-  Memory in 'rtl\Memory.pas',
-  Debug in 'rtl\Debug.pas',
-  Arch in 'rtl\Arch.pas',
-  Filesystem in 'rtl\Filesystem.pas',
-  Network in 'rtl\Network.pas',
-  Console in 'rtl\Drivers\Console.pas',
-  Ne2000 in 'rtl\Drivers\Ne2000.pas';
+  Kernel in '..\rtl\Kernel.pas',
+  Process in '..\rtl\Process.pas',
+  Memory in '..\rtl\Memory.pas',
+  Debug in '..\rtl\Debug.pas',
+  Arch in '..\rtl\Arch.pas',
+  Filesystem in '..\rtl\Filesystem.pas',
+  Pci in '..\rtl\Drivers\Pci.pas',
+  Network in '..\rtl\Network.pas',
+  Console in '..\rtl\Drivers\Console.pas',
+  Ne2000 in '..\rtl\Drivers\Ne2000.pas';
 
 const 
   Welcome: PChar = '<b>Hello from Toro!</b>'+#13#10;

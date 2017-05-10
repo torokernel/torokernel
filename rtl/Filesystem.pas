@@ -174,21 +174,6 @@ type
     FileSystemMounted: PSuperBlock; // ??? Not sure about it ???
   end;
 
-  // Devices information in PCI BUS
-  PBusDevInfo = ^TBusDevInfo;
-  TBusDevInfo = record
-    bus: LongInt;
-    dev: LongInt;
-    func: LongInt;
-    irq: LongInt;
-    IO: array[0..5] of UInt32;
-    Vendor: UInt32;
-    Device: UInt32;
-    MainClass: UInt32;
-    SubClass: UInt32;
-    Next: PBusDevInfo;
- end;
- 
 // Programmer's Interface
 procedure FileSystemInit;
 procedure GetDevice(Dev:PBlockDriver);
@@ -216,7 +201,6 @@ procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
 function SysCreateFile(Path:  PAnsiChar): THandle;
 
 var
-  PCIDevices: PBusDevInfo; // List of Devices in PCI Bus .
   FileSystemDrivers: PFileSystemDriver; // Filesystem Drivers installed
  
 implementation
@@ -225,123 +209,7 @@ var
   Storages: array [0..MAX_CPU-1] of TStorage; // Dedicated Storage
   BlockDevices: PBlockDriver; // Block Drivers installed
 
-//------------------------------------------------------------------------------
-// PCI kernel's driver implementation
-//------------------------------------------------------------------------------
-// TODO : Remove PCI detection in Filesystem's Unit.
 
-const
- ADDPCISTART = $e0000;
- MAX_PCIBUS = 4;
- MAX_PCIDEV = 32;
- MAX_PCIFUNC = 8;
- PCI_CONF_PORT_INDEX = $CF8;
- PCI_CONF_PORT_DATA  = $CFC;
- PCI_CONFIG_INTR        = 15;
- PCI_CONFIG_VENDOR      = 0;
- PCI_CONFIG_CLASS_REV   = 2;
- PCI_CONFIG_BASE_ADDR_0 = 4;
- PCI_BAR                = $10;
-
-type
-  PBios32 = ^TBios32;
-  TBios32 = record
-    Magic: LongInt;
-    phys_entry: LongInt;
-    Revision: Byte;
-    Length : Byte;
-    CRC: XChar;
-    Reserved: array [1..5] of Byte;
- end;
-
-// Detect all devices in PCI Buses.
-procedure PciDetect;
-var
-  dev, func, Bus, Vendor, Device, regnum: UInt32;
-  DevInfo: PBusDevInfo;
-  I, Tmp, btmp: UInt32;
-begin
-  btmp := 0;
-  // this is not the best way to look the PCI devices.
-  for Bus := 0 to MAX_PCIBUS-1 do
-  begin
-    for dev := 0 to MAX_PCIDEV-1 do
-    begin
-      {$IFDEF DebugArch} WriteDebug('PciDetect - Bus: %d Dev: %d', [Bus, Dev]); {$ENDIF}
-      for func := 0 to MAX_PCIFUNC-1 do
-      begin
-        {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
-        Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_VENDOR);
-        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_VENDOR func: %d Tmp: %h', [Tmp, func]); {$ENDIF}
-        Vendor := Tmp and $FFFF;
-        Device := Tmp div 65536;
-        // some bug
-        if func = 0 then
-          btmp := Device
-        else if Device = btmp then
-          Break;
-        // the device exists
-        if (Vendor = $ffff) or (Vendor = 0) then
-          Continue;
-        DevInfo := ToroGetMem(SizeOf(TBusDevInfo));
-        if DevInfo = nil then
-          Exit;
-        DevInfo.Device := Device;
-        DevInfo.Vendor := Vendor;
-        Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_CLASS_REV);
-        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_CLASS_REV func: %d Tmp: %h', [Tmp, func]); {$ENDIF}
-        DevInfo.MainClass := Tmp div 16777216;
-        DevInfo.SubClass := (Tmp div 65536) and $ff;
-        for I := 0 to 5 do
-        begin
-          regnum := PCI_CONFIG_BASE_ADDR_0+I;
-          {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
-          {$IFDEF DebugArch} WriteDebug('PciDetect - Before PciReadDword I: %d', [I]); {$ENDIF}
-          Tmp := PciReadDword(Bus, dev, func, regnum);
-          {$IFDEF DebugArch} WriteDebug('PciDetect - After PciReadDword Bus: %q dev: %d func: %d', [Bus, dev, func]); {$ENDIF}
-          {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_BASE_ADDR_0+%d, Tmp: %h', [Tmp, I]); {$ENDIF}
-          if (Tmp and 1) = 1 then
-          begin
-            DevInfo.IO[I] := Tmp and $FFFFFFFC // IO port
-          end else begin
-            DevInfo.IO[I] := Tmp; // Memory Address
-          end;
-        end;
-        Tmp := PciReadDword(Bus, dev, func, PCI_CONFIG_INTR);
-        {$IFDEF DebugArch} WriteDebug('PciDetect - PciReadDword PCI_CONFIG_INTR, func: %d, Tmp: %h', [Tmp, func]); {$ENDIF}
-        DevInfo.irq := Tmp and $ff;
-        DevInfo.bus := Bus;
-        DevInfo.func := func;
-        DevInfo.dev := dev;
-        DevInfo.Next := PciDevices; // the device is added
-        PciDevices := DevInfo;
-      end;
-    end;
-  end;
-end;
-
-// Initialization of structures
-procedure PciInit;
-//var
-// fd: PBios32;
-begin
-  PciDetect;
-{
-  fd := Pointer(ADDPCISTART);
-  printK_('PCI Driver ...',0);
-  while (fd < Pointer($100000)) do
-  begin
-   if fd.magic=$5F32335F then
-   begin
-    printK_('/VOk!\n/n',0);
-    PciDetect;
-    exit;
-   end;
-  fd :=fd+1;
-  end;
-  printk_('/RFault\n/n',0);
-}
-end;
 
 // The driver is enque in Block Drivers tail.
 procedure RegisterBlockDriver(Driver: PBlockDriver);
@@ -1161,8 +1029,6 @@ begin
   end;
   BlockDevices := nil;
   FileSystemDrivers := nil;
-  PCIDevices := nil;
-  PciInit;
 end;
 
 end.

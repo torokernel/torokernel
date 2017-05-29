@@ -1,0 +1,35 @@
+# Part of `travis-lazarus` (https://github.com/nielsAD/travis-lazarus)
+# License: MIT
+
+language: generic
+sudo: required
+dist: trusty
+
+os:
+  - linux
+
+env:
+  global:
+    - WINEPREFIX=~/.winelaz
+    - DISPLAY=:99.0
+  matrix:
+    - LAZ_VER=1.6.2 LAZ_ENV=wine WINEARCH=win64 LAZ_OPT="--os=win64 --cpu=x86_64"
+
+before_install:
+  # Start virtual display server
+  - Xvfb $DISPLAY &
+  - chmod +x ./tests/travis.install.py
+
+install:
+  # Install prerequisites (fpc/lazarus/wine/qemu)
+  - ./tests/travis.install.py
+  - /bin/bash -c "sudo apt-get install qemu-system-x86"
+
+script:
+  # Build all test projects
+  - lazbuild $LAZ_OPT ./tests/*.lpi               
+  
+notifications:
+  email:
+    on_success: false
+    on_failure: false

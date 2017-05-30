@@ -140,7 +140,7 @@ procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
-
+procedure ShutdownInQemu;
 
 
 
@@ -642,6 +642,13 @@ end;
 procedure hlt; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
   hlt
+end;
+
+// Turn off Qemu VM
+// it is needed to add "-device isa-debug-exit,iobase=0xf4,iosize=0x04"
+procedure ShutdownInQemu;
+begin
+  write_portb(0, $f4);
 end;
 
 // Get the rdtsc counter

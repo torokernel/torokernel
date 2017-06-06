@@ -334,7 +334,7 @@ const
 
   // Time for wait ACK answer, 50 miliseg per connection
   WAIT_ACK = 50;
-  // Time for wait ARP Responsep
+  // Time for wait ARP Response
   WAIT_ARP = 50;
   // Time for wait a Remote Close , 10 seg. per connection
   WAIT_ACKFIN = 10000;
@@ -700,7 +700,7 @@ begin
     Machine := LookIp(IP); // MAC already added ?
     if Machine <> nil then
     begin
-	  {$IFDEF DebugNetwork} WriteDebug('ARP: New mac added\n', []); {$ENDIF}
+     {$IFDEF DebugNetwork} WriteDebug('GetMacAddress: MAC founded in cache, IP:%h\n', [PtrUInt(IP)]); {$ENDIF}
       Result:= Machine;
       Exit;
     end;

@@ -87,7 +87,7 @@ begin
 	RestoreInt;
 end;
 
-
+// FIXME: I should be incremented
 procedure DebugPrintDecimal(Value: PtrUInt);
 var
   I, Len: Byte;

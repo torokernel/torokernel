@@ -5,8 +5,9 @@
 //
 // Changes:
 //
+// 06.06.2017. First version.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -28,12 +29,15 @@ unit E1000;
 interface
 
 {$I ..\Toro.inc}
-// {$DEFINE DebugE1000}
+{$IFDEF DEBUG}
+        //{$DEFINE DebugE1000}
+{$ENDIF}
 
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  FileSystem, // required only for PciDetect, TODO: move this code to a new unit Pci.pas or in Arch.pas
+  FileSystem,
+  Pci,
   Arch, Console, Network, Process, Memory;
 
 implementation
@@ -81,6 +85,7 @@ type
    end;
 
 const
+   E1000_REG_STATUS = $8;
    E1000_REG_CTRL = 0;
    E1000_REG_FCAL = $28;
    E1000_REG_FCAH = $2c;
@@ -105,14 +110,16 @@ const
    E1000_REG_EERD_START = 1 shl 0;
    E1000_REG_EERD_DATA	= $ffff shl 16;
 
-   E1000_REG_RCTL_MPE	= 1 shl 4;
    E1000_REG_RAH_AV	= 1 shl 31;
 
    E1000_REG_RDBAL = $2800;
    E1000_REG_RDBAH = $2804;
    E1000_REG_RDLEN = $2808;
    E1000_REG_RCTL_EN = 1 shl 1;
+   E1000_REG_RXDCTL_ENABLE = 1 shl 25;
+   // 256 bytes
    E1000_REG_RCTL_BSIZE	= ((1 shl 16) or (1 shl 17));
+   E1000_REG_RXDCTL = $2828;
    E1000_REG_TDBAL = $3800;
    E1000_REG_TDBAH = $3804;
    E1000_REG_TDLEN = $3808;
@@ -120,6 +127,7 @@ const
    E1000_REG_TDT = $3818;
    E1000_REG_RDH = $2810;
    E1000_REG_RDT = $2818;
+   E1000_REG_RDTR = $2820;
    E1000_REG_TCTL_PSP =	1 shl 3;
    E1000_REG_TCTL_EN  = 1 shl 1;
 
@@ -149,9 +157,16 @@ const
    E1000_TX_CMD_RS = 1 shl 3;
 
    E1000_RX_STATUS_EOP	= 1 shl 1;
+   E1000_RX_STATUS_DONE = 1 shl 0;
 
+   E1000_REG_RCTL_UPE = 1 shl 3;
+   E1000_REG_RCTL_MPE = 1 shl 4;
+   E1000_REG_RCTL_BAM = 1 shl 15;
+   E1000_RCTL_SECRC = 1 shl 26;
+
+// Support currently 1 ethernet card
 var
-  NicE1000: TE1000; // Support currently 1 ethernet card
+  NicE1000: TE1000;
 
 // read e1000 register
 function E1000ReadRegister(Net: PE1000; reg: LongInt): LongInt;
@@ -172,7 +187,7 @@ begin
 end;
 
 // set a bit
-procedure E1000SetRegister(Net: PE1000; Reg, Value:LongInt);
+procedure e1000SetRegister(Net: PE1000; Reg, Value: LongInt);
 var
   Data: LongInt;
 begin
@@ -192,16 +207,24 @@ end;
 procedure E1000Reset(Net: PE1000);
 begin
    E1000SetRegister(Net, E1000_REG_CTRL, E1000_REG_CTRL_RST);
-  //delay(1); // 1 micro
+   // delay one microsecond
+   DelayMicro(1000);
 end;
 
 function EepromEerd(Net: PE1000; Reg: LongInt): Word;
+var
+  tmp: LongInt;
 begin
   // Request EEPROM read.
   E1000WriteRegister(Net, E1000_REG_EERD,(Reg shl Net^.EepromAddrOff) or E1000_REG_EERD_START);
   // Wait until ready.
-  while (E1000ReadRegister(Net, E1000_REG_EERD) and Net^.EepromDoneBit) = 1 do ;
-  Result := ((E1000ReadRegister(Net, E1000_REG_EERD) and E1000_REG_EERD_DATA)) shr 16;
+  tmp := E1000ReadRegister(Net, E1000_REG_EERD);
+  while ((tmp and Net^.EepromDoneBit) = 0) do
+  begin
+    DelayMicro(1);
+    tmp := E1000ReadRegister(Net, E1000_REG_EERD);
+  end;
+  Result := tmp shr 16;
 end;
 
 // Kernel starts the card
@@ -210,53 +233,65 @@ var
   CPU: byte;
 begin
   CPU := GetApicid;
-  IrqOn(NicE1000.IRQ);
   // enable the interruption
-  e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
+  IrqOn(NicE1000.IRQ);
+  {$IFDEF DebugE1000} WriteDebug('e1000: starting on CPU%d\n', [CPU]); {$ENDIF}
 end;
 
 // Kernel stops the card
 procedure e1000Stop(net: PNetworkInterface);
 begin
+  IrqOff(NicE1000.IRQ);
 end;
 
 type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
 
-// Internal Job of NetworkSend
-procedure DoSendPacket(Net: PNetworkInterface; Isirq: boolean);
+// This procedure makes all the job of sending packets
+// It is limited to send one packet every time.
+// TODO: To improve this by sending a bunch of packets
+procedure DoSendPacket(Net: PNetworkInterface);
 var
-  Tail, I: LongInt;
+  Tail, I, Head, Next: LongInt;
   Desc: PE1000TxDesc;
   Data, P: PByteArray;
 begin
-  // the kernel is calling, we need protection
-  If not(Isirq) then
-   DisableINT;
-  E1000ReadRegister(@NicE1000, E1000_REG_TDH);
+  DisableINT;
+  Head := E1000ReadRegister(@NicE1000, E1000_REG_TDH);
   Tail := E1000ReadRegister(@NicE1000, E1000_REG_TDT);
+  Next := (Tail + 1) mod NicE1000.TxDescCount;
+
+  // transmission queue is full
+  if (Head = Next) then
+  begin
+       {$IFDEF DebugE1000} WriteDebug('e1000: DoSendPacket with Head = Next, exiting\n', []); {$ENDIF}
+       exit;
+  end;
+
+  // pointer to the descriptor
   Desc := NicE1000.TxDesc;
   inc(Desc, Tail);
+
   Data := Pointer(PtrUInt(NicE1000.TxBuffer) + (Tail*E1000_IOBUF_SIZE));
   P := net.OutgoingPackets.data;
+
   // copy bytes to TX queue buffers
   // TODO : we are not checking if the packet size is longer that the buffer!!
-  // suppousin than the size is less than BUFFER_SIZE
   for I:= 0 to  (net.OutgoingPackets.size-1) do
     Data^[I] := P^[I];
+
   // mark this descriptor ready
-  Desc.Status  := 0;
-  Desc.Command := 0;
+  Desc.Status  := E1000_RX_STATUS_DONE;
   Desc.Length  := net.OutgoingPackets.size;
-  // TODO: We are using just a Buffer per packet
-  // this marks the end of the packet, maybe I am wrong
+
+  // this marks the end of the packet
   Desc.Command := E1000_TX_CMD_EOP or E1000_TX_CMD_FCS or E1000_TX_CMD_RS;
+
   // increment tail and Start transmission
-  E1000WriteRegister(@NicE1000, E1000_REG_TDT,  (Tail+1) mod NicE1000.TxDescCount);
-  // Irq on again
-  If not(Isirq) then
-   RestoreInt;
+  E1000WriteRegister(@NicE1000, E1000_REG_TDT,  Next);
+
+  RestoreInt;
 end;
 
 // Send a packet
@@ -271,7 +306,7 @@ begin
    // i have to enque it
     Net.OutgoingPackets := Packet;
    // send Directly
-    DoSendPacket(Net,false);
+    DoSendPacket(Net);
   end else
   begin
     // we need local protection
@@ -281,11 +316,10 @@ begin
       PacketQueue := PacketQueue.Next;
     PacketQueue.Next := Packet;
     RestoreInt;
-  // end protection
   end;
 end;
 
-// Init RX and TX buffers
+// Initializes RX and TX buffers
 function e1000initbuf(Net: PE1000): Boolean;
 var
   I: LongInt;
@@ -296,122 +330,249 @@ begin
   // number of descriptors
   Net.RxDescCount := E1000_RXDESC_NR;
   Net.TxDescCount := E1000_TXDESC_NR;
+
   // allocate RX descriptors
-  Net.RxDesc := ToroGetMem(Net.RxDescCount*SizeOf(TE1000RxDesc));
+  Net.RxDesc := ToroGetMem(Net.RxDescCount*SizeOf(TE1000RxDesc) + 16);
+
   if Net.RxDesc = nil then
-  begin // not enough memory
+  begin
     Result := False;
     Exit;
   end;
-  // fill with zeros
+
+  // aligned RxDesc address
+  if (PtrUInt(Net.RxDesc) mod 16 <> 0) then
+  begin
+    Net.RxDesc := PE1000RxDesc(PtrUInt(Net.RxDesc) + 16 - PtrUInt(Net.RxDesc) mod 16);
+  end;
+
+  {$IFDEF DebugE1000} WriteDebug('e1000: RxDesc base address: %d\n', [PtrUInt(Net.RxDesc)]); {$ENDIF}
+
   r := pointer(Net.RxDesc) ;
-  for I := 0 to   ((Net.RxDescCount*SizeOf(TE1000RxDesc))-1) do
+  for I := 0 to ((Net.RxDescCount*SizeOf(TE1000RxDesc)+16)-1) do
     r[I] := #0;
+
   // allocate 2048-Byte buffers
   Net.RxBufferSize := E1000_RXDESC_NR * E1000_IOBUF_SIZE;
-  Net.RxBuffer := ToroGetMem(Net.RxBufferSize);
+
+  // TODO: this memory should not be aligned?
+  Net.RxBuffer := ToroGetMem(Net.RxBufferSize+16);
+
   if Net.RxBuffer = nil then
-  begin // not enough memory
+  begin
     ToroFreeMem(Net.RxDesc);
     Result := False;
     Exit;
   end;
+
+  // aligned RxDesc address
+  if (PtrUInt(Net.RxBuffer) mod 16 <> 0) then
+  begin
+    Net.RxBuffer := Pointer(PtrUInt(Net.RxBuffer) + 16 - PtrUInt(Net.RxBuffer) mod 16);
+  end;
+
+  {$IFDEF DebugE1000} WriteDebug('e1000: RxBuffer base address: %d\n', [PtrUInt(Net.RxBuffer)]); {$ENDIF}
+
   // setup RX descriptors
   RxBuff := Net.RxDesc;
   for I := 0 to E1000_RXDESC_NR-1 do
     begin
     RxBuff.Buffer := DWORD(PtrUInt(Net.RxBuffer) + (I * E1000_IOBUF_SIZE));
+    RxBuff.status := 0;
     inc(RxBuff);
     end;
-  Net.TxDesc := ToroGetMem(Net.TxDescCount * SizeOf(TE1000TxDesc));
+
+  Net.TxDesc := ToroGetMem(Net.TxDescCount * SizeOf(TE1000TxDesc) + 16);
   if Net.TxDesc = nil then
-  begin // not enough memory
+  begin
     ToroFreeMem(Net.RxBuffer);
     ToroFreeMem(Net.RxDesc);
     Result := False;
     Exit;
   end;
-  // fill with zeros
+
+  // aligned TxDesc address
+  if (PtrUInt(Net.TxDesc) mod 16 <> 0) then
+  begin
+    Net.TxDesc := PE1000TxDesc(PtrUInt(Net.TxDesc) + 16 - PtrUInt(Net.TxDesc) mod 16);
+  end;
+
+  {$IFDEF DebugE1000} WriteDebug('e1000: TxDesc base address: %d\n', [PtrUInt(Net.TxDesc)]); {$ENDIF}
+
   r := pointer(Net.TxDesc) ;
-  for I := 0 to   ((Net.TxDescCount*SizeOf(TE1000RxDesc))-1) do
+  for I := 0 to ((Net.TxDescCount*SizeOf(TE1000TxDesc))-1) do
    r[I] := #0;
+
   // allocate 2048-Byte buffers
   Net.TxBufferSize := E1000_TXDESC_NR * E1000_IOBUF_SIZE;
-  Net.TxBuffer := ToroGetMem(Net.TxBufferSize);
+  Net.TxBuffer := ToroGetMem(Net.TxBufferSize + 16);
+
   if Net.TxBuffer = nil then
-  begin // not enough memory
+  begin
     ToroFreeMem(Net.TxDesc);
     ToroFreeMem(Net.RxBuffer);
     ToroFreeMem(Net.RxDesc);
     Result := False;
     Exit;
   end;
+
+  // aligned TxBuffer address
+  if (PtrUInt(Net.TxBuffer) mod 16 <> 0) then
+  begin
+    Net.TxBuffer := Pointer(PtrUInt(Net.TxBuffer) + 16 - PtrUInt(Net.TxBuffer) mod 16);
+  end;
+
   // Setup TX descriptors
   TxBuff := Net.TxDesc;
   for I := 0 to E1000_TXDESC_NR-1 do
     begin
     TxBuff.Buffer := DWORD(PtrUInt(Net.TxBuffer) + (I * E1000_IOBUF_SIZE));
+    TxBuff.Command:= 0;
     Inc(TxBuff);
     end;
+
   // Setup the receive ring registers.
-  E1000WriteRegister(Net, E1000_REG_RDBAL, LongInt(Net.RxDesc) );
-  E1000WriteRegister(Net, E1000_REG_RDBAH, 0);
-  E1000WriteRegister(Net, E1000_REG_RDLEN, Net.RxDescCount *SizeOf(TE1000RxDesc));
-  E1000WriteRegister(Net, E1000_REG_RDH,   0);
-  E1000WriteRegister(Net, E1000_REG_RDT,   Net.RxDescCount - 1);
-  e1000UnsetRegister(Net, E1000_REG_RCTL,  E1000_REG_RCTL_BSIZE);
-  E1000SetRegister(Net,   E1000_REG_RCTL,  E1000_REG_RCTL_EN);
+  e1000WriteRegister(Net, E1000_REG_RDBAL, PtrUInt(Net.RxDesc) and $FFFFFFFF);
+  e1000WriteRegister(Net, E1000_REG_RDBAH, PtrUInt(Net.RxDesc) shr 32);
+  e1000WriteRegister(Net, E1000_REG_RDLEN, Net.RxDescCount *SizeOf(TE1000RxDesc));
+  e1000WriteRegister(Net, E1000_REG_RDH,   0);
+  e1000WriteRegister(Net, E1000_REG_RDT, Net.RxDescCount -1);
+
+  // No delay time for reception ints
+  e1000WriteRegister(Net, E1000_REG_RDTR , 0);
+
+  // set packet size
+  e1000UnsetRegister(Net, E1000_REG_RCTL, E1000_REG_RCTL_BSIZE);
+
+  // No loopback
+  e1000UnsetRegister(Net, E1000_REG_RCTL, (1 shl 7) or (1 shl 6));
+
+  // enable reception, disable unicast promiscous, broadcast accept mode
+  e1000SetRegister(Net, E1000_REG_RCTL, E1000_REG_RCTL_EN {or E1000_REG_RCTL_UPE} or E1000_REG_RCTL_BAM or E1000_RCTL_SECRC );
+
   // Setup the transmit ring registers.
-  E1000WriteRegister(Net, E1000_REG_TDBAL, LongInt(Net.TxDesc));
-  E1000WriteRegister(Net, E1000_REG_TDBAH, 0);
+  E1000WriteRegister(Net, E1000_REG_TDBAL, PtrUInt(Net.TxDesc) and $FFFFFFFF );
+  E1000WriteRegister(Net, E1000_REG_TDBAH, PtrUInt(Net.TxDesc) shr 32);
   E1000WriteRegister(Net, E1000_REG_TDLEN, Net.TxDescCount * SizeOf(TE1000TxDesc));
   E1000WriteRegister(Net, E1000_REG_TDH,   0);
-  E1000WriteRegister(Net, E1000_REG_TDT,   0);
+  E1000WriteRegister(Net, E1000_REG_TDT, 0);
   E1000SetRegister(Net, E1000_REG_TCTL,  E1000_REG_TCTL_EN or E1000_REG_TCTL_PSP);
+
   Result := True;
 end;
 
-// Read a packet from net card and enque it to Outgoing Packet list
+
+// Read a packet from net card and enque it to the outgoing packet list
+// This is called only by the interruption handler
 procedure ReadPacket(Net: PE1000);
 var
-  Tail, Current, I: LongInt;
+  Tail, Head, Current, I: LongInt;
   RxDesc: PE1000RxDesc;
   Packet: PPacket;
   Data, P: PByteArray;
+  // this flag is used to drop packets in some situation
+  dropflag: Boolean = false;
 begin
   // Find the head, tail and current descriptors
-  E1000ReadRegister(Net, E1000_REG_RDH);
+  Head := E1000ReadRegister(Net, E1000_REG_RDH);
   Tail := E1000ReadRegister(Net, E1000_REG_RDT);
   Current  := (Tail + 1) mod Net.RxDescCount;
   RxDesc := Net.RxDesc;
   Inc(RxDesc, Current);
+
+  {$IFDEF DebugE1000}
+          WriteDebug('e1000: new packet, head: %d, tail: %d\n', [Head,Tail]);
+          WriteDebug('e1000: new packet, status: %d\n', [RxDesc.Status]);
+  {$ENDIF}
+
+  // this never should happen
+  if (RxDesc.Status and E1000_RX_STATUS_DONE) = 0 then
+  begin
+     {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE exiting\n', []); {$ENDIF}
+     dropflag := true;
+  end;
+
+  // this driver does not hable such a kind of packets
   if (RxDesc.Status and  E1000_RX_STATUS_EOP) = 0 then
   begin
-    // I have to do something here
+    {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_EOP exiting\n', []); {$ENDIF}
+    dropflag := true;
   end;
-  // Alloc memory for new packet
+
+  if dropflag then
+  begin
+    // reset the descriptor
+    RxDesc.Status := E1000_RX_STATUS_DONE;
+    // incrementing the tail
+    E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
+    {$IFDEF DebugE1000} WriteDebug('e1000: packet has been drop\n', []); {$ENDIF}
+    exit;
+  end;
+
+  // get memory for new packet
   Packet := ToroGetMem(RxDesc.Length+SizeOf(TPacket));
-  // we haven't got memory ---> missing packets
+
+  // if we don't have memory just drop the packets
   if Packet = nil then
   begin
-   // incrementing the tail
+   RxDesc.Status := E1000_RX_STATUS_DONE;
    E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
-   WriteConsole('e1000 /Rmising packets/n\n',[]);
+   {$IFDEF DebugE1000} WriteDebug('e1000: no more memory, dropping packets\n', []); {$ENDIF}
    exit;
   end;
+
+  // set up the packet for higher layer
   Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
   Packet.size:= RxDesc.Length;
-  // copying to the buffer
+  Packet.Delete:= false;
+  Packet.Ready:= false;
+  Packet.Next:= nil;
+
+  // copy to the buffer
   Data := Packet.data;
-  P := Pointer(RxDesc.Buffer);
+  P := Pointer(PtrUInt(Net.RxBuffer) + ((Tail + 1) mod Net.RxDescCount) * E1000_IOBUF_SIZE);
+  {$IFDEF DebugE1000} WriteDebug('e1000: new packet, Size: %d\n', [RxDesc.Length]); {$ENDIF}
   for I:= 0 to RxDesc.Length-1 do
     Data^[I] := P^[I];
-  RxDesc.Status := 0;
+
+  // reset the descriptor
+  RxDesc.Status := E1000_RX_STATUS_DONE;
+
   // incrementing the tail
   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
+
   // report to kernel
   EnqueueIncomingPacket(Packet);
 end;
+
+// Read all the packets in the reception ring
+procedure EmptyReadRing(Net: PE1000);
+var
+  Tail, Head, Current, Diff: LongInt;
+  tmpHead: Longint;
+begin
+  Head := E1000ReadRegister(Net, E1000_REG_RDH);
+  Tail := E1000ReadRegister(Net, E1000_REG_RDT);
+  If (Head < Tail) then
+     diff  := Net.RxDescCount - Tail + Head - 1
+  else
+     diff  := Head - Tail - 1;
+  {$IFDEF DebugE1000} WriteDebug('e1000: EmptyReadRing will read %d packets\n', [diff]); {$ENDIF}
+  while diff <> 0 do
+  begin
+    // ReadPacket() moves tail
+    ReadPacket(Net);
+    // we recalculate Tail and we continue getting packets from the ring
+    Head := E1000ReadRegister(Net, E1000_REG_RDH);
+    Tail := E1000ReadRegister(Net, E1000_REG_RDT);
+    If (Head < Tail) then
+    diff  := Net.RxDescCount - Tail + Head - 1
+    else
+       diff  := Head - Tail - 1;
+  end;
+end;
+
+
 
 // E1000 Irq Handler
 procedure e1000Handler;
@@ -421,24 +582,33 @@ var
 begin
   // Read the Interrupt Cause Read register
   cause:= E1000ReadRegister(@NicE1000, E1000_REG_ICR);
-  if (cause and E1000_REG_ICR_LSC) <> 0  then
+  {$IFDEF DebugE1000} WriteDebug('e1000: Interruption, cause=%d\n', [cause]); {$ENDIF}
+  if (cause <> 0) then
   begin
-  // link
-  end else if (cause and (E1000_REG_ICR_RXO or E1000_REG_ICR_RXT)) <> 0 then
-  begin
-    // received packet
-    ReadPacket(@NicE1000);
-    //printk_('recibido!\n',0);
-    {$IFDEF DebugE1000} WriteDebug('e1000Handler - Packet received', []); {$ENDIF}
-  end else if ((cause and E1000_REG_ICR_TXQE) <> 0 ) or ((cause and E1000_REG_ICR_TXDW) <> 0) then
-  begin
-    // inform the kernel that last packet has been sent, and fetch the next packet to send
-    Packet := DequeueOutgoingPacket;
-    //printk_('Enviado!\n',0);
-    // there are more packets?
-    if Packet <> nil then
-        DoSendPacket(@NicE1000.DriverInterface,true);
-    end;
+       // link signal
+       if (cause and E1000_REG_ICR_LSC) <> 0  then
+       begin
+          {$IFDEF DebugE1000} WriteDebug('e1000: Link interruption\n', []); {$ENDIF}
+       end;
+
+       // packets received
+       if ((cause and (E1000_REG_ICR_RXO or E1000_REG_ICR_RXT)) <> 0) then
+       begin
+          {$IFDEF DebugE1000} WriteDebug('e1000: new packet received\n', []); {$ENDIF}
+            EmptyReadRing(@NicE1000);
+       end;
+
+       // packets transmitted
+       if ((cause and (E1000_REG_ICR_TXQE or E1000_REG_ICR_TXDW)) <> 0) then
+       begin
+            {$IFDEF DebugE1000} WriteDebug('e1000: Packet transmitted\n', []); {$ENDIF}
+            // inform the kernel that last packet has been sent, and fetch the next packet to send
+            Packet := DequeueOutgoingPacket;
+            // there are more packets?
+            if Packet <> nil then
+            DoSendPacket(@NicE1000.DriverInterface);
+       end;
+  end;
   eoi;
 end;
 
@@ -482,16 +652,20 @@ asm
  db $cf
 end;
 
-// Search for e1000 card in PCI bus and register it.
+// Look for e1000 cards on PCI bus and register it.
 // Currently support for one NIC
-procedure PCICardInit;
+procedure DetectE1000onPCI;
 var
   I: LongInt;
   Net: PNetworkInterface;
   PciCard: PBusDevInfo;
   wd: word;
+  lowadd: ^dword;
+  highadd: ^word;
 begin
   PciCard := PCIDevices;
+  {$IFDEF DebugE1000} WriteDebug('e1000: scanning pci bus for e1000 driver\n', []); {$ENDIF}
+  DisableInt;
   while PciCard <> nil do
   begin
     // looking for ethernet network card
@@ -501,29 +675,40 @@ begin
       if (PciCard.vendor = $8086) and (PciCard.device = $100E) then
       begin
         NicE1000.IRQ:= PciCard.irq;
-        // manually, I have to fix this
-        NicE1000.Regs:= Pointer($0F2020000); //Pointer(PCIcard.io[0])
-        // work just for $100e card
+        NicE1000.Regs:= Pointer(PCIcard.io[0]);
+        {$IFDEF DebugE1000} WriteDebug('e1000: found e1000 device, Irq: %d, Regs: %h\n', [PciCard.irq, PCIcard.io[0]]); {$ENDIF}
+
+        // Enable bus mastering for this device
+        PciSetMaster(PciCard);
+
+        // specific for E1000_DEV_ID_82540EM
         NicE1000.eepromdonebit := 1 shl 4;
 	NicE1000.eepromaddroff := 8;
-        // reset network card
+
+        // Reset network card
         e1000Reset(@NicE1000);
-        // initialization procedure as intel say
+
+        // Link is set up
         e1000SetRegister(@NicE1000, E1000_REG_CTRL, E1000_REG_CTRL_ASDE or E1000_REG_CTRL_SLU);
         e1000UnsetRegister(@NicE1000, E1000_REG_CTRL, E1000_REG_CTRL_LRST);
         e1000UnsetRegister(@NicE1000, E1000_REG_CTRL, E1000_REG_CTRL_PHY_RST);
         e1000UnsetRegister(@NicE1000, E1000_REG_CTRL, E1000_REG_CTRL_ILOS);
+
+        // Flow control is disabled
+        // TODO: qemu logs says this is invalid write
         e1000WriteRegister(@NicE1000, E1000_REG_FCAL, 0);
         e1000WriteRegister(@NicE1000, E1000_REG_FCAH, 0);
         e1000WriteRegister(@NicE1000, E1000_REG_FCT,  0);
         e1000WriteRegister(@NicE1000, E1000_REG_FCTTV, 0);
+
+        // VLAN is disable
         e1000UnsetRegister(@NicE1000, E1000_REG_CTRL, E1000_REG_CTRL_VME);
-        // Clear Multicast Table Array (MTA)
-        for I := 0 to 127 do
-          e1000WriteRegister(@NicE1000, E1000_REG_MTA + I, 0);
+
         // Initialize statistics registers
         for I := 0 to 63 do
           e1000WriteRegister(@NicE1000, E1000_REG_CRCERRS + (I * 4), 0);
+
+        // Configure the MAC address
         // read the MAC from the eeprom
         for I:=0 to 2 do
           begin
@@ -531,20 +716,59 @@ begin
           NicE1000.Driverinterface.HardAddress[I*2]:= wd and $ff;
           NicE1000.Driverinterface.HardAddress[(I*2+1)]:= (wd and $ff00) shr 8;
         end;
-        // set receive address
-        e1000WriteRegister(@NicE1000, E1000_REG_RAL, dword(@NicE1000.Driverinterface.HardAddress[0]));
-        e1000WriteRegister(@NicE1000, E1000_REG_RAH, word(@NicE1000.Driverinterface.HardAddress[4]));
+
+        lowadd := @NicE1000.Driverinterface.HardAddress[0];
+        highadd := @NicE1000.Driverinterface.HardAddress[4];
+
+        // Set receive address
+        e1000WriteRegister(@NicE1000, E1000_REG_RAL, lowadd^);
+        e1000WriteRegister(@NicE1000, E1000_REG_RAH, highadd^);
         e1000SetRegister(@NicE1000,   E1000_REG_RAH,   E1000_REG_RAH_AV);
-        e1000SetRegister(@NicE1000,   E1000_REG_RCTL,  E1000_REG_RCTL_MPE);
+
+        // Clear Multicast Table Array (MTA)
+        for I := 0 to 127 do
+          e1000WriteRegister(@NicE1000, E1000_REG_MTA + (I * 4), 0);
+
         WriteConsole('e1000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
         WriteConsole('e1000: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]);
+        {$IFDEF DebugE1000} WriteDebug('e1000: mac %d:%d:%d:%d:%d:%d\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]); {$ENDIF}
+
         // buffer initialization
         if e1000initbuf(@NicE1000) then
-         WriteConsole('e1000: buffer init ... /VOk/n\n',[])
+        begin
+             WriteConsole('e1000: buffer init ... /VOk/n\n',[]);
+             {$IFDEF DebugE1000} WriteDebug('e1000: initbuffer() sucesses\n', []); {$ENDIF}
+        end
         else
-        WriteConsole('e1000: buffer init ... /RFault/n\n',[]);
+        begin
+             WriteConsole('e1000: buffer init ... /RFault/n\n',[]);
+             {$IFDEF DebugE1000} WriteDebug('e1000: initbuffer() fails, exiting\n', []); {$ENDIF}
+             continue;
+        end;
+
+        // enable interrupt
+        e1000SetRegister(@NicE1000, E1000_REG_IMS, E1000_REG_IMS_LSC or E1000_REG_IMS_RXO or E1000_REG_IMS_RXT or E1000_REG_IMS_TXQE or E1000_REG_IMS_TXDW);
+
+        // clear any spurius irq
+        E1000ReadRegister(@NicE1000, E1000_REG_ICR);
+
+        // get link status
+        i := e1000ReadRegister(@NicE1000, E1000_REG_STATUS);
+        if (i and 3 <> 0) then
+        begin
+           WriteConsole('e1000: link is /VUp/n\n', []);
+           {$IFDEF DebugE1000} WriteDebug('e1000: Link Up\n', []); {$ENDIF}
+        end
+        else
+        begin
+           WriteConsole('e1000: link is /RDown/n\n', []);
+           {$IFDEF DebugE1000} WriteDebug('e1000: Link Down\n', []); {$ENDIF}
+        end;
+
         // capture de interrupt
         CaptureInt(32+NicE1000.IRQ, @e1000irqhandler);
+
+        // registre network driver
         Net := @NicE1000.Driverinterface;
         Net.Name:= 'e1000';
         Net.MaxPacketSize:= E1000_IOBUF_SIZE;
@@ -553,15 +777,16 @@ begin
         Net.stop:= @e1000Stop;
         Net.Reset:= @e1000Reset;
         Net.TimeStamp := 0;
-        // regist network driver
         RegisterNetworkInterface(Net);
         end;
       end;
     PciCard := PciCard.Next;
     end;
+    RestoreInt;
+    {$IFDEF DebugE1000} WriteDebug('e1000: scan ended\n', []); {$ENDIF}
 end;
 
 initialization
-	PCICardInit;
+	DetectE1000onPCI;
 
 end.

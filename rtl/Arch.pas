@@ -141,8 +141,10 @@ procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 procedure ShutdownInQemu;
-
-
+procedure DelayMicro(microseg: LongInt);
+procedure PciWriteWord (const bus, device, func, regnum, value: Word);
+function read_portw(port: Word): Word;
+function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -300,10 +302,24 @@ asm
           out dx, al
 end;
 
+// IO port access
+procedure write_portw(Data: Word; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm
+     {$IFDEF LINUX} mov dx, port {$ENDIF}
+          mov ax, data
+          out dx, ax
+end;
+
 function read_portb(port: Word): Byte; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
          mov dx, port
          in al, dx
+end;
+
+function read_portw(port: Word): Word; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+asm
+         mov dx, port
+         in ax, dx
 end;
 
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
@@ -409,6 +425,26 @@ begin
   tmp := Pointer(eoi_reg);
   tmp^ := 0;
 end;
+
+procedure DelayMicro(microseg: LongInt);
+var
+  tmp : ^DWORD ;
+begin
+  tmp := Pointer (divide_reg);
+  tmp^ := $b;
+  tmp := Pointer(timer_init_reg); // set the count
+  tmp^ := (CPU_CYLES div 1000000)*microseg; // the count is aprox.
+  tmp := Pointer (timer_curr_reg); // wait for the counter
+  while tmp^ <> 0 do
+  begin
+    NOP;
+  end;
+  // send the end of interruption
+  tmp := Pointer(eoi_reg);
+  tmp^ := 0;
+end;
+
+
 
 // Change the Address of Apic registers
 procedure RelocateAPIC;
@@ -863,7 +899,7 @@ const
  PCI_CONF_PORT_INDEX = $CF8;
  PCI_CONF_PORT_DATA  = $CFC;
 
-function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
+function PciReadDword(const bus, device, func, regnum: UInt32): UInt32;
 var
   Send: DWORD;
 begin
@@ -871,6 +907,26 @@ begin
   write_portd(@Send, PCI_CONF_PORT_INDEX);
   read_portd(@Send, PCI_CONF_PORT_DATA);
   Result := Send;
+end;
+
+function PciReadWord(const bus, device, func, regnum: UInt32): Word;
+var
+  Send: DWORD;
+  tmp: Word;
+begin
+  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
+  write_portd(@Send, PCI_CONF_PORT_INDEX);
+  tmp := read_portw(PCI_CONF_PORT_DATA);
+  Result := (tmp shr ((regnum and 2) * 8 )) and $ffff;
+end;
+
+procedure PciWriteWord (const bus, device, func, regnum, value: Word);
+var
+  Send: DWORD;
+begin
+  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
+  write_portd(@Send, PCI_CONF_PORT_INDEX);
+  write_portw(value, PCI_CONF_PORT_DATA);
 end;
 
 // Initialization of the SSE and SSE2 Extensions

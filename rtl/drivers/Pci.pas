@@ -45,6 +45,8 @@ TBusDevInfo = record
   Next: PBusDevInfo;
 end;
 
+procedure PciSetMaster(dev: PBusDevInfo);
+
 // List of the pci devices
 var
   PCIDevices: PBusDevInfo = nil;
@@ -143,6 +145,19 @@ begin
       end;
     end;
   end;
+end;
+
+// PciSetMaster:
+// set a device as bus mastering. This is used for e1000 driver that runs
+// as master
+//
+procedure PciSetMaster(dev: PBusDevInfo);
+var
+  Tmp: Word;
+begin
+ Tmp := PciReadWord(dev.bus, dev.dev, dev.func, $4 );
+ Tmp := Tmp or $4;
+ PciWriteWord(dev.bus, dev.dev, dev.func, $4, Tmp);
 end;
 
 initialization

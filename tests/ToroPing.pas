@@ -27,12 +27,11 @@ program ToroPing;
  {$mode delphi}
 {$ENDIF}
 
-
 // Configuring the RUN for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
+         {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
 {$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -net nic,model=ne2k_pci -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
+         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
 {$ENDIF}
 {%RunFlags BUILD-}
 
@@ -50,8 +49,7 @@ uses
   Pci in  '..\rtl\Drivers\Pci.pas',
   Network in '..\rtl\Network.pas',
   Console in '..\rtl\Drivers\Console.pas',
-  Ne2000 in '..\rtl\Drivers\Ne2000.pas';
-
+  E1000 in '..\rtl\Drivers\E1000.pas';
 const 
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
@@ -59,7 +57,7 @@ const
   // this ip may change depending on windows or linux host
   PingIP: array[0..3] of Byte  = (192, 100, 200, 10);
   // wait for ping in seconds
-  WAIT_FOR_PING = 2; 
+  WAIT_FOR_PING = 1;
 var  
   PingIPDword: Dword;
   PingPacket: PPacket;
@@ -69,13 +67,13 @@ var
   ICMP: PICMPHeader;
 begin
   // Dedicate the ne2000 network card to local cpu
-  DedicateNetwork('ne2000', LocalIP, Gateway, MaskIP, nil);
-  
+  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+
   // I convert the IP to a DWord
   _IPAddress (PingIP, PingIPDword);
   
   // I keep sending ICMP packets and waiting for an answer
-  WriteConsole ('\c\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
+  WriteConsole ('\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
   while true do 
   begin
    WriteConsole ('\t ToroPing: /Vsending/n ping to %d.%d.%d.%d, seq: %d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3],seq]);
@@ -88,7 +86,7 @@ begin
 	if ((IP.SourceIP = PingIPDword) and (ICMP.seq = SwapWORD(seq))) then
 	begin
 	    WriteConsole ('\t ToroPing: /areceived/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
-	end else WriteConsole ('\t ToroPing: /rwrong/n received ping\n',[]);
+	end else WriteConsole ('\t ToroPing: /rwrong/n received ping, seq=%d\n',[SwapWORD(ICMP.seq)]);
         ToroFreeMem (PingPacket); 
    end else WriteConsole ('\t ToroPing: /rno received/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
    // I increment the seq for next packet

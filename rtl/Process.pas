@@ -1077,8 +1077,8 @@ begin
   // initialize the exception and irq
   if HasException then
     InitializeExceptions;
-  {$IFDEF DebugProcess} WriteDebug('CPU Speed: %d Mhz', [LocalCpuSpeed]); {$ENDIF}
   InitCores;
+  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Number of Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
   // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
   with ToroThreadManager do

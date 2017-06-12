@@ -102,8 +102,6 @@ type
     CPUBoot: Boolean;
     InitConfirmation: Boolean; // Synchronization variable between core to INIT-core
     InitProc: procedure; // Procedure to initialize the core
-    Int: Boolean;  // Int is true if interruptions are enabled
-    OldINT: Boolean; // This is used to restore the value of the interruptions
   end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord);
@@ -162,9 +160,11 @@ const
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
   AvailableMemory: QWord; // Memory in the system
-  LocalCpuSpeed: Integer;
+  // These variables are used to calculate
+  // the delays
+  LocalCpuSpeed: Int64 = 0;
+  CPU_CYCLES: Int64 = 0 ;
   StartTime: TNow;
-  CPU_CYLES: Int64;
   Cores: array[0..MAX_CPU-1] of TCore;
     
 implementation
@@ -433,7 +433,7 @@ begin
   tmp := Pointer (divide_reg);
   tmp^ := $b;
   tmp := Pointer(timer_init_reg); // set the count
-  tmp^ := (CPU_CYLES div 1000000)*microseg; // the count is aprox.
+  tmp^ := (CPU_CYCLES div 1000000)*microseg; // the count is aprox.
   tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
@@ -575,10 +575,9 @@ end;
 
 // This code has been extracted from DelphineOS <delphineos.sourceforge.net>
 // Return the CPU speed in Mhz
-function CalculateCpuSpeed: Int64;
+function CalculateCpuSpeed: Word;
 var
   count_lo, count_hi, family: DWORD;
-  speed: Word;
 asm
   mov eax , 1
   cpuid
@@ -1036,19 +1035,19 @@ begin
   begin
     // wakeup the remote core with IPI-INIT
     send_apic_init(apicid);
-    Delay(CPU_CYLES, 100);
+    Delay(CPU_CYCLES, 100);
     // send the first startup
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYLES  ,100);
+    Delay(CPU_CYCLES  ,100);
     // remote CPU read the IPI?
     if not is_apic_ready then
     begin // some problem ?? wait for 2 sec
-      Delay(CPU_CYLES, 500);
+      Delay(CPU_CYCLES, 500);
       if not is_apic_ready then
         Exit; // Serious problem -> exit
     end;
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYLES, 100);
+    Delay(CPU_CYCLES, 500);
     Dec(Attempt);
   end;
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
@@ -1245,8 +1244,6 @@ begin
     Cores[J].ApicID := 0;
     Cores[J].InitConfirmation := False;
     Cores[J].InitProc := nil;
-    Cores[J].Int := false;
-	Cores[J].oldInt := false;
   end;
   CPU_COUNT := 0;
   acpi_table_detect; // ACPI detection
@@ -1259,8 +1256,6 @@ begin
   Cores[0].CPUBoot := True;
   Cores[0].ApicID := GetApicID;
   Cores[0].InitConfirmation := True;
-  Cores[0].Int := false;
-  Cores[0].oldINT := false;
   // temporary stack used to initialize every Core
   esp_tmp := @start_stack[MAX_CPU-1][size_start_stack];
 end;
@@ -1351,7 +1346,7 @@ begin
   CacheManagerInit;
   LocalCpuSpeed := CalculateCpuSpeed;
   // increment of RDTSC counter per miliseg
-  CPU_CYLES  := LocalCpuSpeed * 100000;
+  CPU_CYCLES  := LocalCpuSpeed * 100000;
   IrqOn(2);
   // hardware Interruptions
   for I := 33 to 47 do

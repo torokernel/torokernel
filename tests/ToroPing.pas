@@ -50,6 +50,7 @@ uses
   Network in '..\rtl\Network.pas',
   Console in '..\rtl\Drivers\Console.pas',
   E1000 in '..\rtl\Drivers\E1000.pas';
+
 const 
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
@@ -89,8 +90,10 @@ begin
 	end else WriteConsole ('\t ToroPing: /rwrong/n received ping, seq=%d\n',[SwapWORD(ICMP.seq)]);
         ToroFreeMem (PingPacket); 
    end else WriteConsole ('\t ToroPing: /rno received/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
+
    // I increment the seq for next packet
    seq := seq + 1;
+
    // I wait WAIT_FOR_PING seconds
    sleep (WAIT_FOR_PING * 1000);
   end; 

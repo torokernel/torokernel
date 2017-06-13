@@ -139,7 +139,7 @@ function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
 procedure ThreadExit(Schedule: Boolean);
-
+procedure Panic(const cond: Boolean; const Format: AnsiString);
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -1071,6 +1071,17 @@ begin
   hlt;
 end;
 
+// Just halt the system execution due to a Panic Condition
+procedure Panic(const cond: Boolean; const Format: AnsiString);
+begin
+  if not cond then exit;
+  DisableInt;
+  WriteConsole('Panic: ',[]);
+  WriteConsole(Format,[]);
+  {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
+  while true do;
+end;
+
 // Initialize all local structures and send the INIT IPI to all cpus  
 procedure ProcessInit;
 begin
@@ -1081,6 +1092,7 @@ begin
   {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Number of Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
   // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
+
   with ToroThreadManager do
   begin
     InitManager            := nil;

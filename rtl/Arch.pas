@@ -577,8 +577,24 @@ end;
 // Return the CPU speed in Mhz
 function CalculateCpuSpeed: Word;
 var
-  count_lo, count_hi, family: DWORD;
-asm
+  count_lo, count_hi, family, features: DWORD;
+  speed: WORD;
+begin
+  asm
+  mov eax, 1
+  cpuid
+  mov features, edx
+  end;
+
+  // we verify if there is timecounter
+  // if not we cannot calculate the speed so we exit
+  if ((features and $10) <> $10 ) then
+  begin
+   result := 0;
+   exit
+  end;
+
+  asm
   mov eax , 1
   cpuid
   and eax , $0f00
@@ -671,6 +687,10 @@ asm
   pop   bx
   pop   ax
 @CPUS_SKP:
+  mov speed, ax
+  end;
+
+  result := speed;
 end;
 
 // Stop the execution of CPU
@@ -1344,9 +1364,9 @@ begin
   MemoryCounterInit;
   // cache Page structures
   CacheManagerInit;
-  LocalCpuSpeed := CalculateCpuSpeed;
+  LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
   // increment of RDTSC counter per miliseg
-  CPU_CYCLES  := LocalCpuSpeed * 100000;
+  CPU_CYCLES  := PtrUInt(LocalCpuSpeed * 100000);
   IrqOn(2);
   // hardware Interruptions
   for I := 33 to 47 do

@@ -15,7 +15,7 @@
 // 10/07/2007: Some bugs have been fixed.
 // 17/06/2007: First Version by Matias Vara.
 //
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -275,12 +275,14 @@ begin
     Next:= ReadPort(Net.iobase+NE_DATA);
     Len:= ReadPort(Net.iobase+NE_DATA);
     Len:= Len + ReadPort(Net.iobase+NE_DATA) shl 8;
+    // not sure why this hack works
+    Len := Len - 4;
     WritePort($40,Net.iobase+INTERRUPTSTATUS);
     if (rsr and 31 = 1) and (Next >= PSTART) and (Next <= PSTOP) and (Len <= 1532) then
     begin
       // Alloc memory for new packet
       Packet := ToroGetMem(Len+SizeOf(TPacket));
-	  {$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: getting %d bytes in %h\n', [Len+SizeOf(TPacket),PtrUInt(Packet)]); {$ENDIF}
+      {$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: getting %d bytes in %h\n', [Len,PtrUInt(Packet)]); {$ENDIF}
 	  // todo: null memory scenario 
 	  // if Packet = nil then 
 	  // begin
@@ -288,9 +290,9 @@ begin
 	  // end;
       Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
       Packet.Size := Len;
-	  Packet.Next := nil;
-	  Packet.Ready := false;
-	  Packet.Delete := false;
+      Packet.Next := nil;
+      Packet.Ready := false;
+      Packet.Delete := false;
       Data := Packet.Data;
       WritePort(Len, Net.iobase+REMOTEBYTECOUNT0);
       WritePort(Len shr 8, Net.iobase+REMOTEBYTECOUNT1);

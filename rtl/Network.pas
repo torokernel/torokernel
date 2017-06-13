@@ -1225,16 +1225,15 @@ begin
         // Request of Ping
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
-          Packet.Size := Packet.Size - 4;
-		  // the kernel is in charge to free the packet
+	  // the kernel is in charge to free the packet
           Packet.Delete := true;
-		  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
+	  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
           ICMPHeader.checksum:= 0 ;
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
-		  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
+	  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
         // Ping reply 
 		end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
 		begin

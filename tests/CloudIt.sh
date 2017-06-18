@@ -1,16 +1,11 @@
 #!/bin/sh
 #
-# CloudIt.sh <name>
+# CloudIt.sh <Application>
 #
-# This script compiles the freepascal application in <name>
-# within the Toro Kernel. This results in a disk image named 
-# <name>.img. Then, this image is used to run a instance of 
-# the app in a VM in QEMU. The script checks if the file <name>.qemu 
-# exists. In that case, it uses the content of the file as parameters
-# for qemu. The script also checks if the scripts <name>.pre and <name>.post
-# exists. In that case, it executes those scripts as pre and post compilation.  
+# Script that helps to compile and run an app in Linux. To compile we base on
+# wine and to run we base on KVM.
 #
-# Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
+# Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
 #
 #
@@ -29,42 +24,23 @@
 #
 
 app="$1";
-appsource="$app.pas";
-appbin=$app;
+applpi="$app.lpi";
 appimg="$app.img";
-qemufile="$app.qemu"
-prefile="$app.pre.sh"
-postfile="$app.post.sh"
 
-# we get the parameters
-if [ -f $qemufile ]; then
-	qemuparam=`cat $qemufile`
-fi
+# remove all compiled files
+rm -f ../rtl/*.o ../rtl/*.ppu
+rm -f $appimg
 
-# we execute the pre script
-if [ -f $prefile ]; then
-	sh $prefile
-fi
+# remove the application
+rm -f $app "$app.o"
 
-# we compile the application
-fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
+# force to compile the application
+wine c:/lazarus/lazbuild.exe $applpi
 
-# we build the image
-if [ -f boot.o ]; then 
-	./build 2 $appbin boot.o $appimg
-else
-	echo "ERROR: boot.o not found, run make first"
-	exit 
-fi
+# destroy any previous instance
+sudo virsh destroy $app 
+sudo virsh undefine $app
 
-# we execute the post compilation script
-if [ -f $postfile ]; then
-    # we run the application in qemu in background and 
-	# we run the post compilation script
-    qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg &
-	sh $postfile
-else
-	# we run the application in qemu
-	qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg
-fi
-
+# TODO parameters should come from the .pas
+# VNC is open at port 590X
+sudo virt-install --name=$app --vcpus=2 --ram=512 --disk path=$appimg --boot hd --graphics vnc

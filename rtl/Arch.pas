@@ -665,8 +665,8 @@ begin
 
   mov   cx , -1
   sub   cx , dx
-  xor   ax , ax
-  xor   dx , dx
+  //xor   ax , ax
+  //xor   dx , dx
   cmp   cx , 110
   jb    @CPUS_SKP
   mov   ax , 11932

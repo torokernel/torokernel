@@ -273,7 +273,7 @@ begin
   SpinLock (3,4,LockDebug);
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
-  WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(Thread)]);
+  WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
   WriteSerial (Format, Args);
   LockDebug := 3;
   RestoreInt;

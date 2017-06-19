@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectGroup FileVersion="1">
-    <Targets Count="8">
+    <Targets Count="9">
       <Target0 FileName="FPC\ToroKernel.lpk"/>
       <Target1 FileName="FPC\ToroHello.lpi">
         <BuildModes Count="1"/>
@@ -11,7 +11,7 @@
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target2>
-      <Target3 FileName="tests\ToroKeyb.lpi">
+      <Target3 FileName="FPC\ToroKeyb.lpi">
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target3>
@@ -19,7 +19,7 @@
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target4>
-      <Target5 FileName="FPC\ToroHttp.lpi">
+      <Target5 FileName="FPC\ToroThread.lpi">
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target5>
@@ -27,10 +27,14 @@
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target6>
-      <Target7 FileName="FPC\ToroThread.lpi">
+      <Target7 FileName="FPC\ToroHttp.lpi">
         <BuildModes Count="1"/>
         <Mode1 Name="Default"/>
       </Target7>
+      <Target8 FileName="tests\TorowithFileSystem.lpi">
+        <BuildModes Count="1"/>
+        <Mode1 Name="Default"/>
+      </Target8>
     </Targets>
   </ProjectGroup>
 </CONFIG>

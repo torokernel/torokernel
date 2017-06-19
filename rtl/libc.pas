@@ -321,7 +321,7 @@ end;
 
 procedure _lldiv;
 asm
-        PUSHd    EBX
+        PUSH    EBX
         PUSH    ESI
         PUSH    EDI
         MOV     EBX, [RSP+16]

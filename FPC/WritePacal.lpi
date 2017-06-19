@@ -101,11 +101,11 @@
     <Other>
       <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
-        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o$(ProjOutDir)\build.exe"/>
+        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o$Path($(TargetFile))\build.exe"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="$(ProjOutDir)\build.exe 2 $(ProjOutDir)\$Nameonly($Project(InfoFile)).exe ..\tests\boot.o $(ProjOutDir)\$Nameonly($Project(InfoFile)).img"/>
+        <Command Value="$Path($(TargetFile))\build.exe 2 $(TargetFile) ..\tests\boot.o $Path($(TargetFile))\$NameOnly($(TargetFile)).img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="10"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <Title Value="ToroKeyb"/>
+      <UseAppBundle Value="False"/>
+      <ResourceType Value="res"/>
+    </General>
+    <i18n>
+      <EnableI18N LFM="False"/>
+    </i18n>
+    <BuildModes Count="1">
+      <Item1 Name="Default" Default="True"/>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+      </local>
+    </RunParams>
+    <Units Count="2">
+      <Unit0>
+        <Filename Value="ToroKeyb.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="..\tests\uToroKeyb.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit1>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="..\bin\$Nameonly($Project(InfoFile))"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir);..\rtl;$(CompPath)\..\..\..\source\rtl\inc"/>
+      <OtherUnitFiles Value="..\rtl;..\rtl\drivers;..\tests"/>
+      <UnitOutputDirectory Value="..\lib\$Nameonly($Project(InfoFile))\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <UseAnsiStrings Value="False"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <Optimizations>
+        <OptimizationLevel Value="0"/>
+      </Optimizations>
+    </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <GenerateDebugInfo Value="False"/>
+      </Debugging>
+    </Linking>
+    <Other>
+      <WriteFPCLogo Value="False"/>
+      <ExecuteBefore>
+        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o..\bin\build.exe"/>
+        <CompileReasons Run="False"/>
+      </ExecuteBefore>
+      <ExecuteAfter>
+        <Command Value="..\bin\build.exe 2 ..\bin\$Nameonly($Project(InfoFile)).exe ..\tests\boot.o ..\bin\$Nameonly($Project(InfoFile)).img"/>
+        <ShowAllMessages Value="True"/>
+        <CompileReasons Run="False"/>
+      </ExecuteAfter>
+    </Other>
+    <CompileReasons Run="False"/>
+  </CompilerOptions>
+  <Debugging>
+    <Exceptions Count="3">
+      <Item1>
+        <Name Value="EAbort"/>
+      </Item1>
+      <Item2>
+        <Name Value="ECodetoolError"/>
+      </Item2>
+      <Item3>
+        <Name Value="EFOpenError"/>
+      </Item3>
+    </Exceptions>
+  </Debugging>
+</CONFIG>

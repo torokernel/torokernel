@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="4">
+    <PathDelim Value="\"/>
+    <Name Value="ToroKernel"/>
+    <Type Value="RunAndDesignTime"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <PathDelim Value="\"/>
+      <SearchPaths>
+        <IncludeFiles Value="..\rtl;$(CompPath)\..\..\..\source\rtl\inc"/>
+        <OtherUnitFiles Value="..\rtl;..\rtl\drivers"/>
+        <UnitOutputDirectory Value="..\lib\$(PkgName)\$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+      <Parsing>
+        <Style Value="1"/>
+        <SyntaxOptions>
+          <UseAnsiStrings Value="False"/>
+        </SyntaxOptions>
+      </Parsing>
+    </CompilerOptions>
+    <Files Count="19">
+      <Item1>
+        <HasRegisterProc Value="True"/>
+      </Item1>
+      <Item2>
+        <Filename Value="..\rtl\Arch.pas"/>
+        <UnitName Value="Arch"/>
+      </Item2>
+      <Item3>
+        <Filename Value="..\rtl\Debug.pas"/>
+        <UnitName Value="Debug"/>
+      </Item3>
+      <Item4>
+        <Filename Value="..\rtl\Errno.pas"/>
+        <UnitName Value="ErrNo"/>
+      </Item4>
+      <Item5>
+        <Filename Value="..\rtl\Filesystem.pas"/>
+        <UnitName Value="FileSystem"/>
+      </Item5>
+      <Item6>
+        <Filename Value="..\rtl\fpintres.pp"/>
+        <UnitName Value="fpintres"/>
+      </Item6>
+      <Item7>
+        <Filename Value="..\rtl\Kernel.pas"/>
+        <UnitName Value="Kernel"/>
+      </Item7>
+      <Item8>
+        <Filename Value="..\rtl\libc.pas"/>
+        <UnitName Value="Libc"/>
+      </Item8>
+      <Item9>
+        <Filename Value="..\rtl\Memory.pas"/>
+        <UnitName Value="Memory"/>
+      </Item9>
+      <Item10>
+        <Filename Value="..\rtl\Network.pas"/>
+        <UnitName Value="Network"/>
+      </Item10>
+      <Item11>
+        <Filename Value="..\rtl\Process.pas"/>
+        <UnitName Value="Process"/>
+      </Item11>
+      <Item12>
+        <Filename Value="..\rtl\SysUtils.pas"/>
+        <UnitName Value="SysUtils"/>
+      </Item12>
+      <Item13>
+        <Filename Value="..\rtl\Toro.inc"/>
+        <Type Value="Include"/>
+      </Item13>
+      <Item14>
+        <Filename Value="..\rtl\drivers\Console.pas"/>
+        <UnitName Value="Console"/>
+      </Item14>
+      <Item15>
+        <Filename Value="..\rtl\drivers\E1000.pas"/>
+        <UnitName Value="E1000"/>
+      </Item15>
+      <Item16>
+        <Filename Value="..\rtl\drivers\Ext2.pas"/>
+        <UnitName Value="Ext2"/>
+      </Item16>
+      <Item17>
+        <Filename Value="..\rtl\drivers\IdeDisk.pas"/>
+        <UnitName Value="IdeDisk"/>
+      </Item17>
+      <Item18>
+        <Filename Value="..\rtl\drivers\Ne2000.pas"/>
+        <UnitName Value="Ne2000"/>
+      </Item18>
+      <Item19>
+        <Filename Value="..\rtl\drivers\Pci.pas"/>
+        <UnitName Value="Pci"/>
+      </Item19>
+    </Files>
+    <RequiredPkgs Count="1">
+      <Item1>
+        <PackageName Value="FCL"/>
+      </Item1>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>

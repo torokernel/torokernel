@@ -133,7 +133,7 @@ procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
-function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
+function GetMemoryRegion (ID: LongInt ; out Buffer : TMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
@@ -274,22 +274,22 @@ var
 // Put interruption gate in the idt
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
-  idt_gates^[int].handler_0_15 := Word(QWord(handler) and $ffff);
+  idt_gates^[int].handler_0_15 := Word(Ptrint(handler) and $ffff);
   idt_gates^[int].selector := kernel_code_sel;
   idt_gates^[int].tipe := gate_syst;
-  idt_gates^[int].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
-  idt_gates^[int].handler_32_63 := DWORD(QWord(handler) shr 32);
+  idt_gates^[int].handler_16_31 := Word((PtrUint(handler) shr 16) and $ffff);
+  idt_gates^[int].handler_32_63 := DWORD(PtrUint(handler) shr 32);
   idt_gates^[int].res := 0;
   idt_gates^[int].nu := 0;
 end;	
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
-  idt_gates^[Exception].handler_0_15 := Word(QWord(handler) and $ffff) ;
+  idt_gates^[Exception].handler_0_15 := Word(Ptrint(handler) and $ffff) ;
   idt_gates^[Exception].selector := kernel_code_sel;
   idt_gates^[Exception].tipe := gate_syst ;
-  idt_gates^[Exception].handler_16_31 := Word((QWord(handler) shr 16) and $ffff);
-  idt_gates^[Exception].handler_32_63 := DWORD(QWord(handler) shr 32);
+  idt_gates^[Exception].handler_16_31 := Word((PtrUint(handler) shr 16) and $ffff);
+  idt_gates^[Exception].handler_32_63 := DWORD(PtrUint(handler) shr 32);
   idt_gates^[Exception].res := 0 ;
   idt_gates^[Exception].nu := 0 ;
 end;
@@ -779,7 +779,7 @@ var
   CounterID: LongInt; // starts with CounterID = 1
 
 // Return information about Memory Region
-function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
+function GetMemoryRegion(ID: LongInt;out Buffer: TMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
 begin

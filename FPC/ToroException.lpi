@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="10"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <Title Value="ToroException"/>
+      <UseAppBundle Value="False"/>
+      <ResourceType Value="res"/>
+    </General>
+    <i18n>
+      <EnableI18N LFM="False"/>
+    </i18n>
+    <BuildModes Count="1">
+      <Item1 Name="Default" Default="True"/>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+      </local>
+    </RunParams>
+    <Units Count="2">
+      <Unit0>
+        <Filename Value="ToroException.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="..\tests\uToroException.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit1>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="..\bin\$(TargetCPU)-$(TargetOS)\$Nameonly($Project(InfoFile))"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir);..\rtl;$(CompPath)\..\..\..\source\rtl\inc"/>
+      <OtherUnitFiles Value="..\rtl;..\rtl\drivers;..\tests"/>
+      <UnitOutputDirectory Value="..\lib\$Nameonly($Project(InfoFile))\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <SyntaxMode Value="Delphi"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <SmartLinkUnit Value="True"/>
+      <RelocatableUnit Value="True"/>
+      <SmallerCode Value="True"/>
+    </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <GenerateDebugInfo Value="False"/>
+      </Debugging>
+      <LinkSmart Value="True"/>
+    </Linking>
+    <Other>
+      <WriteFPCLogo Value="False"/>
+      <ExecuteBefore>
+        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o..\bin\$(TargetCPU)-$(TargetOS)\build.exe"/>
+        <CompileReasons Run="False"/>
+      </ExecuteBefore>
+      <ExecuteAfter>
+        <Command Value="..\bin\$(TargetCPU)-$(TargetOS)\build.exe 2 ..\bin\$(TargetCPU)-$(TargetOS)\$Nameonly($Project(InfoFile)).exe ..\tests\boot.o ..\bin\$(TargetCPU)-$(TargetOS)\$Nameonly($Project(InfoFile)).img"/>
+        <ShowAllMessages Value="True"/>
+        <CompileReasons Run="False"/>
+      </ExecuteAfter>
+    </Other>
+    <CompileReasons Run="False"/>
+  </CompilerOptions>
+  <Debugging>
+    <Exceptions Count="3">
+      <Item1>
+        <Name Value="EAbort"/>
+      </Item1>
+      <Item2>
+        <Name Value="ECodetoolError"/>
+      </Item2>
+      <Item3>
+        <Name Value="EFOpenError"/>
+      </Item3>
+    </Exceptions>
+  </Debugging>
+</CONFIG>

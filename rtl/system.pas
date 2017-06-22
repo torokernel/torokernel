@@ -12,7 +12,7 @@
  **********************************************************************}
 
 unit System;
-
+{$WARN 5033 off : Function result does not seem to be set}
 interface
 
 {$DEFINE FPC_IS_SYSTEM}
@@ -35,6 +35,7 @@ interface
   {$maxfpuregisters 0}
 {$endif CPUI386}
 
+{$undef FPC_HAS_FEATURE_WIDESTRINGS}
 
 { needed for insert,delete,readln }
 {$P+}
@@ -150,6 +151,12 @@ type
   PError              = ^Error;
   PVariant            = ^Variant;
   POleVariant         = ^OleVariant;
+
+{by JC (from FCL)}
+  TFileTextRecChar    = {$if defined(FPC_ANSI_TEXTFILEREC) or not(defined(FPC_HAS_FEATURE_WIDESTRINGS))}AnsiChar{$else}UnicodeChar{$endif};
+  PFileTextRecChar    = ^TFileTextRecChar;
+
+  CodePointer = pointer;
 
   TTextLineBreakStyle = (tlbsLF,tlbsCRLF,tlbsCR);
 
@@ -1599,12 +1606,15 @@ procedure RTLeventWaitFor(state:pRTLEvent);
 procedure RTLeventWaitFor(state:pRTLEvent;timeout : longint);
 procedure RTLeventsync(m:trtlmethod;p:tprocedure);
 
+{by JC includes from FP-RTL}
+{$I filerec.inc}
+{$I textrec.inc}
 {*****************************************************************************
                           Resources support
 *****************************************************************************}
 
 const 
-  LineEnding = #10;
+  LineFeed = #10;
   LFNSupport = true;
   DirectorySeparator = '/';
   DriveSeparator = ':';
@@ -1622,7 +1632,7 @@ const
   FileNameCaseSensitive : boolean = true;
   CtrlZMarksEOF: boolean = false; 
 
-  sLineBreak = LineEnding;
+  sLineBreak = LineFeed;
   DefaultTextLineBreakStyle : TTextLineBreakStyle = tlbsLF;
 
    
@@ -4778,6 +4788,20 @@ Const
   AnsiRecLen = SizeOf(TAnsiRec);
   FirstOff   = SizeOf(TAnsiRec)-1;
 
+  {****************************************************************************}
+  { Memory manager }
+
+  const
+    MemoryManager: TMemoryManager = (
+      NeedLock: true;
+      GetMem: @SysGetMem;
+      FreeMem: @SysFreeMem;
+      FreeMemSize: @SysFreeMemSize;
+      AllocMem: @SysAllocMem;
+      ReAllocMem: @SysReAllocMem;
+      MemSize: nil;
+    );
+
 
 {****************************************************************************
                     Internal functions, not in interface.
@@ -5046,7 +5070,7 @@ begin
      If Size>high_of_res then
       Size:=high_of_res;
      Move (S2[1],fpc_AnsiStr_To_ShortStr[1],Size);
-     byte(fpc_AnsiStr_To_ShortStr[0]):=byte(Size);
+     setlength(fpc_AnsiStr_To_ShortStr,Size);
    end;
 end;
 
@@ -5059,7 +5083,7 @@ Var
   Size : SizeInt;
 begin
   Size:=Length(S2);
-  Setlength (fpc_ShortStr_To_AnsiStr,Size);
+  Setlength (result,Size);
   if Size>0 then
     Move(S2[1],Pointer(fpc_ShortStr_To_AnsiStr)^,Size);
 end;
@@ -5318,7 +5342,10 @@ begin
       else if PAnsiRec(Pointer(S)-AnsiFirstOff)^.Ref=1 then
         begin
           Temp:=Pointer(s)-AnsiFirstOff;
-          //lens:=MemSize(Temp);
+          if assigned(memoryManager.MemSize) then
+          lens:=memoryManager.MemSize(Temp)
+          else
+            lens := AnsiFirstOff+L+sizeof(AnsiChar);
           lena:=AnsiFirstOff+L+sizeof(AnsiChar);
           { allow shrinking string if that saves at least half of current size }
           if (lena>lens) or ((lens>32) and (lena<=(lens div 2))) then
@@ -5386,10 +5413,10 @@ Function fpc_ansistr_Unique(Var S : Pointer): Pointer; [Public,Alias : 'FPC_ANSI
 {
   Make sure reference count of S is 1,
   using copy-on-write semantics.
-}
 Var
   SNew : Pointer;
-  L    : SizeInt;
+  L    : SizeInt; }
+
 begin
   pointer(result) := pointer(s);
   // todo: to check this
@@ -5436,8 +5463,7 @@ begin
     Index := 0;
   { Check Size. Accounts for Zero-length S, the double check is needed because
     Size can be maxint and will get <0 when adding index }
-  if (Size>Length(S)) or
-     (Index+Size>Length(S)) then
+  if Index+Size>Length(S) then
    Size:=Length(S)-Index;
   If Size>0 then
    begin
@@ -7206,22 +7232,22 @@ operator -(const op : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endi
      variantmanager.varneg(dest);
   end;
 
-operator =(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpeq);
   end;
 
-operator <(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}<(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
   //   dest:=variantmanager.cmpop(op1,op2,opcmplt);
   end;
 
-operator >(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}>(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpgt);
   end;
 
-operator >=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}>=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpge);
   end;
@@ -8331,20 +8357,6 @@ procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'F
 {$endif}
 
 
-{****************************************************************************}
-{ Memory manager }
-
-const
-  MemoryManager: TMemoryManager = (
-    NeedLock: true;
-    GetMem: @SysGetMem;
-    FreeMem: @SysFreeMem;
-    FreeMemSize: @SysFreeMemSize;
-    AllocMem: @SysAllocMem;
-    ReAllocMem: @SysReAllocMem;
-    MemSize: nil;
-  );
-
 
 {*****************************************************************************
                              Memory Manager
@@ -8362,7 +8374,7 @@ begin
 end;
 
 
-function IsMemoryManagerSet:Boolean;
+function {%H-}IsMemoryManagerSet:Boolean;
 begin
 	//IsMemoryManagerSet := (MemoryManager.GetMem<>@SysGetMem) or (MemoryManager.FreeMem<>@SysFreeMem);
 end;
@@ -8382,7 +8394,7 @@ begin
 end;
 
 { Delphi style }
-function FreeMem(P: Pointer): PtrInt;
+function {%H-}FreeMem(P: Pointer): PtrInt;
 begin
 	//Freemem := MemoryManager.FreeMem(P);
 end;
@@ -8394,13 +8406,13 @@ begin
 	//Result := MemoryManager.GetMem(Size);
 end;
 
-function GetMemory(size:ptrint):pointer;
+function {%H-}GetMemory(size:ptrint):pointer;
 
 begin
  //GetMemory := Getmem(size);
 end;
 
-function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
+function {%H-}ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 begin
 	//Result := MemoryManager.g(P, NewSize);
 end;
@@ -8438,7 +8450,7 @@ begin
 	Result := 0;
 end;
 
-function SysAllocMem(Size: PtrInt): Pointer;
+function {%H-}SysAllocMem(Size: PtrInt): Pointer;
 begin
  // Result := MemoryManager.GetMem(size);
  // if Result <> nil then

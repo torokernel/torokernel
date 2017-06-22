@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="..\bin\$(TargetCPU)-$(TargetOS)\$Nameonly($Project(InfoFile))"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir);..\rtl;$(CompPath)\..\..\..\source\rtl\inc"/>
+      <OtherUnitFiles Value="..\rtl;..\rtl\drivers;..\tests"/>
+      <UnitOutputDirectory Value="..\lib\$Nameonly($Project(InfoFile))\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <SyntaxMode Value="Delphi"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <SmartLinkUnit Value="True"/>
+      <RelocatableUnit Value="True"/>
+      <SmallerCode Value="True"/>
+    </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <GenerateDebugInfo Value="False"/>
+      </Debugging>
+      <LinkSmart Value="True"/>
+    </Linking>
+    <Other>
+      <WriteFPCLogo Value="False"/>
+      <ExecuteBefore>
+        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o$Path($(TargetFile))\build.exe"/>
+        <CompileReasons Run="False"/>
+      </ExecuteBefore>
+      <ExecuteAfter>
+        <Command Value="$Path($(TargetFile))\build.exe 2 $(TargetFile) ..\tests\boot.o $Path($(TargetFile))\$NameOnly($(TargetFile)).img"/>
+        <ShowAllMessages Value="True"/>
+        <CompileReasons Run="False"/>
+      </ExecuteAfter>
+    </Other>
+    <CompileReasons Run="False"/>
+  </CompilerOptions>
+</CONFIG>

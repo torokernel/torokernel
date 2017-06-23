@@ -2,12 +2,11 @@
 #
 # CloudIt.sh <Application>
 #
-# Script that helps to compile and run an app in Linux. To compile we base on
-# wine and to run we base on KVM.
+# Script to compile and run a Toro app in Linux. We base on wine 
+# to generate the image and on KVM/QEMU to run it.
 #
 # Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
-#
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +25,36 @@
 app="$1";
 applpi="$app.lpi";
 appimg="$app.img";
+kvmfile="$app.kvm";
+
+# get the kvm parameters
+if [ -f $kvmfile ]; then
+   kvmparam=`cat $kvmfile`
+fi
+
+# check for parameters
+if [ "$#" -lt 1 ]; then
+   echo "Usage: CloudIt.sh ApplicationName [Options]"
+   exit 1
+fi
+
+
+# this avoids to regenerate the image
+if [ "$#" -eq 2 ]; then
+   if [ "$2" = "onlykvm" ]; then
+    # destroy any previous instance
+    sudo virsh destroy $app
+    sudo virsh undefine $app
+    # VNC is open at port 590X
+    sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+    # show the serial console
+    sleep 5
+    sudo virsh console $app
+    exit 0
+   fi
+ echo "Parameter: $2 not recognized"
+ exit 1
+fi
 
 # remove all compiled files
 rm -f ../rtl/*.o ../rtl/*.ppu
@@ -41,6 +70,9 @@ wine c:/lazarus/lazbuild.exe $applpi
 sudo virsh destroy $app 
 sudo virsh undefine $app
 
-# TODO parameters should come from the .pas
 # VNC is open at port 590X
-sudo virt-install --name=$app --vcpus=2 --ram=512 --disk path=$appimg --boot hd --graphics vnc
+sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+
+# show the serial console
+sleep 5
+sudo virsh console $app

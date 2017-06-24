@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fpdoc-descriptions><package name="WritePacal2"><module name="uWritePascal2"><element name="TRange"><short>Print Bereich (0 .. 11) </short>
+      </element><element name="Pascal"><short>Bitmap, defines "Pascal" ( 1 - Pixel , 0 - empty) 16*4 Pixel (the l is the first row of the P) </short>
+      </element><element name="StrIdx"><short>StrIdx xored with pascal) gives the String to Display 7*2 bit</short>
+      </element><element name="CharIdx"><short>Charindex for all 4*7 to the Power of 5 </short>
+      </element>
+    </module>
+  </package>
+</fpdoc-descriptions>

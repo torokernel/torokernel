@@ -21,7 +21,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-program WritePacal;
+program WritePacal2;
 
 {$IFDEF FPC}
  {$mode delphi}
@@ -49,7 +49,7 @@ uses
     Filesystem in '..\rtl\Filesystem.pas',
     Pci in '..\rtl\Drivers\Pci.pas',
     Console in '..\rtl\Drivers\Console.pas',
-    uWritePascal;
+    uWritePascal2;
 
 begin
   Main;

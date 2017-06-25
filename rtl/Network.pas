@@ -1421,7 +1421,7 @@ var
 begin
   Net := NetworkInterfaces;
   CPUID:= GetApicid;
-  {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: dedicating on CPU#d\n', [CPUID]); {$ENDIF}
+  {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: dedicating on CPU%d\n', [CPUID]); {$ENDIF}
   while Net <> nil do
   begin
     if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then

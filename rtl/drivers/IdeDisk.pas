@@ -36,7 +36,7 @@ unit IdeDisk;
 interface
 
 {$I ..\Toro.inc}
-{$DEFINE DebugIdeDisk}
+//{$DEFINE DebugIdeDisk}
 
 uses Console, Arch, FileSystem, Process, Debug;
 
@@ -341,8 +341,8 @@ begin
           Ctr.Minors[Minor+I].FileDesc.Next:=nil;
 	  WriteConsole('IdeDisk: /V', []);
           WriteConsole(ATANames[Ctr.Driver.Major], []);
-	  WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
-	  {$IFDEF DebugIdeDisk} WriteDebug('ATADetectPartition - Controller: %d, Disk: %d --> Ok\n', [Ctr.Driver.Major, Minor+I]); {$ENDIF}
+	  WriteConsole('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
+	  {$IFDEF DebugIdeDisk} WriteDebug('ATADetectPartition: Controller: %d, Disk: %d --> Ok\n', [Ctr.Driver.Major, Minor+I]); {$ENDIF}
         end;
         Inc(Entry);
       end;
@@ -387,7 +387,7 @@ begin
         {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo*5]); {$ENDIF}
         WriteConsole('IdeDisk: /V', []);
         WriteConsole(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
-        WriteConsole('/n ,Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
+        WriteConsole('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
         ATADetectPartition(@ATAControllers[ControllerNo], DriveNo*5);
       end
       {$IFDEF DebugIdeDisk}

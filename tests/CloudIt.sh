@@ -27,21 +27,28 @@ applpi="$app.lpi";
 appimg="$app.img";
 kvmfile="$app.kvm";
 
-# get the kvm parameters
-if [ -f $kvmfile ]; then
-   kvmparam=`cat $kvmfile`
-fi
-
-# check for parameters
+# check parameters
 if [ "$#" -lt 1 ]; then
    echo "Usage: CloudIt.sh ApplicationName [Options]"
    exit 1
 fi
 
+# get the kvm parameters
+if [ -f $kvmfile ]; then
+   kvmparam=`cat $kvmfile`
+else
+   # parameters by default
+   kvmparam="--vcpus=2 --ram=512"
+fi
 
 # this avoids to regenerate the image
 if [ "$#" -eq 2 ]; then
    if [ "$2" = "onlykvm" ]; then
+    # check if image exists
+    if [ ! -f $appimg ]; then
+       echo "$appimg does not exist, exiting"
+       exit 1
+    fi
     # destroy any previous instance
     sudo virsh destroy $app
     sudo virsh undefine $app
@@ -63,16 +70,25 @@ rm -f $appimg
 # remove the application
 rm -f $app "$app.o"
 
-# force to compile the application
-wine c:/lazarus/lazbuild.exe $applpi
+if [ -f $applpi ]; then
+   # force to compile the application
+   wine c:/lazarus/lazbuild.exe $applpi
+else
+   echo "$applpi does not exist, exiting"
+   exit 1
+fi
 
 # destroy any previous instance
 sudo virsh destroy $app 
 sudo virsh undefine $app
 
-# VNC is open at port 590X
-sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
-
+if [ -f $appimg ]; then
+   # VNC is open at port 590X
+   sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+else
+   echo "$appimg does not exist, exiting"
+   exit 1
+fi
 # show the serial console
 sleep 5
 sudo virsh console $app

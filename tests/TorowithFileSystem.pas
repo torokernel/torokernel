@@ -61,8 +61,8 @@ uses
 // IP values
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
-  Gateway: array[0..3] of Byte  = (192, 168, 100, 1);
-  LocalIP: array[0..3] of Byte  = (192, 168, 100, 100);
+  Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
+  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
 var
   HttpServer: PSocket;

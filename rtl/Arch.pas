@@ -274,22 +274,22 @@ var
 // Put interruption gate in the idt
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
-  idt_gates^[int].handler_0_15 := Word(Ptrint(handler) and $ffff);
+  idt_gates^[int].handler_0_15 := Word(PtrUInt(Handler) and $ffff);
   idt_gates^[int].selector := kernel_code_sel;
   idt_gates^[int].tipe := gate_syst;
-  idt_gates^[int].handler_16_31 := Word((PtrUint(handler) shr 16) and $ffff);
-  idt_gates^[int].handler_32_63 := DWORD(PtrUint(handler) shr 32);
+  idt_gates^[int].handler_16_31 := Word((PtrUInt(Handler) shr 16) and $ffff);
+  idt_gates^[int].handler_32_63 := DWORD(PtrUInt(Handler) shr 32);
   idt_gates^[int].res := 0;
   idt_gates^[int].nu := 0;
-end;	
+end;
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
-  idt_gates^[Exception].handler_0_15 := Word(Ptrint(handler) and $ffff) ;
+  idt_gates^[Exception].handler_0_15 := Word(PtrUInt(Handler) and $ffff) ;
   idt_gates^[Exception].selector := kernel_code_sel;
   idt_gates^[Exception].tipe := gate_syst ;
-  idt_gates^[Exception].handler_16_31 := Word((PtrUint(handler) shr 16) and $ffff);
-  idt_gates^[Exception].handler_32_63 := DWORD(PtrUint(handler) shr 32);
+  idt_gates^[Exception].handler_16_31 := Word((PtrUInt(Handler) shr 16) and $ffff);
+  idt_gates^[Exception].handler_32_63 := DWORD(PtrUInt(Handler) shr 32);
   idt_gates^[Exception].res := 0 ;
   idt_gates^[Exception].nu := 0 ;
 end;
@@ -594,7 +594,7 @@ begin
    exit
   end;
 
-  asm
+asm
   mov eax , 1
   cpuid
   and eax , $0f00

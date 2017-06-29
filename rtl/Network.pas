@@ -277,7 +277,7 @@ function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
 function GetMacAddress(IP: TIPAddress): PMachine;
 procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
-procedure _IPAddresstoArray(const Ip: TIPAddress; var Result: array of Byte);
+procedure _IPAddresstoArray(const Ip: TIPAddress; out Result: array of Byte);
 function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: longint; seq, id: word): longint;
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
@@ -403,7 +403,7 @@ begin
   Result := (Ip[3] shl 24) or (Ip[2] shl 16) or (Ip[1] shl 8) or Ip[0];
 end;
 
-procedure _IPAddresstoArray(const Ip: TIPAddress; var Result: array of Byte);
+procedure _IPAddresstoArray(const Ip: TIPAddress; out Result: array of Byte);
 begin
   Result[0] := Ip and $ff;
   Result[1] := (Ip and $ff00) shr 8;
@@ -1225,15 +1225,15 @@ begin
         // Request of Ping
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
-	  // the kernel is in charge to free the packet
+		  // the kernel is in charge to free the packet
           Packet.Delete := true;
-	  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
+		  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
           ICMPHeader.checksum:= 0 ;
           Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
           ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
           AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
           IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
-	  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
+		  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
         // Ping reply 
 		end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
 		begin

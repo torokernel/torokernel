@@ -59,7 +59,6 @@ type
   Integer  = SmallInt;
 
 
-{$ifdef CPUX86_64}
   {$define DEFAULT_DOUBLE}
   ValReal = Double;
 
@@ -73,25 +72,12 @@ type
   {$define SUPPORT_SINGLE}
   {$define SUPPORT_DOUBLE}
 
-{$endif CPUX86_64}
-
-{$ifdef CPU64}
   SizeInt = Int64;
   SizeUInt = QWord;
   PtrInt = Int64;
   PtrUInt = QWord;
   ValSInt = Int64;
   ValUInt = QWord;
-{$endif CPU64}
-
-{$IFDEF CPU32}
-  SizeInt = Longint;
-  SizeUInt = DWord;
-  PtrInt = Longint;
-  PtrUInt = DWORD;
-  ValSInt = Longint;
-  ValUInt = Cardinal;
-{$ENDIF CPU32}
 
 { Zero - terminated strings }
   PChar               = ^Char;
@@ -118,9 +104,6 @@ type
   PSingle             = ^Single;
   PDouble             = ^Double;
   PCurrency           = ^Currency;
-{$ifdef SUPPORT_COMP}
-  PComp               = ^Comp;
-{$endif SUPPORT_COMP}
   PExtended           = ^Extended;
 
   PSmallInt           = ^Smallint;
@@ -160,12 +143,12 @@ type
 
   TTextLineBreakStyle = (tlbsLF,tlbsCRLF,tlbsCR);
 
-        LARGE_INTEGER = record
-        case byte of
-          0: (LowPart : DWORD;
-              HighPart : DWORD);
-          1: (QuadPart : QWORD);
-       end;
+  LARGE_INTEGER = record
+    case byte of
+      0: (LowPart : DWORD;
+          HighPart : DWORD);
+      1: (QuadPart : QWORD);
+  end;
 
    TSystemTime = record
       wYear, wMonth, wDay, wDayOfWeek : word;
@@ -181,11 +164,7 @@ type
   TProcedure  = Procedure;
   
 type
-{$ifdef CPU64}
   THandle = QWord;
-{$else CPU64}
-  THandle = DWORD;
-{$endif CPU64}
   TThreadID = THandle;
   
   PRTLCriticalSection = ^TRTLCriticalSection;
@@ -218,11 +197,6 @@ type
   PPCharArray = ^TPCharArray;
 
 const
-{$ifdef cpui386}
-  Test8086 : byte = 2;       { Always i386 or newer }
-  Test8087 : byte = 3;       { Always 387 or newer. Emulated if needed. }
-{$endif cpui386}
-
 { max level in dumping on error }
   Max_Frame_Dump : Word = 8;
 
@@ -394,8 +368,8 @@ Function Swap (X : Cardinal) : Cardinal;{$ifdef SYSTEMINLINE}inline;{$endif}[int
 Function Swap (X : QWord) : QWord;{$ifdef SYSTEMINLINE}inline;{$endif}[internconst:fpc_in_const_swap_qword];
 Function swap (X : Int64) : Int64;{$ifdef SYSTEMINLINE}inline;{$endif}[internconst:fpc_in_const_swap_qword];
 
-Function Align (Addr : PtrInt; Alignment : PtrInt) : PtrInt;{$ifdef SYSTEMINLINE}inline;{$endif}
-Function Align (Addr : Pointer; Alignment : PtrInt) : Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
+Function Align (Addr : PtrUInt; Alignment : PtrUInt) : PtrUInt;{$ifdef SYSTEMINLINE}inline;{$endif}
+Function Align (Addr : Pointer; Alignment : PtrUInt) : Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
 
 Function abs(l:Longint):Longint;[internconst:fpc_in_const_abs];{$ifdef SYSTEMINLINE}inline;{$endif}
 Function abs(l:Int64):Int64;[internconst:fpc_in_const_abs];{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -748,15 +722,9 @@ type
   TVarRec = record
      case VType : Ptrint of
        vtInteger    : (VInteger: Longint);
-{$ifdef ENDIAN_BIG}
-       vtBoolean    : (booldummy1,booldummy2,booldummy3: byte; VBoolean: Boolean);
-       vtChar       : (chardummy1,chardummy2,chardummy3: byte; VChar: Char);
-       vtWideChar   : (wchardummy1,VWideChar: WideChar);
-{$else ENDIAN_BIG}
        vtBoolean    : (VBoolean: Boolean);
        vtChar       : (VChar: Char);
        vtWideChar   : (VWideChar: WideChar);
-{$endif ENDIAN_BIG}
        vtExtended   : (VExtended: PExtended);
        vtString     : (VString: PShortString);
        vtPointer    : (VPointer: Pointer);
@@ -1021,12 +989,6 @@ operator :=(const source : single) dest : variant;{$ifdef SYSTEMINLINE}inline;{$
 {$ifdef SUPPORT_DOUBLE}
 operator :=(const source : double) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
 {$endif SUPPORT_DOUBLE}
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : extended) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_EXTENDED}
-{$ifdef SUPPORT_COMP}
-operator :=(const source : comp) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_COMP}
 
 { Misc. }
 operator :=(const source : currency) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -1068,17 +1030,6 @@ operator :=(const source : variant) dest : single;{$ifdef SYSTEMINLINE}inline;{$
 {$ifdef SUPPORT_DOUBLE}
 operator :=(const source : variant) dest : double;{$ifdef SYSTEMINLINE}inline;{$endif}
 {$endif SUPPORT_DOUBLE}
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : variant) dest : extended;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_EXTENDED}
-{$ifdef SUPPORT_COMP}
-operator :=(const source : variant) dest : comp;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_COMP}
-
-{$IFDEF CPUI386}
-operator :=(const source : olevariant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : variant) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$ENDIF}
 
 { Misc. }
 operator :=(const source : variant) dest : currency;{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -1116,100 +1067,6 @@ procedure VarCast(var dest : variant;const source : variant;vartype : longint);
 {**********************************************************************
                         from OLEVariant assignments
  **********************************************************************}
-{$IFDEF CPUI386}
-{ Integer }
-operator :=(const source : olevariant) dest : byte;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : shortint;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : word;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : smallint;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : dword;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : longint;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : qword;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : int64;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Boolean }
-operator :=(const source : olevariant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : wordbool;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : longbool;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Chars }
-operator :=(const source : olevariant) dest : char;{$ifdef SYSTEMINLINE}inline;{$endif}
-//operator :=(const source : olevariant) dest : widechar;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Strings }
-operator :=(const source : olevariant) dest : shortstring;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : ansistring;{$ifdef SYSTEMINLINE}inline;{$endif}
-//operator :=(const source : olevariant) dest : widestring;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Floats }
-{$ifdef SUPPORT_SINGLE}
-operator :=(const source : olevariant) dest : single;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_SINGLE}
-{$ifdef SUPPORT_DOUBLE}
-operator :=(const source : olevariant) dest : double;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_DOUBLE}
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : olevariant) dest : extended;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_EXTENDED}
-{$ifdef SUPPORT_COMP}
-//operator :=(const source : olevariant) dest : comp;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_COMP}
-
-{ Misc. }
-operator :=(const source : olevariant) dest : currency;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : tdatetime;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : olevariant) dest : error;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{**********************************************************************
-                         to OLEVariant assignments
- **********************************************************************}
-
-{ Integer }
-operator :=(const source : byte) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : shortint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : word) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : smallint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : dword) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : longint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : qword) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : int64) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Boolean }
-operator :=(const source : boolean) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : wordbool) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : longbool) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Chars }
-operator :=(const source : char) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-//operator :=(const source : widechar) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Strings }
-operator :=(const source : shortstring) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : ansistring) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-//operator :=(const source : widestring) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{ Floats }
-{$ifdef SUPPORT_SINGLE}
-operator :=(const source : single) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_SINGLE}
-{$ifdef SUPPORT_DOUBLE}
-operator :=(const source : double) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_DOUBLE}
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : extended) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_EXTENDED}
-{$ifdef SUPPORT_COMP}
-operator :=(const source : comp) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-{$endif SUPPORT_COMP}
-
-
-{ Misc. }
-operator :=(const source : currency) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : tdatetime) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-operator :=(const source : error) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-
-{$ENDIF}
-
 
 { some dummy types necessary to have generic resulttypes for certain compilerprocs }
 type
@@ -1231,16 +1088,10 @@ function fpc_shortstr_to_shortstr(len:longint;const sstr:shortstring): shortstri
 {$else FPC_STRTOSHORTSTRINGPROC}
 procedure fpc_shortstr_to_shortstr(out res:shortstring; const sstr: shortstring);compilerproc;
 {$endif FPC_STRTOSHORTSTRINGPROC}
-{$IFDEF CPUX86_64}
  procedure fpc_shortstr_concat(var dests:shortstring;const s1,s2:shortstring);compilerproc;
-{$ELSE}
- function fpc_shortstr_concat(const s1,s2:shortstring): shortstring; compilerproc;
-{$ENDIF}
 procedure fpc_shortstr_append_shortstr(var s1:shortstring;const s2:shortstring); compilerproc;
 function fpc_shortstr_compare(const left,right:shortstring) : longint; compilerproc;
-{$IFDEF CPUX86_64}
  function fpc_shortstr_compare_equal(const left,right:shortstring) : longint; compilerproc;
-{$ENDIF}
 {$ifndef FPC_STRTOSHORTSTRINGPROC}
 function fpc_pchar_to_shortstr(p:pchar):shortstring;compilerproc;
 {$else FPC_STRTOSHORTSTRINGPROC}
@@ -1261,12 +1112,6 @@ procedure fpc_shortstr_SInt(v : valSInt;len : SizeInt;out s : shortstring); comp
 procedure fpc_shortstr_uint(v : valuint;len : SizeInt;var s : shortstring); compilerproc;
 procedure fpc_chararray_sint(v : valsint;len : SizeInt;var a : array of char); compilerproc;
 procedure fpc_chararray_uint(v : valuint;len : SizeInt;var a : array of char); compilerproc;
-{$ifndef CPU64}
-procedure fpc_shortstr_qword(v : qword;len : SizeInt;var s : shortstring); compilerproc;
-procedure fpc_shortstr_int64(v : int64;len : SizeInt;var s : shortstring); compilerproc;
-procedure fpc_chararray_qword(v : qword;len : SizeInt;var a : array of char); compilerproc;
-procedure fpc_chararray_int64(v : int64;len : SizeInt;var a : array of char); compilerproc;
-{$endif CPU64}
 //procedure fpc_ansistr_qword(v : qword;len : SizeInt;var s : ansistring); compilerproc;
 //procedure fpc_ansistr_int64(v : int64;len : SizeInt;var s : ansistring); compilerproc;
 
@@ -1274,12 +1119,6 @@ procedure fpc_chararray_int64(v : int64;len : SizeInt;var a : array of char); co
 Function fpc_Val_Real_ShortStr(const s : shortstring; var code : ValSInt): ValReal; compilerproc;
 Function fpc_Val_SInt_ShortStr(DestSize: SizeInt; Const S: ShortString; var Code: ValSInt): ValSInt; compilerproc;
 Function fpc_Val_UInt_Shortstr(Const S: ShortString; var Code: ValSInt): ValUInt; compilerproc;
-{$ifndef CPU64}
-Function fpc_val_int64_shortstr(Const S: ShortString; var Code: ValSInt): Int64; compilerproc;
-Function fpc_val_qword_shortstr(Const S: ShortString; var Code: ValSInt): QWord; compilerproc;
-Function fpc_Val_qword_AnsiStr (Const S : AnsiString; Var Code : ValSInt): qword;compilerproc;
-Function fpc_Val_int64_AnsiStr (Const S : AnsiString; Var Code : ValSInt): Int64; compilerproc;
-{$endif CPU64}
 
 Procedure fpc_AnsiStr_Decr_Ref (Var S : Pointer); compilerproc;
 Procedure fpc_AnsiStr_Incr_Ref (S : Pointer); compilerproc;
@@ -1317,13 +1156,6 @@ Function fpc_ansistr_Unique(Var S : Pointer): Pointer; compilerproc;
 procedure fpc_variant_copy(d,s : pointer);compilerproc;
 //procedure fpc_vararray_get(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
 procedure fpc_vararray_put(var d : variant;const s : variant;indices : plongint;len : sizeint);compilerproc;
-
-{$ifdef FPC_INCLUDE_SOFTWARE_MOD_DIV}
-function fpc_div_dword(n,z : dword) : dword; compilerproc;
-function fpc_mod_dword(n,z : dword) : dword; compilerproc;
-function fpc_div_longint(n,z : longint) : longint; compilerproc;
-function fpc_mod_longint(n,z : longint) : longint; compilerproc;
-{$endif FPC_INCLUDE_SOFTWARE_MOD_DIV}
 
 function fpc_div_qword(n,z : qword) : qword; compilerproc;
 function fpc_mod_qword(n,z : qword) : qword; compilerproc;
@@ -1430,7 +1262,7 @@ type
     FreememSize         : function(p:pointer;Size:ptrint):ptrint;
     AllocMem            : function(Size:ptrint):Pointer;
     //ReAllocMem          : function(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
-	ReAllocMem          : Function(var p:pointer;Size:ptruint):Pointer;
+	  ReAllocMem          : Function(var p:pointer;Size:ptruint):Pointer;
     MemSize             : function(p:pointer):ptrint;
   end;
 
@@ -1438,21 +1270,12 @@ procedure GetMemoryManager(var MemMgr: TMemoryManager);
 procedure SetMemoryManager(const MemMgr: TMemoryManager);
 function  IsMemoryManagerSet: Boolean;
 
-{ Variables }
-const
-  MaxKeptOSChunks: DWord = 3; { if more than MaxKeptOSChunks are free, the heap manager will release
-                              chunks back to the OS }
-  growheapsizesmall : ptrint=32*1024; { fixed-size small blocks will grow with 32k }
-  growheapsize1 : ptrint=256*1024;  { < 256k will grow with 256k }
-  growheapsize2 : ptrint=1024*1024; { > 256k will grow with 1m }
-var
-  ReturnNilIfGrowHeapFails : boolean;
-
 { Default MemoryManager functions }
 Function  SysGetmem(Size:ptrint): Pointer;
 Function  SysFreeMem(P: Pointer): PtrInt;
 Function  SysFreememSize(p:pointer;Size:ptrint):ptrint;
 Function  SysAllocMem(Size: PtrInt): Pointer;
+function SysMemSize(p: pointer): ptrint;
 //function SysReAllocMem(var P: Pointer; OldSize, NewSize: PtrInt): Pointer;
 Function  SysReAllocMem(var p:pointer;size:ptruint):Pointer;
 
@@ -1669,13 +1492,6 @@ var
 {****************************************************************************
                     Include processor specific routines
 ****************************************************************************}
-
-{$ifdef cpui386}
-  {$ifdef SYSPROCDEFINED}
-    {$Error Can't determine processor type !}
-  {$endif}
-  {$i i386.inc}  { Case dependent, don't change }
-{$endif cpui386}
 
 {$ifdef CPUX86_64}
   {$ifdef SYSPROCDEFINED}
@@ -2682,7 +2498,6 @@ end;
 
 {$ifndef FPC_SYSTEM_HAS_FPC_SHORTSTR_CONCAT}
 
-{$IFDEF CPUX86_64}
 procedure fpc_shortstr_concat(var dests:shortstring;const s1,s2:shortstring);compilerproc;
 var
   s1l, s2l : longint;
@@ -2706,20 +2521,6 @@ begin
     end;
   dests[0]:=chr(s1l+s2l);
 end;
-{$ELSE}
-function fpc_shortstr_concat(const s1,s2:shortstring): shortstring;[public,alias:'FPC_SHORTSTR_CONCAT']; compilerproc;
-var
-  s1l, s2l : byte;
-begin
-  s1l:=length(s1);
-  s2l:=length(s2);
-  if s1l+s2l>255 then
-    s2l:=255-s1l;
-  move(s1[1],fpc_shortstr_concat[1],s1l);
-  move(s2[1],fpc_shortstr_concat[s1l+1],s2l);
-  fpc_shortstr_concat[0]:=chr(s1l+s2l);
-end;
-{$ENDIF}
 {$endif ndef FPC_SYSTEM_HAS_FPC_SHORTSTR_CONCAT}
 
 
@@ -2917,152 +2718,6 @@ end;
                                  Math
 ****************************************************************************}
 
-{****************************************************************************
-                          Software longint/dword division
-****************************************************************************}
-{$ifdef FPC_INCLUDE_SOFTWARE_MOD_DIV}
-
-function count_leading_zeros_32bit(l : longint) : longint;
-  var
-    i : longint;
-  begin
-     for i:=0 to 31 do
-       begin
-          if (l and (longint($80000000) shr i))<>0 then
-            begin
-               result:=i;
-               exit;
-            end;
-       end;
-     result:=i;
-  end;
-
-
-{$ifndef FPC_SYSTEM_HAS_DIV_DWORD}
-function fpc_div_dword(n,z : dword) : dword; [public,alias: 'FPC_DIV_DWORD']; compilerproc;
-  var
-     shift,lzz,lzn : longint;
-  begin
-     result:=0;
-     if n=0 then
-       HandleErrorFrame(200,get_frame);
-     lzz:=count_leading_zeros_32bit(z);
-     lzn:=count_leading_zeros_32bit(n);
-     { if the denominator contains less zeros
-       then the numerator
-       the d is greater than the n }
-     if lzn<lzz then
-       exit;
-     shift:=lzn-lzz;
-     n:=n shl shift;
-     repeat
-       if z>=n then
-         begin
-            z:=z-n;
-            result:=result+dword(1 shl shift);
-         end;
-       dec(shift);
-       n:=n shr 1;
-     until shift<0;
-  end;
-{$endif FPC_SYSTEM_HAS_DIV_DWORD}
-
-
-{$ifndef FPC_SYSTEM_HAS_MOD_DWORD}
-function fpc_mod_dword(n,z : dword) : dword; [public,alias: 'FPC_MOD_DWORD']; compilerproc;
-  var
-     shift,lzz,lzn : longint;
-  begin
-    result:=0;
-    if n=0 then
-      HandleErrorFrame(200,get_frame);
-    lzz:=count_leading_zeros_32bit(z);
-    lzn:=count_leading_zeros_32bit(n);
-    { if the denominator contains less zeros
-      then the numerator
-      the d is greater than the n }
-    if lzn<lzz then
-      begin
-         result:=z;
-         exit;
-      end;
-    shift:=lzn-lzz;
-    n:=n shl shift;
-    repeat
-      if z>=n then
-        z:=z-n;
-      dec(shift);
-      n:=n shr 1;
-    until shift<0;
-    result:=z;
-  end;
-{$endif FPC_SYSTEM_HAS_MOD_DWORD}
-
-
-{$ifndef FPC_SYSTEM_HAS_DIV_LONGINT}
-function fpc_div_longint(n,z : longint) : longint; [public,alias: 'FPC_DIV_LONGINT']; compilerproc;
-  var
-     sign : boolean;
-     d1,d2 : dword;
-  begin
-     if n=0 then
-       HandleErrorFrame(200,get_frame);
-     sign:=false;
-     if z<0 then
-       begin
-          sign:=not(sign);
-          d1:=dword(-z);
-       end
-     else
-       d1:=z;
-     if n<0 then
-       begin
-          sign:=not(sign);
-          d2:=dword(-n);
-       end
-     else
-       d2:=n;
-
-     { the div is coded by the compiler as call to divdword }
-     if sign then
-       result:=-(d1 div d2)
-     else
-       result:=d1 div d2;
-  end;
-{$endif FPC_SYSTEM_HAS_DIV_LONGINT}
-
-
-{$ifndef FPC_SYSTEM_HAS_MOD_LONGINT}
-function fpc_mod_longint(n,z : longint) : longint; [public,alias: 'FPC_MOD_LONGINT']; compilerproc;
-  var
-     signed : boolean;
-     r,nq,zq : dword;
-  begin
-     if n=0 then
-       HandleErrorFrame(200,get_frame);
-     nq:=abs(n);
-
-     if z<0 then
-       begin
-          zq:=dword(-z);
-          signed:=true;
-       end
-     else
-       begin
-         zq:=z;
-         signed:=false;
-       end;
-
-     r:=zq mod nq;
-     if signed then
-       result:=-longint(r)
-     else
-       result:=r;
-  end;
-{$endif FPC_SYSTEM_HAS_MOD_LONGINT}
-
-{$endif FPC_INCLUDE_SOFTWARE_MOD_DIV}
-
 
 {****************************************************************************}
 
@@ -3156,47 +2811,12 @@ end;
 
 {$endif ndef FPC_SYSTEM_HAS_SQR_INT64}
 
-{$ifndef FPC_SYSTEM_HAS_DECLOCKED_LONGINT}
-function declocked(var l:longint):boolean;
-  begin
-    Dec(l);
-    declocked:=(l=0);
-  end;
-{$endif FPC_SYSTEM_HAS_DECLOCKED_LONGINT}
-
-
-{$ifndef FPC_SYSTEM_HAS_DECLOCKED_INT64}
-function declocked(var l:int64):boolean;
-  begin
-    Dec(l);
-    declocked:=(l=0);
-  end;
-{$endif FPC_SYSTEM_HAS_DECLOCKED_INT64}
-
-
-{$ifndef FPC_SYSTEM_HAS_INCLOCKED_LONGINT}
-procedure inclocked(var l:longint);
-  begin
-    Inc(l);
-  end;
-{$endif FPC_SYSTEM_HAS_INCLOCKED_LONGINT}
-
-
-{$ifndef FPC_SYSTEM_HAS_INCLOCKED_INT64}
-procedure inclocked(var l:int64);
-  begin
-    Inc(l);
-  end;
-{$endif FPC_SYSTEM_HAS_INCLOCKED_INT64}
-
-
 {$ifndef FPC_SYSTEM_HAS_SPTR}
 {_$error Sptr must be defined for each processor }
 {$endif ndef FPC_SYSTEM_HAS_SPTR}
 
 
-
-function align(addr : PtrInt;alignment : PtrInt) : PtrInt;{$ifdef SYSTEMINLINE}inline;{$endif}
+function align(addr : PtrUInt;alignment : PtrUInt) : PtrUInt;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     if addr mod alignment<>0 then
       result:=addr+(alignment-(addr mod alignment))
@@ -3205,7 +2825,7 @@ function align(addr : PtrInt;alignment : PtrInt) : PtrInt;{$ifdef SYSTEMINLINE}i
   end;
 
 
-function align(addr : Pointer;alignment : PtrInt) : Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
+function align(addr : Pointer; alignment : PtrUInt) : Pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     if PtrUInt(addr) mod alignment <> 0 then
       result:=pointer(addr+(alignment-(PtrUInt(addr) mod alignment)))
@@ -3710,33 +3330,12 @@ begin
    Pos:=0;
 end;
 
-
-{$ifdef IBM_CHAR_SET}
-const
-  UpCaseTbl : shortstring[7]=#154#142#153#144#128#143#165;
-  LoCaseTbl : shortstring[7]=#129#132#148#130#135#134#164;
-{$endif}
-
 function upcase(c : char) : char;
-{$IFDEF IBM_CHAR_SET}
-var
-  i : longint;
-{$ENDIF}
 begin
   if (c in ['a'..'z']) then
     upcase:=char(byte(c)-32)
   else
-{$IFDEF IBM_CHAR_SET}
-    begin
-      i:=Pos(c,LoCaseTbl);
-      if i>0 then
-       upcase:=UpCaseTbl[i]
-      else
-       upcase:=c;
-    end;
-{$ELSE}
    upcase:=c;
-{$ENDIF}
 end;
 
 
@@ -3751,25 +3350,11 @@ end;
 
 
 function lowercase(c : char) : char;overload;
-{$IFDEF IBM_CHAR_SET}
-var
-  i : longint;
-{$ENDIF}
 begin
   if (c in ['A'..'Z']) then
    lowercase:=char(byte(c)+32)
   else
-{$IFDEF IBM_CHAR_SET}
-   begin
-     i:=Pos(c,UpCaseTbl);
-     if i>0 then
-      lowercase:=LoCaseTbl[i]
-     else
-      lowercase:=c;
-   end;
- {$ELSE}
    lowercase:=c;
- {$ENDIF}
 end;
 
 
@@ -3903,27 +3488,6 @@ begin
     s:=space(len-length(s))+s;
 end;
 
-{$ifndef CPU64}
-
-  procedure fpc_shortstr_qword(v : qword;len : longint;var s : shortstring);[public,alias:'FPC_SHORTSTR_QWORD']; compilerproc;
-    begin
-       int_str(v,s);
-       if length(s)<len then
-         s:=space(len-length(s))+s;
-    end;
-
-
-  procedure fpc_shortstr_int64(v : int64;len : longint;var s : shortstring);[public,alias:'FPC_SHORTSTR_INT64'];  compilerproc;
-    begin
-       int_str(v,s);
-       if length(s)<len then
-         s:=space(len-length(s))+s;
-    end;
-
-{$endif CPU64}
-
-
-
 
 {
    Array Of Char Str() helpers
@@ -3959,46 +3523,6 @@ begin
     maxlen:=high(a)+1;
   move(ss[1],pchar(@a)^,maxlen);
 end;
-
-
-{$ifndef CPU64}
-
-procedure fpc_chararray_qword(v : qword;len : SizeInt;var a : array of char);compilerproc;
-var
-  ss : shortstring;
-  maxlen : SizeInt;
-begin
-  int_str(v,ss);
-  if length(ss)<len then
-    ss:=space(len-length(ss))+ss;
-  if length(ss)<high(a)+1 then
-    maxlen:=length(ss)
-  else
-    maxlen:=high(a)+1;
-  move(ss[1],pchar(@a)^,maxlen);
-end;
-
-
-procedure fpc_chararray_int64(v : int64;len : SizeInt;var a : array of char);compilerproc;
-var
-  ss : shortstring;
-  maxlen : SizeInt;
-begin
-  int_str(v,ss);
-  if length(ss)<len then
-    ss:=space(len-length(ss))+ss;
-  if length(ss)<high(a)+1 then
-    maxlen:=length(ss)
-  else
-    maxlen:=high(a)+1;
-  move(ss[1],pchar(@a)^,maxlen);
-end;
-
-{$endif CPU64}
-
-
-
-
 
 {*****************************************************************************
                            Val() Functions
@@ -4144,115 +3668,6 @@ begin
 end;
 
 
-{$ifndef CPU64}
-
-  Function fpc_val_int64_shortstr(Const S: ShortString; var Code: ValSInt): Int64; [public, alias:'FPC_VAL_INT64_SHORTSTR']; compilerproc;
-   type
-     QWordRec = packed record
-       l1,l2: longint;
-     end;
-
-    var
-       u, temp, prev, maxint64, maxqword : qword;
-       base : byte;
-       negative : boolean;
-
-  begin
-    fpc_val_int64_shortstr := 0;
-    Temp:=0;
-    Code:=InitVal(s,negative,base);
-    if Code>length(s) then
-     exit;
-    { high(int64) produces 0 in version 1.0 (JM) }
-    with qwordrec(maxint64) do
-      begin
-{$ifdef ENDIAN_LITTLE}
-        l1 := longint($ffffffff);
-        l2 := $7fffffff;
-{$else ENDIAN_LITTLE}
-        l1 := $7fffffff;
-        l2 := longint($ffffffff);
-{$endif ENDIAN_LITTLE}
-      end;
-    with qwordrec(maxqword) do
-      begin
-        l1 := longint($ffffffff);
-        l2 := longint($ffffffff);
-      end;
-
-    while Code<=Length(s) do
-     begin
-       case s[Code] of
-         '0'..'9' : u:=Ord(S[Code])-Ord('0');
-         'A'..'F' : u:=Ord(S[Code])-(Ord('A')-10);
-         'a'..'f' : u:=Ord(S[Code])-(Ord('a')-10);
-       else
-        u:=16;
-       end;
-       Prev:=Temp;
-       Temp:=Temp*Int64(base);
-     If (u >= base) or
-        ((base = 10) and
-         (maxint64-temp+ord(negative) < u)) or
-        ((base <> 10) and
-         (qword(maxqword-temp) < u)) or
-        (prev > maxqword div qword(base)) Then
-       Begin
-         fpc_val_int64_shortstr := 0;
-         Exit
-       End;
-       Temp:=Temp+u;
-       inc(code);
-     end;
-    code:=0;
-    fpc_val_int64_shortstr:=int64(Temp);
-    If Negative Then
-      fpc_val_int64_shortstr:=-fpc_val_int64_shortstr;
-  end;
-
-
-  Function fpc_val_qword_shortstr(Const S: ShortString; var Code: ValSInt): QWord; [public, alias:'FPC_VAL_QWORD_SHORTSTR']; compilerproc;
-    type qwordrec = packed record
-      l1,l2: longint;
-    end;
-    var
-       u, prev, maxqword: QWord;
-       base : byte;
-       negative : boolean;
-  begin
-    fpc_val_qword_shortstr:=0;
-    Code:=InitVal(s,negative,base);
-    If Negative or (Code>length(s)) Then
-      Exit;
-    with qwordrec(maxqword) do
-      begin
-        l1 := longint($ffffffff);
-        l2 := longint($ffffffff);
-      end;
-    while Code<=Length(s) do
-     begin
-       case s[Code] of
-         '0'..'9' : u:=Ord(S[Code])-Ord('0');
-         'A'..'F' : u:=Ord(S[Code])-(Ord('A')-10);
-         'a'..'f' : u:=Ord(S[Code])-(Ord('a')-10);
-       else
-        u:=16;
-       end;
-       prev := fpc_val_qword_shortstr;
-       If (u>=base) or
-         ((QWord(maxqword-u) div QWord(base))<prev) then
-         Begin
-           fpc_val_qword_shortstr := 0;
-           Exit
-         End;
-       fpc_val_qword_shortstr:=fpc_val_qword_shortstr*QWord(base) + u;
-       inc(code);
-     end;
-    code := 0;
-  end;
-
-{$endif CPU64}
-
 
 Function fpc_Val_Real_ShortStr(const s : shortstring; var code : ValSInt): ValReal; [public, alias:'FPC_VAL_REAL_SHORTSTR']; compilerproc;
 var
@@ -4374,18 +3789,10 @@ end;}
 {$R- no range checking }
 
     type
-{$ifdef ENDIAN_LITTLE}
        tqwordrec = packed record
          low : dword;
          high : dword;
        end;
-{$endif ENDIAN_LITTLE}
-{$ifdef ENDIAN_BIG}
-       tqwordrec = packed record
-         high : dword;
-         low : dword;
-       end;
-{$endif ENDIAN_BIG}
 
 
 {$ifdef  FPC_INCLUDE_SOFTWARE_SHIFT_INT64}
@@ -4788,20 +4195,19 @@ Const
   AnsiRecLen = SizeOf(TAnsiRec);
   FirstOff   = SizeOf(TAnsiRec)-1;
 
-  {****************************************************************************}
-  { Memory manager }
+{****************************************************************************}
+{ Memory manager }
 
-  const
-    MemoryManager: TMemoryManager = (
-      NeedLock: true;
-      GetMem: @SysGetMem;
-      FreeMem: @SysFreeMem;
-      FreeMemSize: @SysFreeMemSize;
-      AllocMem: @SysAllocMem;
-      ReAllocMem: @SysReAllocMem;
-      MemSize: nil;
-    );
-
+const
+  MemoryManager: TMemoryManager = (
+    NeedLock: True;
+    GetMem: @SysGetMem;
+    FreeMem: @SysFreeMem;
+    FreeMemSize: @SysFreeMemSize;
+    AllocMem: @SysAllocMem;
+    ReAllocMem: @SysReAllocMem;
+    MemSize: @SysMemSize;
+  );
 
 {****************************************************************************
                     Internal functions, not in interface.
@@ -5070,7 +4476,7 @@ begin
      If Size>high_of_res then
       Size:=high_of_res;
      Move (S2[1],fpc_AnsiStr_To_ShortStr[1],Size);
-     setlength(fpc_AnsiStr_To_ShortStr,Size);
+     SetLength(fpc_AnsiStr_To_ShortStr,Size);
    end;
 end;
 
@@ -5083,7 +4489,7 @@ Var
   Size : SizeInt;
 begin
   Size:=Length(S2);
-  Setlength (result,Size);
+  SetLength(Result, Size);
   if Size>0 then
     Move(S2[1],Pointer(fpc_ShortStr_To_AnsiStr)^,Size);
 end;
@@ -5342,10 +4748,10 @@ begin
       else if PAnsiRec(Pointer(S)-AnsiFirstOff)^.Ref=1 then
         begin
           Temp:=Pointer(s)-AnsiFirstOff;
-          if assigned(memoryManager.MemSize) then
-          lens:=memoryManager.MemSize(Temp)
+          if Assigned(MemoryManager.MemSize) then
+            lens := MemoryManager.MemSize(Temp)
           else
-            lens := AnsiFirstOff+L+sizeof(AnsiChar);
+            lens := AnsiFirstOff+L+SizeOf(AnsiChar);
           lena:=AnsiFirstOff+L+sizeof(AnsiChar);
           { allow shrinking string if that saves at least half of current size }
           if (lena>lens) or ((lens>32) and (lena<=(lens div 2))) then
@@ -5418,7 +4824,7 @@ Var
   L    : SizeInt; }
 
 begin
-  pointer(result) := pointer(s);
+  Pointer(Result) := Pointer(S);
   // todo: to check this
 end;
 
@@ -5555,41 +4961,6 @@ begin
   pos:=0;
 end;
 
-
-{$ifndef CPU64}
-
-Function fpc_Val_qword_AnsiStr (Const S : AnsiString; Var Code : ValSInt): qword; [public, alias:'FPC_VAL_QWORD_ANSISTR']; compilerproc;
-Var
-  SS : ShortString;
-begin
-  fpc_Val_qword_AnsiStr:=0;
-  if length(S)>255 then
-    code:=256
-  else
-    begin
-       SS := S;
-       Val(SS,fpc_Val_qword_AnsiStr,Code);
-    end;
-end;
-
-Function fpc_Val_int64_AnsiStr (Const S : AnsiString; Var Code : ValSInt): Int64; [public, alias:'FPC_VAL_INT64_ANSISTR']; compilerproc;
-Var
-  SS : ShortString;
-begin
-  fpc_Val_int64_AnsiStr:=0;
-  if length(S)>255 then
-    code:=256
-  else
-    begin
-       SS := s;
-       Val(SS,fpc_Val_int64_AnsiStr,Code);
-    end;
-end;
-
-
-{$endif CPU64}
-
-
 {
 Procedure fpc_AnsiStr_UInt(v : ValUInt;Len : SizeInt; Var S : AnsiString);[Public,Alias : 'FPC_ANSISTR_VALUINT']; compilerproc;
 Var
@@ -5610,31 +4981,6 @@ begin
   S:=SS;
 end;
 }
-
-//{$ifndef CPU64}
-
-{
-Procedure fpc_AnsiStr_QWord(v : QWord;Len : SizeInt; Var S : AnsiString);[Public,Alias : 'FPC_ANSISTR_QWORD']; compilerproc;
-Var
-  SS : ShortString;
-begin
-  str(v:Len,SS);
-  S:=SS;
-end;
-}
-
-{
-Procedure fpc_AnsiStr_Int64(v : Int64; Len : SizeInt; Var S : AnsiString);[Public,Alias : 'FPC_ANSISTR_INT64']; compilerproc;
-Var
-  SS: ShortString;
-begin
-  str(v:Len, SS);
-  S := SS;
-end;
-}
-
-//{$endif CPU64}
-
 
 Procedure Delete (Var S : AnsiString; Index,Size: SizeInt);
 Var
@@ -6483,9 +5829,6 @@ Function fpc_PushExceptAddr (Ft: Longint;_buf,_newaddr : pointer): PJmp_buf ;
 var
   _ExceptAddrstack : ^PExceptAddr;
 begin
-{$ifdef excdebug}
-  writeln ('In PushExceptAddr');
-{$endif}
   _ExceptAddrstack:=@ExceptAddrstack;
   PExceptAddr(_newaddr)^.Next:=_ExceptAddrstack^;
   _ExceptAddrStack^:=PExceptAddr(_newaddr);
@@ -6508,9 +5851,6 @@ var
   caller_frame,
   caller_addr : Pointer;
 begin
-{$ifdef excdebug}
-  writeln ('In PushExceptObject');
-{$endif}
   _ExceptObjectStack:=@ExceptObjectStack;
   If _ExceptObjectStack^=Nil then
     begin
@@ -6588,9 +5928,6 @@ var
   _ExceptObjectStack : PExceptObject;
   _ExceptAddrstack : PExceptAddr;
 begin
-{$ifdef excdebug}
-  writeln ('In RaiseException');
-{$endif}
   fpc_Raiseexception:=nil;
   fpc_PushExceptObj(Obj,AnAddr,AFrame);
   _ExceptAddrstack:=ExceptAddrStack;
@@ -6624,9 +5961,6 @@ function fpc_PopObjectStack : TObject;[Public, Alias : 'FPC_POPOBJECTSTACK']; co
 var
   hp,_ExceptObjectStack : PExceptObject;
 begin
-{$ifdef excdebug}
-  writeln ('In PopObjectstack');
-{$endif}
   _ExceptObjectStack:=ExceptObjectStack;
   If _ExceptObjectStack=nil then
     begin
@@ -6655,9 +5989,6 @@ function fpc_PopSecondObjectStack : TObject;[Public, Alias : 'FPC_POPSECONDOBJEC
 var
   hp,_ExceptObjectStack : PExceptObject;
 begin
-{$ifdef excdebug}
-  writeln ('In PopObjectstack');
-{$endif}
   _ExceptObjectStack:=ExceptObjectStack;
   If not(assigned(_ExceptObjectStack)) or
      not(assigned(_ExceptObjectStack^.next)) then
@@ -6683,9 +6014,6 @@ Procedure fpc_ReRaise;[Public, Alias : 'FPC_RERAISE']; compilerproc;
 var
   _ExceptAddrStack : PExceptAddr;
 begin
-{$ifdef excdebug}
-  writeln ('In reraise');
-{$endif}
   _ExceptAddrStack:=ExceptAddrStack;
   If _ExceptAddrStack=Nil then
     DoUnHandledException;
@@ -6700,7 +6028,6 @@ var
 begin
   If ExceptObjectStack=Nil then
    begin
-{$IFDEF CPUI386} Writeln ('Internal error.'); {$ENDIF}
      halt (255);
    end;
   _Objtype := TExceptObjectClass(Objtype);
@@ -6937,23 +6264,6 @@ begin
 end;
 {$endif SUPPORT_DOUBLE}
 
-
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : extended) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-begin
-  VariantManager.VarFromReal(Dest,Source);
-end;
-{$endif SUPPORT_EXTENDED}
-
-
-{$ifdef SUPPORT_COMP}
-Operator :=(const source : comp) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-begin
-  VariantManager.VarFromReal(Dest,Source);
-end;
-{$endif SUPPORT_COMP}
-
-
 { Misc. }
 operator :=(const source : currency) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
@@ -7098,22 +6408,6 @@ end;
 {$endif SUPPORT_DOUBLE}
 
 
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : variant) dest : extended;{$ifdef SYSTEMINLINE}inline;{$endif}
-begin
-  dest:=variantmanager.vartoreal(source);
-end;
-{$endif SUPPORT_EXTENDED}
-
-
-{$ifdef SUPPORT_COMP}
-operator :=(const source : variant) dest : comp;{$ifdef SYSTEMINLINE}inline;{$endif}
-begin
-  dest:=comp(variantmanager.vartoreal(source));
-end;
-{$endif SUPPORT_COMP}
-
-
 { Misc. }
 operator :=(const source : variant) dest : currency;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
@@ -7125,19 +6419,6 @@ operator :=(const source : variant) dest : tdatetime;{$ifdef SYSTEMINLINE}inline
   begin
     dest:=variantmanager.vartotdatetime(source);
   end;
-
-
-{$IFDEF CPUI386}
-operator :=(const source : olevariant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    tvardata(result):=tvardata(source);
-  end;
-
-operator :=(const source : variant) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromvar(dest,source);
-  end;
-{$ENDIF}
 
 
 operator :=(const source : variant) dest : error;{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -7273,294 +6554,6 @@ procedure VarCast(var dest : variant;const source : variant;vartype : longint);
                         from OLEVariant assignments
  **********************************************************************}
 { Integer }
-{$IFDEF CPUI386}
-operator :=(const source : olevariant) dest : byte;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    { cast away olevar to var conversion and avoid
-      endless recursion }
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : shortint;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : word;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : smallint;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : dword;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : longint;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : qword;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint64(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : int64;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoword64(variant(tvardata(source)));
-  end;
-
-
-{ Boolean }
-operator :=(const source : olevariant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartobool(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : wordbool;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartobool(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : longbool;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartobool(variant(tvardata(source)));
-  end;
-
-
-{ Chars }
-operator :=(const source : olevariant) dest : char;{$ifdef SYSTEMINLINE}inline;{$endif}
-  var
-    S : String;
-  begin
-    VariantManager.VarToPStr(S,Source);
-    If Length(S)>0 then
-      Dest:=S[1]
-    else
-      Dest:=#0;
-  end;
-
-
-
-{ Strings }
-operator :=(const source : olevariant) dest : shortstring;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.vartopstr(dest,variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : ansistring;{$ifdef SYSTEMINLINE}inline;{$endif}
-begin
-	variantmanager.vartolstr(dest, variant(tvardata(source)));
-end;
-
-
-
-{ Floats }
-{$ifdef SUPPORT_SINGLE}
-operator :=(const source : olevariant) dest : single;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoreal(variant(tvardata(source)));
-  end;
-{$endif SUPPORT_SINGLE}
-
-
-{$ifdef SUPPORT_DOUBLE}
-operator :=(const source : olevariant) dest : double;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoreal(variant(tvardata(source)));
-  end;
-{$endif SUPPORT_DOUBLE}
-
-
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : olevariant) dest : extended;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoreal(variant(tvardata(source)));
-  end;
-{$endif SUPPORT_EXTENDED}
-
-
-
-{ Misc. }
-operator :=(const source : olevariant) dest : currency;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartocurr(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : tdatetime;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartotdatetime(variant(tvardata(source)));
-  end;
-
-
-operator :=(const source : olevariant) dest : error;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    dest:=variantmanager.vartoint(variant(tvardata(source)));
-  end;
-
-{**********************************************************************
-                          to OLEVariant assignments
- **********************************************************************}
-
-operator :=(const source : byte) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,1);
-  end;
-
-
-operator :=(const source : shortint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,-1);
-  end;
-
-
-operator :=(const source : word) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,2);
-  end;
-
-
-operator :=(const source : smallint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,-2);
-  end;
-
-
-operator :=(const source : dword) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,4);
-  end;
-
-
-operator :=(const source : longint) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,-4);
-  end;
-
-
-operator :=(const source : qword) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,8);
-  end;
-
-
-operator :=(const source : int64) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,-8);
-  end;
-
-{ Boolean }
-operator :=(const source : boolean) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromBool(variant(tvardata(dest)),Source);
-   end;
-
-
-operator :=(const source : wordbool) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromBool(variant(tvardata(Dest)),Source);
-   end;
-
-
-operator :=(const source : longbool) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromBool(variant(tvardata(Dest)),Source);
-   end;
-
-
-{ Chars }
-operator :=(const source : char) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfrompstr(dest,source);
-  end;
-
-
-
-
-{ Strings }
-operator :=(const source : shortstring) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfrompstr(dest,source);
-  end;
-
-
-operator :=(const source : ansistring) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromlstr(dest,source);
-  end;
-
-
-
-
-{ Floats }
-{$ifdef SUPPORT_SINGLE}
-operator :=(const source : single) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromreal(variant(tvardata(dest)),source);
-  end;
-{$endif SUPPORT_SINGLE}
-
-
-{$ifdef SUPPORT_DOUBLE}
-operator :=(const source : double) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromreal(variant(tvardata(dest)),source);
-  end;
-{$endif SUPPORT_DOUBLE}
-
-
-{$ifdef SUPPORT_EXTENDED}
-operator :=(const source : extended) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromreal(variant(tvardata(dest)),source);
-  end;
-{$endif SUPPORT_EXTENDED}
-
-
-{$ifdef SUPPORT_COMP}
-operator :=(const source : comp) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromreal(variant(tvardata(dest)),source);
-  end;
-{$endif SUPPORT_COMP}
-
-
-{ Misc. }
-operator :=(const source : currency) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromcurr(variant(tvardata(dest)),source);
-  end;
-
-
-operator :=(const source : tdatetime) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.varfromtdatetime(variant(tvardata(dest)),source);
-  end;
-
-
-operator :=(const source : error) dest : olevariant;{$ifdef SYSTEMINLINE}inline;{$endif}
-  begin
-    variantmanager.olevarfromint(dest,source,-sizeof(error));
-  end;
-
-{$ENDIF}
 
 {**********************************************************************
                       Variant manager functions
@@ -7591,20 +6584,9 @@ end;
 
 
 procedure initvariantmanager;
-{$IFDEF CPUI386}
-var
-   i : longint;
-{$ENDIF}
 begin
    VarDispProc:=@vardisperror;
    DispCallByIDProc:=@vardisperror;
-{$IFDEF CPUI386}
-   tvardata(Unassigned).VType:=varEmpty;
-   tvardata(Null).VType:=varNull;
-   for i:=0 to (sizeof(tvariantmanager) div sizeof(pointer))-1 do
-     ppointer(@variantmanager+i*sizeof(pointer))^ := @invalidvariantopnovariants;
-   pointer(variantmanager.varclear):=@varclear
-{$ENDIF}
 end;
 
 {****************************************************************************
@@ -8065,11 +7047,9 @@ Begin
   { Show runtime error and exit }
   If erroraddr<>nil Then
    Begin
-     {$IFDEF CPUI386} Writeln(stdout,'Runtime error ',Errorcode,' at $',hexstr(PtrInt(Erroraddr),sizeof(PtrInt)*2)); {$ENDIF}
      { to get a nice symify }
 //     Writeln(stdout,BackTraceStrFunc(Erroraddr));
      dump_stack(dump, ErrorBase);
-     {$IFDEF CPUI386} Writeln(stdout,''); {$ENDIF} 
    End;
 End;
 
@@ -8254,14 +7234,6 @@ end;
 
 Procedure SysAssert(Const Msg,FName:Shortstring;LineNo:Longint;ErrorAddr:Pointer);
 begin
-{$IFDEF CPUI386}
-  If msg='' then
-    write(stderr,'Assertion failed')
-  else
-    write(stderr,msg);
-  Writeln(stderr,' (',FName,', line ',LineNo,').');
-  Writeln(stderr,'');
-{$ENDIF}
   Halt(227);
 end;
 
@@ -8355,8 +7327,6 @@ procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'F
 {$ifdef OverflowCheckWasOn}
 {$Q+}
 {$endif}
-
-
 
 {*****************************************************************************
                              Memory Manager
@@ -8452,6 +7422,7 @@ end;
 
 function {%H-}SysAllocMem(Size: PtrInt): Pointer;
 begin
+  Result := nil;
  // Result := MemoryManager.GetMem(size);
  // if Result <> nil then
  //   FillChar(Result^, MemoryManager.MemSize(Result), 0);

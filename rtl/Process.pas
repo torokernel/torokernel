@@ -1084,7 +1084,16 @@ end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  
 procedure ProcessInit;
-begin
+begin  
+  // do Panic() if we can't calculate LocalCpuSpeed
+  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
+  {$IFDEF DebugProcess}
+  	if (LocalCpuSpeed = MAX_CPU_SPEED_MHZ) then
+  	begin
+           WriteDebug('Process: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
+  	end;
+  {$ENDIF}
+
   // initialize the exception and irq
   if HasException then
     InitializeExceptions;

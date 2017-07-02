@@ -1090,7 +1090,7 @@ begin
   {$IFDEF DebugProcess}
   	if (LocalCpuSpeed = MAX_CPU_SPEED_MHZ) then
   	begin
-           WriteDebug('Process: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
+           WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
   	end;
   {$ENDIF}
 
@@ -1098,7 +1098,7 @@ begin
   if HasException then
     InitializeExceptions;
   InitCores;
-  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Number of Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
   // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
 

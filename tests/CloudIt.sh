@@ -89,6 +89,7 @@ else
    echo "$appimg does not exist, exiting"
    exit 1
 fi
+
 # show the serial console
 sleep 5
 sudo virsh console $app

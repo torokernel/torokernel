@@ -290,7 +290,7 @@ begin
   write_portb (1, BASE_COM_PORT);
   write_portb (3, BASE_COM_PORT+3);
   WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
-  WriteDebug('Initialization of debuging console.\n',[]);
+  WriteDebug('Initialization of debugging console.\n',[]);
   {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 

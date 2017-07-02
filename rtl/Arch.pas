@@ -58,6 +58,10 @@ const
   MEM_AVAILABLE = 1;
   MEM_RESERVED = 2;
 
+  // Max CPU speed in Mhz
+  // if it fails to get the right value
+  MAX_CPU_SPEED_MHZ = 2393;
+
 type
 {$IFDEF UNICODE}
   XChar = AnsiChar;
@@ -688,6 +692,11 @@ asm
   pop   ax
 @CPUS_SKP:
   mov speed, ax
+  end;
+  
+  if speed = 0 then
+  begin
+    speed := MAX_CPU_SPEED_MHZ;
   end;
 
   result := speed;
@@ -1364,6 +1373,7 @@ begin
   MemoryCounterInit;
   // cache Page structures
   CacheManagerInit;
+  // CPU speed in Mhz
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
   // increment of RDTSC counter per miliseg
   CPU_CYCLES  := PtrUInt(LocalCpuSpeed * 100000);

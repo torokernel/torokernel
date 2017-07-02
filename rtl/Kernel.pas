@@ -55,8 +55,6 @@ begin
   WriteConsole('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   {$IFDEF DEBUG} DebugInit; {$ENDIF}
-  // Do Panic() if we can't calculate LocalCpuSpeed
-  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
   ProcessInit;
   MemoryInit;
   FileSystemInit;

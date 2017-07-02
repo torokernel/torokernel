@@ -1,18 +1,12 @@
 #!/bin/sh
 #
-# CloudIt.sh <name>
+# CloudIt.sh <Application>
 #
-# This script compiles the freepascal application in <name>
-# within the Toro Kernel. This results in a disk image named 
-# <name>.img. Then, this image is used to run a instance of 
-# the app in a VM in QEMU. The script checks if the file <name>.qemu 
-# exists. In that case, it uses the content of the file as parameters
-# for qemu. The script also checks if the scripts <name>.pre and <name>.post
-# exists. In that case, it executes those scripts as pre and post compilation.  
+# Script to compile and run a Toro app in Linux. We base on wine 
+# to generate the image and on KVM/QEMU to run it.
 #
-# Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
+# Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
-#
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,42 +23,73 @@
 #
 
 app="$1";
-appsource="$app.pas";
-appbin=$app;
+applpi="$app.lpi";
 appimg="$app.img";
-qemufile="$app.qemu"
-prefile="$app.pre.sh"
-postfile="$app.post.sh"
+kvmfile="$app.kvm";
 
-# we get the parameters
-if [ -f $qemufile ]; then
-	qemuparam=`cat $qemufile`
+# check parameters
+if [ "$#" -lt 1 ]; then
+   echo "Usage: CloudIt.sh ApplicationName [Options]"
+   exit 1
 fi
 
-# we execute the pre script
-if [ -f $prefile ]; then
-	sh $prefile
-fi
-
-# we compile the application
-fpc $appsource -o$appbin -Fu../rtl/ -Fu../rtl/drivers
-
-# we build the image
-if [ -f boot.o ]; then 
-	./build 2 $appbin boot.o $appimg
+# get the kvm parameters
+if [ -f $kvmfile ]; then
+   kvmparam=`cat $kvmfile`
 else
-	echo "ERROR: boot.o not found, run make first"
-	exit 
+   # parameters by default
+   kvmparam="--vcpus=2 --ram=512"
 fi
 
-# we execute the post compilation script
-if [ -f $postfile ]; then
-    # we run the application in qemu in background and 
-	# we run the post compilation script
-    qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg &
-	sh $postfile
+# this avoids to regenerate the image
+if [ "$#" -eq 2 ]; then
+   if [ "$2" = "onlykvm" ]; then
+    # check if image exists
+    if [ ! -f $appimg ]; then
+       echo "$appimg does not exist, exiting"
+       exit 1
+    fi
+    # destroy any previous instance
+    sudo virsh destroy $app
+    sudo virsh undefine $app
+    # VNC is open at port 590X
+    sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+    # show the serial console
+    sleep 5
+    sudo virsh console $app
+    exit 0
+   fi
+ echo "Parameter: $2 not recognized"
+ exit 1
+fi
+
+# remove all compiled files
+rm -f ../rtl/*.o ../rtl/*.ppu
+rm -f $appimg
+
+# remove the application
+rm -f $app "$app.o"
+
+if [ -f $applpi ]; then
+   # force to compile the application
+   wine c:/lazarus/lazbuild.exe $applpi
 else
-	# we run the application in qemu
-	qemu-system-x86_64 $qemuparam -drive format=raw,file=$appimg
+   echo "$applpi does not exist, exiting"
+   exit 1
 fi
 
+# destroy any previous instance
+sudo virsh destroy $app 
+sudo virsh undefine $app
+
+if [ -f $appimg ]; then
+   # VNC is open at port 590X
+   sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+else
+   echo "$appimg does not exist, exiting"
+   exit 1
+fi
+
+# show the serial console
+sleep 5
+sudo virsh console $app

@@ -32,7 +32,7 @@ interface
 
 {$I ..\Toro.inc}
 
-{$DEFINE DebugExt2FS}
+//{$DEFINE DebugExt2FS}
 
 uses Console,Arch,FileSystem,Process,Debug,Memory;
 

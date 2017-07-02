@@ -634,17 +634,17 @@ begin
   if CPUID = GetApicID then
   begin
     NewThread := ToroGetMem(SizeOf(TThread));
-    {$IFDEF DebugProcess} WriteDebug('ThreadCreate - NewThread: %h\n', [PtrUInt(NewThread)]); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread: %h\n', [PtrUInt(NewThread)]); {$ENDIF}
     if NewThread = nil then
     begin
-      {$IFDEF DebugProcess} WriteDebug('ThreadCreate - NewThread = nil\n', []); {$ENDIF}
+      {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread = nil\n', []); {$ENDIF}
       Result := nil;
       Exit;
     end;
     NewThread^.StackAddress := ToroGetMem(StackSize);
     if NewThread.StackAddress = nil  then
     begin
-      {$IFDEF DebugProcess} WriteDebug('ThreadCreate - NewThread.StackAddress = nil\n',[]); {$ENDIF}
+      {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.StackAddress = nil\n',[]); {$ENDIF}
       ToroFreeMem(NewThread);
       Result := nil;
       Exit;
@@ -652,14 +652,14 @@ begin
     // is this the first thread ?
     if not Initialized then
     begin
-      {$IFDEF DebugProcess} WriteDebug('ThreadCreate - First Thread -> Initialized=True\n', []); {$ENDIF}
+      {$IFDEF DebugProcess} WriteDebug('ThreadCreate: First Thread -> Initialized=True\n', []); {$ENDIF}
       Initialized := True;
     end else if THREADVAR_BLOCKSIZE <> 0 then
     begin
       NewThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
       if NewThread.TLS = nil then
       begin // not enough memory, Thread cannot be created
-        {$IFDEF DebugProcess} WriteDebug('ThreadCreate - NewThread.TLS = nil\n', []); {$ENDIF}
+        {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.TLS = nil\n', []); {$ENDIF}
         ToroFreeMem(NewThread.StackAddress);
         ToroFreeMem(NewThread);
         Result := nil;
@@ -674,7 +674,7 @@ begin
     NewThread.State := tsReady;
     NewThread.StartArg := Arg; // this argument we will read by thread main
     NewThread.ThreadFunc := ThreadFunction;
-    {$IFDEF DebugProcess} WriteDebug('ThreadCreate - NewThread.ThreadFunc: %h\n', [PtrUInt(@NewThread.ThreadFunc)]); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.ThreadFunc: %h\n', [PtrUInt(@NewThread.ThreadFunc)]); {$ENDIF}
     NewThread.PrivateHeap := XHeapAcquire(CPUID); // private heap allocator init
     NewThread.ThreadID := TThreadID(NewThread);
     NewThread.CPU := @CPU[CPUID];
@@ -720,7 +720,7 @@ var
 begin
   CountTime := 0;
   ResumeTime := Miliseg*LocalCPUSpeed*1000;
-  {$IFDEF DebugProcess} WriteDebug('Sleep - ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
   while CountTime < ResumeTime do
   begin
      CurrentTime:= read_rdtsc;
@@ -731,7 +731,7 @@ begin
      else
       CountTime:= CountTime + ($ffffffff-CurrentTime+tmp);
   end;
-  {$IFDEF DebugProcess} WriteDebug('Sleep - ResumeTime exiting\n', []); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime exiting\n', []); {$ENDIF}
 end;
 
 
@@ -754,7 +754,7 @@ begin
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem (CurrentThread.StackAddress);
   ToroFreeMem(CurrentThread);
-  {$IFDEF DebugProcess} WriteDebug('ThreadExit - ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ThreadExit: ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
   if Schedule then  
     // try to Schedule a new thread
     Scheduling(NextThread);
@@ -885,12 +885,12 @@ begin
     // in the first moment I am here
     if CurrentCPU.Threads = nil then
     begin
-	  {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to loop\n', []); {$ENDIF}
+	  {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
       // spin of init
       while CurrentCPU.Threads = nil do
     		Inmigrating(CurrentCPU);
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
-      {$IFDEF DebugProcess} WriteDebug('Scheduling: Jumping to Current Thread, StackPointer return: %h\n', [PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp)]); {$ENDIF}
+      {$IFDEF DebugProcess} WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp)]); {$ENDIF}
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
       // jump to thread execution
       Exit;
@@ -915,7 +915,7 @@ begin
     if Candidate.State <> tsReady then
       Continue;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess}WriteDebug('Scheduling: Jumping to Current Thread , stack pointer: %h\n', [PtrUInt(Candidate.ret_thread_sp)]);{$ENDIF}
+    {$IFDEF DebugProcess}WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(Candidate.ret_thread_sp)]);{$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     SwitchStack(@CurrentThread.ret_thread_sp, @Candidate.ret_thread_sp);
@@ -961,7 +961,7 @@ var
   InitThread: PThread;
   LocalCPU: PCPU;
 begin
-  {$IFDEF DebugProcess} WriteDebug('CreateInitThread - StackSize: %d\n', [StackSize]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('CreateInitThread: StackSize: %d\n', [StackSize]); {$ENDIF}
   LocalCPU := @CPU[GetApicID];
   InitThread := ThreadCreate(StackSize, LocalCPU.ApicID, ThreadFunction, nil);
   if InitThread = nil then
@@ -975,12 +975,12 @@ begin
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI
-  {$IFDEF DebugProcess} WriteDebug('CreateInitThread - InitialThreadID: %h\n', [InitialThreadID]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('CreateInitThread: InitialThreadID: %h\n', [InitialThreadID]); {$ENDIF}
   // now we have in the stack ip pointer for ret instruction
   // TODO: when compiling with DCC, check that previous assertion is correct
   // TODO: when previous IFDEF is activated, check that WriteDebug is not messing
   InitThread.ret_thread_sp := Pointer(PtrUInt(InitThread.ret_thread_sp)+SizeOf(Pointer));
-  {$IFDEF DebugProcess} WriteDebug('CreateInitThread - InitThread.ret_thread_sp: %h -> change_sp to execute ThreadMain with this stack address\n', [PtrUInt(InitThread.ret_thread_sp)]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('CreateInitThread: InitThread.ret_thread_sp: %h\n', [PtrUInt(InitThread.ret_thread_sp)]); {$ENDIF}
   change_sp(InitThread.ret_thread_sp);
   // the procedure "PASCALMAIN" is executed (this is the ThreadFunction in parameter)
 end;
@@ -1006,10 +1006,10 @@ begin
   // open standard IO files, stack checking, iores, etc .
   {$IFDEF FPC} InitThread(CurrentThread.StackSize); {$ENDIF}
   // TODO: !!! InitThread() for Delphi
-  {$IFDEF DebugProcess} WriteDebug('ThreadMain - CurrentThread: #%h\n', [PtrUInt(CurrentThread)]); {$ENDIF}
-  {$IFDEF DebugProcess} WriteDebug('ThreadMain - CurrentThread.ThreadFunc: %h\n', [PtrUInt(@CurrentThread.ThreadFunc)]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ThreadMain: CurrentThread: #%h\n', [PtrUInt(CurrentThread)]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ThreadMain: CurrentThread.ThreadFunc: %h\n', [PtrUInt(@CurrentThread.ThreadFunc)]); {$ENDIF}
   ExitCode := CurrentThread.ThreadFunc(CurrentThread.StartArg);
-  {$IFDEF DebugProcess} WriteDebug('ThreadMain - returning from CurrentThread.ThreadFunc CurrentThread: %h\n', [PtrUInt(CurrentThread)]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ThreadMain: returning from CurrentThread.ThreadFunc CurrentThread: %h\n', [PtrUInt(CurrentThread)]); {$ENDIF}
   if CurrentThread.ThreadID = InitialThreadID then
     SystemExit; // System is ending !
   ThreadExit(True);
@@ -1034,12 +1034,12 @@ begin
   if NewThread = nil then
   begin
     ThreadID := 0;
-    {$IFDEF DebugProcess} WriteDebug('BeginThread - ThreadCreate Failed\n', []); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('SysBeginThread: ThreadCreate Failed\n', []); {$ENDIF}
     Result := 0;
     Exit;
   end;
   ThreadID := NewThread.ThreadID;
-  {$IFDEF DebugProcess} WriteDebug('BeginThread - ThreadID: %h on CPU %d\n', [NewThread.ThreadID, NewThread.CPU.ApicID]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('SysBeginThread: ThreadID: %h on CPU %d\n', [NewThread.ThreadID, NewThread.CPU.ApicID]); {$ENDIF}
   Result := NewThread.ThreadID;
 end;
 
@@ -1084,12 +1084,21 @@ end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  
 procedure ProcessInit;
-begin
+begin  
+  // do Panic() if we can't calculate LocalCpuSpeed
+  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
+  {$IFDEF DebugProcess}
+  	if (LocalCpuSpeed = MAX_CPU_SPEED_MHZ) then
+  	begin
+           WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
+  	end;
+  {$ENDIF}
+
   // initialize the exception and irq
   if HasException then
     InitializeExceptions;
   InitCores;
-  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Number of Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
   // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
 

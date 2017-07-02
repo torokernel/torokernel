@@ -113,7 +113,7 @@ procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 // only used in the debug unit to synchronize access to serial port
-procedure Delay(clock_hz: Int64; milisec: LongInt);
+procedure Delay(milisec: LongInt);
 procedure eoi;
 function GetApicID: Byte;
 function get_irq_master: Byte;
@@ -164,10 +164,9 @@ const
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
   AvailableMemory: QWord; // Memory in the system
-  // These variables are used to calculate
-  // the delays
+  // LocalCpuSpeed has the speed of the local CPU in Mhz
+  // It is used to calculate the delays
   LocalCpuSpeed: Int64 = 0;
-  CPU_CYCLES: Int64 = 0 ;
   StartTime: TNow;
   Cores: array[0..MAX_CPU-1] of TCore;
     
@@ -362,7 +361,7 @@ procedure send_apic_startup(apicid, vector: Byte);
 var
   icrl, icrh: ^DWORD;
 begin
-  delay(LocalCpuSpeed, 50);
+  Delay(10);
   icrl := Pointer(icrlo_reg);
   icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
@@ -410,16 +409,16 @@ asm
   nop;
 end;
 
-// Wait milisec using the clock bus speed in clock_hz
-// The apic interrupt need the clock_hz
-procedure Delay(clock_hz: Int64; milisec: LongInt);
+// Wait a number of miliseconds
+// It uses the Local Apic
+procedure Delay(milisec: LongInt);
 var
   tmp : ^DWORD ;
 begin
   tmp := Pointer (divide_reg);
   tmp^ := $b;
   tmp := Pointer(timer_init_reg); // set the count
-  tmp^ := (clock_hz div 1000)*milisec; // the count is aprox.
+  tmp^ := (LocalCpuSpeed * 1000)*milisec; // the count is aprox.
   tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
@@ -430,6 +429,8 @@ begin
   tmp^ := 0;
 end;
 
+// Wait a number of microseconds
+// It uses the Local Apic
 procedure DelayMicro(microseg: LongInt);
 var
   tmp : ^DWORD ;
@@ -437,7 +438,7 @@ begin
   tmp := Pointer (divide_reg);
   tmp^ := $b;
   tmp := Pointer(timer_init_reg); // set the count
-  tmp^ := (CPU_CYCLES div 1000000)*microseg; // the count is aprox.
+  tmp^ := LocalCpuSpeed*microseg; // the count is aprox.
   tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
@@ -1059,24 +1060,26 @@ procedure InitCore(ApicID: Byte);
 var
   Attempt: LongInt;
 begin
+  // tray two times two wake up each core
   Attempt := 2;
   while Attempt > 0 do
   begin
     // wakeup the remote core with IPI-INIT
     send_apic_init(apicid);
-    Delay(CPU_CYCLES, 100);
+    Delay(10);
     // send the first startup
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYCLES  ,100);
+    Delay(10);
     // remote CPU read the IPI?
     if not is_apic_ready then
-    begin // some problem ?? wait for 2 sec
-      Delay(CPU_CYCLES, 500);
+    begin // some problem ?? we wait
+      Delay(100);
+      // Serious problem -> exit
       if not is_apic_ready then
-        Exit; // Serious problem -> exit
+        Exit;
     end;
     send_apic_startup(ApicID, 2);
-    Delay(CPU_CYCLES, 500);
+    Delay(10);
     Dec(Attempt);
   end;
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
@@ -1375,8 +1378,6 @@ begin
   CacheManagerInit;
   // CPU speed in Mhz
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
-  // increment of RDTSC counter per miliseg
-  CPU_CYCLES  := PtrUInt(LocalCpuSpeed * 100000);
   IrqOn(2);
   // hardware Interruptions
   for I := 33 to 47 do

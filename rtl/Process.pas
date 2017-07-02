@@ -719,6 +719,7 @@ var
   CurrentTime,ResumeTime,CountTime,tmp: Int64;
 begin
   CountTime := 0;
+  // LocalCPUSpeed is in Mhz
   ResumeTime := Miliseg*LocalCPUSpeed*1000;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
   while CountTime < ResumeTime do

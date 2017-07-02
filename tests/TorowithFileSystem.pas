@@ -39,7 +39,7 @@ program TorowithFileSystem;
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 4 -drive format=raw,file=TorowithFileSystem.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}

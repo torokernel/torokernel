@@ -448,7 +448,8 @@ var rbx_reg: QWord;
     rip_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
-    rflags_reg: Qword;
+    rflags_reg: QWord;
+    rcr2: QWord;
 begin
 asm
  mov  rbx_reg, rbx
@@ -461,9 +462,11 @@ asm
  mov rip_reg, rax
  mov rax, [rbp] + 24
  mov rflags_reg, rax
+ mov rax, cr2
+ mov rcr2, rax
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Page Fault\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RPage Fault/n\n',[GetApicid]);
+  {$IFDEF DebugProcess} WriteDebug('Exception: Page Fault, cr2: %h\n', [rcr2]); {$ENDIF}
+  WriteConsole('[\t] CPU#%d Exception: /RPage Fault/n, cr2: %h\n',[GetApicid, rcr2]);
   WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);

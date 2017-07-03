@@ -136,10 +136,11 @@ end;
 procedure PrintDecimal(Value: PtrUInt);
 var
   I, Len: Byte;
-  S: string[64];
+  // 21 is the max number of characters needed to represent 64 bits number in decimal
+  S: string[21];
 begin
   Len := 0;
-  I := 10;
+  I := 21;
   if Value = 0 then
   begin
     PutC('0');
@@ -148,23 +149,12 @@ begin
     while Value <> 0 do
     begin
       S[I] := AnsiChar((Value mod 10) + $30);
-    Value := Value div 10;
-   I := I-1;
-   Len := Len+1;
-  end;
-  if (Len <> 10) then
-  begin
-   S[0] := XChar(Len);
-   for I := 1 to Len do
-   begin
-    S[I] := S[11-Len];
-    Len := Len-1;
-   end;
-   end else
-   begin
-    S[0] := chr(10);
-   end;
-   for I := 1 to ord(S[0]) do
+      Value := Value div 10;
+      I := I-1;
+      Len := Len+1;
+    end;
+    S[0] := XChar(Len);
+   for I := (sizeof(S)-Len) to sizeof(S)-1 do
    begin
     PutC(S[I]);
    end;

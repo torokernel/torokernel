@@ -169,23 +169,27 @@ procedure Ne2000Send(net: PNetworkInterface; Packet: PPacket);
 var
   PacketQueue: PPacket;
 begin
-  //DisabledINT; // Protection from Local Access
   DisableInt;
   {$IFDEF DebugNe2000} WriteDebug('ne2000: sending packet %d\n', [Qword(Packet)]); {$ENDIF}
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
   begin
    net.OutgoingPackets := Packet; // Enqueue the packet
+   {$IFDEF DebugNe2000}
+     if (Net.OutgoingPacketTail <> nil) then
+     begin
+       WriteDebug('e1000: OutgoingPacket=nil but OutgoingPacketTail <> nil\n', []);
+     end;
+   {$ENDIF}
+   Net.OutgoingPacketTail := Packet;
    DoSendPacket(net); // Send immediately
   {$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d is transmitted\n', [Qword(Packet)]); {$ENDIF}
   end else
-  begin // It is a FIFO queue
-    while PacketQueue.next <> nil do
-      PacketQueue := PacketQueue.Next;
-    PacketQueue.Next := Packet;
-	{$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d enqueued\n', [Qword(Packet)]); {$ENDIF}
+  begin
+    Net.OutgoingPacketTail.Next := Packet;
+    Net.OutgoingPacketTail := Packet;
+    {$IFDEF DebugNe2000} WriteDebug('ne2000: packet %d enqueued\n', [Qword(Packet)]); {$ENDIF}
   end;
-  //EnabledINT;
   RestoreInt;
 end;
 

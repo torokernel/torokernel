@@ -153,8 +153,12 @@ type
     Minor: LongInt; // Internal Identificator
     MaxPacketSize: LongInt; // Max size of packet
     HardAddress: THardwareAddress; // MAC Address
-    // Packets from physical layer.
+    // Queue of Packets from physical layer
+    // Received Packets
+    IncomingPacketTail: PPacket;
     IncomingPackets: PPacket;
+    // Transmission queue
+    OutgoingPacketTail: PPacket;
     OutgoingPackets: PPacket;
     // Handlers of drivers
     Start: procedure (NetInterface: PNetworkInterface);
@@ -415,7 +419,9 @@ end;
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
   NetInterface.IncomingPackets := nil;
+  NetInterface.IncomingPacketTail := nil;
   NetInterface.OutgoingPackets := nil;
+  NetInterface.OutgoingPacketTail := nil;
   NetInterface.Next := NetworkInterfaces;
   NetInterface.CPUID := -1;
   NetworkInterfaces := NetInterface;
@@ -820,14 +826,19 @@ var
 begin
   CPUID := GetApicid;
   Packet := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
-  // wrong alarm, the queue is empty
+  // a null packet has been sent, there were a problem
   If Packet = nil then
   begin
-    WriteConsole('Network: /RNull packet/n sent\n',[]);
-    result := nil;
+    {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: OutgoingPackets = NULL\n', []);{$ENDIF}
+    Result := nil;
     exit;
   end;
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := Packet.Next;
+  // if it is the last one we clean the tail
+  if Packet.Next = nil then
+  begin
+     DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil
+  end;
   DedicateNetworks[CPUID].NetworkInterface.TimeStamp := read_rdtsc;
   // the packet must be delete
   if Packet.Delete then
@@ -849,15 +860,21 @@ begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF} 
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
   Packet.Next := nil;
+  // enqueue the packet last
   if PacketQueue = nil then
   begin
-    DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets:=Packet;
-  end else begin
-	// we have packets in the tail
-    while PacketQueue.Next <> nil do
-	 PacketQueue := PacketQueue.Next;
-    PacketQueue.Next := Packet;
+    DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets := Packet;
+    {$IFDEF DebugNetwork}
+      if DedicateNetworks[GetApicId].NetworkInterface.IncomingPacketTail <> nil then
+      begin
+        WriteDebug('EnqueueIncomingPacket: IncomingPacketTail <> nil\n', []);
+      end;
+    {$ENDIF}
+  end else
+  begin
+    DedicateNetworks[GetApicId].NetworkInterface.IncomingPacketTail.Next := Packet;
   end;
+  DedicateNetworks[GetApicId].NetworkInterface.IncomingPacketTail := Packet
 end;
 
 // Port is marked free in Local Socket Bitmap
@@ -1316,9 +1333,14 @@ begin
     Result := nil
   else begin
     DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := Packet.Next;
-	Packet.Next := nil;
+    // if it is the last one, clean the tail
+    If Packet.Next = nil then
+    begin
+      DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
+    end;
+    Packet.Next := nil;
     Result := Packet;
-	{$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
   end;
   RestoreInt;
 end;
@@ -1394,7 +1416,9 @@ begin
   CPUID := GetApicid;
   // cleaning  packet queue
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
+  DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
+  DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
   // initilization of Services for Packets Manipulation
   NetworkServicesInit;
   // driver internal initilization

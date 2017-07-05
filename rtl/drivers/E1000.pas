@@ -305,16 +305,21 @@ begin
   begin
    // i have to enque it
     Net.OutgoingPackets := Packet;
+    {$IFDEF DebugE1000}
+     if (Net.OutgoingPacketTail <> nil) then
+     begin
+       WriteDebug('e1000: OutgoingPacket=nil but OutgoingPacketTail <> nil\n', []);
+     end;
+    {$ENDIF}
+    Net.OutgoingPacketTail := Packet;
    // send Directly
     DoSendPacket(Net);
   end else
   begin
     // we need local protection
     DisableInt;
-    // it is a FIFO queue
-    while PacketQueue.Next <> nil do
-      PacketQueue := PacketQueue.Next;
-    PacketQueue.Next := Packet;
+    Net.OutgoingPacketTail.Next := Packet;
+    Net.OutgoingPacketTail := Packet;
     RestoreInt;
   end;
 end;
@@ -548,8 +553,7 @@ end;
 // Read all the packets in the reception ring
 procedure EmptyReadRing(Net: PE1000);
 var
-  Tail, Head, Current, Diff: LongInt;
-  tmpHead: Longint;
+  Tail, Head, Diff: LongInt;
 begin
   Head := E1000ReadRegister(Net, E1000_REG_RDH);
   Tail := E1000ReadRegister(Net, E1000_REG_RDT);

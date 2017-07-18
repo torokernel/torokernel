@@ -763,7 +763,7 @@ begin
     PageStart := PageStart-PAGE_SIZE;
   // StartPage is a Page_Size multipler
   StartPage := Pointer(PageStart);
-  Size := Size + PtrUInt(Add) mod PAGE_SIZE;
+  Size := Size + {%H-}PtrUInt(Add) mod PAGE_SIZE;
   PageCount := Size div PAGE_SIZE;
   if Size mod PAGE_SIZE <> 0 then
     Inc(PageCount);
@@ -796,7 +796,7 @@ begin
     PageStart := PageStart-PAGE_SIZE;
   // StartPage is a Page_Size multipler
   StartPage := Pointer(PageStart);
-  Size := Size + PtrUInt(Add) mod PAGE_SIZE;
+  Size := Size + {%H-}PtrUInt(Add) mod PAGE_SIZE;
   PageCount := Size div PAGE_SIZE;
   if Size mod PAGE_SIZE <> 0 then
     Inc(PageCount);
@@ -865,7 +865,7 @@ begin
   ID := 1;
   // First Region must start at ALLOC_MEMORY_START
   // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
-  while GetMemoryRegion(ID, @Buff) <> 0 do
+  while GetMemoryRegion(ID, Buff) <> 0 do
   begin
     if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.Length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
       Break;
@@ -902,7 +902,7 @@ begin
         Counter := 0;
         // looking for a free block of memory
         Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
+        while GetMemoryRegion(ID, Buff) <> 0 do
         begin
           if Buff.Flag = MEM_AVAILABLE then
             Break;
@@ -917,7 +917,7 @@ begin
         Counter := Counter-Amount;
         // looking for a free block of memory
         Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
+        while GetMemoryRegion(ID, Buff) <> 0 do
         begin
           if Buff.Flag = MEM_AVAILABLE then
             Break;

@@ -137,7 +137,7 @@ procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
-function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
+function GetMemoryRegion (ID: LongInt ; out Buffer : TMemoryRegion): LongInt;
 procedure InitCore(ApicID: Byte);
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
@@ -284,7 +284,7 @@ begin
   idt_gates^[int].handler_32_63 := DWORD(PtrUInt(Handler) shr 32);
   idt_gates^[int].res := 0;
   idt_gates^[int].nu := 0;
-end;	
+end;
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
@@ -789,7 +789,7 @@ var
   CounterID: LongInt; // starts with CounterID = 1
 
 // Return information about Memory Region
-function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
+function GetMemoryRegion(ID: LongInt;out Buffer: TMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
 begin

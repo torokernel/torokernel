@@ -12,7 +12,7 @@
  **********************************************************************}
 
 unit System;
-
+{$WARN 5033 off : Function result does not seem to be set}
 interface
 
 {$DEFINE FPC_IS_SYSTEM}
@@ -29,6 +29,13 @@ interface
 {$ifdef COMPPROCINLINEFIXED}
 {$define SYSTEMINLINE}
 {$endif COMPPROCINLINEFIXED}
+
+{ don't use FPU registervariables on the i386 }
+{$ifdef CPUI386}
+  {$maxfpuregisters 0}
+{$endif CPUI386}
+
+{$undef FPC_HAS_FEATURE_WIDESTRINGS}
 
 { needed for insert,delete,readln }
 {$P+}
@@ -127,6 +134,12 @@ type
   PError              = ^Error;
   PVariant            = ^Variant;
   POleVariant         = ^OleVariant;
+
+{by JC (from FCL)}
+  TFileTextRecChar    = {$if defined(FPC_ANSI_TEXTFILEREC) or not(defined(FPC_HAS_FEATURE_WIDESTRINGS))}AnsiChar{$else}UnicodeChar{$endif};
+  PFileTextRecChar    = ^TFileTextRecChar;
+
+  CodePointer = pointer;
 
   TTextLineBreakStyle = (tlbsLF,tlbsCRLF,tlbsCR);
 
@@ -1416,12 +1429,15 @@ procedure RTLeventWaitFor(state:pRTLEvent);
 procedure RTLeventWaitFor(state:pRTLEvent;timeout : longint);
 procedure RTLeventsync(m:trtlmethod;p:tprocedure);
 
+{by JC includes from FP-RTL}
+{$I filerec.inc}
+{$I textrec.inc}
 {*****************************************************************************
                           Resources support
 *****************************************************************************}
 
 const 
-  LineEnding = #10;
+  LineFeed = #10;
   LFNSupport = true;
   DirectorySeparator = '/';
   DriveSeparator = ':';
@@ -1439,7 +1455,7 @@ const
   FileNameCaseSensitive : boolean = true;
   CtrlZMarksEOF: boolean = false; 
 
-  sLineBreak = LineEnding;
+  sLineBreak = LineFeed;
   DefaultTextLineBreakStyle : TTextLineBreakStyle = tlbsLF;
 
    
@@ -4853,8 +4869,7 @@ begin
     Index := 0;
   { Check Size. Accounts for Zero-length S, the double check is needed because
     Size can be maxint and will get <0 when adding index }
-  if (Size>Length(S)) or
-     (Index+Size>Length(S)) then
+  if Index+Size>Length(S) then
    Size:=Length(S)-Index;
   If Size>0 then
    begin
@@ -6498,22 +6513,22 @@ operator -(const op : variant) dest : variant;{$ifdef SYSTEMINLINE}inline;{$endi
      variantmanager.varneg(dest);
   end;
 
-operator =(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpeq);
   end;
 
-operator <(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}<(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
   //   dest:=variantmanager.cmpop(op1,op2,opcmplt);
   end;
 
-operator >(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}>(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpgt);
   end;
 
-operator >=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
+operator {%H-}>=(const op1,op2 : variant) dest : boolean;{$ifdef SYSTEMINLINE}inline;{$endif}
   begin
     // dest:=variantmanager.cmpop(op1,op2,opcmpge);
   end;
@@ -7329,7 +7344,7 @@ begin
 end;
 
 
-function IsMemoryManagerSet:Boolean;
+function {%H-}IsMemoryManagerSet:Boolean;
 begin
 	//IsMemoryManagerSet := (MemoryManager.GetMem<>@SysGetMem) or (MemoryManager.FreeMem<>@SysFreeMem);
 end;
@@ -7349,7 +7364,7 @@ begin
 end;
 
 { Delphi style }
-function FreeMem(P: Pointer): PtrInt;
+function {%H-}FreeMem(P: Pointer): PtrInt;
 begin
 	//Freemem := MemoryManager.FreeMem(P);
 end;
@@ -7361,13 +7376,13 @@ begin
 	//Result := MemoryManager.GetMem(Size);
 end;
 
-function GetMemory(size:ptrint):pointer;
+function {%H-}GetMemory(size:ptrint):pointer;
 
 begin
  //GetMemory := Getmem(size);
 end;
 
-function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
+function {%H-}ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 begin
 	//Result := MemoryManager.g(P, NewSize);
 end;
@@ -7405,7 +7420,7 @@ begin
 	Result := 0;
 end;
 
-function SysAllocMem(Size: PtrInt): Pointer;
+function {%H-}SysAllocMem(Size: PtrInt): Pointer;
 begin
   Result := nil;
  // Result := MemoryManager.GetMem(size);

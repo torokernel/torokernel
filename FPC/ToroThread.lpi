@@ -5,23 +5,18 @@
     <PathDelim Value="\"/>
     <General>
       <Flags>
-        <MainUnitHasUsesSectionForAllUnits Value="False"/>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
-        <LRSInOutputDirectory Value="False"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="TorowithFileSystem"/>
+      <Title Value="ToroThread"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
     <i18n>
       <EnableI18N LFM="False"/>
     </i18n>
-    <VersionInfo>
-      <StringTable ProductVersion=""/>
-    </VersionInfo>
     <BuildModes Count="1">
       <Item1 Name="Default" Default="True"/>
     </BuildModes>
@@ -33,50 +28,57 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="1">
+    <Units Count="2">
       <Unit0>
-        <Filename Value="TorowithFileSystem.pas"/>
+        <Filename Value="ToroThread.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
+      <Unit1>
+        <Filename Value="..\tests\uToroThread.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit1>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename ApplyConventions="False"/>
+      <Filename Value="..\bin\$(TargetCPU)-$(TargetOS)\$Nameonly($Project(InfoFile))"/>
     </Target>
     <SearchPaths>
-      <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\rtl;..\rtl\drivers"/>
+      <IncludeFiles Value="$(ProjOutDir);..\rtl;$(CompPath)\..\..\..\source\rtl\inc"/>
+      <OtherUnitFiles Value="..\rtl;..\rtl\drivers;..\tests"/>
+      <UnitOutputDirectory Value="..\lib\$Nameonly($Project(InfoFile))\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>
-        <UseAnsiStrings Value="False"/>
+        <SyntaxMode Value="Delphi"/>
       </SyntaxOptions>
     </Parsing>
     <CodeGeneration>
-      <Optimizations>
-        <OptimizationLevel Value="0"/>
-      </Optimizations>
+      <SmartLinkUnit Value="True"/>
+      <RelocatableUnit Value="True"/>
+      <SmallerCode Value="True"/>
     </CodeGeneration>
     <Linking>
       <Debugging>
         <GenerateDebugInfo Value="False"/>
       </Debugging>
+      <LinkSmart Value="True"/>
     </Linking>
     <Other>
+      <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
-        <Command Value="$(CompPath) build.pas"/>
-        <ShowAllMessages Value="True"/>
+        <Command Value="$(CompPath) ..\tests\build.pas -FU..\lib\build\$(TargetCPU)-$(TargetOS) -o$Path($(TargetFile))\build.exe"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="build.exe 2 TorowithFileSystem boot.o TorowithFileSystem.img"/>
+        <Command Value="$Path($(TargetFile))\build.exe 2 $(TargetFile) ..\tests\boot.o $Path($(TargetFile))\$NameOnly($(TargetFile)).img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>
     </Other>
+    <CompileReasons Run="False"/>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

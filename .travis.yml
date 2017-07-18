@@ -27,7 +27,7 @@ install:
 
 script:
   # Build all test projects
-  - lazbuild $LAZ_OPT ./tests/*.lpi               
+  - lazbuild $LAZ_OPT ./FPC/*.lpi               
   
 notifications:
   email:

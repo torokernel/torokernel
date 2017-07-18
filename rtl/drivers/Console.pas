@@ -1,10 +1,10 @@
-
+//
 // Console.pas
-
+//
 // Console Manipulation.
-
+// 
 // Changes:
-
+// 
 // 18/12/2016 Adding protection to WriteConsole()
 // 04/09/2016 Removing Printk_(), only WriteConsole() is used which is protected. 
 // 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
@@ -13,24 +13,24 @@
 //            The consoles's procedures are only for users, the kernel only need PrintK_().
 // 15/07/2006 The code was rewrited  by Matias Vara.
 // 09/02/2005 First Version by Matias Vara.
-
+//
 // Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-
-
+//
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+//
 
 unit Console;
 
@@ -68,7 +68,6 @@ procedure WriteConsole(const Format: ansistring; const Args: array of PtrUInt);
 
 // Reads a Character from the console
 procedure ReadConsole(var C: XChar);
-
 
 procedure ReadlnConsole(Format: PXChar);
 procedure DisabledConsole;
@@ -108,17 +107,17 @@ const
 const
     VIDEO_OFFSET = $B8000;
 
+type
+	TConsolePixel = record // screen text mode
+        car: XChar;
+        form: byte;
+    end;
+
 
 var
     // Protection for concurrent access
     LockConsole: UInt64 = 3;
 
-
-type
-    TConsolePixel = record
-        car: XChar;
-        form: byte;
-    end;
 
 var
     PConsole: ^TConsolePixel;
@@ -169,7 +168,7 @@ procedure PutC(const Car: XChar);
 begin
     if  (Y > 24) then
         Y := 24;
-    if (X > 79) then
+    if X > 79 then
         NewLine;
     if Ord(Car) <> 8 then
       begin
@@ -201,13 +200,15 @@ end;
 procedure PrintDecimal(Value: PtrUInt);
 var
     I, Len: byte;
-    S: string[64];
+  // 21 is the max number of characters needed to represent 64 bits number in decimal
+  S: string[21];
 begin
     Len := 0;
-    I := 10;
+  I := 21;
     if Value = 0 then
-        PutC('0')
-    else
+  begin
+    PutC('0');
+  end else
       begin
         while Value <> 0 do
           begin
@@ -216,19 +217,11 @@ begin
             I := I - 1;
             Len := Len + 1;
           end;
-        if (Len <> 10) then
-          begin
-            S[0] := XChar(Len);
-            for I := 1 to Len do
-              begin
-                S[I] := S[11 - Len];
-                Len := Len - 1;
-              end;
-          end
-        else
-            S[0] := chr(10);
-        for I := 1 to Ord(S[0]) do
-            PutC(S[I]);
+    S[0] := XChar(Len);
+   for I := (sizeof(S)-Len) to sizeof(S)-1 do
+   begin
+    PutC(S[I]);
+   end;
       end;
 end;
 
@@ -296,7 +289,9 @@ begin
                 Exit;
             case Format[J] of
                 'c':
+          begin
                     PutC(XChar(args[ArgNo]));
+			    end;
                 'h':
                   begin
                     Value := args[ArgNo];
@@ -308,7 +303,9 @@ begin
                     PrintDecimal(Value);
                   end;
                 '%':
+          begin
                     PutC('%');
+          end;
                 'p':
                   begin
                     Values := pointer(args[ArgNo]);
@@ -441,14 +438,16 @@ begin
             //Shift, Crt and CpsLockk are not implement
             29, 42, 58: Exit;
             14:
+        begin
+               //Bkspc key
                 if x <> 0 then
                   begin
                     x := x - 1;
                     PutC(#0);
                     x := x - 1;
                     setcursor(x, y);
-                  end;//Bkspc key
-
+                  end;
+        end;
             28:
               begin
                 // Enter Key
@@ -482,7 +481,7 @@ begin
 end;
 
 {$IFNDEF NOFORMAT}
-procedure IrqKeyb; {$IFDEF FPC}[nostackframe];{$ENDIF} assembler;
+procedure IrqKeyb; {$IFDEF FPC} [nostackframe]; {$ENDIF} assembler;
 asm
   {$IFDEF DCC} .noframe {$ENDIF}
   // save registers
@@ -523,6 +522,7 @@ asm
   db $cf
 end;
 {$ENDIF}
+
 // Read a Char from Console
 procedure ReadConsole(var C: XChar);
 begin

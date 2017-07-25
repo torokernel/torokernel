@@ -7358,7 +7358,7 @@ end;
 function FreeMem(P: Pointer): PtrInt;
 begin
 	//Freemem := MemoryManager.FreeMem(P);
-	Freemem := nil;
+	Freemem := 0;
 end;
 
 

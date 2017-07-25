@@ -192,6 +192,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -224,6 +225,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -256,6 +258,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -289,6 +292,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -321,6 +325,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -353,6 +358,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -385,6 +391,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -417,6 +424,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -451,6 +459,7 @@ var rbx_reg: QWord;
     rflags_reg: QWord;
     rcr2: QWord;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx
@@ -485,6 +494,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
 begin
+ errc_reg := 0;
 asm
  mov  rbx_reg, rbx
  mov  rcx_reg, rcx

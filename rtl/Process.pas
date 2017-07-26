@@ -446,10 +446,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 16
+ mov rbx, rbp
+ mov rax, [rbx] + 16
  mov rip_reg, rax
- mov rax, [rbp] + 32
+ mov rax, [rbx] + 32
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: General Protection Fault\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RGeneral Protection Fault/n\n',[GetApicid]);

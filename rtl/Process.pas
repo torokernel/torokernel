@@ -200,10 +200,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Division by zero\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RDivision by zero/n\n',[GetApicid]);
@@ -233,10 +235,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Overflow\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /ROverflow/n\n',[GetApicid]);
@@ -266,10 +270,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Bound Instruction\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RBound Instrucction/n\n',[GetApicid]);
@@ -300,10 +306,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Illegal Instruction\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RIllegal Instruction /n\n',[GetApicid]);
@@ -333,10 +341,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Device not available\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RDevice not available/n\n',[GetApicid]);
@@ -366,10 +376,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Double Fault\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RDouble Fault/n\n',[GetApicid]);
@@ -399,10 +411,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: Stack Fault\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RStack Fault/n\n',[GetApicid]);
@@ -467,10 +481,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
  mov rax, cr2
  mov rcr2, rax
 end;
@@ -502,10 +518,12 @@ asm
  mov  rdx_reg, rdx
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
- mov rax, [rbp] + 8
+ mov rbx, rbp
+ mov rax, [rbx] + 8
  mov rip_reg, rax
- mov rax, [rbp] + 24
+ mov rax, [rbx] + 24
  mov rflags_reg, rax
+ mov rbp, rbp_reg
 end;
   {$IFDEF DebugProcess} WriteDebug('Exception: FPU error\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RFPU error/n\n',[GetApicid]);

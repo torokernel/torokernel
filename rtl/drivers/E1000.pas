@@ -103,14 +103,14 @@ const
    E1000_REG_CTRL_ASDE = 1 shl 5;
    E1000_REG_CTRL_SLU = 1 shl 6;
    E1000_REG_CTRL_LRST = 1 shl 3;
-   E1000_REG_CTRL_PHY_RST = 1 shl 31;
+   E1000_REG_CTRL_PHY_RST = LongInt(1 shl 31);
    E1000_REG_CTRL_ILOS	= 1 shl 7;
    E1000_REG_CTRL_VME	= 1 shl 30;
 
    E1000_REG_EERD_START = 1 shl 0;
    E1000_REG_EERD_DATA	= $ffff shl 16;
 
-   E1000_REG_RAH_AV	= 1 shl 31;
+   E1000_REG_RAH_AV	= LongInt(1 shl 31);
 
    E1000_REG_RDBAL = $2800;
    E1000_REG_RDBAH = $2804;
@@ -229,10 +229,14 @@ end;
 
 // Kernel starts the card
 procedure e1000Start(net: PNetworkInterface);
+{$IFDEF DebugE1000}
 var
   CPU: byte;
 begin
   CPU := GetApicid;
+{$ELSE}
+begin
+{$ENDIF}
   // enable the interruption
   IrqOn(NicE1000.IRQ);
   {$IFDEF DebugE1000} WriteDebug('e1000: starting on CPU%d\n', [CPU]); {$ENDIF}
@@ -471,7 +475,8 @@ end;
 // This is called only by the interruption handler
 procedure ReadPacket(Net: PE1000);
 var
-  Tail, Head, Current, I: LongInt;
+  Tail, Current, I: LongInt;
+  {$IFDEF DebugE1000} Head: LongInt;{$ENDIF}
   RxDesc: PE1000RxDesc;
   Packet: PPacket;
   Data, P: PByteArray;
@@ -479,7 +484,7 @@ var
   dropflag: Boolean = false;
 begin
   // Find the head, tail and current descriptors
-  Head := E1000ReadRegister(Net, E1000_REG_RDH);
+  {$IFDEF DebugE1000} Head := E1000ReadRegister(Net, E1000_REG_RDH); {$ENDIF}
   Tail := E1000ReadRegister(Net, E1000_REG_RDT);
   Current  := (Tail + 1) mod Net.RxDescCount;
   RxDesc := Net.RxDesc;
@@ -679,7 +684,7 @@ begin
       if (PciCard.vendor = $8086) and (PciCard.device = $100E) then
       begin
         NicE1000.IRQ:= PciCard.irq;
-        NicE1000.Regs:= Pointer(PCIcard.io[0]);
+        NicE1000.Regs:= Pointer(PtrUInt(PCIcard.io[0]));
         {$IFDEF DebugE1000} WriteDebug('e1000: found e1000 device, Irq: %d, Regs: %h\n', [PciCard.irq, PCIcard.io[0]]); {$ENDIF}
 
         // Enable bus mastering for this device

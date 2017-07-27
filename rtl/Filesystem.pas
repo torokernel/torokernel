@@ -762,11 +762,9 @@ var
   Count: LongInt;
   Name: String;
   ino: PInode;
-  SPath: PChar;
 begin
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   Base.Count := Base.Count+1;
-  SPath := Path;
   Path := Path+1;
   Count := 1;
   Result := 0;

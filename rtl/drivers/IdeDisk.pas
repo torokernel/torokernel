@@ -270,7 +270,7 @@ end;
 procedure ATAIn(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
 asm // RCX: Buffer, RDX: IOPort
   {$IFDEF DCC} push rdi {$ENDIF}
-  {$IFDEF LINUX} mov rdx, IOPort {$ENDIF}
+  {$IFDEF LINUX} mov edx, IOPort {$ENDIF}
   mov rdi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256
@@ -281,7 +281,7 @@ end;
 procedure ATAOut(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
 asm // RCX: Buffer, RDX: IOPort
   {$IFDEF DCC} push rsi {$ENDIF}
-  {$IFDEF LINUX} mov rdx, IOPort {$ENDIF}
+  {$IFDEF LINUX} mov edx, IOPort {$ENDIF}
   mov rsi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256

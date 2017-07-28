@@ -468,8 +468,7 @@ var
   block_group, group_desc, desc, block_bitmap, bitmap_size_in_blocks: longint;
   k, j, nr_inode: longint;
   p: PByte;
-  InoInfo: ^ext2_inode_info;
-  NInode, Nino: PInode;
+  NInode: PInode;
 label do_inode;
 begin
    // group descriptor
@@ -477,7 +476,6 @@ begin
   block_group:= (Inode.ino-1) div (SbInfo.inodes_per_group);
   group_desc:= block_group div SbInfo.desc_per_block;
   desc:= block_group and (SbInfo.desc_per_block -1);
-  InoInfo:= Inode.InoInfo;
 
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: Inode: %d\n', [Inode.ino]); {$ENDIF}
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: groups_desc: %d, desc: %d\n', [group_desc,desc]); {$ENDIF}
@@ -567,8 +565,7 @@ var
   block_group, group_desc, desc, block_bitmap, bitmap_size_in_blocks: longint;
   k, j, nr_inode: longint;
   p: PByte;
-  InoInfo: ^ext2_inode_info;
-  NInode, Nino: PInode;
+  NInode: PInode;
 label do_inode;
 begin
    // group descriptor
@@ -576,7 +573,6 @@ begin
   block_group:= (Inode.ino-1) div (SbInfo.inodes_per_group);
   group_desc:= block_group div SbInfo.desc_per_block;
   desc:= block_group and (SbInfo.desc_per_block -1);
-  InoInfo:= Inode.InoInfo;
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: Inode: %d\n', [Inode.ino]); {$ENDIF}
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: groups_desc: %d, desc: %d\n', [group_desc,desc]); {$ENDIF}
   // buffer head that points to the group descriptor block
@@ -751,7 +747,7 @@ var
   last_i, J: longint;
   InoInfo: ^ext2_inode_info;
   bh : PBufferHead;
-  Offset, align_size: longint;
+  Offset: longint;
   entry: P_Ext2_Dir_Entry;
   prev_rec_len: word;
 begin
@@ -824,7 +820,7 @@ var
   last_i, J: longint;
   InoInfo: ^ext2_inode_info;
   bh : PBufferHead;
-  Offset, align_size: longint;
+  Offset: longint;
   entry: P_Ext2_Dir_Entry;
   prev_rec_len: word;
 begin
@@ -896,12 +892,9 @@ end;
 // Add a new entry to an Inode directory
 function InitializeInodeDir(Ino: PInode; Inode: longint): Boolean;
 var
-  last_i, J: longint;
   InoInfo: ^ext2_inode_info;
   bh : PBufferHead;
-  Offset, align_size: longint;
   entry: P_Ext2_Dir_Entry;
-  prev_rec_len: word;
 begin
   InoInfo := Ino.InoInfo;
   Result := false;
@@ -1212,7 +1205,7 @@ end;
 function Ext2WriteFile (FileDesc: PFileRegular; Count: longint; Buffer: Pointer): longint;
 var
   initoff, Len: longint;
-  indice,tmp, nrfreeblks, real_block, start_block, J, nb_block, nb_bytes, last_block, lastoff: longint;
+  nrfreeblks, real_block, start_block, J, last_block, lastoff: longint;
   i_off, end_off: longint;
   ret: Boolean;
   bh: PBufferHead;
@@ -1226,8 +1219,6 @@ begin
   initoff := FileDesc.FilePos mod FileDesc.Inode.SuperBlock.BlockSize;
   lastoff := (FileDesc.FilePos + Count) mod FileDesc.Inode.SuperBlock.BlockSize;
 
-  // number of blocks to write
-  nb_block := last_block - start_block;
   Len := 0;
   {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: start_block: %d, last_block: %d, initoff: %d, lastoff: %d, Size: %d\n', [start_block, last_block, initoff, lastoff, FileDesc.Inode.Size]); {$ENDIF}
 

@@ -130,8 +130,8 @@ function XHeapUnstack(Heap: PXHeap): PXHeap;
 function ToroGetMem(Size: PtrUInt): Pointer;
 function ToroFreeMem(P: Pointer): Integer;
 function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
-function SysCacheRegion(Add: Pointer; Size: LongInt): Boolean;
-function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
+function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 procedure MemoryInit;
 
 implementation
@@ -745,7 +745,7 @@ end;
 //
 
 // Set a Memory's Region as CACHEABLE
-function SysCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 var
   StartPage, EndPage: Pointer;
   PageCount, PageStart: PtrUInt;
@@ -778,7 +778,7 @@ begin
 end;
 
 // Set a Memory's Region as NO-CACHEABLE
-function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 var
   StartPage, EndPage: Pointer;
   PageCount, PageStart: PtrUInt;

@@ -60,11 +60,6 @@
         <OptimizationLevel Value="0"/>
       </Optimizations>
     </CodeGeneration>
-    <Linking>
-      <Debugging>
-        <GenerateDebugInfo Value="False"/>
-      </Debugging>
-    </Linking>
     <Other>
       <ExecuteBefore>
         <Command Value="$(CompPath) build.pas"/>
@@ -72,7 +67,7 @@
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="build.exe 2 TorowithFileSystem boot.o TorowithFileSystem.img"/>
+        <Command Value="build.exe 4 TorowithFileSystem boot.o TorowithFileSystem.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

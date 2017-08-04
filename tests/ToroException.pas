@@ -1,8 +1,9 @@
 //
-// Toro Exceptions Example
+// Toro Exception Example
 //
 // Changes :
 // 
+// 04.8.2017 Adding backtrace.
 // 24.8.2016 First Version by Matias E. Vara.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>

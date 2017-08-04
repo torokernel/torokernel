@@ -57,7 +57,9 @@ end;
 
  Machine: Word;
  NumberOfSections: Word;
- res: array[1..12] of Byte;
+ TimeDateStamp : DWORD;
+ PointerToSymbolTable : DWORD;
+ NumberOfSymbols : DWORD;
  SizeOfOptionalHeader:word;
  Characteristics:word;
 end;
@@ -116,8 +118,25 @@ end;
  p_align  : qword;
 end;
 
+
+ coffsymbol=packed record
+   name    : array[0..3] of char; { real is [0..7], which overlaps the strofs ! }
+   strofs  : longint;
+   value   : longint;
+   section : smallint;
+   empty   : word;
+   typ     : byte;
+   aux     : byte;
+ end;
+
+ kerneldebuginfo = record
+   magic: longint;
+   size: longint;
+   data: array of byte;
+ end;
+
 var
- // First instrucction in the kernel
+ // Pointer to main() in the kernel
  addmain: pointer;
 
 
@@ -129,12 +148,17 @@ function PEtoKernelBin(const PEFileName: string): Boolean;
 var
   Buffer: PByte;
   BytesRead: Integer;
-  I: Integer;
-  Magic: Integer;
+  I, J: Integer;
+  Magic, Code: Integer;
   OutputFile: File;
   PEFile: File;
   PEHeader: TImageFileHeader;
-  PESections: array[1..10] of TImageSectionHeader;
+  PESections: ^TImageSectionHeader;
+  PEKDebug: ^kerneldebuginfo;
+  value: Longint;
+  tmp: array [0..7] of char;
+  secnamebuf : array[0..255] of char;
+  secname    : string;
 begin
   // PE file
   Assign(PEFile, PEFileName);
@@ -153,11 +177,16 @@ begin
       BlockRead(PEFile,PEOptHeader,SizeOf(PEOptHeader),BytesRead); // optional header
       addmain := Pointer(ImageBase + PEOptHeader.AddressOfEntryPoint); // point to start
       Seek(PEFile, filepos(PEFile)+PEHeader.SizeOfOptionalHeader-BytesRead); // position of PE sections
+      PESections := GetMem(PEHeader.NumberOfSections * sizeof(TImageSectionHeader));
+
       // reading the sections of PE file
-      for I:= 1 to PEHeader.NumberOfSections do
+      for I:= 0 to (PEHeader.NumberOfSections-1) do
+      begin
         BlockRead(PEFile, PESections[I], SizeOf(TImageSectionHeader), BytesRead);
+      end;
+
       // the sections aren't sorted
-      for I:= 1 to PEHeader.NumberOfSections do
+      for I:= 0 to (PEHeader.NumberOfSections-1) do
       begin
         if (PESections[I].name='.text') or (PESections[I].name='.data') or (PESections[I].name='.rdata')then
         begin
@@ -172,7 +201,41 @@ begin
           finally
             FreeMem(Buffer);
           end;
-        end else writeln('Ignoring ',PESections[I].name,' section ...');
+        end else
+        begin
+          if (PESections[I].name[0] = '/') then
+          begin
+             for J:= 1 to 7 do
+               tmp[J-1] := PESections[I].name[J];
+             Val (tmp, value, Code);
+             if Code=0 then
+             begin
+               FillChar(secnamebuf,sizeof(secnamebuf),0);
+               Seek(PEFile,PEHeader.PointerToSymbolTable+PEHeader.NumberOfSymbols*sizeof(coffsymbol)+value);
+               BlockRead(PEFile,secnamebuf,sizeof(secnamebuf));
+               secname:= strpas(secnamebuf);
+             end else secname:='';
+
+             // copy .debug_line section
+             if (secname = '.debug_line') then
+             begin
+                 PEKDebug := GetMem({sizeof(kerneldebuginfo) +} PESections[I].PhysicalSize);
+                 // magic number used to find the section
+                 //PEKDebug^.magic := $6969;
+                 // size of the debug_line section
+                 //PEKDebug^.size := PESections[I].PhysicalSize;
+                 Seek(PEFile, PESections[I].PhysicalOffset);
+                 Seek(OutputFile, $200000{PESections[I].VirtualAddress});
+                 try
+                    BlockRead(PEFile, PEKDebug^ , PESections[I].PhysicalSize);
+                    BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize{+ sizeof(kerneldebuginfo)});
+                 finally
+                    FreeMem(PEKDebug);
+                 end;
+                 WriteLn('Writing ', secname,' section ... Size= ',PESections[I].PhysicalSize);
+             end else WriteLn('Ignoring ', secname,' section ... ');
+          end else writeln('Ignoring ',PESections[I].name,' section ... ');
+        end;
       end;
       WriteLn('Building binary ... ');
       Close(PEFile);
@@ -283,6 +346,8 @@ begin
   Reset(BootFile, 1);
   Assign(KernelFile, 'kernel.bin');
   Reset(KernelFile, 1);
+
+  // Calculate the size of the kernel in 512 bytes blocks
   if (FileSize(KernelFile) mod 512) = 0 then
   begin
     ImageSize := ImageSize - FileSize(KernelFile) div 512;
@@ -292,13 +357,16 @@ begin
     ImageSize := ImageSize - FileSize(KernelFile) div 512 - 1 ;
     Count := FileSize(KernelFile) div 512 + 1;
   end;
+
   Writeln('Building Image ... ');
   BytesRead := 0;
   BlockRead(BootFile, Buffer, SizeOf(Buffer), BytesRead); // copying Bootloader
   p := @buffer[1];
+
   // finding the Boot's Magic Number
   while  (p^ <> $1987) and not(longint(p) = longint((@buffer[512])+1)) do
     p := p + 1;
+
   // Invalid Bootloader
   if (p^ <> $1987) then
   begin
@@ -308,24 +376,30 @@ begin
     writeln('Bad boot.bin file!!');
     Exit;
   end;
-  // Information about file
+
+  // Information about the kernel.bin
   BootHead := pointer(p);
   BootHead^.end_sector := FileSize(KernelFile) div 512+1;
+
   // Address of Binary in memory
   BootHead^.add_image := ImageBase ;
   BootHead^.add_main := dword(addmain);
   BlockWrite(ToroImageFile, Buffer, BytesRead);
   writeln('Entry point : ', BootHead^.add_main);
+
   // second block of boot
   BlockRead(BootFile, Buffer, SizeOf(Buffer), BytesRead);
   BlockWrite(ToroImageFile, Buffer, BytesRead);
   repeat
     BlockRead(KernelFile, Buffer, SizeOf(Buffer),BytesRead);
+
     // some bugs here ever read and write 512 bytes !
     BlockWrite(ToroImageFile, Buffer, sizeof(Buffer));
     Count := Count - 1 ;
+
     // the size is not correct if use BytesRead = 0
   until (Count=0);
+
   // filling with zeros
   FillChar(Buffer, SizeOf(Buffer), 0);
   for Count := 1 to ImageSize do

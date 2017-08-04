@@ -149,7 +149,7 @@ implementation
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Console, Memory;
+  Console, Memory, lnfodwrfToro;
 
 const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
@@ -174,6 +174,32 @@ var
 // Routines to capture all exceptions
 //------------------------------------------------------------------------------
 
+function get_caller_frame(framebp:pointer;addr:pointer=nil):pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
+begin
+  get_caller_frame:=framebp;
+  if assigned(framebp) then
+    get_caller_frame:=PPointer(framebp)^;
+end;
+
+function get_caller_addr(framebp:pointer;addr:pointer=nil):pointer;{$ifdef SYSTEMINLINE}inline;{$endif}
+begin
+  get_caller_addr:=framebp;
+  if assigned(framebp) then
+    get_caller_addr:=PPointer(framebp)[1];
+end;
+
+procedure get_caller_stackinfo(var framebp : pointer; var addr : pointer);
+var
+  nextbp : pointer;
+  nextaddr : pointer;
+begin
+  nextbp:=get_caller_frame(framebp,addr);
+  nextaddr:=get_caller_addr(framebp,addr);
+  framebp:=nextbp;
+  addr:=nextaddr;
+end;
+
+
 procedure ExceptionHandler;
 begin
   EnableInt;
@@ -191,6 +217,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -207,12 +234,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Division by zero\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RDivision by zero/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('Thread#%d registers:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Division by zero\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -226,6 +266,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -242,12 +283,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Overflow\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /ROverflow/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Overflow\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -261,6 +315,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -277,12 +332,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Bound Instruction\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RBound Instrucction/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('[\t] CPU#%d Exception: /RBound instrucction/n\n',[GetApicid]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Bound instrucction\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -297,6 +365,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -313,12 +382,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Illegal Instruction\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RIllegal Instruction /n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('[\t] CPU#%d Exception: /RIllegal instrucction/n\n',[GetApicid]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Illegal instrucction\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -332,6 +414,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -348,12 +431,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Device not available\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RDevice not available/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Device not available\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -367,6 +463,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -383,12 +480,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Double Fault\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RDouble Fault/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('[\t] CPU#%d Exception: /RDouble fault/n\n',[GetApicid]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Double fault\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -402,6 +512,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -418,12 +529,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Stack Fault\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RStack Fault/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('[\t] CPU#%d Exception: /RStack fault/n\n',[GetApicid]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: Stack fault\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -437,6 +561,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -453,12 +578,27 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: General Protection Fault\n', []); {$ENDIF}
-  WriteConsole('[\t] CPU#%d Exception: /RGeneral Protection Fault/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('[\t] CPU#%d Exception: /RGeneral protection fault/n\n',[GetApicid]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: General protection fault\n',[]);
+     WriteDebug('Thread dump:\n',[]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  PrintBackTraceStr(pointer(rip_reg));
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -474,6 +614,7 @@ var rbx_reg: QWord;
     errc_reg: QWord;
     rflags_reg: QWord;
     rcr2: QWord;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -484,21 +625,36 @@ asm
  mov  rsp_reg, rsp
  mov  rbp_reg, rbp
  mov rbx, rbp
- mov rax, [rbx] + 8
+ mov rax, [rbx] + 16
  mov rip_reg, rax
- mov rax, [rbx] + 24
+ mov rax, [rbx] + 32
  mov rflags_reg, rax
  mov rbp, rbp_reg
  mov rax, cr2
  mov rcr2, rax
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: Page Fault, cr2: %h\n', [rcr2]); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RPage Fault/n, cr2: %h\n',[GetApicid, rcr2]);
   WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-  ExceptionHandler;
+ {$IFDEF DebugCrash}
+   WriteDebug('Exception: Page Fault, cr2: %h\n',[rcr2]);
+   WriteDebug('Thread dump:\n',[]);
+   WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+   WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+   WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+   WriteDebug('Backtrace:\n',[]);
+ {$ENDIF}
+ WriteConsole('Backtrace:\n',[]);
+ PrintBackTraceStr(pointer(rip_reg));
+ get_caller_stackinfo(pointer(rbp_reg), addr);
+ while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+ begin
+     get_caller_stackinfo(pointer(rbp_reg), addr);
+     PrintBackTraceStr(addr);
+ end;
+ ExceptionHandler;
 end;
 
 procedure ExceptFPUE;
@@ -511,6 +667,7 @@ var rbx_reg: QWord;
     rbp_reg: QWord;
     errc_reg: QWord;
     rflags_reg: Qword;
+    addr: pointer;
 begin
  errc_reg := 0;
 asm
@@ -527,12 +684,25 @@ asm
  mov rflags_reg, rax
  mov rbp, rbp_reg
 end;
-  {$IFDEF DebugProcess} WriteDebug('Exception: FPU error\n', []); {$ENDIF}
   WriteConsole('[\t] CPU#%d Exception: /RFPU error/n\n',[GetApicid]);
-  WriteConsole('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+  WriteConsole('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsole('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsole('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
   WriteConsole('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Exception: FPU error\n',[]);
+     WriteDebug('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
+     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
+     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
+     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
+     WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  WriteConsole('Backtrace:\n',[]);
+  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
   ExceptionHandler;
 end;
 
@@ -779,7 +949,12 @@ begin
   XHeapRelease(CurrentThread.PrivateHeap);
   // inform that the main thread is being killed
   if CurrentThread = PThread(InitialThreadID) then
-   WriteConsole('ThreadExit: /Rwarning/n killing MainThread\n',[]);
+  begin
+   WriteConsole('ThreadExit: /RWarning!/n MainThread has been killed\n',[]);
+   {$IFDEF DebugCrash}
+    WriteDebug('ThreadExit: Warning! MainThread has been killed',[]);
+   {$ENDIF}
+  end;
   NextThread := CurrentThread.Next;
   // removing from scheduling queue
   RemoveThreadReady(CurrentThread);
@@ -1005,7 +1180,7 @@ begin
   end;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
-  WriteConsole('Starting User Application ... Thread: %d \n', [InitialThreadID]);
+  WriteConsole('Starting MainThread: /V%d/n\n', [InitialThreadID]);
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI
@@ -1127,7 +1302,6 @@ begin
            WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
   	end;
   {$ENDIF}
-
   // initialize the exception and irq
   if HasException then
     InitializeExceptions;

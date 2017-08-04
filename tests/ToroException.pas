@@ -44,20 +44,21 @@ program ToroException;
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
 uses
-  Kernel in 'rtl\Kernel.pas',
-  Process in 'rtl\Process.pas',
-  Memory in 'rtl\Memory.pas',
-  Debug in 'rtl\Debug.pas',
-  Arch in 'rtl\Arch.pas',
-  Filesystem in 'rtl\Filesystem.pas',
-  Console in 'rtl\Drivers\Console.pas';
+  Kernel in '..\rtl\Kernel.pas',
+  Process in '..\rtl\Process.pas',
+  Memory in '..\rtl\Memory.pas',
+  Debug in '..\rtl\Debug.pas',
+  Arch in '..\rtl\Arch.pas',
+  Filesystem in '..\rtl\Filesystem.pas',
+  Console in '..\rtl\Drivers\Console.pas';
 
 var
-  tmp: TThreadID;
+  tmp: TThreadID = 0;
 
-function Exception_Core2(Param: Pointer):PtrInt;
+// Procedure that tests Division by zero exception handler
+procedure DoDivZero;
 begin
-  {$ASMMODE intel}
+    {$ASMMODE intel}
      asm
    	mov rbx, 1987
      	mov rax, 166
@@ -65,6 +66,34 @@ begin
         mov rdx, 555
    	div rcx
      end;
+end;
+
+
+// Procedure that tests Page Fault exception handler
+procedure DoPageFault;
+var
+  p: ^longint;
+begin
+  // this page is not present
+  p := pointer($ffffffffffffffff);
+  p^ := $1234;
+end;
+
+// Procedure that tests Protection Fault exception handler
+procedure DoProtectionFault;
+begin
+  asm
+     mov ax, $20
+     mov ds, ax
+  end;
+end;
+
+// Procedure that tests Illegal instruction exception handler
+procedure DoIllegalInstruction;
+begin
+  asm
+  db $ff, $ff
+  end;
 end;
 
 // This procedure is a exception handler. 
@@ -79,21 +108,21 @@ begin
   ThreadExit(True);
 end;
 
+function Exception_Core2(Param: Pointer):PtrInt;
+begin
+  //DoDivZero;
+  //DoPageFault;
+  DoProtectionFault;
+  //DoIllegalInstruction;
+end;
 
 begin
-  WriteConsole('\c',[]);
-
   //CaptureInt(EXC_DIVBYZERO, @MyOwnHandler);
-
   tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
   SysThreadSwitch;
 
-  {$ASMMODE intel}
-    asm
-  	mov rbx, 1987
-    	mov rax, 166
-        mov rcx, 0
-        mov rdx, 555
-  	div rcx
-   end;
+  //DoDivZero;
+  //DoPageFault;
+  DoProtectionFault;
+  //DoIllegalInstruction;
 end.

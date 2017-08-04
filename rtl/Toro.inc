@@ -10,7 +10,8 @@
 {$ENDIF}
 //{$DEFINE cpui386}
 //{$DEFINE CPUX86_64}
-//{$DEFINE DEBUG}
+{$DEFINE DEBUG}
+{$DEFINE DebugCrash}
 //{$DEFINE DebugArch}
 //{$DEFINE DebugFS}
 //{$DEFINE DebugMemory}

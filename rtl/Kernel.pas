@@ -54,6 +54,8 @@ procedure KernelStart;
 begin
   WriteConsole('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
+  // CPU must be initialized before DebugInit
+  FillChar(CPU, sizeof(CPU),0);
   {$IFDEF DEBUG} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;

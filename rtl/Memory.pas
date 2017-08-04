@@ -234,7 +234,7 @@ begin
   PBlockHeader(P)^ := PBlockHeader(P)^ or FLAG_FREE;
 end;
 
-procedure GetHeader(P: Pointer; var CPU, SX, FlagFree, FlagPrivateHeap: Byte; var Size: PtrUInt);
+procedure GetHeader(P: Pointer; out CPU, SX, FlagFree, FlagPrivateHeap: Byte; out Size: PtrUInt);
 var
   Header: TBlockHeader;
 begin

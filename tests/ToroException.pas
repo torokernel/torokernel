@@ -119,11 +119,11 @@ end;
 
 begin
   //CaptureInt(EXC_DIVBYZERO, @MyOwnHandler);
-  tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
+  //tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
   SysThreadSwitch;
 
-  //DoDivZero;
+  DoDivZero;
   //DoPageFault;
-  DoProtectionFault;
+  //DoProtectionFault;
   //DoIllegalInstruction;
 end.

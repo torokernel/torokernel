@@ -176,90 +176,28 @@ begin
   // Empty so can test if GetModuleByAddr has worked
   filename := '';
 
-  // Get filename by address using GetModuleByAddr
-  //GetModuleByAddr(addr,baseaddr,filename);
 {$ifdef DEBUG_LINEINFO}
   //writeln(stderr,filename,' Baseaddr: ',hexstr(ptruint(baseaddr),sizeof(baseaddr)*2));
 {$endif DEBUG_LINEINFO}
 
-  // Check if GetModuleByAddr has worked
-  //if filename = '' then
-  //  exit;
-
-  // If target filename same as previous, then re-use previous result
-  //if AllowReuseOfLineInfoData and (filename = lastfilename) then
-  //begin
-  //  {$ifdef DEBUG_LINEINFO}
-  //  writeln(stderr,'Reusing debug data');
-  //  {$endif DEBUG_LINEINFO}
-  //  OpenDwarf:=lastopendwarf;
-  //  exit;
- // end;
-
-  // Close previously opened Dwarf
-  //CloseDwarf;
-
-  // Reset last open dwarf result
-  //lastopendwarf := false;
-
-  // Save newly processed filename
   lastfilename := filename;
-
-  // Open exe file or debug link
-  //if not OpenExeFile(e,filename) then
-   // exit;
-  //if ReadDebugLink(e,dbgfn) then
-  //  begin
-   //   CloseExeFile(e);
-   //   if not OpenExeFile(e,dbgfn) then
-   //     exit;
-   // end;
-
-  // Find debug data section
-  //e.processaddress:=ptruint(baseaddr)-e.processaddress;
-  ////if FindExeSection(e,'.debug_line',dwarfoffset,dwarfsize) then
-  ////begin
-  //  lastopendwarf:=true;
-  //  OpenDwarf:=true;
- // end
- // else
-  //  CloseExeFile(e);
+  // debug info is set up at address $600000
+  // this leaves 2MB for kernel + user code and data
+  p := pointer($600000 - sizeof(DWORD));
+  dwarfsize := p^;
   p := pointer($600000);
-  //while (p^ <> $6969) and (p < pointer($800000)) do
-  //begin
-   // p := p + 1;
-  //end;
-  // if we found it we grab the offset
-  //if (p^ = $6969) then
-  //begin
-    DebugInfo := pointer(p);
-    dwarfoffset := PtrUInt(p) {+ 2 * sizeof(longint) -1};
-    dwarfsize := 10752{DebugInfo^.size};
-    OpenDwarf:=true;
-    lastopendwarf:=true;
-    //WriteConsole('DebugInfo=%d, dwarfoffset=%d, dwarfsize=%d\n',[PtrUInt(DebugInfo),dwarfoffset, dwarfsize]);
-  //end;
+  DebugInfo := pointer(p);
+  dwarfoffset := PtrUInt(p);
+  OpenDwarf:=true;
+  lastopendwarf:=true;
 end;
-
-
-//procedure CloseDwarf;
-//begin
-//  if e.isopen then
- //   CloseExeFile(e);
-
-  // Reset last processed filename
- // lastfilename := '';
-//end;
 
 
 function Init(aBase, aLimit : Int64) : Boolean;
 begin
   base := aBase;
   limit := aLimit;
-  // TODO: to check this
   Init := (aBase + limit) <= (DwarfOffset + DwarfSize);
-  //Init := true;
-  //seek(e.f, base);
   pointtosection := pointer (base);
   EBufCnt := 0;
   EBufPos := 0;
@@ -307,12 +245,9 @@ begin
     EBufCnt := EBUF_SIZE;
     if EBufCnt > limit - index then
       EBufCnt := limit - index;
-    //blockread(e.f, EBuf, EBufCnt, bytesread);
     t := pointtosection;
     Move(t^,EBuf,EBufCnt);
     pointtosection := pointtosection + EBufCnt;
-    //WriteConsole('ReadNext: %h\n',[PtrUInt(pointtosection)]);
-    //EBufCnt := bytesread;
   end;
   if EBufPos < EBufCnt then begin
     ReadNext := EBuf[EBufPos];
@@ -346,15 +281,10 @@ begin
       EBufCnt := EBUF_SIZE;
       if EBufCnt > limit - index then
         EBufCnt := limit - index;
-      //blockread(e.f, EBuf, EBufCnt, bytesread);
       t := pointtosection;
       Move(t^, EBuf , EBufCnt);
-      ////WriteConsole('Move EBufCnt=%d\n',[EBufCnt]);
       pointtosection := pointtosection + EBufCnt;
-      //WriteConsole('ReadNext: %h\n',[PtrUInt(pointtosection)]);
-      ////WriteConsole('ReadNext: %d\n',[PtrUInt(pointtosection)]);
       bytesread := EBufCnt;
-      //EBufCnt := bytesread;
       if bytesread <= 0 then
         r := False;
     end;
@@ -657,11 +587,10 @@ begin
 
   fillchar(numoptable, sizeof(numoptable), #0);
   ReadNext(numoptable, header64.opcode_base-1);
-  //WriteConsole('Opcode parameter count table',[]);
-  for i := 1 to header64.opcode_base-1 do begin
+ { for i := 1 to header64.opcode_base-1 do begin
     //WriteConsole('Opcode[%d] - %d\n', [i,numoptable[i]]);
   end;
-
+  }
   DEBUG_WRITELN('Reading directories...');
   include_directories := Pos();
   SkipDirectories();

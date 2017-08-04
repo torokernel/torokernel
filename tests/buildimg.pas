@@ -219,20 +219,18 @@ begin
              // copy .debug_line section
              if (secname = '.debug_line') then
              begin
-                 PEKDebug := GetMem({sizeof(kerneldebuginfo) +} PESections[I].PhysicalSize);
-                 // magic number used to find the section
-                 //PEKDebug^.magic := $6969;
-                 // size of the debug_line section
-                 //PEKDebug^.size := PESections[I].PhysicalSize;
+                 PEKDebug := GetMem(PESections[I].PhysicalSize);
                  Seek(PEFile, PESections[I].PhysicalOffset);
-                 Seek(OutputFile, $200000{PESections[I].VirtualAddress});
+                 Seek(OutputFile, $200000 - sizeof (PESections[I].PhysicalSize));
+                 BlockWrite(OutputFile, PESections[I].PhysicalSize, sizeof (PESections[I].PhysicalSize));
+                 Seek(OutputFile, $200000);
                  try
                     BlockRead(PEFile, PEKDebug^ , PESections[I].PhysicalSize);
-                    BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize{+ sizeof(kerneldebuginfo)});
+                    BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize);
                  finally
                     FreeMem(PEKDebug);
                  end;
-                 WriteLn('Writing ', secname,' section ... Size= ',PESections[I].PhysicalSize);
+                 WriteLn('Writing ', secname,' section ...');
              end else WriteLn('Ignoring ', secname,' section ... ');
           end else writeln('Ignoring ',PESections[I].name,' section ... ');
         end;

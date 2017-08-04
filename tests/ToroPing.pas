@@ -60,7 +60,7 @@ const
   // wait for ping in seconds
   WAIT_FOR_PING = 1;
 var  
-  PingIPDword: Dword;
+  PingIPDword: Dword = 0;
   PingPacket: PPacket;
   PingContent: Pchar = 'abcdefghijklmtororstuvwabcdefghi';
   seq: word = 90;

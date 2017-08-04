@@ -62,16 +62,21 @@
     <Linking>
       <Debugging>
         <GenerateDebugInfo Value="False"/>
+        <DebugInfoType Value="dsDwarf2"/>
       </Debugging>
     </Linking>
     <Other>
+      <Verbosity>
+        <ShowDebugInfo Value="True"/>
+      </Verbosity>
+      <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) build.pas"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="build.exe 2 ToroException boot.o ToroException.img"/>
+        <Command Value="build.exe 4 ToroException boot.o ToroException.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

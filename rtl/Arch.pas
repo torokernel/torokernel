@@ -20,7 +20,6 @@
 // Copyright (c) 2003-2016 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
-//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -147,6 +146,7 @@ procedure DelayMicro(microseg: LongInt);
 procedure PciWriteWord (const bus, device, func, regnum, value: Word);
 function read_portw(port: Word): Word;
 function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
+procedure SetPageReadOnly(Add: Pointer);
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -1349,6 +1349,29 @@ begin
   Bit_Set(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE),4);
 end;
 
+
+// Set Page as Read Only
+// "Add" is Pointer to page, It's a multiple of 2MB (Page Size)
+procedure SetPageReadOnly(Add: Pointer);
+var
+  I_PML4,I_PPD,I_PDE: LongInt;
+  PDD_Table, PDE_Table, Entry: PDirectoryPage;
+  Page: QWord;
+begin
+  Page := QWord(Add);
+  I_PML4:= Page div 512*1024*1024*1024;
+  I_PPD := (Page div (1024*1024*1024)) mod 512;
+  I_PDE := (Page div (1024*1024*2)) mod 512;
+  Entry:= Pointer(SizeUInt(PML4_Table) + SizeOf(TDirectoryPageEntry)*I_PML4);
+  PDD_Table := Pointer((entry.PageDescriptor shr 12)*4096);
+  Entry := Pointer(SizeUInt(PDD_Table) + SizeOf(TDirectoryPageEntry)*I_PPD);
+  PDE_Table := Pointer((Entry.PageDescriptor shr 12)*4096);
+  // 2 MB page's entry
+  Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE), 1);
+end;
+
+
+
 // Cache Manager Initialization
 procedure CacheManagerInit;
 var
@@ -1358,6 +1381,8 @@ begin
   PML4_Table := Pointer(PDADD);
   // first two pages aren't cacheable (0-2*PAGE_SIZE)
   RemovePageCache(Page);
+  // first page is read only
+  SetPageReadOnly(Page);
   Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
   RemovePageCache(Page);
   // The whole kernel is cacheable from bootloader
@@ -1370,6 +1395,7 @@ var
   I: LongInt;
 begin
   // the bootloader creates the idt
+  // TODO: we should move the IDT
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   RelocateIrqs;

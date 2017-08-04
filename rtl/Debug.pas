@@ -280,7 +280,6 @@ begin
 end;
 
 
-
 // initialize the debuging
 procedure DebugInit;
 begin
@@ -291,6 +290,11 @@ begin
   write_portb (3, BASE_COM_PORT+3);
   WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
   WriteDebug('Initialization of debugging console.\n',[]);
+  {$IFDEF DebugCrash}
+     WriteDebug('Crash dumping is Enabled\n',[]);
+  {$ELSE}
+     WriteDebug('Crash dumping is Disable\n',[]);
+  {$ENDIF}
   {$IFDEF DCC} System.DebugTraceProc := @DebugTrace; {$ENDIF}
 end;
 

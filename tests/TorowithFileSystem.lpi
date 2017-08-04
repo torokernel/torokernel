@@ -72,7 +72,7 @@
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="build.exe 2 TorowithFileSystem boot.o TorowithFileSystem.img"/>
+        <Command Value="build.exe 4 TorowithFileSystem boot.o TorowithFileSystem.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

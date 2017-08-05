@@ -312,7 +312,7 @@ begin
     {$IFDEF DebugE1000}
      if (Net.OutgoingPacketTail <> nil) then
      begin
-       WriteDebug('e1000: OutgoingPacket=nil but OutgoingPacketTail <> nil\n', []);
+       WriteDebug('e1000: Net.OutgoingPackets=nil but Net.OutgoingPacketTail <> nil\n\n', []);
      end;
     {$ENDIF}
     Net.OutgoingPacketTail := Packet;
@@ -328,10 +328,15 @@ begin
   end;
 end;
 
+Type
+  TarrayofLongInt = ^arrayofLongInt;
+  arrayofLongInt = array[0..1] of LongInt;
+
 // Initializes RX and TX buffers
 function e1000initbuf(Net: PE1000): Boolean;
 var
   I: LongInt;
+  tmp: TarrayofLongInt;
   RxBuff: PE1000RxDesc;
   TxBuff: PE1000TxDesc;
   r: ^char;
@@ -441,8 +446,9 @@ begin
     end;
 
   // Setup the receive ring registers.
-  e1000WriteRegister(Net, E1000_REG_RDBAL, PtrUInt(Net.RxDesc) and $FFFFFFFF);
-  e1000WriteRegister(Net, E1000_REG_RDBAH, PtrUInt(Net.RxDesc) shr 32);
+  tmp := @Net.RxDesc;
+  e1000WriteRegister(Net, E1000_REG_RDBAL, tmp[0]);
+  e1000WriteRegister(Net, E1000_REG_RDBAH, tmp[1]);
   e1000WriteRegister(Net, E1000_REG_RDLEN, Net.RxDescCount *SizeOf(TE1000RxDesc));
   e1000WriteRegister(Net, E1000_REG_RDH,   0);
   e1000WriteRegister(Net, E1000_REG_RDT, Net.RxDescCount -1);
@@ -460,8 +466,9 @@ begin
   e1000SetRegister(Net, E1000_REG_RCTL, E1000_REG_RCTL_EN {or E1000_REG_RCTL_UPE} or E1000_REG_RCTL_BAM or E1000_RCTL_SECRC );
 
   // Setup the transmit ring registers.
-  E1000WriteRegister(Net, E1000_REG_TDBAL, PtrUInt(Net.TxDesc) and $FFFFFFFF );
-  E1000WriteRegister(Net, E1000_REG_TDBAH, PtrUInt(Net.TxDesc) shr 32);
+  tmp := @Net.TxDesc;
+  E1000WriteRegister(Net, E1000_REG_TDBAL, tmp[0]);
+  E1000WriteRegister(Net, E1000_REG_TDBAH, tmp[1]);
   E1000WriteRegister(Net, E1000_REG_TDLEN, Net.TxDescCount * SizeOf(TE1000TxDesc));
   E1000WriteRegister(Net, E1000_REG_TDH,   0);
   E1000WriteRegister(Net, E1000_REG_TDT, 0);

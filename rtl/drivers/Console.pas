@@ -43,7 +43,7 @@ uses Arch, Process;
 procedure CleanConsole;
 procedure PrintDecimal(Value: PtrUInt);
 procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
-procedure ReadConsole(var C: XChar);
+procedure ReadConsole(out C: XChar);
 procedure ReadlnConsole(Format: PXChar);
 procedure DisabledConsole;
 procedure EnabledConsole;
@@ -435,7 +435,7 @@ asm
 end;
 
 // Read a Char from Console
-procedure ReadConsole(var C: XChar);
+procedure ReadConsole(out C: XChar);
 begin
   ThreadInkey := GetCurrentThread;
   if BufferCount = LastChar then

@@ -938,6 +938,7 @@ var
   SizeDiv8: Cardinal;
   SX: Byte;
 begin
+  FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
   MajorBlockSize := 8; // First Size indeX is 8 bytes, then 16, 32, 64, 128, ...
   SX := 1;

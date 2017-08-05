@@ -67,7 +67,7 @@
     </Linking>
     <Other>
       <Verbosity>
-        <ShowDebugInfo Value="True"/>
+        <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
       <ExecuteBefore>

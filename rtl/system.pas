@@ -149,7 +149,10 @@ type
 
 { procedure type }
   TProcedure  = Procedure;
-  
+
+  FILEREC = record end;
+  TEXTREC = record end;
+
 type
   THandle = QWord;
   TThreadID = THandle;

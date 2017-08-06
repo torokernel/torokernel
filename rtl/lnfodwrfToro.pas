@@ -71,7 +71,7 @@ type
 const
   EBUF_SIZE = 100;
 
-{$WARNING This code is not thread-safe, and needs improvement}
+//{$WARNING This code is not thread-safe, and needs improvement}
 var
   { the input file to read DWARF debug info from, i.e. paramstr(0) }
   //e : TExeFile;
@@ -149,11 +149,9 @@ type
 var
   base, limit : SizeInt;
   index : SizeInt;
-  baseaddr : pointer;
   filename,
-  dbgfn : string;
   lastfilename: string;   { store last processed file }
-  lastopendwarf: Boolean; { store last result of processing a file }
+  //lastopendwarf: Boolean; { store last result of processing a file }
   pointtosection: pointer;
 
   Type
@@ -168,7 +166,6 @@ end;
 function OpenDwarf(addr : pointer) : boolean;
 var
   p: ^longint;
-  DebugInfo: PkerneldebugInfo;
 begin
   // False by default
   OpenDwarf:=false;
@@ -186,10 +183,9 @@ begin
   p := pointer($600000 - sizeof(DWORD));
   dwarfsize := p^;
   p := pointer($600000);
-  DebugInfo := pointer(p);
   dwarfoffset := PtrUInt(p);
   OpenDwarf:=true;
-  lastopendwarf:=true;
+  //lastopendwarf:=true;
 end;
 
 
@@ -231,7 +227,6 @@ end;
   an error }
 function ReadNext() : Longint; inline;
 var
-  bytesread : SizeInt;
   t: ^byte;
 begin
   ReadNext := -1;
@@ -538,7 +533,6 @@ var
 
   prev_line : QWord;
   prev_file : DWord;
-  s: ShortString;
 
 begin
   prev_line := 0;
@@ -625,7 +619,7 @@ begin
             //WriteConsole('DW_LNE_SET_ADDRESS (%h)\n', [state.address]);
           end;
           DW_LNE_DEFINE_FILE : begin
-            s := ReadString();
+            //s := ReadString();
             SkipLEB128();
             SkipLEB128();
             SkipLEB128();
@@ -788,7 +782,6 @@ procedure PrintBackTraceStr(addr: Pointer);
 var
   func,
   source : string;
-  hs     : string;
   line   : longint;
   Store  : TBackTraceStrFunc;
   Success : boolean;

@@ -67,7 +67,7 @@ var
   IP: PIPHeader;
   ICMP: PICMPHeader;
 begin
-  // Dedicate the ne2000 network card to local cpu
+  // Dedicate the e1000 network card to local cpu
   DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
 
   // I convert the IP to a DWord

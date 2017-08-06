@@ -112,7 +112,7 @@ procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 // only used in the debug unit to synchronize access to serial port
-procedure Delay(milisec: LongInt);
+procedure Delay(ms: LongInt);
 procedure eoi;
 function GetApicID: Byte;
 function get_irq_master: Byte;
@@ -277,7 +277,7 @@ var
 // Put interruption gate in the idt
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
-  idt_gates^[int].handler_0_15 := Word(PtrUInt(Handler) and $ffff);
+  Move(PtrUInt(Handler), idt_gates^[int].handler_0_15, sizeof(WORD));
   idt_gates^[int].selector := kernel_code_sel;
   idt_gates^[int].tipe := gate_syst;
   idt_gates^[int].handler_16_31 := Word((PtrUInt(Handler) shr 16) and $ffff);
@@ -288,7 +288,7 @@ end;
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 begin
-  idt_gates^[Exception].handler_0_15 := Word(PtrUInt(Handler) and $ffff) ;
+  Move(PtrUInt(Handler), idt_gates^[Exception].handler_0_15, sizeof(WORD));
   idt_gates^[Exception].selector := kernel_code_sel;
   idt_gates^[Exception].tipe := gate_syst ;
   idt_gates^[Exception].handler_16_31 := Word((PtrUInt(Handler) shr 16) and $ffff);
@@ -409,16 +409,16 @@ asm
   nop;
 end;
 
-// Wait a number of miliseconds
+// Wait a number of ms
 // It uses the Local Apic
-procedure Delay(milisec: LongInt);
+procedure Delay(ms: LongInt);
 var
   tmp : ^DWORD ;
 begin
   tmp := Pointer (divide_reg);
   tmp^ := $b;
   tmp := Pointer(timer_init_reg); // set the count
-  tmp^ := (LocalCpuSpeed * 1000)*milisec; // the count is aprox.
+  tmp^ := (LocalCpuSpeed * 1000)*ms; // the count is aprox.
   tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
@@ -1060,7 +1060,7 @@ procedure InitCore(ApicID: Byte);
 var
   Attempt: LongInt;
 begin
-  // tray two times two wake up each core
+  // try two times to wake up each core
   Attempt := 2;
   while Attempt > 0 do
   begin

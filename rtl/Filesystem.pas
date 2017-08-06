@@ -502,7 +502,7 @@ begin
   begin
     Queue := Inode;
     Inode.Next := Inode;
-    Inode.Prev := InoDE;
+    Inode.Prev := Inode;
     Exit;
   end;
   Inode.Prev := Queue.Prev;
@@ -762,6 +762,7 @@ var
   Count: LongInt;
   Name: String;
   ino: PInode;
+  {$IFDEF DebugFS}SPath: PChar;{$ENDIF}
 begin
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   Base.Count := Base.Count+1;
@@ -769,7 +770,10 @@ begin
   Count := 1;
   Result := 0;
   SetLength(Name, 0);
-  {$IFDEF DebugFS} WriteDebug('SysCreateDir: creating directoy %p\n', [PtrUInt(SPath)]); {$ENDIF}
+  {$IFDEF DebugFS}
+    SPath := Path;
+    WriteDebug('SysCreateDir: creating directoy %p\n', [PtrUInt(SPath)]);
+  {$ENDIF}
   while PtrUint(Path^) <> 0 do
   begin
     // ascii code of '/'
@@ -839,10 +843,12 @@ var
   ino: PInode;
   SPath: PChar;
 begin
-  {$IFDEF DebugFS} WriteDebug('SysCreateFile: creating file %p\n', [PtrUInt(SPath)]); {$ENDIF}
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   Base.Count := Base.Count+1;
   SPath := Path;
+  {$IFDEF DebugFS}
+    WriteDebug('SysCreateFile: creating file %p\n', [PtrUInt(SPath)]);
+  {$ENDIF}
   Path := Path+1;
   Count := 1;
   Result := 0;

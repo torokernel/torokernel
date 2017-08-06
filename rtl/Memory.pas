@@ -130,8 +130,8 @@ function XHeapUnstack(Heap: PXHeap): PXHeap;
 function ToroGetMem(Size: PtrUInt): Pointer;
 function ToroFreeMem(P: Pointer): Integer;
 function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
-function SysCacheRegion(Add: Pointer; Size: LongInt): Boolean;
-function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
+function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 procedure MemoryInit;
 
 implementation
@@ -234,7 +234,7 @@ begin
   PBlockHeader(P)^ := PBlockHeader(P)^ or FLAG_FREE;
 end;
 
-procedure GetHeader(P: Pointer; var CPU, SX, FlagFree, FlagPrivateHeap: Byte; var Size: PtrUInt);
+procedure GetHeader(P: Pointer; out CPU, SX, FlagFree, FlagPrivateHeap: Byte; out Size: PtrUInt);
 var
   Header: TBlockHeader;
 begin
@@ -745,7 +745,7 @@ end;
 //
 
 // Set a Memory's Region as CACHEABLE
-function SysCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 var
   StartPage, EndPage: Pointer;
   PageCount, PageStart: PtrUInt;
@@ -778,7 +778,7 @@ begin
 end;
 
 // Set a Memory's Region as NO-CACHEABLE
-function SysUnCacheRegion(Add: Pointer; Size: LongInt): Boolean;
+function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 var
   StartPage, EndPage: Pointer;
   PageCount, PageStart: PtrUInt;
@@ -938,6 +938,7 @@ var
   SizeDiv8: Cardinal;
   SX: Byte;
 begin
+  FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
   MajorBlockSize := 8; // First Size indeX is 8 bytes, then 16, 32, 64, 128, ...
   SX := 1;

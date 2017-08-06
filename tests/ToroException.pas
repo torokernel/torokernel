@@ -53,8 +53,8 @@ uses
   Filesystem in '..\rtl\Filesystem.pas',
   Console in '..\rtl\Drivers\Console.pas';
 
-var
-  tmp: TThreadID = 0;
+//var
+//  tmp: TThreadID = 0;
 
 // Procedure that tests Division by zero exception handler
 procedure DoDivZero;
@@ -115,6 +115,7 @@ begin
   //DoPageFault;
   DoProtectionFault;
   //DoIllegalInstruction;
+  Result := 0;
 end;
 
 begin

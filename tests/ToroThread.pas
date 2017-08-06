@@ -76,7 +76,8 @@ begin
     var3:=var2+7;
     n2:= false;
     n1:= true ;
-  end
+  end;
+  Result := 0;
 end;
 
 
@@ -88,6 +89,7 @@ begin
       var1:=var3 mod 11;
       SysThreadSwitch;
   end;
+  Result := 0;
 end;
 
 

@@ -65,6 +65,9 @@
       </Debugging>
     </Linking>
     <Other>
+      <Verbosity>
+        <ShowHints Value="False"/>
+      </Verbosity>
       <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) build.pas"/>

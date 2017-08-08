@@ -625,7 +625,7 @@ begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: sending SYNACK in Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
   TCPSendPacket(TCP_SYNACK, ClientSocket);
   SetSocketTimeOut(ClientSocket, WAIT_ACK);
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: New connection to Port %d\n', [LocalPort]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: new connection to Port %d, Queue: %d\n', [LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
 end;
 
 // Send a packet using the local Network interface
@@ -1642,8 +1642,9 @@ begin
     case Socket.DispatcherEvent of
       DISP_ACCEPT :
         begin // new connection
-			{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, ACCEPT, Buffer Sender: %h\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF} 
-			Handler.DoAccept(Socket);
+			{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, ACCEPT, Buffer Sender: %h, Service queue counter: %d\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender), Service.ServerSocket.ConnectionsQueueCount]); {$ENDIF}
+                        Service.ServerSocket.ConnectionsQueueCount := Service.ServerSocket.ConnectionsQueueCount - 1;
+                        Handler.DoAccept(Socket);
 	    end;
 	  DISP_CLOSING :
 		begin
@@ -1909,12 +1910,12 @@ begin
   Socket.State := SCK_LISTENING;
   Socket.Mode := MODE_SERVER;
   Socket.NeedfreePort := False;
-  // Max Number of remote conenctions pendings
+  // max number of pending connections
   Socket.ConnectionsQueueLen := QueueLen;
   Socket.ConnectionsQueueCount := 0;
   Socket.DestPort:=0;
   Result := True;
-  {$IFDEF DebugSocket} WriteDebug('SysSocketListen: Socket installed in Local Port: %d, Buffer Sender: %h\n', [Socket.SourcePort,PtrUInt(Socket.BufferSender)]); {$ENDIF}
+  {$IFDEF DebugSocket} WriteDebug('SysSocketListen: Socket listening at Local Port: %d, Buffer Sender: %h, QueueLen: %d\n', [Socket.SourcePort,PtrUInt(Socket.BufferSender),QueueLen]); {$ENDIF}
 end;
 
 // Read Data from Buffer and save it in Addr , The data continue into the buffer

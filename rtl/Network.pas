@@ -896,8 +896,10 @@ var
   ClientSocket: PSocket;
   CPUID: LongInt;
   Service: PNetworkService;
+  tmp, tmp2: PBufferSender;
 begin
   CPUID:= GetApicID;
+  {$IFDEF DebugSocket} WriteDebug('FreeSocket: Freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
   // take the queue of Sockets
   Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
   // Remove It
@@ -918,10 +920,22 @@ begin
       DedicateNetworks[CPUID].SocketDatagram[Socket.SourcePort] := nil;
     FreePort(Socket.SourcePort);
   end;
-  {$IFDEF DebugSocket} WriteDebug('FreeSocket: Freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+  // Empty transmission queue
+  if Socket.BufferSender <> nil then
+  begin
+    tmp := Socket.BufferSender;
+    while tmp <> nil do
+    begin
+      ToroFreeMem(tmp.Packet);
+      tmp2 := tmp.NextBuffer;
+      ToroFreeMem(tmp);
+      tmp := tmp2;
+    end;
+    {$IFDEF DebugSocket} WriteDebug('FreeSocket: Freeing Socket %h, Buffer Sender not empty\n', [PtrUInt(Socket)]); {$ENDIF}
+  end;
   // Free Memory Allocated
-  ToroFreeMem(Socket.Buffer); // Free the buffer Window
-  ToroFreeMem(Socket); // Free Socket Structure 
+  ToroFreeMem(Socket.Buffer);
+  ToroFreeMem(Socket);
 end;
 
 // Processing ARP Packets
@@ -1117,6 +1131,9 @@ begin
 		  // remote host closed the conection 
 		  Socket.RemoteClose := true; 
 		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
+        end else
+        begin
+                  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h TCP Header flag unknown: %d\n', [PtrUInt(Socket), TCPHeader.flags]); {$ENDIF}
         end;
         ToroFreeMem(Packet)
       end;
@@ -1542,7 +1559,8 @@ begin
   {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   // sender Dispatcher can't send, we have to wait for remote host
   // while The WinFlag is up the timer 'll be refreshed
-  if not (Socket.AckFlag) {and Socket.WinFlag} then
+  // prevent to send packet if remote host has closed the connnection
+  if not (Socket.AckFlag)  or (Socket.RemoteClose){and Socket.WinFlag} then
   begin
     // todo: to implement this correctly 
     //if CheckTimeOut(Socket.WinCounter, Socket.WinTimeOut) then
@@ -1859,29 +1877,42 @@ begin
   Result := True;
 end;
 
-// Close connection to Remote Host
-// Just for Client Sockets
+// Close connection to Remote Host, only for Client Sockets
 procedure SysSocketClose(Socket: PSocket);
 begin
-	DisableInt;
-	{$IFDEF DebugSocket} WriteDebug('SysSocketClose: Closing Socket %h in port %d, Buffer Sender %h, Dispatcher %d\n', [PtrUInt(Socket),Socket.SourcePort, PtrUInt(Socket.BufferSender),Socket.DispatcherEvent]); {$ENDIF}
-	// is there something to send?
-	if Socket.BufferSender = nil then 
-	begin
-		// we send the ACKFIN and we wait for ACK
-		Socket.State := SCK_PEER_DISCONNECTED;
-		// we have to wait the ACK of remote host
-		SetSocketTimeOut(Socket, WAIT_ACK);
-		// Send ACKFIN to remote host
-		TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
-		{$IFDEF DebugSocket} WriteDebug('SysSocketClose: send FINACK in Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-	end else 
-	begin
-		// the dispatcher will flush the buffer sender
-		Socket.DispatcherEvent := DISP_CLOSING;
-		{$IFDEF DebugSocket} WriteDebug('SysSocketClose: Socket %h in DISP_CLOSING\n', [PtrUInt(Socket)]); {$ENDIF}
-	end;
-	RestoreInt;
+  DisableInt;
+  {$IFDEF DebugSocket} WriteDebug('SysSocketClose: Closing Socket %h in port %d, Buffer Sender %h, Dispatcher %d\n', [PtrUInt(Socket),Socket.SourcePort, PtrUInt(Socket.BufferSender),Socket.DispatcherEvent]); {$ENDIF}
+  // Remote host has closed the connection first
+  // we only do a local close
+  if Socket.RemoteClose then
+  begin
+    // we send the ACKFIN and we wait for ACK
+    Socket.State := SCK_PEER_DISCONNECTED;
+    // we have to wait the ACK of remote host
+    SetSocketTimeOut(Socket, WAIT_ACK);
+    // Send ACKFIN to remote host
+    TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
+    {$IFDEF DebugSocket} WriteDebug('SysSocketClose: RemoteHost has closed, Send FINACK in Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+  end
+  // we need to close locally and remotly
+  else begin
+    // is there something to send?
+    if Socket.BufferSender = nil then
+    begin
+      // we send the ACKFIN and we wait for ACK
+      Socket.State := SCK_PEER_DISCONNECTED;
+      // we have to wait the ACK of remote host
+      SetSocketTimeOut(Socket, WAIT_ACK);
+      // Send ACKFIN to remote host
+      TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
+      {$IFDEF DebugSocket} WriteDebug('SysSocketClose: send FINACK in Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+    end else begin
+      // the dispatcher will flush the buffer sender
+      Socket.DispatcherEvent := DISP_CLOSING;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketClose: Socket %h in DISP_CLOSING\n', [PtrUInt(Socket)]); {$ENDIF}
+    end;
+  end;
+  RestoreInt;
 end;
 
 // Prepare the Socket for receive connections , the socket is in BLOCKED State
@@ -1969,7 +2000,7 @@ begin
       AddrLen := 0;
     end;
     Move(Socket.BufferReader^, Addr^, FragLen);
-    {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: Receiving from %h to %h count: %d\n', [PtrUInt(Socket.BufferReader), PtrUInt(Addr), FragLen]); {$ENDIF}
+    //{$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: Receiving from %h to %h count: %d\n', [PtrUInt(Socket.BufferReader), PtrUInt(Addr), FragLen]); {$ENDIF}
     Result := Result + FragLen;
     Socket.BufferReader := Socket.BufferReader + FragLen;
     // The buffer was read, inform sender that it can send data again

@@ -131,7 +131,7 @@ end;
  // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> closing for timeout\n',[PtrUInt(@Socket)]);
+  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> closing for timeout\n',[PtrUInt(Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;

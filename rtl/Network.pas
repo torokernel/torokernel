@@ -227,7 +227,7 @@ type
     WinFlag: Boolean;
     WinTimeOut: LongInt;
     WinCounter: LongInt;
-	RemoteClose: Boolean;
+    RemoteClose: Boolean;
     Next: PSocket;
   end;
 
@@ -1122,15 +1122,17 @@ begin
         // END of connection
         end else if (TCPHeader.flags = TCP_ACKEND) then
         begin
-		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h received ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
-		  // we confirm the end of connection 
+		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h received ACKFIN, Distpacher: %d\n', [PtrUInt(Socket), Socket.DispatcherEvent]); {$ENDIF}
+                  // we confirm the end of connection
+                  // the connection has been closed by remote peer
 		  Socket.LastAckNumber := Socket.LastAckNumber+1;
 		  TCPSendPacket(TCP_ACK, Socket);
-		  // the dispatcher will run the close event 
-		  Socket.DispatcherEvent := DISP_CLOSE;
-		  // remote host closed the conection 
+                  // Once socketSelect() is invoked
+                  // this socket will be closed
+                  Socket.State:= SCK_LOCALCLOSING;
+                  // remote host closed the conection
 		  Socket.RemoteClose := true; 
-		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
+		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK to confirm ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
         end else
         begin
                   {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h TCP Header flag unknown: %d\n', [PtrUInt(Socket), TCPHeader.flags]); {$ENDIF}
@@ -1321,10 +1323,12 @@ begin
         end else if (TCPHeader.Flags and TCP_RST = TCP_RST) then
         begin
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
-          // If the conection exist then socket is closed
-          // If socket is in connecting to remote host the packet is not important for connection
+          // RST shutdown the connection immediately
           if (Socket <> nil) and (Socket.State <> SCK_CONNECTING) then
+          begin
             Socket.State:= SCK_CLOSED;
+          end;
+          {$IFDEF DebugNetwork} WriteDebug('ip: TCP_RST packet %h, Socket: %h\n', [PtrUInt(Packet), PtrUInt(Socket)]); {$ENDIF}
           ToroFreeMem(Packet);
         end;
       end;
@@ -1655,30 +1659,32 @@ begin
   while NextSocket <> nil do
   begin
     Socket := NextSocket;
-	NextSocket := Socket.Next;
-	{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, Dispatcher Event: %d, Buffer Sender: %h Socket state: %d\n', [PtrUInt(Socket),PtrUInt(Handler),Socket.DispatcherEvent, PtrUInt(Socket.BufferSender), Socket.State]); {$ENDIF} 
+    NextSocket := Socket.Next;
+    {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, Dispatcher Event: %d, Buffer Sender: %h Socket state: %d\n', [PtrUInt(Socket),PtrUInt(Handler),Socket.DispatcherEvent, PtrUInt(Socket.BufferSender), Socket.State]); {$ENDIF}
     case Socket.DispatcherEvent of
       DISP_ACCEPT :
         begin // new connection
-			{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, ACCEPT, Buffer Sender: %h, Service queue counter: %d\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender), Service.ServerSocket.ConnectionsQueueCount]); {$ENDIF}
-                        Service.ServerSocket.ConnectionsQueueCount := Service.ServerSocket.ConnectionsQueueCount - 1;
-                        Handler.DoAccept(Socket);
-	    end;
-	  DISP_CLOSING :
-		begin
-			// we keep sending until the queue is empty 
-			{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h in DISP_CLOSING\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF} 
-			if Socket.BufferSender = nil then
-			begin
-				{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h closing\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF} 
-				Socket.State := SCK_PEER_DISCONNECTED;
-				SetSocketTimeOut(Socket, WAIT_ACK);
-				// Send ACKFIN to remote host
-				TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
-				// we need the dispatcher anymore
-				Socket.DispatcherEvent := DISP_ZOMBIE;
-			end;
-		end;
+          {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, ACCEPT, Buffer Sender: %h, Service queue counter: %d\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender), Service.ServerSocket.ConnectionsQueueCount]); {$ENDIF}
+          // Socket is not pending anymore
+          // we decrement the pending queue
+          Service.ServerSocket.ConnectionsQueueCount := Service.ServerSocket.ConnectionsQueueCount - 1;
+          Handler.DoAccept(Socket);
+	end;
+      DISP_CLOSING :
+        begin
+          // we keep sending until the queue is empty
+	  {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h in DISP_CLOSING\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF}
+	  if Socket.BufferSender = nil then
+	  begin
+            {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h closing\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF}
+	    Socket.State := SCK_PEER_DISCONNECTED;
+	    SetSocketTimeOut(Socket, WAIT_ACK);
+	    // Send ACKFIN to remote host
+	    TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
+	    // we need the dispatcher anymore
+	    Socket.DispatcherEvent := DISP_ZOMBIE;
+	  end;
+        end;
       DISP_WAITING:
         begin // The sockets is waiting for an external event
           ResumeTime:= read_rdtsc;
@@ -1698,29 +1704,37 @@ begin
               Handler.DoConnectFail(Socket)
             end  else if Socket.State = SCK_LOCALCLOSING then
             begin
-			  {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_LOCALCLOSING, freeing \n', [PtrUInt(Socket)]); {$ENDIF} 
+	      {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_LOCALCLOSING, freeing \n', [PtrUInt(Socket)]); {$ENDIF}
               // we lost the connection, free the socket
               FreeSocket(Socket)
             end else if Socket.State = SCK_PEER_DISCONNECTED then
             begin
               // ACK timer expired
               if Socket.RemoteClose then 
-			  begin
-				    // I free the socket since peer did not answer the ACK 
-					FreeSocket(Socket);
-					{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_PEER_DISCONNECTED, freeing\n', [PtrUInt(Socket)]); {$ENDIF} 
-			  end else begin
-					// I go zombie since peer did not answer the ACK
-					Socket.DispatcherEvent := DISP_ZOMBIE;
-					{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_PEER_DISCONNECTED, going zombie\n', [PtrUInt(Socket)]); {$ENDIF} 
-			  end;
+	      begin
+                // I free the socket since peer did not answer the ACK
+		FreeSocket(Socket);
+		{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_PEER_DISCONNECTED, freeing\n', [PtrUInt(Socket)]); {$ENDIF}
+	      end else begin
+		// I go zombie since peer did not answer the ACK
+		Socket.DispatcherEvent := DISP_ZOMBIE;
+		{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_PEER_DISCONNECTED, going zombie\n', [PtrUInt(Socket)]); {$ENDIF}
+	      end;
             end else if Socket.State = SCK_NEGOTIATION then
             begin
-              // The ACK never came  , we 'll close the connection
+              // The ACK never arrived, we close the connection
+              FreeSocket(Socket);
+            // This is due to RST packet
+            end else if Socket.State = SCK_CLOSED then
+            begin
+              {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_CLOSED, Freeing Socket\n', [PtrUInt(Socket)]); {$ENDIF}
               FreeSocket(Socket);
             end else
             begin
+              // This dispatcher event does nothing
+              // only tells the dispatcher that this socket has timed out
               Socket.DispatcherEvent := DISP_TIMEOUT;
+              {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, DoTimeOut(), State: %d\n', [PtrUInt(Socket), Socket.State]); {$ENDIF}
               Handler.DoTimeOut(Socket)
             end
           end;
@@ -2019,20 +2033,24 @@ end;
 function SysSocketSelect(Socket: PSocket; TimeOut: LongInt): Boolean;
 begin
   Result:= True;
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
   // The socket has a remote closing
   if Socket.State = SCK_LOCALCLOSING then
   begin
     Socket.DispatcherEvent := DISP_CLOSE;
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
     Exit;
   end;
   // We have data in a Reader Buffer ?
   if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
   begin
     Socket.DispatcherEvent := DISP_RECEIVE;
+    {$IFDEF DebugNetwork} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
     Exit;
   end;
   // Set a TIMEOUT for wait a remote event
   SetSocketTimeOut(Socket, TimeOut);
+  {$IFDEF DebugNetwork} WriteDebug('SysSocketSelect: Socket %h set timeout\n', [PtrUInt(Socket)]); {$ENDIF}
 end;
 
 // Send data to Remote Host using a Client Socket

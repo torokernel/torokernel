@@ -220,7 +220,6 @@ type
     NeedFreePort: Boolean;
     DispatcherEvent: LongInt;
     TimeOut:Int64;
-    Counter: Int64;
     BufferSender: PBufferSender;
     AckFlag: Boolean;
     AckTimeOut: LongInt;
@@ -252,7 +251,6 @@ type
   TBufferSender = record
     Packet: PPacket;
     Attempts: LongInt;
-    Counter: Int64;
     NextBuffer: PBufferSender;
   end;
 
@@ -338,8 +336,10 @@ const
 
   // Time for wait ACK answer, 50 miliseg per connection
   WAIT_ACK = 50;
+
   // Time for wait ARP Response
   WAIT_ARP = 50;
+
   // Time for wait a Remote Close , 10 seg. per connection
   WAIT_ACKFIN = 10000;
 
@@ -363,7 +363,8 @@ const
 var
   LastId: WORD = 0; // used for ID packets
  
-// Translate IP Address to MAC Address
+// Look for an IP in the IP-MAC translation table
+// TODO: Translate this for something faster, e.g., array.
 function LookIp(IP: TIPAddress):PMachine;
 var
   CPUID: LongInt;
@@ -501,14 +502,14 @@ function TCP_Checksum(SourceIP, DestIp: TIPAddress; PData: PChar; Len: Word): WO
 var
   PseudoHeader: TPseudoHeader;
 begin
-  // Set-up the psueudo-header }
+  // Set-up the psueudo-header
   FillChar(PseudoHeader, SizeOf(PseudoHeader), 0);
   PseudoHeader.SourceIP := SourceIP;
   PseudoHeader.TargetIP := DestIP;
   PseudoHeader.TCPLen := Swap(Word(Len));
   PseudoHeader.Cero := 0;
   PseudoHeader.Protocol := IP_TYPE_TCP;
-  // Calculate the checksum }
+  // Calculate the checksum
   TCP_Checksum := CalculateChecksum(@PseudoHeader,PData,Len, SizeOf(PseudoHeader));
 end;
 
@@ -536,10 +537,9 @@ end;
 // Set a TimeOut on Socket using the Dispatcher
 procedure SetSocketTimeOut(Socket:PSocket;TimeOut:Int64); inline;
 begin
-  Socket.TimeOut:= TimeOut*LocalCPUSpeed*1000;
-  Socket.Counter := read_rdtsc;
+  Socket.TimeOut:= read_rdtsc + TimeOut * LocalCPUSpeed * 1000;
   Socket.DispatcherEvent := DISP_WAITING;
-  {$IFDEF DebugSocket}WriteDebug('SetSocketTimeOut: timeout on Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
+  {$IFDEF DebugSocket}WriteDebug('SetSocketTimeOut: Socket %h, SocketTimeOut: %d, TimeOut: %d\n', [PtrUInt(Socket), Socket.TimeOut, TimeOut]);{$ENDIF}
 end;
 
 procedure TCPSendPacket(Flags: LongInt; Socket: PSocket); forward;
@@ -601,6 +601,8 @@ begin
   ClientSocket.Next := Service.ClientSocket;
   Service.ClientSocket := ClientSocket;
   ClientSocket.SocketType := SOCKET_STREAM;
+  // Prevent the dispatcher to process this socket
+  ClientSocket.DispatcherEvent := DISP_ZOMBIE;
   ClientSocket.Mode := MODE_CLIENT;
   ClientSocket.SourcePort := Socket.SourcePort;
   ClientSocket.DestPort := SwapWORD(TcpHeader.SourcePort);
@@ -622,10 +624,10 @@ begin
   Socket.ConnectionsQueueCount := Socket.ConnectionsQueueCount+1;
   // Send the SYNACK confirmation
   // The socket waits in NEGOTIATION State for the confirmation with Remote ACK
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: sending SYNACK in Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: sending SYNACK in Socket %h for new Socket Client %h\n', [PtrUInt(Socket), PtrUInt(ClientSocket)]);{$ENDIF}
   TCPSendPacket(TCP_SYNACK, ClientSocket);
   SetSocketTimeOut(ClientSocket, WAIT_ACK);
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: new connection to Port %d, Queue: %d\n', [LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: new socket %h to Port %d, Queue: %d\n', [PtrUInt(ClientSocket), LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
 end;
 
 // Send a packet using the local Network interface
@@ -642,6 +644,7 @@ begin
   Packet.Next:= nil;
   {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sending packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
   NetworkInterface.Send(NetworkInterface, Packet);
+  {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sent packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
 end;
 
 const
@@ -682,8 +685,6 @@ begin
   EthPacket.Source:= DedicateNetworks[CpuID].NetworkInterface.HardAddress;
   EthPacket.ProtocolType := SwapWORD(ETH_FRAME_ARP);
   SysNetworkSend(Packet);
-  // free the resources
-  //ToroFreeMem(Packet);
 end;
 
 
@@ -703,6 +704,7 @@ begin
   I := 3;
   while I > 0 do
   begin
+    {$IFDEF DebugNetwork} WriteDebug('GetMacAddress: Attemp %d for IP: %h\n', [I, PtrUInt(IP)]); {$ENDIF}
     Machine := LookIp(IP); // MAC already added ?
     if Machine <> nil then
     begin
@@ -714,6 +716,7 @@ begin
     Sleep(WAIT_ARP); // Wait for Remote Response
     Dec(I);
   end;
+  {$IFDEF DebugNetwork} WriteDebug('GetMacAddress: IP: %h not found\n', [PtrUInt(IP)]); {$ENDIF}
   Result := nil;
 end;
 
@@ -726,12 +729,15 @@ var
 begin
   CPUID:= GetApicid;
   Net := @DedicateNetworks[CPUID];
+  {$IFDEF DebugNetwork} WriteDebug('RouteIP: Getting MAC for IP: %h\n', [PtrUInt(IP)]); {$ENDIF}
   if (Net.Mask and IP) <> (Net.Mask and Net.Gateway) then
   begin
     // The Machine is outside , i must use a Gateway
+    {$IFDEF DebugNetwork} WriteDebug('RouteIP: MAC is gateway\n', []); {$ENDIF}
     Result := GetMacAddress(Net.Gateway);
     Exit;
   end;
+  {$IFDEF DebugNetwork} WriteDebug('RouteIP: MAC is local\n', []); {$ENDIF}
   // The IP is in the Range i will send directly to the machine
   Result := GetMacAddress(IP);
 end;
@@ -744,16 +750,21 @@ var
   IPHeader: PIPHeader;
   Machine: PMachine;
 begin
+  {$IFDEF DebugNetwork} WriteDebug('EthernetSendPacket: packet sending %h\n', [PtrUInt(Packet)]);{$ENDIF}
   CpuID := GetApicid;
   EthHeader := Packet.Data;
   IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthHeader.Source := DedicateNetworks[CpuID].NetworkInterface.HardAddress;
   Machine := RouteIP(IPHeader.destip);
   if Machine = nil then
+  begin
+    {$IFDEF DebugNetwork}WriteDebug('EthernetSendPacket: Route to IP not found\n', []);{$ENDIF}
     Exit;
+  end;
   EthHeader.Destination := Machine.HardAddress;
   EthHeader.ProtocolType := SwapWORD(ETH_FRAME_IP);
   SysNetworkSend(Packet);
+  {$IFDEF DebugNetwork} WriteDebug('EthernetSendPacket: packet sent %h\n', [PtrUInt(Packet)]);{$ENDIF}
 end;
 
 // Make an IP Header for send a IP Packet
@@ -761,6 +772,7 @@ procedure IPSendPacket(Packet: PPacket; IpDest: TIPAddress; Protocol: Byte);
 var
   IPHeader: PIPHeader;
 begin
+  {$IFDEF DebugNetwork}WriteDebug('IPSendPacket: sending packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
   IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   FillChar(IPHeader^, SizeOf(TIPHeader), 0);
   IPHeader.VerLen := IPv4_VERSION_LEN;
@@ -776,6 +788,7 @@ begin
   IPHeader.Checksum := CalculateChecksum(nil,IPHeader,Word(SizeOf(TIPHeader)),0);
   // Send a packet using ethernet layer
   EthernetSendPacket(Packet);
+  {$IFDEF DebugNetwork}WriteDebug('IPSendPacket: packet sent %h\n', [PtrUInt(Packet)]);{$ENDIF}
 end;
 
 const
@@ -851,13 +864,24 @@ begin
   Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
 end;
 
+procedure ProcessARPPacket(Packet: PPacket); forward;
+
 // Inform to Kernel that a new Packet has been received
 // This has to be invoked by disabling interruption to prevent concurrent access
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
+  EthPacket : PEthHeader;
 begin
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF} 
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+  // If it is an ARP packet, we process it immediately
+  EthPacket := Packet.Data;
+  if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
+  begin
+      {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+      ProcessARPPacket(Packet);
+      Exit;
+  end;
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
   Packet.Next := nil;
   // enqueue the packet last
@@ -963,8 +987,9 @@ begin
         ArpPacket.SenderHardAddr:= DedicateNetworks[CPUID].NetworkInterface.HardAddress;
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
         // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
+        // TODO: to check if we have to release the packet memory
         Packet.Delete := true;
-		{$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: Sending my ip\n', []); {$ENDIF}
+	{$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: Sending my ip\n', []); {$ENDIF}
         SysNetworkSend(Packet);
         // reply Request of Ip Address
       end else if ArpPacket.OpCode= SwapWORD(ARP_OP_REPLY) then
@@ -1018,26 +1043,31 @@ begin
       end;
     SCK_PEER_DISCONNECTED:
       begin
-		// we sent ENDACK, we wait for a ACK 
-		if TCPHeader.flags = TCP_ACK then
-		begin
-			if Socket.RemoteClose then 
-			begin
-				FreeSocket(Socket);
-				{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: ACK confirmed and RemoteClose so freeing Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
-			end 
-			else begin
-			    Socket.AckFlag := True;
-				Socket.DispatcherEvent := DISP_ZOMBIE;
-				{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: ACK confirmed, waiting for FINACK %h\n', [PtrUInt(Socket)]);{$ENDIF}
-			end;
-		end else if (TCPHeader.flags and TCP_FIN) = TCP_FIN then
-		begin
-				Socket.LastAckNumber := Socket.LastAckNumber+1;
-				TCPSendPacket(TCP_ACK, Socket);
-				{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: FINACK confirmed free Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
-				FreeSocket(Socket);
-		end;
+        // Remote host confirms the FINACK
+	if (TCPHeader.flags and TCP_ACK = TCP_ACK) then
+	begin
+          if Socket.RemoteClose then
+	  begin
+            FreeSocket(Socket);
+	    {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: ACK confirmed and RemoteClose so freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+	  end else begin
+            // only if remote host has not closed the connection we sleep for a FINACK
+            if ((TCPHeader.flags and TCP_FIN) <> TCP_FIN) then
+            begin
+              Socket.AckFlag := True;
+	      Socket.DispatcherEvent := DISP_ZOMBIE;
+	      {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: ACK confirmed, waiting for FINACK %h\n', [PtrUInt(Socket)]); {$ENDIF}
+            end;
+          end;
+	end;
+        // Remote host sends a FIN
+        if (((TCPHeader.flags and TCP_FIN) = TCP_FIN) and not(Socket.RemoteClose)) then
+        begin
+          Socket.LastAckNumber := Socket.LastAckNumber+1;
+	  TCPSendPacket(TCP_ACK, Socket);
+	  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: FINACK confirmed free Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+	  FreeSocket(Socket);
+	end;
         ToroFreeMem(Packet);
       end;
     //SCK_LOCALCLOSING: // The Local user is closing the connection
@@ -1064,7 +1094,7 @@ begin
         // The socket starts to receive data, Service Thread has got to do a SysSocketAccept()
         Socket.State := SCK_TRANSMITTING;
         Socket.DispatcherEvent := DISP_ACCEPT;
-		{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_ACCEPT\n', [PtrUInt(Socket)]);{$ENDIF}
+	{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_ACCEPT\n', [PtrUInt(Socket)]);{$ENDIF}
         ToroFreeMem(Packet);
       end;
     SCK_TRANSMITTING: // Client Socket is connected to remote Host
@@ -1072,9 +1102,10 @@ begin
       // TODO: we aren't checking if ACK number is correct
        if TCPHeader.flags = TCP_ACK then
        begin
-        Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber);
-		Socket.AckFlag := True;
-		{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+         DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
+         Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
+	 Socket.AckFlag := True;
+	 {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
         // TODO: to implement zero window condition check
 		//
 		// Are we checking zero window condition ?
@@ -1261,26 +1292,26 @@ begin
         // Request of Ping
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
-		  // the kernel is in charge to free the packet
-          Packet.Delete := true;
-		  ICMPHeader.tipe:= ICMP_ECHO_REPLY;
-          ICMPHeader.checksum:= 0 ;
-          Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
-          ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
-          AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
-          IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
-		  {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
-        // Ping reply 
-		end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
-		begin
-		 	// we only enqueue the packet if it has been read 
-		    if ICMPPollerBuffer = nil then 
-			 ICMPPollerBuffer := Packet 
-			// otherwise, we free the packet
-			else ToroFreeMem(Packet);
-			{$IFDEF DebugNetwork} WriteDebug('icmp: received ECHO REPLY\n', []); {$ENDIF}
-		// unknow packets are just freed 
-		end else ToroFreeMem(Packet);
+         // the kernel is in charge to free the packet
+         Packet.Delete := true;
+	 ICMPHeader.tipe:= ICMP_ECHO_REPLY;
+         ICMPHeader.checksum:= 0 ;
+         Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
+         ICMPHeader.Checksum := CalculateChecksum(nil,ICMPHeader,DataLen,0);
+         AddTranslateIp(IPHeader.SourceIP,EthHeader.Source); // I'll use a MAC address of Packet
+         IPSendPacket(Packet,IPHeader.SourceIP,IP_TYPE_ICMP); // sending response
+	 {$IFDEF DebugNetwork} WriteDebug('icmp: ECHO REQUEST answered\n', []); {$ENDIF}
+         // Ping reply
+        end else if ICMPHeader.tipe = ICMP_ECHO_REPLY then
+	begin
+         // we only enqueue the packet if it has been read
+	 if ICMPPollerBuffer = nil then
+         ICMPPollerBuffer := Packet
+	 // otherwise, we free the packet
+         else ToroFreeMem(Packet);
+	 {$IFDEF DebugNetwork} WriteDebug('icmp: received ECHO REPLY\n', []); {$ENDIF}
+	 // unknow packets are just freed
+        end else ToroFreeMem(Packet);
       end;
     IP_TYPE_UDP:
       begin
@@ -1291,32 +1322,36 @@ begin
       begin
         TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
         {$IFDEF DebugNetwork} WriteDebug('ip: received tcp packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
-		if TCPHeader.Flags=TCP_SYN then
+        if TCPHeader.Flags=TCP_SYN then
         begin
-		  {$IFDEF DebugNetwork} WriteDebug('ip: received TCP_SYN packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
-          // Validate the REQUEST to Server Socket
+          {$IFDEF DebugNetwork} WriteDebug('ip: received TCP_SYN packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
+          // Validate the request to Server Socket
           Socket:= ValidateTCPRequest(IPHeader.SourceIP,SwapWORD(TCPHeader.DestPort),SwapWORD(TCPHeader.SourcePort));
           // Enqueue the request to socket
           if Socket <> nil then
-		  begin 
-            {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to port: %d\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
-			EnqueueTCPRequest(Socket, Packet);
-		  end else
-		    begin
-				{$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet invalid\n', [PtrUInt(Packet)]); {$ENDIF}
-				ToroFreeMem(Packet);
-			end;
+          begin
+            {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to local port: %d, remote port: %d\n', [PtrUInt(Packet), Socket.SourcePORT, TCPHeader.SourcePort]); {$ENDIF}
+            // Add the MAC of the IP
+            EthHeader := Packet.Data;
+            AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
+            {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to port: %d, adding MAC to table\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
+            // Process the TCP part
+            EnqueueTCPRequest(Socket, Packet);
+          end else
+          begin
+            {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet invalid\n', [PtrUInt(Packet)]); {$ENDIF}
+	    ToroFreeMem(Packet);
+	  end;
         end else if (TCPHeader.Flags and TCP_ACK = TCP_ACK) then
         begin
           // Validate connection
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
           if Socket <> nil then
-		  begin
-		    {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet %h to port: %d\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
+	  begin
+            {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet %h to port: %d\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
             ProcessTCPSocket(Socket,Packet);
-		  end 
-          else begin
-            {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet %h invalid\n', [PtrUInt(Packet)]); {$ENDIF}
+	  end else begin
+            {$IFDEF DebugNetwork} WriteDebug('ip: ACK packet %h invalid to local port: %d and remote port: %d, TCP_HEADER: %d\n', [PtrUInt(Packet), SwapWORD(TCPHeader.DestPort), SwapWORD(TCPHeader.SourcePort), TCPHeader.Flags]); {$ENDIF}
             ToroFreeMem(Packet);
           end;
           // RST Flags
@@ -1371,14 +1406,8 @@ function ProcessNetworksPackets(Param: Pointer): PtrInt;
 var
   Packet: PPacket;
   EthPacket: PEthHeader;
-  //r: Int64;
-  //Net: PNetworkInterface;
-  //CPUID: longint;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
-  //CPUID := GetApicid;
-  // network driver initialization
-  //Net := DedicateNetworks[CPUID].NetworkInterface;
   while True do
   begin
     // new packet read
@@ -1386,14 +1415,6 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-	// TODO: Re think how to implement this
-    //  if (Net.TimeStamp <> 0) and (Net.OutgoingPackets <> nil) then
-    //  begin
-    //    r := read_rdtsc-Net.TimeStamp;
-        // Maybe the driver is in a loop, we have to inform the driver
-    //    if (r > MAX_TIME_SENDER*LocalCPUSpeed*1000) then
-    //      Net.Reset(Net);
-    //  end;
       SysThreadSwitch;
       Continue;
     end;
@@ -1537,22 +1558,6 @@ end;
 // Socket Implementation
 //------------------------------------------------------------------------------
 
-// Return True if the Timer expired
-function CheckTimeOut(Counter, TimeOut: Int64): Boolean;
-var
-  ResumeTime: Int64;
-begin
-  ResumeTime := read_rdtsc;
-  // Correction for Overflow
-  if Counter < ResumeTime then
-    Counter := Counter - ResumeTime
-  else
-    Counter := $FFFFFFFF-Counter+ResumeTime;
-  if TimeOut < Counter then
-    Result := True
-  else
-    Result := False;
-end;
 
 // Send the packets prepared in Buffer
 procedure DispatcherFlushPacket(Socket: PSocket);
@@ -1560,7 +1565,7 @@ var
   Buffer: PBufferSender;
   DataLen: UInt32;
 begin
-  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF} 
+  //{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   // sender Dispatcher can't send, we have to wait for remote host
   // while The WinFlag is up the timer 'll be refreshed
   // prevent to send packet if remote host has closed the connnection
@@ -1610,20 +1615,21 @@ begin
     end else
     begin
       // TimeOut expired ?
-      if not CheckTimeOut(Socket.BufferSender.Counter,Socket.AckTimeOut) then
-	  begin
-	    {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+      if Socket.AckTimeOut < read_rdtsc then
+      begin
+        {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
         Exit;
-	  end;
+      end;
       // Hardware problem !!!
+      // TODO: To check this
       // we need to re-calculate the RDTSC register counter
       // the timer will be recalculated until the packet has been sent
       // The packet is still queued in Network Buffer
-      if not(Socket.BufferSender.Packet.Ready) then
-      begin
-        Socket.BufferSender.Counter := read_rdtsc;
-        Exit;
-      end;
+      //if not(Socket.BufferSender.Packet.Ready) then
+      //begin
+      //  Socket.BufferSender.Counter := read_rdtsc;
+      //  Exit;
+      //end;
       // number of attemps
       if Buffer.Attempts = 0 then
       begin
@@ -1632,14 +1638,13 @@ begin
         Socket.AckTimeOut := 0;
         // We have to CLOSE
         Socket.DispatcherEvent := DISP_CLOSE ;
-		{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]); {$ENDIF}
+	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]); {$ENDIF}
       end else
         Dec(Buffer.Attempts);
     end;
   end;
   Socket.ACKFlag := False;
-  Socket.AckTimeOut := WAIT_ACK*LocalCPUSpeed*1000;
-  Socket.BufferSender.Counter := read_rdtsc;
+  Socket.AckTimeOut := read_rdtsc + WAIT_ACK*LocalCPUSpeed*1000;
   IPSendPacket(Socket.BufferSender.Packet, Socket.DestIp, IP_TYPE_TCP);
   {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet)]); {$ENDIF}
 end;
@@ -1647,11 +1652,10 @@ end;
 // Dispatch every ready Socket to its associated Network Service
 procedure NetworkDispatcher(Handler: PNetworkHandler);
 var
-  CountTime: Int64;
   NextSocket: PSocket;
-  ResumeTime: Int64;
   Service: PNetworkService;
   Socket: PSocket;
+  DoDispatcherFlushPacket: Boolean = true;
 begin
   Service := GetCurrentThread.NetworkService; // Get Network Service structure
   NextSocket := Service.ClientSocket; // Get Client queue
@@ -1660,7 +1664,7 @@ begin
   begin
     Socket := NextSocket;
     NextSocket := Socket.Next;
-    {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, Dispatcher Event: %d, Buffer Sender: %h Socket state: %d\n', [PtrUInt(Socket),PtrUInt(Handler),Socket.DispatcherEvent, PtrUInt(Socket.BufferSender), Socket.State]); {$ENDIF}
+    //{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h, Dispatcher Event: %d, Buffer Sender: %h Socket state: %d\n', [PtrUInt(Socket),PtrUInt(Handler),Socket.DispatcherEvent, PtrUInt(Socket.BufferSender), Socket.State]); {$ENDIF}
     case Socket.DispatcherEvent of
       DISP_ACCEPT :
         begin // new connection
@@ -1673,7 +1677,7 @@ begin
       DISP_CLOSING :
         begin
           // we keep sending until the queue is empty
-	  {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h in DISP_CLOSING\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF}
+	  {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h in DISP_CLOSING\n', [PtrUInt(Socket),PtrUInt(Handler)]); {$ENDIF}
 	  if Socket.BufferSender = nil then
 	  begin
             {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h Handler: %h Buffer Sender: %h closing\n', [PtrUInt(Socket),PtrUInt(Handler),PtrUInt(Socket.BufferSender)]); {$ENDIF}
@@ -1687,14 +1691,9 @@ begin
         end;
       DISP_WAITING:
         begin // The sockets is waiting for an external event
-          ResumeTime:= read_rdtsc;
-          // Correction for Overflow
-          if Socket.Counter < ResumeTime then
-            CountTime:= Socket.Counter - ResumeTime
-          else
-            CountTime:= $ffffffff-Socket.Counter+ResumeTime;
+          //{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h in DISP_WAITING, TimeOut: %d, rdtsc: %d\n', [PtrUInt(Socket), Socket.TimeOut, read_rdtsc]); {$ENDIF}
           // the TimeOut has expired
-          if Socket.TimeOut < CountTime then
+          if Socket.TimeOut < read_rdtsc then
           begin
             // if client connection lost, need to reconnect
             // In ConnectFail event, need to call connect()
@@ -1722,17 +1721,24 @@ begin
 	      end;
             end else if Socket.State = SCK_NEGOTIATION then
             begin
-              // The ACK never arrived, we close the connection
-              FreeSocket(Socket);
+              // the ACK that confirms the connection is delayed
+              // we wait another WAIT_ACK
+              // TODO: We should not wait for everything
+              SetSocketTimeOut(Socket, WAIT_ACK);
+              {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h in SCK_NEGOTIATION, setting new timeout\n', [PtrUInt(Socket)]); {$ENDIF}
+              // don't flush buffer when exiting
+              DoDispatcherFlushPacket := false;
             // This is due to RST packet
             end else if Socket.State = SCK_CLOSED then
             begin
               {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_CLOSED, Freeing Socket\n', [PtrUInt(Socket)]); {$ENDIF}
               FreeSocket(Socket);
+              // don't flush buffer when exiting
+              DoDispatcherFlushPacket := false;
             end else
             begin
-              // This dispatcher event does nothing
-              // only tells the dispatcher that this socket has timed out
+              // Nothing happened
+              // Call the handler
               Socket.DispatcherEvent := DISP_TIMEOUT;
               {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, DoTimeOut(), State: %d\n', [PtrUInt(Socket), Socket.State]); {$ENDIF}
               Handler.DoTimeOut(Socket)
@@ -1743,8 +1749,12 @@ begin
       DISP_CLOSE: Handler.DoClose(Socket); // Peer socket disconnected
       DISP_CONNECT: Handler.DoConnect(Socket);
     end;
-    DispatcherFlushPacket(Socket); // Send the packets in the buffer
-    {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Flushed %h\n', [PtrUInt(Socket.BufferSender)]); {$ENDIF} 
+    // only flush if DoDispatcherFlushPacket is true
+    if DoDispatcherFlushPacket then
+    begin
+      DispatcherFlushPacket(Socket); // Send the packets in the buffer
+      //{$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Flushed %h\n', [PtrUInt(Socket.BufferSender)]); {$ENDIF}
+    end;
   end;
 end;
 
@@ -1996,7 +2006,7 @@ function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): Lo
 var
   FragLen: LongInt;
 begin
-  {$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: BufferLength: %d\n', [Socket.BufferLength]); {$ENDIF}
+  //{$IFDEF DebugNetwork} WriteDebug('SysSocketRecv: BufferLength: %d\n', [Socket.BufferLength]); {$ENDIF}
   Result := 0;
   if (Socket.State <> SCK_TRANSMITTING) or (AddrLen=0) or (Socket.Buffer+Socket.BufferLength = Socket.BufferReader) then
   begin
@@ -2027,9 +2037,10 @@ begin
   end;
 end;
 
-// The Socket waits for notification, and returns when a new event is received
-// External events are REMOTECLOSE, RECEIVE or TIMEOUT
-// API reserved for Socket Client must be called from event handler
+// The Socket waits for notification and returns when a new event is received
+// External events can be a REMOTECLOSE, RECEIVE or TIMEOUT
+// This API is reserved for a client socket and it must be invoked from event handler
+// TimeOut is in ms
 function SysSocketSelect(Socket: PSocket; TimeOut: LongInt): Boolean;
 begin
   Result:= True;

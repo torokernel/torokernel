@@ -919,21 +919,13 @@ end;
 // Sleep current thread for SleepTime .
 procedure Sleep(Miliseg: LongInt);
 var
-  CurrentTime,ResumeTime,CountTime,tmp: Int64;
+  ResumeTime: Int64;
 begin
-  CountTime := 0;
-  // LocalCPUSpeed is in Mhz
-  ResumeTime := Miliseg*LocalCPUSpeed*1000;
+  ResumeTime := read_rdtsc + Miliseg*LocalCPUSpeed*1000;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
-  while CountTime < ResumeTime do
+  while ResumeTime > read_rdtsc do
   begin
-     CurrentTime:= read_rdtsc;
      Scheduling(nil);
-     tmp:=read_rdtsc;
-     if tmp > CurrentTime then
-      CountTime:= CountTime + tmp - CurrentTime
-     else
-      CountTime:= CountTime + ($ffffffff-CurrentTime+tmp);
   end;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime exiting\n', []); {$ENDIF}
 end;

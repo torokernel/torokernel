@@ -502,7 +502,7 @@ function TCP_Checksum(SourceIP, DestIp: TIPAddress; PData: PChar; Len: Word): WO
 var
   PseudoHeader: TPseudoHeader;
 begin
-  // Set-up the psueudo-header
+  // Setup psueudo-header
   FillChar(PseudoHeader, SizeOf(PseudoHeader), 0);
   PseudoHeader.SourceIP := SourceIP;
   PseudoHeader.TargetIP := DestIP;
@@ -1013,7 +1013,6 @@ var
 begin
   IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TETHHeader));
   TCPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TETHHeader)+SizeOf(TIPHeader));
-//  DataSize := SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
   {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h Packet %h\n', [PtrUInt(Socket),  PtrUInt(Packet)]); {$ENDIF}
   case Socket.State of
     SCK_CONNECTING: // The socket is connecting to remote host
@@ -1043,6 +1042,12 @@ begin
       end;
     SCK_PEER_DISCONNECTED:
       begin
+        // Remote host forces to close the connection
+        if (TCPHeader.flags and TCP_RST = TCP_RST) then
+        begin
+          FreeSocket(Socket);
+	  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: RST+ACK in SCK_DISCONNECTED so freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+        end else
         // Remote host confirms the FINACK
 	if (TCPHeader.flags and TCP_ACK = TCP_ACK) then
 	begin
@@ -1070,32 +1075,43 @@ begin
 	end;
         ToroFreeMem(Packet);
       end;
-    //SCK_LOCALCLOSING: // The Local user is closing the connection
-    //  begin
-    //    // we have to wait the REMOTECLOSE
-        // we have to wait a FINACK
-	//	{$IFDEF DebugNetwork} 
-	//	    if TCPHeader.flags = TCP_ACK then
-	//		begin
-	///			WriteDebug('ProcessTCPSocket: ACK packet in LOCALCLOSING state Socket %h\n', [PtrUInt(Socket)]);
-	//		end;
-	//	{$ENDIF}
-    //    Socket.State := SCK_PEER_DISCONNECTED;
-    //    SetSocketTimeOut(Socket,WAIT_ACKFIN);
-    //    ToroFreeMem(Packet);
-    //  end;
+    SCK_LOCALCLOSING:
+      begin
+        if (TCPHeader.Flags and TCP_RST = TCP_RST) then
+        begin
+          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: RST confirmed and LocalClose so freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+           FreeSocket(Socket);
+        end;
+      end;
     SCK_BLOCKED: // Server Socket is not listening remote connections
       begin
         ToroFreeMem(Packet)
       end;
     SCK_NEGOTIATION: // Socket is waiting for remote ACK confirmation
       begin
-        // the connection has been established
-        // The socket starts to receive data, Service Thread has got to do a SysSocketAccept()
-        Socket.State := SCK_TRANSMITTING;
-        Socket.DispatcherEvent := DISP_ACCEPT;
-	{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_ACCEPT\n', [PtrUInt(Socket)]);{$ENDIF}
-        ToroFreeMem(Packet);
+        // remote host is closing the connection
+        if (TCPHeader.Flags and TCP_FIN = TCP_FIN) then
+        begin
+          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h received ACKFIN during SCK_NEGOTIATION\n', [PtrUInt(Socket)]); {$ENDIF}
+          // we confirm the end of connection
+          // the connection has been closed by remote peer
+	  Socket.LastAckNumber := Socket.LastAckNumber+1;
+	  TCPSendPacket(TCP_ACK, Socket);
+          // Once socketSelect() is invoked
+          // this socket will be closed
+          Socket.State:= SCK_LOCALCLOSING;
+          // remote host closed the conection
+	  Socket.RemoteClose := true;
+          Socket.DispatcherEvent:= DISP_ACCEPT;
+        end else
+        begin
+          // The connection has been established
+          // The socket starts to receive data, Service Thread has got to do a SysSocketAccept()
+          Socket.State := SCK_TRANSMITTING;
+          Socket.DispatcherEvent := DISP_ACCEPT;
+	  {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_ACCEPT\n', [PtrUInt(Socket)]);{$ENDIF}
+         end;
+          ToroFreeMem(Packet);
       end;
     SCK_TRANSMITTING: // Client Socket is connected to remote Host
       begin
@@ -1124,7 +1140,7 @@ begin
          //if SwapWord(TCPHeader.Window_Size) = 0 then
          // Socket.WinFlag := True;
         //end;
-       end else if TCPHeader.flags = TCP_ACKPSH then
+       end else if (TCPHeader.flags and TCP_ACKPSH = TCP_ACKPSH) then
        begin
           if SwapDWORD(TCPHeader.AckNumber) = Socket.LastSequenceNumber then
           begin
@@ -1133,22 +1149,29 @@ begin
             Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
             Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
             Move(Source^, Dest^, DataSize);
-			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Moving from %h to %h count: %d\n', [PtrUInt(Source),PtrUInt(Dest),DataSize]); {$ENDIF}
+	    {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Moving from %h to %h count: %d\n', [PtrUInt(Source),PtrUInt(Dest),DataSize]); {$ENDIF}
             Socket.BufferLength := Socket.BufferLength + DataSize;
-			// We switch the state only if the dispatcher is waiting for an event 
+	    // We switch the state only if the dispatcher is waiting for an event
             if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
-			begin
-				Socket.DispatcherEvent := DISP_RECEIVE;
-				{$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
-			end;
+	    begin
+              Socket.DispatcherEvent := DISP_RECEIVE;
+	      {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
+	    end;
             // we confirm the ACKPSH
             TCPSendPacket(TCP_ACK, Socket);
-			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
+            // host closed remote connection
+            if (TCPHeader.flags and TCP_FIN = TCP_FIN) then
+            begin
+              Socket.State:= SCK_LOCALCLOSING;
+              // remote host closed the conection
+	      Socket.RemoteClose := true;
+            end;
+            {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
           end else begin
             // Invalid Sequence Number
             // sending the correct ACK and Sequence Number
             TCPSendPacket(TCP_ACK, Socket);
-			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for invalid seq\n', [PtrUInt(Socket)]); {$ENDIF}
+	    {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for invalid seq\n', [PtrUInt(Socket)]); {$ENDIF}
           end;
         // END of connection
         end else if (TCPHeader.flags = TCP_ACKEND) then
@@ -1162,7 +1185,8 @@ begin
                   // this socket will be closed
                   Socket.State:= SCK_LOCALCLOSING;
                   // remote host closed the conection
-		  Socket.RemoteClose := true; 
+		  Socket.RemoteClose := true;
+                  Socket.AckFlag := True;
 		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK to confirm ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
         end else
         begin
@@ -1358,12 +1382,12 @@ begin
         end else if (TCPHeader.Flags and TCP_RST = TCP_RST) then
         begin
           Socket:= ValidateTCP(IPHeader.SourceIP,SwapWORD(TCPHeader.SourcePort),SwapWORD(TCPHeader.DestPort));
-          // RST shutdown the connection immediately
-          if (Socket <> nil) and (Socket.State <> SCK_CONNECTING) then
-          begin
-            Socket.State:= SCK_CLOSED;
-          end;
           {$IFDEF DebugNetwork} WriteDebug('ip: TCP_RST packet %h, Socket: %h\n', [PtrUInt(Packet), PtrUInt(Socket)]); {$ENDIF}
+          // RST shutdown the connection immediately
+          if (Socket <> nil) then
+          begin
+            ProcessTCPSocket (Socket, Packet);
+          end else
           ToroFreeMem(Packet);
         end;
       end;
@@ -1569,7 +1593,7 @@ begin
   // sender Dispatcher can't send, we have to wait for remote host
   // while The WinFlag is up the timer 'll be refreshed
   // prevent to send packet if remote host has closed the connnection
-  if not (Socket.AckFlag)  or (Socket.RemoteClose){and Socket.WinFlag} then
+  if not (Socket.AckFlag)  {or (Socket.RemoteClose)}{and Socket.WinFlag} then
   begin
     // todo: to implement this correctly 
     //if CheckTimeOut(Socket.WinCounter, Socket.WinTimeOut) then
@@ -1582,7 +1606,7 @@ begin
    //   Socket.WinTimeOut := WAIT_WIN*LocalCPUSpeed*1000;
 	//  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: checking if remote windows was refreshed , Socket %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   //  end;
-  	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h ACK Flag is FALSE\n', [PtrUInt(Socket)]); {$ENDIF} 
+  	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]); {$ENDIF}
     Exit;
   end;
   // the socket doesn't have packets to send
@@ -1655,8 +1679,9 @@ var
   NextSocket: PSocket;
   Service: PNetworkService;
   Socket: PSocket;
-  DoDispatcherFlushPacket: Boolean = true;
+  DoDispatcherFlushPacket: Boolean;
 begin
+  DoDispatcherFlushPacket := true;
   Service := GetCurrentThread.NetworkService; // Get Network Service structure
   NextSocket := Service.ClientSocket; // Get Client queue
   // we will execute a handler for every socket depending of the EVENT
@@ -1910,13 +1935,21 @@ begin
   // we only do a local close
   if Socket.RemoteClose then
   begin
-    // we send the ACKFIN and we wait for ACK
-    Socket.State := SCK_PEER_DISCONNECTED;
-    // we have to wait the ACK of remote host
-    SetSocketTimeOut(Socket, WAIT_ACK);
-    // Send ACKFIN to remote host
-    TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
-    {$IFDEF DebugSocket} WriteDebug('SysSocketClose: RemoteHost has closed, Send FINACK in Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+    // is there something to send?
+    if Socket.BufferSender = nil then
+    begin
+      // we send the ACKFIN and we wait for ACK
+      Socket.State := SCK_PEER_DISCONNECTED;
+      // we have to wait the ACK of remote host
+      SetSocketTimeOut(Socket, WAIT_ACK);
+      // Send ACKFIN to remote host
+      TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
+      {$IFDEF DebugSocket} WriteDebug('SysSocketClose: send FINACK in Socket %h with RemoteClose\n', [PtrUInt(Socket)]); {$ENDIF}
+    end else begin
+      // the dispatcher will flush the buffer sender
+      Socket.DispatcherEvent := DISP_CLOSING;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketClose: Socket %h in DISP_CLOSING with RemoteClose\n', [PtrUInt(Socket)]); {$ENDIF}
+    end;
   end
   // we need to close locally and remotly
   else begin

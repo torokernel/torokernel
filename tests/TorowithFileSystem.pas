@@ -92,8 +92,8 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole('\t /VToroWebServer/n: new connection from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
-  //DebugWrite('ToroWebServer: New connection'#13#10);
+  WriteConsole('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
+  DebugWrite('ToroWebServer: New connection'#13#10);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 20000);
   Result := 0;
@@ -105,14 +105,14 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  //DebugWrite('ToroWebServer: Receiving Data'#13#10);
-  WriteConsole ('\t /VToroWebServer/n: reading from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
+  DebugWrite('ToroWebServer: Receiving Data'#13#10);
+  WriteConsole ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
-  // we send the all file
+  // we send the whole file
   SysSocketSend(Socket, @buff[0], count, 0);
-  //DebugWrite('ToroWebServer: Sending Data'#13#10);
-  WriteConsole ('\t /VToroWebServer/n: sending to %d.%d.%d.%d and closing connection\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
+  DebugWrite('ToroWebServer: Sending Data'#13#10);
+  WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -123,16 +123,16 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole ('\t /VToroWebServer/n: closed from remote host from %d.%d.%d.%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3]]);
+  WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
-  //DebugWrite('ToroWebServer: Closing connection'#13#10);
+  DebugWrite('ToroWebServer: Closing connection'#13#10);
   Result := 0;
 end;
 
  // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('\t /VToroWebServer/n: Socket: %d --> closing for timeout\n',[PtrUInt(Socket)]);
+  WriteConsole ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;

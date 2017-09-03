@@ -717,17 +717,16 @@ begin
 end;
 
 // Get the rdtsc counter
-// Beware of specific code due to qemu x64 which is not handling rdtsc instruction properly
 function read_rdtsc: Int64;
 var
-  lw, hg: DWORD;
-asm
+  l, h: QWORD;
+begin
+  asm
   rdtsc
-  mov lw, eax
-  mov hg, edx
-  mov eax, hg
-  shl rax, 32
-  add eax, lw
+  mov l, eax
+  mov h, edx
+  end;
+  result := QWORD(h shl 32) or l;
 end;
 
 // Next procedures aren't atomic

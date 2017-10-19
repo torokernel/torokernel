@@ -10,6 +10,7 @@
 //
 // Changes :
 //
+// 19 / 10 / 2017 Adding support of irq core affinity
 // 12 / 03 / 2017 v3.
 // 07 / 03 / 2009 v2.
 // 22 / 02 / 2007 v1.
@@ -399,14 +400,14 @@ begin
     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Before RegisterBlockDriver Controller: %d\n', [ControllerNo]); {$ENDIF}
     RegisterBlockDriver(@ATAControllers[ControllerNo].Driver);
     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After RegisterBlockDriver Controller: %d\n', [ControllerNo]); {$ENDIF}
-    // Irq Handlers
-    IrqOn(ATAControllers[ControllerNo].IRQ);
-    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After Irq_On Controller: %d\n', [ControllerNo]); {$ENDIF}
-    CaptureInt(ATAControllers[ControllerNo].IRQ+32, ATAControllers[ControllerNo].IrqHandler);
-    {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After CaptureInt Controller: %d\n', [ControllerNo]); {$ENDIF}
   end;
   {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Done.\n', []); {$ENDIF}
 end;
+
+var
+  ATA0onCPUID: longint;
+
+procedure ATA0IrqDelivery; forward;
 
 // Dedicate Controller to Cpu
 procedure ATADedicate(Driver:PBlockDriver;CPUID: LongInt);
@@ -421,17 +422,79 @@ begin
     // the file descriptor is enqued in a dedicate filesystem
     DedicateBlockFile(@ATAControllers[Driver.Major].Minors[I].FileDesc,CPUID);
     {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: Dedicate Controller %d ,Disk: %q to CPU %d\n', [Int64(ATAControllers[Driver.Major].Minors[I].FileDesc.Minor), Driver.Major, CPUID]); {$ENDIF}
+    // Irq Handlers
+    IrqOn(ATAControllers[Driver.Major].IRQ);
+    if (CPUID <> 0) then
+    begin
+      {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After Irq_On Controller: %d\n', [Driver.Major]); {$ENDIF}
+      // TODO: to change in the case of ATA1
+      ATA0onCPUID := CPUID;
+      CaptureInt(ATAControllers[Driver.Major].IRQ+32, @ATA0IrqDelivery);
+      // 76 is the interruption vector for the ipi
+      CaptureInt(76, ATAControllers[Driver.Major].IrqHandler);
+     {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - After CaptureInt Controller: %d\n', [Driver.Major]); {$ENDIF}
+    end
+    else begin
+      CaptureInt(ATAControllers[Driver.Major].IRQ+32, ATAControllers[Driver.Major].IrqHandler);
+    end;
   end;
 end;
  
 // Irq Handlers only for ATA0 and ATA1 Standart Controllers.
 procedure ATAHandler(Controller: LongInt);
 begin
-  eoi;
+  if GetApicID <> 0 then
+   eoi_apic
+  else
+    eoi;
   ATAControllers[Controller].Driver.WaitOn.State := tsReady;
   {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATA0 Irq Captured, Thread Wake Up: #%h\n', [PtrUInt(ATAControllers[Controller].Driver.WaitOn)]); {$ENDIF}
 end;
 
+
+// Handler to deliver the ATA0 irq to the core in ATA0onCPUID
+procedure ATA0IrqDelivery; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
+asm
+// save registers
+push rbp
+push rax
+push rbx
+push rcx
+push rdx
+push rdi
+push rsi
+push r8
+push r9
+push r13
+push r14
+// protect the stack
+mov r15 , rsp
+mov rbp , r15
+sub r15 , 32
+mov  rsp , r15
+// deliver the irq to the correspondent core
+mov ecx, ATA0onCPUID
+mov edx, 76
+call send_apic_int
+call eoi
+mov rsp , rbp
+// restore the registers
+pop r14
+pop r13
+pop r9
+pop r8
+pop rsi
+pop rdi
+pop rdx
+pop rcx
+pop rbx
+pop rax
+pop rbp
+db $48
+db $cf
+end;
+
+// irq handler used when ATA0 is dedicated to core 0
 procedure ATA0IrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
   {$IFDEF DCC} .noframe {$ENDIF}

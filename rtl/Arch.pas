@@ -147,6 +147,8 @@ procedure PciWriteWord (const bus, device, func, regnum, value: Word);
 function read_portw(port: Word): Word;
 function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 procedure SetPageReadOnly(Add: Pointer);
+procedure send_apic_int (apicid, vector: Byte);
+procedure eoi_apic;
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -185,7 +187,8 @@ const
   timer_curr_reg = apic_base + $390;
   divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
-  
+  svr_reg = apic_base + $f0;
+
   // IDT descriptors
   gate_syst = $8E;
   
@@ -367,6 +370,37 @@ begin
   icrh^ := apicid shl 24 ;
   // mode: init   , destination no shorthand
   icrl^ := $600 or vector;
+end;
+
+// send an IPI(vector) to the core identified by apicid
+procedure send_apic_int (apicid, vector: Byte);
+var
+  icrl, icrh: ^DWORD;
+begin
+  Delay(10);
+  icrl := Pointer(icrlo_reg);
+  icrh := Pointer(icrhi_reg) ;
+  icrh^ := apicid shl 24 ;
+  icrl^ := vector;
+end;
+
+// enable the local apic
+procedure enable_local_apic;
+var
+  svr: ^DWORD;
+begin
+  svr := Pointer(svr_reg);
+  svr^ := svr^ or $100;
+  Delay(10);
+end;
+
+procedure eoi_apic;
+var
+  tmp: ^DWORD;
+begin
+  tmp := Pointer(eoi_reg);
+  tmp^ := 0;
+  Delay(10);
 end;
 
 // It implements atomic compare and change
@@ -1008,7 +1042,7 @@ var
 begin
   CpuID := GetApicID;
   Cores[CPUID].InitConfirmation := True;
-  // Local Kernel Initialization
+  enable_local_apic;
   Cores[CPUID].InitProc;
 end;
 

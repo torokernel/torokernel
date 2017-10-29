@@ -71,12 +71,12 @@
       </Verbosity>
       <WriteFPCLogo Value="False"/>
       <ExecuteBefore>
-        <Command Value="$(CompPath) build.pas"/>
+        <Command Value="$(CompPath) ../builder/build.pas"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="build.exe 4 TorowithFileSystem boot.o TorowithFileSystem.img"/>
+        <Command Value="../builder/build.exe 4 TorowithFileSystem ../builder/boot.o TorowithFileSystem.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

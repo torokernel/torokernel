@@ -1,1 +1,0 @@
---vcpus=2 --ram=512  --graphics vnc --disk path=ToroFiles.img,bus=ide --network=bridge:toro-bridge,model=e1000 

@@ -18,16 +18,16 @@ env:
 before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
-  - chmod +x ./tests/travis.install.py
+  - chmod +x ./examples/travis.install.py
 
 install:
   # Install prerequisites (fpc/lazarus/wine/qemu)
-  - ./tests/travis.install.py
+  - ./examples/travis.install.py
   - /bin/bash -c "sudo apt-get install qemu-system-x86"
 
 script:
   # Build all test projects
-  - lazbuild $LAZ_OPT ./tests/*.lpi               
+  - lazbuild $LAZ_OPT ./examples/*.lpi               
   
 notifications:
   email:

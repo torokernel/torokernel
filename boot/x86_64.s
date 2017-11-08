@@ -182,12 +182,12 @@ read_loop:
   push esi
   call read_sector
   ; moving 512 bytes from low memory to high memory
-  mov ecx ,64
+  mov ecx, 128
   movesector:
-   movq   mm0 , qword[ds:si] 
-   movq  qword[es:edi] ,mm0
-   add edi , 8
-   add esi , 8
+   mov   ebx , dword[ds:si] 
+   mov  dword[es:edi], ebx
+   add edi , 4
+   add esi , 4
    loop movesector
   pop esi
   pop ecx

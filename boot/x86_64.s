@@ -383,6 +383,11 @@ align 8
 main64:
  ; We need to page more memory
  call paging
+ ; Initialize CMOS shutdown code to 0ah
+ mov al, 0fh
+ out 070h, al
+ mov al, 0ah
+ out 071h, al
  ; When the signal INIT is sent, the execution starts in 2000h address 
  mov rsi , 2000h
  mov [rsi] , byte 0eah

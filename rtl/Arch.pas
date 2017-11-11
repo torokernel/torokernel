@@ -356,8 +356,12 @@ begin
 	icrl := Pointer(ApicBase+icrlo_reg);
 	icrh := Pointer(ApicBase+icrhi_reg) ;
 	icrh^ := apicid shl 24 ;
-	// mode: init   , destination no shorthand
-	icrl^ := $500;
+	// INIT or LEVEL or ASSERT
+	icrl^ := $500 or $8000 or $4000;
+        DelayMicro(200);
+        // INIT or LEVEL
+        icrl^ := $500 or $8000;
+        DelayMicro(200);
 end;
 
 // Send the startup IPI for initialize for processor 
@@ -1117,7 +1121,6 @@ begin
   begin
     // wakeup the remote core with IPI-INIT
     send_apic_init(apicid);
-    Delay(10);
     // send the first startup
     send_apic_startup(ApicID, 2);
     Delay(10);
@@ -1465,6 +1468,7 @@ begin
     CaptureInt(I, @Interruption_Ignore);
   EnableInt;
   Now(@StartTime);
+  enable_local_apic;
   SMPInitialization;
   // initialization of Floating Point Unit
   SSEInit;

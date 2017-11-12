@@ -725,6 +725,7 @@ end;
 procedure InitCores;
 var
   I, J: LongInt;
+  Attemps: Longint;
 begin
   WriteConsole('Multicore Initialization ...\n',[]);
   // cleaning all table
@@ -749,8 +750,18 @@ begin
     if not Cores[I].CPUBoot and Cores[I].present then
     begin
       CPU[Cores[I].ApicID].ApicID := Cores[I].ApicID;
-      Cores[I].InitProc := @Scheduling; 
-      InitCore(Cores[I].ApicID); // initialize the CPU
+      Cores[I].InitProc := @Scheduling;
+      // try to initialize the CPU twice
+      for Attemps:= 0 to 1 do
+      begin
+        If not InitCore(Cores[I].ApicID) then
+        begin
+          WriteConsole('Core#%d ... /RHardware Issue\n/n', [Cores[I].ApicID]);
+          break;
+        end;
+        If Cores[I].InitConfirmation then
+         break;
+      end;
       if Cores[I].InitConfirmation then
         WriteConsole('Core#%d ... /VUp\n/n', [Cores[I].ApicID])
       else

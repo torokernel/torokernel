@@ -138,7 +138,7 @@ procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
-procedure InitCore(ApicID: Byte);
+function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
@@ -369,7 +369,6 @@ procedure send_apic_startup(apicid, vector: Byte);
 var
   icrl, icrh: ^DWORD;
 begin
-  Delay(10);
   icrl := Pointer(icrlo_reg);
   icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
@@ -1111,31 +1110,29 @@ end;
 
 // Boot CPU using IPI messages.
 // Warning this procedure must be do it just one time per CPU
-procedure InitCore(ApicID: Byte);
-var
-  Attempt: LongInt;
+function InitCore(ApicID: Byte): Boolean;
 begin
-  // try two times to wake up each core
-  Attempt := 2;
-  while Attempt > 0 do
-  begin
-    // wakeup the remote core with IPI-INIT
-    send_apic_init(apicid);
-    // send the first startup
-    send_apic_startup(ApicID, 2);
-    Delay(10);
-    // remote CPU read the IPI?
+  Result := true;
+  // wakeup the remote core with IPI-INIT
+  // send_apic_init already added some delay
+  send_apic_init(apicid);
+  Delay(10);
+  // send the first startup
+  send_apic_startup(ApicID, 2);
+  Delay(10);
+  // remote CPU read the IPI?
+  if not is_apic_ready then
+  begin // some problem ?? we wait
+    Delay(100);
+    // Serious problem -> exit
     if not is_apic_ready then
-    begin // some problem ?? we wait
-      Delay(100);
-      // Serious problem -> exit
-      if not is_apic_ready then
-        Exit;
+    begin
+     Result := false;
+     Exit;
     end;
-    send_apic_startup(ApicID, 2);
-    Delay(10);
-    Dec(Attempt);
   end;
+  send_apic_startup(ApicID, 2);
+  Delay(10);
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 

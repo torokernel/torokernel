@@ -172,23 +172,23 @@ var
   LocalCpuSpeed: Int64 = 0;
   StartTime: TNow;
   Cores: array[0..MAX_CPU-1] of TCore;
-  ApicBase: Pointer;
 
 implementation
 
 uses Kernel, Console;
 
 const
-  apicid_reg = $20;
-  icrlo_reg = $300;
-  icrhi_reg = $310;
-  err_stat_reg = $280;
-  timer_reg = $320;
-  timer_init_reg = $380;
-  timer_curr_reg = $390;
-  divide_reg = $3e0;
-  eoi_reg = $b0;
-  svr_reg = $f0;
+  Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
+  apicid_reg = apic_base + $20;
+  icrlo_reg = apic_base + $300;
+  icrhi_reg = apic_base + $310;
+  err_stat_reg = apic_base + $280;
+  timer_reg = apic_base + $320;
+  timer_init_reg = apic_base + $380;
+  timer_curr_reg = apic_base + $390;
+  divide_reg = apic_base + $3e0;
+  eoi_reg = apic_base + $b0;
+  svr_reg = apic_base + $f0;
 
   // IDT descriptors
   gate_syst = $8E;
@@ -353,8 +353,8 @@ procedure send_apic_init(apicid: Byte);
 var
 	icrl, icrh: ^DWORD;
 begin
-	icrl := Pointer(ApicBase+icrlo_reg);
-	icrh := Pointer(ApicBase+icrhi_reg) ;
+	icrl := Pointer(icrlo_reg);
+	icrh := Pointer(icrhi_reg) ;
 	icrh^ := apicid shl 24 ;
 	// INIT or LEVEL or ASSERT
 	icrl^ := $500 or $8000 or $4000;
@@ -370,8 +370,8 @@ var
   icrl, icrh: ^DWORD;
 begin
   Delay(10);
-  icrl := Pointer(ApicBase+icrlo_reg);
-  icrh := Pointer(ApicBase+icrhi_reg) ;
+  icrl := Pointer(icrlo_reg);
+  icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
   // mode: init   , destination no shorthand
   icrl^ := $600 or vector;
@@ -383,8 +383,8 @@ var
   icrl, icrh: ^DWORD;
 begin
   Delay(10);
-  icrl := Pointer(ApicBase+icrlo_reg);
-  icrh := Pointer(ApicBase+icrhi_reg) ;
+  icrl := Pointer(icrlo_reg);
+  icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
   icrl^ := vector;
 end;
@@ -394,7 +394,7 @@ procedure enable_local_apic;
 var
   svr: ^DWORD;
 begin
-  svr := Pointer(ApicBase+svr_reg);
+  svr := Pointer(svr_reg);
   svr^ := svr^ or $100;
   Delay(10);
 end;
@@ -403,7 +403,7 @@ procedure eoi_apic;
 var
   tmp: ^DWORD;
 begin
-  tmp := Pointer(ApicBase+eoi_reg);
+  tmp := Pointer(eoi_reg);
   tmp^ := 0;
   Delay(10);
 end;
@@ -425,7 +425,7 @@ end;
 // Get local Apic id
 function GetApicID: Byte; inline;
 begin
-  Result := PDWORD(ApicBase + apicid_reg)^ shr 24;
+  Result := PDWORD(apicid_reg)^ shr 24;
 end;
 
 // Get the apic base address
@@ -451,7 +451,7 @@ function is_apic_ready: Boolean;{$IFDEF ASMINLINE} inline; {$ENDIF}
 var
   r: PDWORD;
 begin
-  r := Pointer(ApicBase+icrlo_reg) ;
+  r := Pointer(icrlo_reg) ;
   if (r^ and $1000) = 0 then
     Result := True
   else
@@ -471,17 +471,17 @@ procedure Delay(ms: LongInt);
 var
   tmp : ^DWORD ;
 begin
-  tmp := Pointer (ApicBase+divide_reg);
+  tmp := Pointer (divide_reg);
   tmp^ := $b;
-  tmp := Pointer(ApicBase+timer_init_reg); // set the count
+  tmp := Pointer(timer_init_reg); // set the count
   tmp^ := (LocalCpuSpeed * 1000)*ms; // the count is aprox.
-  tmp := Pointer (ApicBase+timer_curr_reg); // wait for the counter
+  tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
     NOP;
   end;
   // send the end of interruption
-  tmp := Pointer(ApicBase+eoi_reg);
+  tmp := Pointer(eoi_reg);
   tmp^ := 0;
 end;
 
@@ -491,17 +491,17 @@ procedure DelayMicro(microseg: LongInt);
 var
   tmp : ^DWORD ;
 begin
-  tmp := Pointer (ApicBase+divide_reg);
+  tmp := Pointer (divide_reg);
   tmp^ := $b;
-  tmp := Pointer(ApicBase+timer_init_reg); // set the count
+  tmp := Pointer(timer_init_reg); // set the count
   tmp^ := LocalCpuSpeed*microseg; // the count is aprox.
-  tmp := Pointer (ApicBase+timer_curr_reg); // wait for the counter
+  tmp := Pointer (timer_curr_reg); // wait for the counter
   while tmp^ <> 0 do
   begin
     NOP;
   end;
   // send the end of interruption
-  tmp := Pointer(ApicBase+eoi_reg);
+  tmp := Pointer(eoi_reg);
   tmp^ := 0;
 end;
 
@@ -1456,7 +1456,6 @@ begin
   MemoryCounterInit;
   // cache Page structures
   CacheManagerInit;
-  ApicBase := GetApicBaseAddr;
   // CPU speed in Mhz
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
   IrqOn(2);

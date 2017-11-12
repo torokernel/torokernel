@@ -502,14 +502,12 @@ function TCP_Checksum(SourceIP, DestIp: TIPAddress; PData: PChar; Len: Word): WO
 var
   PseudoHeader: TPseudoHeader;
 begin
-  // Setup psueudo-header
   FillChar(PseudoHeader, SizeOf(PseudoHeader), 0);
   PseudoHeader.SourceIP := SourceIP;
   PseudoHeader.TargetIP := DestIP;
   PseudoHeader.TCPLen := Swap(Word(Len));
   PseudoHeader.Cero := 0;
   PseudoHeader.Protocol := IP_TYPE_TCP;
-  // Calculate the checksum
   TCP_Checksum := CalculateChecksum(@PseudoHeader,PData,Len, SizeOf(PseudoHeader));
 end;
 

@@ -752,11 +752,11 @@ begin
       Cores[I].InitProc := @Scheduling; 
       InitCore(Cores[I].ApicID); // initialize the CPU
       if Cores[I].InitConfirmation then
-        WriteConsole('Core#%d ... /VRunning\n/n', [Cores[I].ApicID])
+        WriteConsole('Core#%d ... /VUp\n/n', [Cores[I].ApicID])
       else
-        WriteConsole('Core#%d ... /RFault\n/n', [Cores[I].ApicID]);
+        WriteConsole('Core#%d ... /RDown\n/n', [Cores[I].ApicID]);
     end else if Cores[I].CPUBoot then
-      WriteConsole('Core#0 ... /VRunning\n/n',[]);
+      WriteConsole('Core#0 ... /VUp\n/n',[]);
   end;
 end;
 

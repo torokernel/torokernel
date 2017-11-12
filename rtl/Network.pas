@@ -1543,12 +1543,12 @@ begin
       _IPAddress(IP, Network.IpAddress);
       _IPAddress(Gateway, Network.Gateway);
       _IPAddress(Mask, Network.Mask);
-      WriteConsole('Network configuration :\n', []);
-      WriteConsole('Local IP  ... /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
+      WriteConsole('Network configuration:\n', []);
+      WriteConsole('Local IP: /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
 	  (Network.Ipaddress shr 8) and $ff, (Network.Ipaddress shr 16) and $ff, (Network.Ipaddress shr 24) and $ff ]);
-      WriteConsole('/nGateway   ... /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
+      WriteConsole('/nGateway: /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
 	  (Network.Gateway shr 8) and $ff, (Network.Gateway shr 16) and $ff, (Network.Gateway shr 24) and $ff ]);
-	  WriteConsole('/nMask      ... /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
+	  WriteConsole('/nMask: /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
 	  (Network.Mask shr 8) and $ff, (Network.Mask shr 16) and $ff, (Network.Mask shr 24) and $ff ]);
       {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: New Driver dedicated to CPU#%d\n', [CPUID]); {$ENDIF}
       Exit;

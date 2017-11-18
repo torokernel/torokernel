@@ -10,8 +10,8 @@
 {$ENDIF}
 //{$DEFINE cpui386}
 //{$DEFINE CPUX86_64}
-{$DEFINE DEBUG}
-{$DEFINE DebugCrash}
+//{$DEFINE DEBUG}
+//{$DEFINE DebugCrash}
 //{$DEFINE DebugArch}
 //{$DEFINE DebugFS}
 //{$DEFINE DebugMemory}
@@ -22,10 +22,6 @@
 //{$DEFINE DebugSocket}
 //{$DEFINE DebugNe2000}
 
-{$MACRO ON}
-
-// Macros to handle interruptions
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
+// Architecture dependent macros
+{$I Arch.inc}
 

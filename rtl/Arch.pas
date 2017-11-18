@@ -118,7 +118,6 @@ function GetApicID: Byte;
 function GetApicBaseAddr: pointer;
 function get_irq_master: Byte;
 function get_irq_slave: Byte;
-procedure hlt;
 procedure IrqOn(irq: Byte);
 procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
@@ -150,6 +149,8 @@ function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 procedure SetPageReadOnly(Add: Pointer);
 procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
+procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
+procedure mwait(ext: DWORD; hint: DWORD);
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -172,6 +173,8 @@ var
   LocalCpuSpeed: Int64 = 0;
   StartTime: TNow;
   Cores: array[0..MAX_CPU-1] of TCore;
+  LargestMonitorLine: longint;
+  SmallestMonitorLine: longint;
 
 implementation
 
@@ -411,13 +414,10 @@ end;
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
 @spin:
-  nop
-  nop
-  nop
-  nop
   mov rax, cmpval
   {$IFDEF LINUX} lock cmpxchg [rdx], rsi {$ENDIF}
   {$IFDEF WINDOWS} lock cmpxchg [r8], rdx {$ENDIF}
+  pause
   jnz @spin
 end;
 
@@ -756,12 +756,6 @@ asm
   end;
 
   result := speed;
-end;
-
-// Stop the execution of CPU
-procedure hlt; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm
-  hlt
 end;
 
 // Turn off Qemu VM
@@ -1440,6 +1434,34 @@ begin
   FlushCr3;
 end;
 
+
+// NOTE: addr must be set as a write-back memory
+procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);assembler;
+asm
+  mov rax, addr
+  mov ecx, ext
+  mov edx, hint
+  monitor
+end;
+
+// NOTE: processor has to support mwait/monitor instrucctions
+procedure mwait(ext: DWORD; hint: DWORD);assembler;
+asm
+  mov ecx, ext
+  mov eax, hint
+  mwait
+end;
+
+procedure MWaitInit;
+begin
+  asm
+    mov eax, 05h
+    cpuid
+    mov LargestMonitorLine, ebx
+    mov SmallestMonitorLine, eax
+  end;
+end;
+
 // Architecture's variables initialization
 procedure ArchInit;
 var
@@ -1468,6 +1490,7 @@ begin
   SMPInitialization;
   // initialization of Floating Point Unit
   SSEInit;
+  MWaitInit;
 end;
 
 end.

@@ -164,6 +164,7 @@ const
   HasCacheHandler: Boolean = True;
   HasException: Boolean = True;
   HasFloatingPointUnit : Boolean = True;
+  INTER_CORE_IRQ = 80;
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
@@ -971,6 +972,13 @@ asm
   db $48, $cf
 end;
 
+procedure Apic_IRQ_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
+asm
+  call eoi_apic
+  db $48, $cf
+end;
+
+
 // PCI bus access
 const
  PCI_CONF_PORT_INDEX = $CF8;
@@ -1055,9 +1063,9 @@ procedure boot_confirmation;
 var
   CpuID: Byte;
 begin
+  enable_local_apic;
   CpuID := GetApicID;
   Cores[CPUID].InitConfirmation := True;
-  enable_local_apic;
   Cores[CPUID].InitProc;
 end;
 
@@ -1434,24 +1442,48 @@ begin
   FlushCr3;
 end;
 
+//
+// Monitor/MWait Support
+//
 
 // NOTE: addr must be set as a write-back memory
-procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);assembler;
-asm
-  mov rax, addr
-  mov ecx, ext
-  mov edx, hint
-  monitor
+procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
+begin
+If LargestMonitorLine <> 0 then
+begin
+  asm
+   mov rax, addr
+   mov ecx, ext
+   mov edx, hint
+   monitor
+  end;
+end;
 end;
 
 // NOTE: processor has to support mwait/monitor instrucctions
-procedure mwait(ext: DWORD; hint: DWORD);assembler;
+procedure mwait(ext: DWORD; hint: DWORD);
+begin
+If LargestMonitorLine <> 0 then
+begin
 asm
   mov ecx, ext
   mov eax, hint
   mwait
+end
+// halt if mwait is not supported
+end
+ else
+ begin
+  asm
+   hlt
+  end;
+end;
+  asm
+  hlt
+  end;
 end;
 
+// Check if Monitor/MWait is supported
 procedure MWaitInit;
 begin
   asm
@@ -1484,11 +1516,11 @@ begin
   // CPU Exceptions
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
+  CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
   Now(@StartTime);
   enable_local_apic;
   SMPInitialization;
-  // initialization of Floating Point Unit
   SSEInit;
   MWaitInit;
 end;

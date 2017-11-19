@@ -101,6 +101,7 @@ type
   // each CPU has this entry
   TCPU = record 
     ApicID: LongInt;
+    Idle: Boolean;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
@@ -733,7 +734,8 @@ begin
   begin
     CPU[I].ApicID := 0 ;
     CPU[I].CurrentThread := nil;
-    CPU[I].Threads :=nil;
+    CPU[I].Threads := nil;
+    CPU[I].Idle:= false;
     for J := 0 to Max_CPU-1 do
     begin
       CPU[I].MsgsToBeDispatched[J] := nil;
@@ -1079,6 +1081,9 @@ begin
     begin
       CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] := CurrentCPU.MsgsToBeDispatched[RemoteCpuID];
       CurrentCPU.MsgsToBeDispatched[RemoteCpuID]:= nil;
+      // wake up cpu
+      if CPU[RemoteCpuID].Idle then
+         send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
       {$IFDEF DebugProcessEmigrating} WriteDebug('Emigrating - Switch Threads of DispatchArray[%d] to EmigrateArray[%d]\n', [CurrentCPU.ApicID, RemoteCpuID]); {$ENDIF}
     end;
   end;
@@ -1094,13 +1099,17 @@ begin
   CurrentCPU := @CPU[GetApicID];
   while True do
   begin
-    // in the first moment I am here
+    // go to save-power state if queue is empty
     if CurrentCPU.Threads = nil then
     begin
-	  {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
-      // spin of init
+      {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
       while CurrentCPU.Threads = nil do
-    		Inmigrating(CurrentCPU);
+      begin
+        CurrentCPU.Idle := true;
+        hlt;
+        CurrentCPU.Idle := false;
+        Inmigrating(CurrentCPU);
+      end;
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
       {$IFDEF DebugProcess} WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp)]); {$ENDIF}
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);

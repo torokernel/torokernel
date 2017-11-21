@@ -1062,6 +1062,9 @@ begin
        RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
        // wake up the parent
        RemoteMsgs.Parent.state := tsReady;
+       // wake up cpu
+       if CPU[RemoteCpuID].Idle then
+          send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
        RemoteMsgs := RemoteMsgs.Next;
       end;      
       CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] := nil;
@@ -1128,13 +1131,21 @@ begin
       begin
         // the device has completed its operation -> Candidate thread is ready to continue its process
         Candidate.State:= tsReady;
-				Break;
+	Break;
       end else begin
     	Candidate := Candidate.Next;
       end;
     until Candidate = CurrentThread;
+    //
+    // halt the core if there is no ready thread
+    // a irq must wake it up
     if Candidate.State <> tsReady then
+    begin
+      CurrentCPU.Idle := true;
+      hlt;
+      CurrentCPU.Idle := false;
       Continue;
+    end;
     CurrentCPU.CurrentThread := Candidate;
     {$IFDEF DebugProcess}WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(Candidate.ret_thread_sp)]);{$ENDIF}
     if Candidate = CurrentThread then

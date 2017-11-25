@@ -289,6 +289,11 @@ procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 var
   DedicateNetworks: array[0..MAX_CPU-1] of TNetworkDedicate;
   NetworkInterfaces: PNetworkInterface = nil;
@@ -1437,9 +1442,12 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch;
+      SysThreadSwitch(true);
       Continue;
     end;
+    // reset idle time counter
+    GetCurrentThread.IdleTime := 0;
+    GetCurrentThread.state :=tsReady;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1783,11 +1791,23 @@ end;
 
 // Do all internal job of service
 function DoNetworkService(Handler: PNetworkHandler): LongInt;
+var
+  Service: PNetworkService;
 begin
-  Handler.DoInit; // Initilization of Service
+  Handler.DoInit;
   {$IFDEF DebugSocket} WriteDebug('DoNetworkService: DoInit in Handler: %h\n', [PtrUInt(Handler)]); {$ENDIF} 
   while True do
   begin
+    Service := GetCurrentThread.NetworkService;
+    if (Service.ClientSocket = nil) then
+    begin
+      // this tells the scheduler that the thread is doing idle work
+      SysThreadSwitch(true);
+      Continue;
+    end;
+    // reset idle time
+    GetCurrentThread.IdleTime := 0;
+    GetCurrentThread.state :=tsReady;
     NetworkDispatcher(Handler); // Fetch event for socket and dispatch
     SysThreadSwitch;
   end;

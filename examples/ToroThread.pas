@@ -31,7 +31,6 @@
 
 program ToroThread;
 
-
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
@@ -45,20 +44,16 @@ program ToroThread;
 {$ENDIF}
 {%RunFlags BUILD-}
 
-
-
-
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
 uses
-  Kernel in 'rtl\Kernel.pas',
-  Process in 'rtl\Process.pas',
-  Memory in 'rtl\Memory.pas',
-  Debug in 'rtl\Debug.pas',
-  Arch in 'rtl\Arch.pas',
-  Filesystem in 'rtl\Filesystem.pas',
-  Console in 'rtl\Drivers\Console.pas';
-
+  Kernel in '..\rtl\Kernel.pas',
+  Process in '..\rtl\Process.pas',
+  Memory in '..\rtl\Memory.pas',
+  Debug in '..\rtl\Debug.pas',
+  Arch in '..\rtl\Arch.pas',
+  Filesystem in '..\rtl\Filesystem.pas',
+  Console in '..\rtl\Drivers\Console.pas';
 
 var
  tmp: TThreadID;

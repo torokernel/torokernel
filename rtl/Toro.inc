@@ -22,6 +22,3 @@
 //{$DEFINE DebugSocket}
 //{$DEFINE DebugNe2000}
 
-// Architecture dependent macros
-{$I Arch.inc}
-

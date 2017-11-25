@@ -57,6 +57,12 @@ const
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
+
 const
     CHAR_CODE : array [1..57] of XChar =
    ('0','1','2','3','4','5','6','7','8','9','0','?','=','0',' ','q','w',

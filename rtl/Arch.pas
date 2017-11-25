@@ -151,6 +151,7 @@ procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
 procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
 procedure mwait(ext: DWORD; hint: DWORD);
+procedure hlt; assembler;
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -180,6 +181,11 @@ var
 implementation
 
 uses Kernel, Console;
+
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
 
 const
   Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
@@ -938,10 +944,6 @@ begin
 end;
 
 {$IFDEF FPC}
-procedure nolose; [public, alias: 'FPC_ABSMASK_DOUBLE'];
-begin
-end;
-
 procedure nolose2; [public, alias: 'FPC_EMPTYINTF'];
 begin
 end;
@@ -955,8 +957,6 @@ procedure nolose4;  [public, alias: 'FPC_DONEEXCEPTION'];
 begin
 
 end;
-
-
 {$ENDIF}
 
 // Procedures to capture unhandle interruptions
@@ -1492,6 +1492,11 @@ begin
     mov LargestMonitorLine, ebx
     mov SmallestMonitorLine, eax
   end;
+end;
+
+procedure hlt;assembler;
+asm
+  hlt
 end;
 
 // Architecture's variables initialization

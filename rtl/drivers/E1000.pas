@@ -42,6 +42,11 @@ uses
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 type
   PE1000 = ^TE1000;
   PE1000RxDesc = ^TE1000RxDesc;

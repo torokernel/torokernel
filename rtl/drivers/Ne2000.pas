@@ -47,6 +47,11 @@ implementation
 
 {$IFDEF DebugNe2000} uses Debug; {$ENDIF}
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 type
   PNe2000 = ^TNe2000;
   TNe2000 = record

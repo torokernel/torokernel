@@ -39,8 +39,6 @@ program ToroHello;
 {$ENDIF}
 {%RunFlags BUILD-}
 
-{$I ../rtl/Arch.inc}
-
 // They are declared just the necessary units
 // The needed units depend on the hardware where you are running the application
 uses

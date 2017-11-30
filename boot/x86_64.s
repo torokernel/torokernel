@@ -105,7 +105,8 @@ start:
   mov es , ax
   
   ; Return to "Unreal-Mode"
-  and al,0xFE     
+  mov eax, cr0
+  and al, 0xFE     
   mov  cr0, eax 
   sti
   

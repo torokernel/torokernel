@@ -1446,13 +1446,8 @@ begin
       Continue;
     end else
     begin
-      // reset idle time counter
-      if (GetCurrentThread.State = tsIdle) then
-      begin
-        GetCurrentThread.IdleTime := 0;
-        GetCurrentThread.state := tsReady;
-        GetCurrentThread.CPU.PollingThreadCount -=1 ;
-      end;
+      // reset idle counter
+      SysThreadActive;
     end;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
@@ -1804,20 +1799,16 @@ begin
   {$IFDEF DebugSocket} WriteDebug('DoNetworkService: DoInit in Handler: %h\n', [PtrUInt(Handler)]); {$ENDIF} 
   while True do
   begin
-    NetworkDispatcher(Handler); // Fetch event for socket and dispatch
+    // Fetch events for socket and dispatch
+    NetworkDispatcher(Handler);
     Service := GetCurrentThread.NetworkService;
     if (Service.ClientSocket = nil) then
     begin
       SysThreadSwitch (True);
     end else
     begin
-     if (GetCurrentThread.State = tsIdle) then
-     begin
-      GetCurrentThread.IdleTime := 0;
-      GetCurrentThread.state := tsReady;
-      GetCurrentThread.CPU.PollingThreadCount -=1 ;
-     end;
-     SysThreadSwitch;
+      // reset idle counter
+      SysThreadSwitch;
     end;
   end;
   Result := 0;

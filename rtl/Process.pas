@@ -149,7 +149,7 @@ function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch(const Idle: Boolean = False);
 procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString);
-procedure RegisterPollingThread;
+procedure SysThreadActive;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -796,22 +796,15 @@ end;
 //------------------------------------------------------------------------------
 
 
-procedure RegisterPollingThread;
-var
-  CPU: PCPU;
-  Thread: PThread;
+// reset idle counter
+procedure SysThreadActive;
 begin
-  Thread := GetCurrentThread;
-  CPU := Thread.CPU;
-  Inc(CPU.PollingThreadTotal);
-  if CPU.PollingThreads = nil then
+  if (GetCurrentThread.State = tsIdle) then
   begin
-    CPU.PollingThreads := Thread;
-    CPU.PollingThreadsTail:= Thread;
-    Exit;
+    GetCurrentThread.IdleTime := 0;
+    GetCurrentThread.state := tsReady;
+    GetCurrentThread.CPU.PollingThreadCount -=1 ;
   end;
-  CPU.PollingThreadsTail.NextPollingThread := Thread;
-  CPU.PollingThreadsTail := Thread;
 end;
 
 // Adds a thread to ready task queue
@@ -1356,6 +1349,10 @@ begin
           end;
         end;
      end;
+  end else
+  begin
+   {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread is active\n', []); {$ENDIF}
+   SysThreadActive;
   end;
   Scheduling(nil);
   // checking kill flag

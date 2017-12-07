@@ -146,7 +146,7 @@ procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
-procedure SysThreadSwitch(const Idle: Boolean = false);
+procedure SysThreadSwitch(const Idle: Boolean = False);
 procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString);
 procedure RegisterPollingThread;
@@ -749,7 +749,7 @@ begin
     CPU[I].ApicID := 0 ;
     CPU[I].CurrentThread := nil;
     CPU[I].Threads := nil;
-    CPU[I].Idle:= false;
+    CPU[I].Idle:= False;
     CPU[I].PollingThreads := nil;
     CPU[I].PollingThreadsTail := nil;
     CPU[I].PollingThreadCount:= 0;
@@ -851,7 +851,7 @@ begin
   Thread.Previous := nil;
 end;
 
-// Enqueu a New Msg to emigrate array
+// Enqueue a New Msg to emigrate array
 procedure AddThreadMsg(Msg: PThreadCreateMsg);
 var
   ApicID: LongInt;
@@ -926,7 +926,7 @@ begin
     NewThread.StackSize := StackSize;
     NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
     NewThread.sleep_rdtsc := 0;
-    NewThread.FlagKill := false;
+    NewThread.FlagKill := False;
     NewThread.State := tsReady;
     NewThread.StartArg := Arg; // this argument we will read by thread main
     NewThread.ThreadFunc := ThreadFunction;
@@ -935,7 +935,7 @@ begin
     NewThread.ThreadID := TThreadID(NewThread);
     NewThread.CPU := @CPU[CPUID];
     NewThread.Parent :=  GetCurrentThread;
-    NewThread.IsPollThread := false;
+    NewThread.IsPollThread := False;
     NewThread.NextPollingThread:= nil;
     NewThread.IdleTime:= 0;
     // when executing ret_to_thread  this stack is pushed in esp register
@@ -1150,7 +1150,7 @@ var
   CurrentThread, Th: PThread;
   NextTurnHalt: Boolean;
 begin
-  NextTurnHalt:= false;
+  NextTurnHalt:= False;
   CurrentCPU := @CPU[GetApicID];
 
   while True do
@@ -1163,7 +1163,7 @@ begin
       begin
         CurrentCPU.Idle := True;
         hlt;
-        CurrentCPU.Idle := false;
+        CurrentCPU.Idle := False;
         Inmigrating(CurrentCPU);
       end;
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
@@ -1209,7 +1209,7 @@ begin
         {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
         CurrentCPU.Idle := True;
         hlt;
-        CurrentCPU.Idle := false;
+        CurrentCPU.Idle := False;
         {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
         // when we wake up, we set all polling threads in ready state
         Th := CurrentCPU.PollingThreads;
@@ -1228,8 +1228,8 @@ begin
       begin
         CurrentCPU.Idle := True;
         hlt;
-        CurrentCPU.Idle := false;
-        NextTurnHalt:= false;
+        CurrentCPU.Idle := False;
+        NextTurnHalt:= False;
       end else
       begin
          DelayMicro(50);
@@ -1238,7 +1238,7 @@ begin
       Continue;
     end;
     end;
-    NextTurnHalt:= false;
+    NextTurnHalt:= False;
     CurrentCPU.CurrentThread := Candidate;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate),Candidate.State,PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
@@ -1311,7 +1311,7 @@ begin
 end;
 
 // The current thread is remaining in tq_ready tail and the next thread is scheduled
-procedure SysThreadSwitch(const Idle: Boolean = false);
+procedure SysThreadSwitch(const Idle: Boolean = False);
 var
  idletime: Int64;
  tmp: PCPU;

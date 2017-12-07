@@ -194,7 +194,7 @@ begin
   if bh=nil then
   begin
    {$IFDEF DebugExt2FS} WriteDebug('Ext2WriteSuper: GetBlock has failed\n', []); {$ENDIF}
-    Result:= false;
+    Result:= False;
     Exit;
   end;
   SuperExt2:= bh.data;
@@ -420,7 +420,7 @@ begin
     CTime:= ATime;
     DTime:= 0;
     Mode:= cache_mode;
-    Dirty:= false;
+    Dirty:= False;
   end;
 
   // cleaning entries
@@ -656,7 +656,7 @@ do_inode:
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: new Inode created: %d\n', [nr_inode]); {$ENDIF}
   // we ensure the Inode is written
   Ext2WriteInode(Inode);
-  Inode.Dirty:= false;
+  Inode.Dirty:= False;
   Result := NInode;
 end;
 
@@ -717,7 +717,7 @@ begin
   InoInfo.block_group:= block_group;
   InoInfo.blocks:= raw_inode.blocks;
   InoInfo.links_count:= raw_inode.links_count;
-  Inode.Dirty:= false;
+  Inode.Dirty:= False;
   Inode.ATime:= Raw_Inode.atime;
   Inode.CTime:= raw_Inode.ctime;
   Inode.DTime:= raw_Inode.dtime;
@@ -752,7 +752,7 @@ var
   prev_rec_len: word;
 begin
   InoInfo := Ino.InoInfo;
-  Result := false;
+  Result := False;
   last_i := Ino.Size div Ino.SuperBlock.BlockSize;
   if (last_i > 12) then
   begin
@@ -825,7 +825,7 @@ var
   prev_rec_len: word;
 begin
   InoInfo := Ino.InoInfo;
-  Result := false;
+  Result := False;
   last_i := Ino.Size div Ino.SuperBlock.BlockSize;
   if (last_i > 12) then
   begin
@@ -897,7 +897,7 @@ var
   entry: P_Ext2_Dir_Entry;
 begin
   InoInfo := Ino.InoInfo;
-  Result := false;
+  Result := False;
   if not (AddFreeBlocktoInode(Ino, 1)) then
   begin
     {$IFDEF DebugFS} WriteDebug('InitializeInodeDir: error when adding free block to inode\n', []); {$ENDIF}
@@ -1048,7 +1048,7 @@ begin
     // error in read operations
     if bh = nil then
     begin
-      Result:=false;
+      Result:=False;
       Exit;
     end;
     buffer := bh.data;
@@ -1058,7 +1058,7 @@ begin
     Result:=True;
     // More Blocks are not supported
   end else
-    Result := false;
+    Result := False;
 end;
 
 // AddFreeBlockToInode
@@ -1093,7 +1093,7 @@ begin
   if (gdp^[desc].free_blocks_count = 0) then
   begin
     {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode: no more free blocks for Inode: %d\n', [Inode.ino]); {$ENDIF}
-    Result:= false;
+    Result:= False;
   end;
 
   {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode: free_blocks_count is %d\n', [gdp^[desc].free_blocks_count]); {$ENDIF}
@@ -1140,7 +1140,7 @@ begin
       PutBlock(Inode.SuperBlock.BlockDevice, bh);
       end;
       {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode: no enough space for indirect block\n', []); {$ENDIF}
-      Result := false;
+      Result := False;
       exit;
   end;
   do_direct:
@@ -1167,7 +1167,7 @@ begin
             end else
             begin
                  {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode:  Fail to add block to Inode\n', []); {$ENDIF}
-                 Result := false;
+                 Result := False;
                  Exit;
             end;
             Inode.Dirty := True;
@@ -1196,7 +1196,7 @@ begin
       end;
       PutBlock(Inode.SuperBlock.BlockDevice, bh);
   end;
-Result:= false;
+Result:= False;
 end;
 
 //

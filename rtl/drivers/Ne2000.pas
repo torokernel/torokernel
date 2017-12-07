@@ -179,7 +179,7 @@ begin
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
   begin
-   net.OutgoingPackets := Packet; // Enqueue the packet
+   net.OutgoingPackets := Packet; // Enqueuee the packet
    {$IFDEF DebugNe2000}
      if (Net.OutgoingPacketTail <> nil) then
      begin
@@ -300,8 +300,8 @@ begin
       Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
       Packet.Size := Len;
       Packet.Next := nil;
-      Packet.Ready := false;
-      Packet.Delete := false;
+      Packet.Ready := False;
+      Packet.Delete := False;
       Data := Packet.Data;
       WritePort(Len, Net.iobase+REMOTEBYTECOUNT0);
       WritePort(Len shr 8, Net.iobase+REMOTEBYTECOUNT1);
@@ -317,7 +317,7 @@ begin
         Net.NextPacket := PSTART
       else
         Net.NextPacket := Next;
-      EnqueueIncomingPacket(Packet);
+      EnqueueeIncomingPacket(Packet);
     end;
     if Net.NextPacket = PSTART then
       WritePort(PSTOP-1, Net.iobase+BOUNDARY)

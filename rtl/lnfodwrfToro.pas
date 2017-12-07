@@ -168,7 +168,7 @@ var
   p: ^longint;
 begin
   // False by default
-  OpenDwarf:=false;
+  OpenDwarf:=False;
 
   // Empty so can test if GetModuleByAddr has worked
   filename := '';
@@ -254,8 +254,8 @@ begin
 end;
 
 { Reads the next size bytes into dest. Returns True if successful,
-  false otherwise. Note that dest may be partially overwritten after
-  returning false. }
+  False otherwise. Note that dest may be partially overwritten after
+  returning False. }
 function ReadNext(var dest; size : SizeInt) : Boolean;
 var
   bytesread, totalread : SizeInt;
@@ -412,12 +412,12 @@ begin
     line := 1;
     column := 0;
     is_stmt := aIs_Stmt;
-    basic_block := false;
-    end_sequence := false;
-    prolouge_end := false;
-    epilouge_begin := false;
+    basic_block := False;
+    end_sequence := False;
+    prolouge_end := False;
+    epilouge_begin := False;
     isa := 0;
-    append_row := false;
+    append_row := False;
   end;
 end;
 
@@ -539,7 +539,7 @@ begin
   prev_file := 0;
   first_row := True;
 
-  found := false;
+  found := False;
 
   ReadNext(temp_length, sizeof(temp_length));
   if (temp_length <> $ffffffff) then begin
@@ -634,9 +634,9 @@ begin
         end;
       end;
       DW_LNS_COPY : begin
-        state.basic_block := false;
-        state.prolouge_end := false;
-        state.epilouge_begin := false;
+        state.basic_block := False;
+        state.prolouge_end := False;
+        state.epilouge_begin := False;
         state.append_row := True;
         DEBUG_WRITELN('DW_LNS_COPY');
       end;
@@ -698,9 +698,9 @@ begin
           lineIncrement := header64.line_base + (adjusted_opcode mod header64.line_range);
           inc(state.line, lineIncrement);
           //WriteConsole('Special opcode %d, address increment: %d, new line: %d\n', [opcode, addrIncrement, lineIncrement]);
-          state.basic_block := false;
-          state.prolouge_end := false;
-          state.epilouge_begin := false;
+          state.basic_block := False;
+          state.prolouge_end := False;
+          state.epilouge_begin := False;
           state.append_row := True;
         end;
       end;
@@ -716,7 +716,7 @@ begin
       if (first_row) then begin
         if (state.address > addr) then
           break;
-        first_row := false;
+        first_row := False;
       end;
 
       { when we have found the address we need to return the previous
@@ -733,7 +733,7 @@ begin
           prev_line := state.line;
         end;
 
-      state.append_row := false;
+      state.append_row := False;
       if (state.end_sequence) then begin
         InitStateRegisters(state, header64.default_is_stmt);
         first_row := True;
@@ -759,8 +759,8 @@ var
 begin
   func := '';
   source := '';
-  found := false;
-  GetLineInfo:=false;
+  found := False;
+  GetLineInfo:=False;
 
   if not OpenDwarf(pointer(addr)) then
     exit;
@@ -787,7 +787,7 @@ var
   Success : boolean;
 begin
   { reset to prevent infinite recursion if problems inside the code }
-  Success:=false;
+  Success:=False;
   Store := BackTraceStrFunc;
   BackTraceStrFunc := @SysBackTraceStr;
   Success:=GetLineInfo(ptruint(addr), func, source, line);

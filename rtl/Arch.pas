@@ -792,7 +792,7 @@ asm
   {$IFDEF WINDOWS} bt  [rcx], rdx {$ENDIF}
   {$IFDEF LINUX} bt [rdi], rsi {$ENDIF}
   jc  @True
-  @false:
+  @False:
    mov rax , 0
    jmp @salir
   @True:
@@ -1129,7 +1129,7 @@ begin
     // Serious problem -> exit
     if not is_apic_ready then
     begin
-     Result := false;
+     Result := False;
      Exit;
     end;
   end;

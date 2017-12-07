@@ -1440,7 +1440,7 @@ const
   StdErrorHandle  = 2;
 
   FileNameCaseSensitive : boolean = True;
-  CtrlZMarksEOF: boolean = false; 
+  CtrlZMarksEOF: boolean = False; 
 
   sLineBreak = LineEnding;
   DefaultTextLineBreakStyle : TTextLineBreakStyle = tlbsLF;
@@ -3154,7 +3154,7 @@ function fpc_set_unset_byte(const source: fpc_normal_set; b : byte): fpc_normal_
    var
     i: integer;
    begin
-     fpc_set_comp_sets:= false;
+     fpc_set_comp_sets:= False;
      for i:=0 to 7 do
        if set1[i] <> set2[i] then
          exit;
@@ -3172,7 +3172,7 @@ function fpc_set_unset_byte(const source: fpc_normal_set; b : byte): fpc_normal_
  var
   i : integer;
  begin
-   fpc_set_contains_sets:= false;
+   fpc_set_contains_sets:= False;
    for i:=0 to 7 do
      if (set1[i] and not set2[i]) <> 0 then
        exit;
@@ -3524,7 +3524,7 @@ begin
   while (code<=length(s)) and (s[code] in [' ',#9]) do
    inc(code);
 {Sign}
-  negativ:=false;
+  negativ:=False;
   case s[code] of
    '-' : begin
            negativ:=True;
@@ -3973,7 +3973,7 @@ end;}
            HandleErrorFrame(200,get_frame);
          { can the fpu do the work? }
            begin
-              sign:=false;
+              sign:=False;
               if z<0 then
                 begin
                    sign:=not(sign);
@@ -4020,7 +4020,7 @@ end;}
            end
          else
            begin
-             signed:=false;
+             signed:=False;
              zq:=z;
            end;
          r:=zq mod nq;
@@ -4045,7 +4045,7 @@ end;}
       begin
         fpc_mul_qword:=0;
         bitpos:=1;
-        f1overflowed:=false;
+        f1overflowed:=False;
 
         for l:=0 to 63 do
           begin
@@ -4078,7 +4078,7 @@ end;}
 
       begin
            begin
-              sign:=false;
+              sign:=False;
               if f1<0 then
                 begin
                    sign:=not(sign);
@@ -5459,7 +5459,7 @@ end;
                   end;
                 vmt:=pclass(pointer(vmt)+vmtParent)^;
              end;
-           InheritsFrom:=false;
+           InheritsFrom:=False;
         end;
 
       class function TObject.stringmessagetable : pstringmessagetable;

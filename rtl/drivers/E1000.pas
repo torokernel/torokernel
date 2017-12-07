@@ -493,7 +493,7 @@ var
   Packet: PPacket;
   Data, P: PByteArray;
   // this flag is used to drop packets in some situation
-  dropflag: Boolean = false;
+  dropflag: Boolean = False;
 begin
   // Find the head, tail and current descriptors
   {$IFDEF DebugE1000} Head := E1000ReadRegister(Net, E1000_REG_RDH); {$ENDIF}
@@ -546,8 +546,8 @@ begin
   // set up the packet for higher layer
   Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
   Packet.size:= RxDesc.Length;
-  Packet.Delete:= false;
-  Packet.Ready:= false;
+  Packet.Delete:= False;
+  Packet.Ready:= False;
   Packet.Next:= nil;
 
   // copy to the buffer
@@ -564,7 +564,7 @@ begin
   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
 
   // report to kernel
-  EnqueueIncomingPacket(Packet);
+  EnqueueeIncomingPacket(Packet);
 end;
 
 // Read all the packets in the reception ring

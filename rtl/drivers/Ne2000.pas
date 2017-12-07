@@ -7,7 +7,7 @@
 // Changes:
 //
 // 06/03/2011: Fixed bug at the initialization.
-// 27/12/2009: Bug Fixed in Initilization process.
+// 27/12/2009: Bug Fixed in Initialization process.
 // 24/12/2008: Bug in Read procedure. In One irq I must read all the packets in the internal buffer
 //             of ne2000. It is a circular buffer.Some problems if Buffer Overflow happens .
 // 24/12/2007: Bug in size of Packets was solved.

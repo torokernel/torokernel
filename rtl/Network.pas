@@ -1444,10 +1444,16 @@ begin
     begin
       SysThreadSwitch(true);
       Continue;
+    end else
+    begin
+      // reset idle time counter
+      if (GetCurrentThread.State = tsIdle) then
+      begin
+        GetCurrentThread.IdleTime := 0;
+        GetCurrentThread.state := tsReady;
+        GetCurrentThread.CPU.PollingThreadCount -=1 ;
+      end;
     end;
-    // reset idle time counter
-    GetCurrentThread.IdleTime := 0;
-    GetCurrentThread.state :=tsReady;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1491,9 +1497,9 @@ begin
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
-  // initilization of Services for Packets Manipulation
+  // initialization of Services for Packets Manipulation
   NetworkServicesInit;
-  // driver internal initilization
+  // driver internal initialization
   DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   // cleaning the Socket table
   for I:= 0 to (MAX_SocketPORTS-1) do
@@ -1564,7 +1570,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: fail, driver not found\n', []); {$ENDIF}
 end;
 
-// Initilization of Network structures
+// Initialization of Network structures
 procedure NetworkInit;
 var
   I: LongInt;
@@ -1798,18 +1804,21 @@ begin
   {$IFDEF DebugSocket} WriteDebug('DoNetworkService: DoInit in Handler: %h\n', [PtrUInt(Handler)]); {$ENDIF} 
   while True do
   begin
+    NetworkDispatcher(Handler); // Fetch event for socket and dispatch
     Service := GetCurrentThread.NetworkService;
     if (Service.ClientSocket = nil) then
     begin
-      // this tells the scheduler that the thread is doing idle work
-      SysThreadSwitch(true);
-      Continue;
+      SysThreadSwitch (true);
+    end else
+    begin
+     if (GetCurrentThread.State = tsIdle) then
+     begin
+      GetCurrentThread.IdleTime := 0;
+      GetCurrentThread.state := tsReady;
+      GetCurrentThread.CPU.PollingThreadCount -=1 ;
+     end;
+     SysThreadSwitch;
     end;
-    // reset idle time
-    GetCurrentThread.IdleTime := 0;
-    GetCurrentThread.state :=tsReady;
-    NetworkDispatcher(Handler); // Fetch event for socket and dispatch
-    SysThreadSwitch;
   end;
   Result := 0;
 end;

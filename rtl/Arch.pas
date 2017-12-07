@@ -7,7 +7,7 @@
 // Changes :
 //
 // 18/01/2017 Adding DisableInt() and RestoreInt().
-// 11/12/2011 Fixed a bug at boot core initilization.
+// 11/12/2011 Fixed a bug at boot core initialization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
 // 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
@@ -1053,7 +1053,7 @@ end;
 //------------------------------------------------------------------------------
 
 var
-  esp_tmp: Pointer; // Pointer to Stack for each CPU during SMP Initilization
+  esp_tmp: Pointer; // Pointer to Stack for each CPU during SMP Initialization
   start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte; // temporary stack for each CPU
 
 {$IFDEF FPC}
@@ -1159,7 +1159,7 @@ begin
       Cores[cp.Apic_id].ApicID := cp.Apic_id;
       Cores[cp.Apic_id].Present := True;
       m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
-      // boot core doesn't need initilization
+      // boot core doesn't need initialization
       if (cp.flags and 2 ) = 2 then
       begin
         Cores[cp.Apic_id].CpuBoot := True ;

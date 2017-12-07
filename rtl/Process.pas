@@ -133,7 +133,7 @@ const
   tsReady = 2 ;
   tsSuspended = 1 ;
   tsZombie = 4 ;
-  tsIdle = 5;
+  tsIdle = 6;
   
   
 // Interface function matching common declaration
@@ -1143,7 +1143,6 @@ begin
   end;
 end;
 
-// This is the Scheduler
 // Schedule next thread, the current thread must be added in the appropriate list (CPU[].MsgsToBeDispatched) and have saved its registers
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
@@ -1153,6 +1152,7 @@ var
 begin
   NextTurnHalt:= false;
   CurrentCPU := @CPU[GetApicID];
+
   while True do
   begin
     // go to save-power state if queue is empty
@@ -1175,9 +1175,12 @@ begin
     Emigrating(CurrentCPU); // enqueue newly created threads to others CPUs
     Inmigrating(CurrentCPU); // Import new threads to CurrentCPU.Threads
     CurrentThread := CurrentCPU.CurrentThread;
+
     if Candidate = nil then
       Candidate := CurrentThread.Next;
+
     repeat
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
       if Candidate.State = tsReady then
         Break
       else if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
@@ -1191,17 +1194,23 @@ begin
     	Candidate := Candidate.Next;
       end;
     until Candidate = CurrentThread;
+
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
+
     if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
       // do thing in this case
     else
+    begin
     if (Candidate.State <> tsReady) then
     begin
       // is the whole system in polling mode?
       if (CurrentCPU.PollingThreadCount = CurrentCPU.PollingThreadTotal) and (CurrentCPU.PollingThreadCount <> 0) then
       begin
+        {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
         CurrentCPU.Idle := true;
         hlt;
         CurrentCPU.Idle := false;
+        {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
         // when we wake up, we set all polling threads in ready state
         Th := CurrentCPU.PollingThreads;
         while Th <> nil do
@@ -1228,9 +1237,10 @@ begin
       end;
       Continue;
     end;
+    end;
     NextTurnHalt:= false;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess}WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(Candidate.ret_thread_sp)]);{$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate),Candidate.State,PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     SwitchStack(@CurrentThread.ret_thread_sp, @Candidate.ret_thread_sp);
@@ -1310,9 +1320,11 @@ begin
   // thread is idle
   if Idle then
   begin
+     {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: Idle = true\n', []); {$ENDIF}
      // the thread is enqueue first time
      if not GetCurrentThread.IsPollThread then
      begin
+      {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: IsPollThread = true\n', []); {$ENDIF}
       Thread := GetCurrentThread;
       tmp := Thread.CPU;
       Thread.IsPollThread:= true;
@@ -1329,7 +1341,8 @@ begin
      idletime := GetCurrentThread.IdleTime;
      if (idletime = 0) then
      begin
-       GetCurrentThread.IdleTime := read_rdtsc
+       GetCurrentThread.IdleTime := read_rdtsc;
+       {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: setting GetCurrentThread.IdleTime = %d\n', [read_rdtsc]); {$ENDIF}
      end else
      begin
        // it waits 200ms to set the thread in idle
@@ -1339,6 +1352,7 @@ begin
           begin
            GetCurrentThread.State := tsIdle;
            Inc(GetCurrentThread.CPU.PollingThreadCount);
+           {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread in idle state\n', []); {$ENDIF}
           end;
         end;
      end;

@@ -936,7 +936,7 @@ begin
   end;
 end;
 
-// Initilization of Memory Directory for every Core
+// Initialization of Memory Directory for every Core
 procedure MemoryInit;
 var
   MajorBlockSize: PtrUInt;

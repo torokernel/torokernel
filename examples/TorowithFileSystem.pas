@@ -68,15 +68,9 @@ var
   HttpServer: PSocket;
   Buffer: char;
   buff: array[0..500] of char;
-  tmp, log: THandle;
+  tmp: THandle;
   HttpHandler: TNetworkHandler;
   count: longint = 0;
-
-// Simple logger for the webserver
-procedure DebugWrite(msg: pchar);
-begin
-  SysWriteFile(log,strlen(msg),msg);
-end;
 
 // Socket initialization
 procedure HttpInit;
@@ -93,7 +87,6 @@ var
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsole('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  DebugWrite('ToroWebServer: New connection'#13#10);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 20000);
   Result := 0;
@@ -105,13 +98,11 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  DebugWrite('ToroWebServer: Receiving Data'#13#10);
   WriteConsole ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
   // we send the whole file
   SysSocketSend(Socket, @buff[0], count, 0);
-  DebugWrite('ToroWebServer: Sending Data'#13#10);
   WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
@@ -125,7 +116,6 @@ begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
-  DebugWrite('ToroWebServer: Closing connection'#13#10);
   Result := 0;
 end;
 
@@ -138,7 +128,7 @@ begin
 end;
 
 begin
-  // Dedicate the ne2000 network card to local cpu
+  // Dedicate the e1000 network card to local cpu
   DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
 
   // Dedicate the ide disk to local cpu
@@ -153,25 +143,6 @@ begin
   HttpHandler.DoTimeOut := @HttpTimeOut;
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose := @HttpClose;
-
-  // try to create the logs directory
-  SysCreateDir('/web/logs');
-
-  // we first try to create the file for logs
-  log := SysCreateFile('/web/logs/log');
-  if log = 0 then
-  begin
-    // if it exists we just open it
-    log := SysOpenFile ('/web/logs/log');
-    if log = 0 then
-    begin
-      WriteConsole ('logs not found\n',[]);
-    end else
-    begin
-      // end of file
-      SysSeekFile(log,0,SeekEof);
-    end;
-  end;
 
   // we open the file which is used as main page for the webserver
   tmp := SysOpenFile('/web/index.html');
@@ -188,6 +159,7 @@ begin
   // we register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
   WriteConsole('\t /VToroWebServer/n: listening ...\n',[]);
-  while True do
-    SysThreadSwitch;
+
+  // main thread goes to sleep
+  SysSuspendThread(0);
 end.

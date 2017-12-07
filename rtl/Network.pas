@@ -619,7 +619,7 @@ begin
   ClientSocket.BufferSender := nil;
   ClientSocket.RemoteClose := false;
   // todo: to check if it is valid this 
-  ClientSocket.AckFlag := true; 
+  ClientSocket.AckFlag := True; 
   AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
   // we don't need the packet
   ToroFreeMem(Packet);
@@ -671,7 +671,7 @@ begin
   CPUID:= GetApicid;
   Packet.Data := Pointer(PtrUInt(Packet)+SizeOf(TPacket));
   Packet.Size := SizeOf(TArpHeader)+SizeOf(TEthHeader);
-  Packet.Delete := true; 
+  Packet.Delete := True; 
   ARPPacket := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket := Packet.Data;
   ARPPacket.Hardware := SwapWORD(1);
@@ -991,7 +991,7 @@ begin
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
         // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
         // TODO: to check if we have to release the packet memory
-        Packet.Delete := true;
+        Packet.Delete := True;
 	{$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: Sending my ip\n', []); {$ENDIF}
         SysNetworkSend(Packet);
         // reply Request of Ip Address
@@ -1104,7 +1104,7 @@ begin
           // this socket will be closed
           Socket.State:= SCK_LOCALCLOSING;
           // remote host closed the conection
-	  Socket.RemoteClose := true;
+	  Socket.RemoteClose := True;
           Socket.DispatcherEvent:= DISP_ACCEPT;
         end else
         begin
@@ -1167,7 +1167,7 @@ begin
             begin
               Socket.State:= SCK_LOCALCLOSING;
               // remote host closed the conection
-	      Socket.RemoteClose := true;
+	      Socket.RemoteClose := True;
             end;
             {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
           end else begin
@@ -1188,7 +1188,7 @@ begin
                   // this socket will be closed
                   Socket.State:= SCK_LOCALCLOSING;
                   // remote host closed the conection
-		  Socket.RemoteClose := true;
+		  Socket.RemoteClose := True;
                   Socket.AckFlag := True;
 		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK to confirm ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
         end else
@@ -1320,7 +1320,7 @@ begin
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
          // the kernel is in charge to free the packet
-         Packet.Delete := true;
+         Packet.Delete := True;
 	 ICMPHeader.tipe:= ICMP_ECHO_REPLY;
          ICMPHeader.checksum:= 0 ;
          Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
@@ -1442,7 +1442,7 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch(true);
+      SysThreadSwitch(True);
       Continue;
     end else
     begin
@@ -1693,7 +1693,7 @@ var
   Socket: PSocket;
   DoDispatcherFlushPacket: Boolean;
 begin
-  DoDispatcherFlushPacket := true;
+  DoDispatcherFlushPacket := True;
   Service := GetCurrentThread.NetworkService; // Get Network Service structure
   NextSocket := Service.ClientSocket; // Get Client queue
   // we will execute a handler for every socket depending of the EVENT
@@ -1786,7 +1786,7 @@ begin
       DISP_CLOSE: Handler.DoClose(Socket); // Peer socket disconnected
       DISP_CONNECT: Handler.DoConnect(Socket);
     end;
-    // only flush if DoDispatcherFlushPacket is true
+    // only flush if DoDispatcherFlushPacket is True
     if DoDispatcherFlushPacket then
     begin
       DispatcherFlushPacket(Socket); // Send the packets in the buffer
@@ -1808,7 +1808,7 @@ begin
     Service := GetCurrentThread.NetworkService;
     if (Service.ClientSocket = nil) then
     begin
-      SysThreadSwitch (true);
+      SysThreadSwitch (True);
     end else
     begin
      if (GetCurrentThread.State = tsIdle) then

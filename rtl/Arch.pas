@@ -791,11 +791,11 @@ function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm
   {$IFDEF WINDOWS} bt  [rcx], rdx {$ENDIF}
   {$IFDEF LINUX} bt [rdi], rsi {$ENDIF}
-  jc  @true
+  jc  @True
   @false:
    mov rax , 0
    jmp @salir
-  @true:
+  @True:
     mov rax , 1
   @salir:
 end;
@@ -1114,7 +1114,7 @@ end;
 // Warning this procedure must be do it just one time per CPU
 function InitCore(ApicID: Byte): Boolean;
 begin
-  Result := true;
+  Result := True;
   // wakeup the remote core with IPI-INIT
   // send_apic_init already added some delay
   send_apic_init(apicid);
@@ -1163,8 +1163,8 @@ begin
       if (cp.flags and 2 ) = 2 then
       begin
         Cores[cp.Apic_id].CpuBoot := True ;
-        Cores[cp.Apic_id].InitConfirmation := true;
-	Cores[cp.Apic_id].Present := true;
+        Cores[cp.Apic_id].InitConfirmation := True;
+	Cores[cp.Apic_id].Present := True;
       end;
     end else
     begin
@@ -1301,8 +1301,8 @@ begin
                 if Processor.apicid = 0 then
                 begin
                   Cores[Processor.apicid].CPUBoot := True;
-                  Cores[Processor.apicid].InitConfirmation := true;
-		  Cores[Processor.apicid].Present := true;
+                  Cores[Processor.apicid].InitConfirmation := True;
+		  Cores[Processor.apicid].Present := True;
                 end;
               end;
             end;

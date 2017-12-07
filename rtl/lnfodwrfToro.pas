@@ -184,8 +184,8 @@ begin
   dwarfsize := p^;
   p := pointer($600000);
   dwarfoffset := PtrUInt(p);
-  OpenDwarf:=true;
-  //lastopendwarf:=true;
+  OpenDwarf:=True;
+  //lastopendwarf:=True;
 end;
 
 
@@ -253,7 +253,7 @@ begin
     ReadNext := -1;
 end;
 
-{ Reads the next size bytes into dest. Returns true if successful,
+{ Reads the next size bytes into dest. Returns True if successful,
   false otherwise. Note that dest may be partially overwritten after
   returning false. }
 function ReadNext(var dest; size : SizeInt) : Boolean;
@@ -426,7 +426,7 @@ end;
 procedure SkipDirectories();
 var s : ShortString;
 begin
-  while (true) do begin
+  while (True) do begin
     s := ReadString();
     if (s = '') then break;
     DEBUG_WRITELN('Skipping directory : ', s);
@@ -447,7 +447,7 @@ end;
 procedure SkipFilenames();
 var s : ShortString;
 begin
-  while (true) do begin
+  while (True) do begin
     s := ReadString();
     if (s = '') then break;
     DEBUG_WRITELN('Skipping filename : ', s);
@@ -537,7 +537,7 @@ var
 begin
   prev_line := 0;
   prev_file := 0;
-  first_row := true;
+  first_row := True;
 
   found := false;
 
@@ -610,8 +610,8 @@ begin
             exit;
           end;
           DW_LNE_END_SEQUENCE : begin
-            state.end_sequence := true;
-            state.append_row := true;
+            state.end_sequence := True;
+            state.append_row := True;
             DEBUG_WRITELN('DW_LNE_END_SEQUENCE');
           end;
           DW_LNE_SET_ADDRESS : begin
@@ -637,7 +637,7 @@ begin
         state.basic_block := false;
         state.prolouge_end := false;
         state.epilouge_begin := false;
-        state.append_row := true;
+        state.append_row := True;
         DEBUG_WRITELN('DW_LNS_COPY');
       end;
       DW_LNS_ADVANCE_PC : begin
@@ -663,7 +663,7 @@ begin
         DEBUG_WRITELN('DW_LNS_NEGATE_STMT (', state.is_stmt, ')');
       end;
       DW_LNS_SET_BASIC_BLOCK : begin
-        state.basic_block := true;
+        state.basic_block := True;
         DEBUG_WRITELN('DW_LNS_SET_BASIC_BLOCK');
       end;
       DW_LNS_CONST_ADD_PC : begin
@@ -675,11 +675,11 @@ begin
         //WriteConsole('DW_LNS_FIXED_ADVANCE_PC (%h)\n', [state.address]);
       end;
       DW_LNS_SET_PROLOGUE_END : begin
-        state.prolouge_end := true;
+        state.prolouge_end := True;
         DEBUG_WRITELN('DW_LNS_SET_PROLOGUE_END');
       end;
       DW_LNS_SET_EPILOGUE_BEGIN : begin
-        state.epilouge_begin := true;
+        state.epilouge_begin := True;
         DEBUG_WRITELN('DW_LNS_SET_EPILOGUE_BEGIN');
       end;
       DW_LNS_SET_ISA : begin
@@ -701,7 +701,7 @@ begin
           state.basic_block := false;
           state.prolouge_end := false;
           state.epilouge_begin := false;
-          state.append_row := true;
+          state.append_row := True;
         end;
       end;
     end;
@@ -723,7 +723,7 @@ begin
         line because that contains the call instruction }
       if (state.address >= addr) then
       begin
-        found:=true;
+        found:=True;
         //WriteConsole('Found state.address=%h, addr=%h\n',[state.address, addr]);
       end
       else
@@ -736,7 +736,7 @@ begin
       state.append_row := false;
       if (state.end_sequence) then begin
         InitStateRegisters(state, header64.default_is_stmt);
-        first_row := true;
+        first_row := True;
       end;
     end;
 
@@ -774,7 +774,7 @@ begin
       source, line, found);
   end;
 
-  GetLineInfo:=true;
+  GetLineInfo:=True;
 end;
 
 

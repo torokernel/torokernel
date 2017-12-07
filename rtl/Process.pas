@@ -987,7 +987,7 @@ begin
 end;
 
 
-// Kill current Thread and call to the scheduler if Schedule is true
+// Kill current Thread and call to the scheduler if Schedule is True
 procedure ThreadExit(Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
@@ -1032,7 +1032,7 @@ begin
   end;
   {$IFDEF DebugProcess} WriteDebug('SysKillThread - sending signal to Thread: %h in CPU: %d \n', [ThreadID, Thread.CPU.ApicID]); {$ENDIF}
   // setting the kill flag 
-  Thread.FlagKill := true;
+  Thread.FlagKill := True;
   Result := 0;
 end;
 
@@ -1161,7 +1161,7 @@ begin
       {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
       while CurrentCPU.Threads = nil do
       begin
-        CurrentCPU.Idle := true;
+        CurrentCPU.Idle := True;
         hlt;
         CurrentCPU.Idle := false;
         Inmigrating(CurrentCPU);
@@ -1207,7 +1207,7 @@ begin
       if (CurrentCPU.PollingThreadCount = CurrentCPU.PollingThreadTotal) and (CurrentCPU.PollingThreadCount <> 0) then
       begin
         {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
-        CurrentCPU.Idle := true;
+        CurrentCPU.Idle := True;
         hlt;
         CurrentCPU.Idle := false;
         {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
@@ -1226,14 +1226,14 @@ begin
       // we do two turns before halt it
       if NextTurnHalt then
       begin
-        CurrentCPU.Idle := true;
+        CurrentCPU.Idle := True;
         hlt;
         CurrentCPU.Idle := false;
         NextTurnHalt:= false;
       end else
       begin
          DelayMicro(50);
-         NextTurnHalt:= true;
+         NextTurnHalt:= True;
       end;
       Continue;
     end;
@@ -1320,14 +1320,14 @@ begin
   // thread is idle
   if Idle then
   begin
-     {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: Idle = true\n', []); {$ENDIF}
+     {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: Idle = True\n', []); {$ENDIF}
      // the thread is enqueue first time
      if not GetCurrentThread.IsPollThread then
      begin
-      {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: IsPollThread = true\n', []); {$ENDIF}
+      {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: IsPollThread = True\n', []); {$ENDIF}
       Thread := GetCurrentThread;
       tmp := Thread.CPU;
-      Thread.IsPollThread:= true;
+      Thread.IsPollThread:= True;
       Inc(tmp.PollingThreadTotal);
       if tmp.PollingThreads = nil then
       begin
@@ -1448,7 +1448,7 @@ begin
   WriteConsole('Panic: ',[]);
   WriteConsole(Format,[]);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
-  while true do;
+  while True do;
 end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  

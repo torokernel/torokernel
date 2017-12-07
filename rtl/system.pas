@@ -1425,7 +1425,7 @@ procedure RTLeventsync(m:trtlmethod;p:tprocedure);
 
 const 
   LineEnding = #10;
-  LFNSupport = true;
+  LFNSupport = True;
   DirectorySeparator = '/';
   DriveSeparator = ':';
   PathSeparator = ':';
@@ -1439,7 +1439,7 @@ const
   StdOutputHandle = 1;
   StdErrorHandle  = 2;
 
-  FileNameCaseSensitive : boolean = true;
+  FileNameCaseSensitive : boolean = True;
   CtrlZMarksEOF: boolean = false; 
 
   sLineBreak = LineEnding;
@@ -2413,7 +2413,7 @@ end;
 {$ifndef FPC_SYSTEM_HAS_FPC_CHECK_OBJECT_EXT}
 { checks for a correct vmt pointer }
 { deeper check to see if the current object is }
-{ really related to the true }
+{ really related to the True }
 procedure fpc_check_object_ext(vmt, expvmt : pointer); [public,alias:'FPC_CHECK_OBJECT_EXT']; compilerproc;
 type
   pvmt = ^tvmt;
@@ -3158,7 +3158,7 @@ function fpc_set_unset_byte(const source: fpc_normal_set; b : byte): fpc_normal_
      for i:=0 to 7 do
        if set1[i] <> set2[i] then
          exit;
-     fpc_set_comp_sets:= true;
+     fpc_set_comp_sets:= True;
    end;
 {$endif}
 
@@ -3176,7 +3176,7 @@ function fpc_set_unset_byte(const source: fpc_normal_set; b : byte): fpc_normal_
    for i:=0 to 7 do
      if (set1[i] and not set2[i]) <> 0 then
        exit;
-   fpc_set_contains_sets:= true;
+   fpc_set_contains_sets:= True;
  end;
 {$endif}
 
@@ -3527,7 +3527,7 @@ begin
   negativ:=false;
   case s[code] of
    '-' : begin
-           negativ:=true;
+           negativ:=True;
            inc(code);
          end;
    '+' : inc(code);
@@ -4015,7 +4015,7 @@ end;}
            nq:=n;
          if z<0 then
            begin
-             signed:=true;
+             signed:=True;
              zq:=qword(-z)
            end
          else
@@ -4099,7 +4099,7 @@ end;}
               if checkoverflow and (q1 <> 0) and (q2 <>0) and
               ((q1>q3) or (q2>q3) or
                 { the bit 63 can be only set if we have $80000000 00000000 }
-                { and sign is true                                         }
+                { and sign is True                                         }
                 ((tqwordrec(q3).high and dword($80000000))<>0) and
                  ((q3<>(qword(1) shl 63)) or not(sign))
                 ) then
@@ -4253,7 +4253,7 @@ Begin
   { check for constant strings ...}
   l:=@PAnsiRec(S-FirstOff)^.Ref;
   If l^<0 then exit;
-  { declocked does a MT safe dec and returns true, if the counter is 0 }
+  { declocked does a MT safe dec and returns True, if the counter is 0 }
   //If declocked(l^) then
     { Ref count dropped to zero }
     // TODO: to fix it properly
@@ -5454,7 +5454,7 @@ end;
              begin
                 if vmt=aclass then
                   begin
-                     InheritsFrom:=true;
+                     InheritsFrom:=True;
                      exit;
                   end;
                 vmt:=pclass(pointer(vmt)+vmtParent)^;
@@ -6928,7 +6928,7 @@ begin
   c := Sptr - (stack_size + STACK_MARGIN);
   if (c <= StackBottom) then
    begin
-     StackError:=true;
+     StackError:=True;
      HandleError(202);
    end;
 end;

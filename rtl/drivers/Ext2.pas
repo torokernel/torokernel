@@ -203,10 +203,10 @@ begin
   // only update the number of free inodes and blocks
   SuperExt2.free_blocks_count := SpbInfo.free_blocks_count;
   SuperExt2.free_inodes_count := SpbInfo.free_inodes_count;
-  bh.Dirty:= true;
+  bh.Dirty:= True;
   PutBlock(Super.BlockDevice,bh);
   {$IFDEF DebugExt2FS} WriteDebug('Ext2WriteSuper: SuperBlock has been updated, free_blocks_count: %d, free_inodes_count: %d\n', [SpbInfo.free_blocks_count, SpbInfo.free_inodes_count]); {$ENDIF}
-  Result := true;
+  Result := True;
 end;
 
 //
@@ -368,7 +368,7 @@ begin
   // we update the access and modification time
   raw_inode.atime:= Inode.ATime;
   raw_inode.mtime:= Inode.MTime;
-  bh.Dirty:= true;
+  bh.Dirty:= True;
   PutBlock (Inode.SuperBlock.BlockDevice, bh);
   {$IFDEF DebugExt2FS} WriteDebug('Ext2WriteInode: updating Inode: %d, blocks: %d, links_count: %d\n', [Inode.ino,raw_inode.blocks,raw_inode.links_count]); {$ENDIF}
 end;
@@ -452,7 +452,7 @@ begin
   end;
 
   // the block that contains the inode is marked as dirty
-  bh.Dirty:= true;
+  bh.Dirty:= True;
   PutBlock (Inode.SuperBlock.BlockDevice, bh);
   {$IFDEF DebugExt2FS} WriteDebug('Ext2InitInode: initializing Inode: %d, Inode.atime: %d\n', [Inode.ino, raw_Inode^.atime]); {$ENDIF}
 end;
@@ -513,11 +513,11 @@ begin
         {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: free Inode: %d\n', [nr_inode]); {$ENDIF}
         gdp^[desc].free_inodes_count := gdp^[desc].free_inodes_count -1;
         // descriptor block is marked as dirty
-        bh_gdp.Dirty:= true;
+        bh_gdp.Dirty:= True;
         // we update the descriptor group
         WriteBlock(Inode.SuperBlock.BlockDevice, bh_gdp);
         // bitmap block is marked as dirty
-        bh.Dirty:= true;
+        bh.Dirty:= True;
         // we update the bitmap block
         WriteBlock(Inode.SuperBlock.BlockDevice, bh);
         PutBlock(Inode.SuperBlock.BlockDevice, bh);
@@ -608,11 +608,11 @@ begin
         // we increment the number of directories
         gdp^[desc].used_dirs_count:= gdp^[desc].used_dirs_count + 1;
         // descriptor block is marked as dirty
-        bh_gdp.Dirty:= true;
+        bh_gdp.Dirty:= True;
         // we update the descriptor group
         WriteBlock(Inode.SuperBlock.BlockDevice, bh_gdp);
         // bitmap block is marked as dirty
-        bh.Dirty:= true;
+        bh.Dirty:= True;
         // we update the bitmap block
         WriteBlock(Inode.SuperBlock.BlockDevice, bh);
         PutBlock(Inode.SuperBlock.BlockDevice, bh);
@@ -807,11 +807,11 @@ begin
     entry.file_type := Ext2_FT_Reg;
     entry.rec_len:= prev_rec_len;
     {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
-    bh.Dirty := true;
+    bh.Dirty := True;
     PutBlock (Ino.SuperBlock.BlockDevice, bh);
     // we increment the links count of the dir inode
-    Ino.Dirty:= true;
-    Result:= true;
+    Ino.Dirty:= True;
+    Result:= True;
 end;
 
 // Add a new entry to an Inode directory
@@ -880,13 +880,13 @@ begin
     entry.file_type := Ext2_FT_Dir;
     entry.rec_len:= prev_rec_len;
     {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
-    bh.Dirty := true;
+    bh.Dirty := True;
     PutBlock (Ino.SuperBlock.BlockDevice, bh);
     {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: old inode size: %d\n', [Ino.Size]); {$ENDIF}
     // we increment the links count of the dir inode
     InoInfo.links_count:= InoInfo.links_count + 1;
-    Ino.Dirty:= true;
-    Result:= true;
+    Ino.Dirty:= True;
+    Result:= True;
 end;
 
 // Add a new entry to an Inode directory
@@ -926,13 +926,13 @@ begin
   entry.name[1] := '.';
   entry.rec_len := 1012;
 
-  bh.Dirty := true;
+  bh.Dirty := True;
   PutBlock (Ino.SuperBlock.BlockDevice, bh);
   Ino.Size:= Ino.SuperBlock.BlockSize;
-  Ino.Dirty:= true;
+  Ino.Dirty:= True;
 
   {$IFDEF DebugFS} WriteDebug('InitializeInodeDir: itself: %d, parent: %d\n', [Ino.ino, Inode]); {$ENDIF}
-  Result:= true;
+  Result:= True;
 end;
 
 
@@ -1038,8 +1038,8 @@ begin
   begin
     InoInfo.data[lasti_entry] := Block;
     // we need to update the inode in disk
-    Inode.Dirty := true;
-    Result := true;
+    Inode.Dirty := True;
+    Result := True;
   end
   else if lasti_entry <= (12 + Inode.SuperBlock.BlockSize div 4) then
   begin
@@ -1053,9 +1053,9 @@ begin
     end;
     buffer := bh.data;
     buffer^[(lasti_entry-12)-1] := Block;
-    bh.dirty := true;
+    bh.dirty := True;
     PutBlock(Inode.SuperBlock.BlockDevice, bh);
-    Result:=true;
+    Result:=True;
     // More Blocks are not supported
   end else
     Result := false;
@@ -1120,14 +1120,14 @@ begin
             p[j div 8] := p[j div 8] or (1 shl (j mod 8));
             InoInfo.data[13] := k*(Inode.SuperBlock.BlockSize * 8) + j + 1;
             {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode: first indirect block: %d to Inode: %d\n', [InoInfo.data[13], PtrUInt(Inode)]); {$ENDIF}
-            Inode.Dirty := true;
+            Inode.Dirty := True;
             gdp^[desc].free_blocks_count := gdp^[desc].free_blocks_count -1;
             // descriptor block is marked as dirty
-            bh_gdp.Dirty:= true;
+            bh_gdp.Dirty:= True;
             // we update the descriptor group
             WriteBlock(Inode.SuperBlock.BlockDevice, bh_gdp);
             // bitmap block is marked as dirty
-            bh.Dirty:= true;
+            bh.Dirty:= True;
             // we update the bitmap block
             WriteBlock(Inode.SuperBlock.BlockDevice, bh);
             PutBlock(Inode.SuperBlock.BlockDevice, bh);
@@ -1170,17 +1170,17 @@ begin
                  Result := false;
                  Exit;
             end;
-            Inode.Dirty := true;
+            Inode.Dirty := True;
             gdp^[desc].free_blocks_count := gdp^[desc].free_blocks_count -1;
 
             // descriptor block is marked as dirty
-            bh_gdp.Dirty:= true;
+            bh_gdp.Dirty:= True;
 
             // we update the descriptor group
             WriteBlock(Inode.SuperBlock.BlockDevice, bh_gdp);
 
             // bitmap block is marked as dirty
-            bh.Dirty:= true;
+            bh.Dirty:= True;
 
             // we update the bitmap block
             WriteBlock(Inode.SuperBlock.BlockDevice, bh);
@@ -1190,7 +1190,7 @@ begin
             SbInfo.free_blocks_count:= SbInfo.free_blocks_count - 1;
             Ext2WriteSuper(Inode.SuperBlock);
 
-            Result := true;
+            Result := True;
             exit;
           end;
       end;
@@ -1281,7 +1281,7 @@ begin
     {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: i_off: %d, end_off: %d, FilePos: %d, Len: %d\n', [initoff, end_off, FileDesc.FilePos, Len]); {$ENDIF}
     // we mark it as dirty
     // we return it to the cache
-    bh.Dirty:= true;
+    bh.Dirty:= True;
     PutBlock(FileDesc.Inode.SuperBlock.BlockDevice,bh);
   end;
 

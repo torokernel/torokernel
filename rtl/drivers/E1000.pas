@@ -511,14 +511,14 @@ begin
   if (RxDesc.Status and E1000_RX_STATUS_DONE) = 0 then
   begin
      {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE exiting\n', []); {$ENDIF}
-     dropflag := true;
+     dropflag := True;
   end;
 
   // this driver does not hable such a kind of packets
   if (RxDesc.Status and  E1000_RX_STATUS_EOP) = 0 then
   begin
     {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_EOP exiting\n', []); {$ENDIF}
-    dropflag := true;
+    dropflag := True;
   end;
 
   if dropflag then

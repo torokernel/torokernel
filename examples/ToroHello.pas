@@ -54,5 +54,5 @@ uses
 begin
   WriteConsole('/RHello World, I am TORO !!!\n',[]);
   // Halt core
-  While true do hlt;
+  While True do hlt;
 end.

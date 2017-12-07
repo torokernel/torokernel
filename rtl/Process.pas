@@ -798,12 +798,15 @@ end;
 
 // reset idle counter
 procedure SysThreadActive;
+var
+ T: PThread;
 begin
-  if (GetCurrentThread.State = tsIdle) then
+  T := GetCurrentThread;
+  if (T.State = tsIdle) then
   begin
-    GetCurrentThread.IdleTime := 0;
-    GetCurrentThread.state := tsReady;
-    GetCurrentThread.CPU.PollingThreadCount -=1 ;
+    T.IdleTime := 0;
+    T.state := tsReady;
+    T.CPU.PollingThreadCount -=1 ;
   end;
 end;
 

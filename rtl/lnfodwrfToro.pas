@@ -168,7 +168,7 @@ var
   p: ^longint;
 begin
   // False by default
-  OpenDwarf:=false;
+  OpenDwarf:=False;
 
   // Empty so can test if GetModuleByAddr has worked
   filename := '';
@@ -184,8 +184,8 @@ begin
   dwarfsize := p^;
   p := pointer($600000);
   dwarfoffset := PtrUInt(p);
-  OpenDwarf:=true;
-  //lastopendwarf:=true;
+  OpenDwarf:=True;
+  //lastopendwarf:=True;
 end;
 
 
@@ -253,9 +253,9 @@ begin
     ReadNext := -1;
 end;
 
-{ Reads the next size bytes into dest. Returns true if successful,
-  false otherwise. Note that dest may be partially overwritten after
-  returning false. }
+{ Reads the next size bytes into dest. Returns True if successful,
+  False otherwise. Note that dest may be partially overwritten after
+  returning False. }
 function ReadNext(var dest; size : SizeInt) : Boolean;
 var
   bytesread, totalread : SizeInt;
@@ -412,12 +412,12 @@ begin
     line := 1;
     column := 0;
     is_stmt := aIs_Stmt;
-    basic_block := false;
-    end_sequence := false;
-    prolouge_end := false;
-    epilouge_begin := false;
+    basic_block := False;
+    end_sequence := False;
+    prolouge_end := False;
+    epilouge_begin := False;
     isa := 0;
-    append_row := false;
+    append_row := False;
   end;
 end;
 
@@ -426,7 +426,7 @@ end;
 procedure SkipDirectories();
 var s : ShortString;
 begin
-  while (true) do begin
+  while (True) do begin
     s := ReadString();
     if (s = '') then break;
     DEBUG_WRITELN('Skipping directory : ', s);
@@ -447,7 +447,7 @@ end;
 procedure SkipFilenames();
 var s : ShortString;
 begin
-  while (true) do begin
+  while (True) do begin
     s := ReadString();
     if (s = '') then break;
     DEBUG_WRITELN('Skipping filename : ', s);
@@ -537,9 +537,9 @@ var
 begin
   prev_line := 0;
   prev_file := 0;
-  first_row := true;
+  first_row := True;
 
-  found := false;
+  found := False;
 
   ReadNext(temp_length, sizeof(temp_length));
   if (temp_length <> $ffffffff) then begin
@@ -610,8 +610,8 @@ begin
             exit;
           end;
           DW_LNE_END_SEQUENCE : begin
-            state.end_sequence := true;
-            state.append_row := true;
+            state.end_sequence := True;
+            state.append_row := True;
             DEBUG_WRITELN('DW_LNE_END_SEQUENCE');
           end;
           DW_LNE_SET_ADDRESS : begin
@@ -634,10 +634,10 @@ begin
         end;
       end;
       DW_LNS_COPY : begin
-        state.basic_block := false;
-        state.prolouge_end := false;
-        state.epilouge_begin := false;
-        state.append_row := true;
+        state.basic_block := False;
+        state.prolouge_end := False;
+        state.epilouge_begin := False;
+        state.append_row := True;
         DEBUG_WRITELN('DW_LNS_COPY');
       end;
       DW_LNS_ADVANCE_PC : begin
@@ -663,7 +663,7 @@ begin
         DEBUG_WRITELN('DW_LNS_NEGATE_STMT (', state.is_stmt, ')');
       end;
       DW_LNS_SET_BASIC_BLOCK : begin
-        state.basic_block := true;
+        state.basic_block := True;
         DEBUG_WRITELN('DW_LNS_SET_BASIC_BLOCK');
       end;
       DW_LNS_CONST_ADD_PC : begin
@@ -675,11 +675,11 @@ begin
         //WriteConsole('DW_LNS_FIXED_ADVANCE_PC (%h)\n', [state.address]);
       end;
       DW_LNS_SET_PROLOGUE_END : begin
-        state.prolouge_end := true;
+        state.prolouge_end := True;
         DEBUG_WRITELN('DW_LNS_SET_PROLOGUE_END');
       end;
       DW_LNS_SET_EPILOGUE_BEGIN : begin
-        state.epilouge_begin := true;
+        state.epilouge_begin := True;
         DEBUG_WRITELN('DW_LNS_SET_EPILOGUE_BEGIN');
       end;
       DW_LNS_SET_ISA : begin
@@ -698,10 +698,10 @@ begin
           lineIncrement := header64.line_base + (adjusted_opcode mod header64.line_range);
           inc(state.line, lineIncrement);
           //WriteConsole('Special opcode %d, address increment: %d, new line: %d\n', [opcode, addrIncrement, lineIncrement]);
-          state.basic_block := false;
-          state.prolouge_end := false;
-          state.epilouge_begin := false;
-          state.append_row := true;
+          state.basic_block := False;
+          state.prolouge_end := False;
+          state.epilouge_begin := False;
+          state.append_row := True;
         end;
       end;
     end;
@@ -716,14 +716,14 @@ begin
       if (first_row) then begin
         if (state.address > addr) then
           break;
-        first_row := false;
+        first_row := False;
       end;
 
       { when we have found the address we need to return the previous
         line because that contains the call instruction }
       if (state.address >= addr) then
       begin
-        found:=true;
+        found:=True;
         //WriteConsole('Found state.address=%h, addr=%h\n',[state.address, addr]);
       end
       else
@@ -733,10 +733,10 @@ begin
           prev_line := state.line;
         end;
 
-      state.append_row := false;
+      state.append_row := False;
       if (state.end_sequence) then begin
         InitStateRegisters(state, header64.default_is_stmt);
-        first_row := true;
+        first_row := True;
       end;
     end;
 
@@ -759,8 +759,8 @@ var
 begin
   func := '';
   source := '';
-  found := false;
-  GetLineInfo:=false;
+  found := False;
+  GetLineInfo:=False;
 
   if not OpenDwarf(pointer(addr)) then
     exit;
@@ -774,7 +774,7 @@ begin
       source, line, found);
   end;
 
-  GetLineInfo:=true;
+  GetLineInfo:=True;
 end;
 
 
@@ -787,7 +787,7 @@ var
   Success : boolean;
 begin
   { reset to prevent infinite recursion if problems inside the code }
-  Success:=false;
+  Success:=False;
   Store := BackTraceStrFunc;
   BackTraceStrFunc := @SysBackTraceStr;
   Success:=GetLineInfo(ptruint(addr), func, source, line);

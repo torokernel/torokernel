@@ -475,7 +475,7 @@ end;
 procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
 begin
   FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block *(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data);
-  Bh.Dirty:= false;
+  Bh.Dirty:= False;
 end;
 
 function FindInode(Buffer: PInode;Inode: LongInt): PInode;

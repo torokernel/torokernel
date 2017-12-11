@@ -75,7 +75,7 @@ begin
   
   // I keep sending ICMP packets and waiting for an answer
   WriteConsole ('\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
-  while true do 
+  while True do 
   begin
    WriteConsole ('\t ToroPing: /Vsending/n ping to %d.%d.%d.%d, seq: %d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3],seq]);
    ICMPSendEcho (PingIPDword,PingContent, 32,seq,0);

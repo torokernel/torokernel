@@ -105,7 +105,8 @@ start:
   mov es , ax
   
   ; Return to "Unreal-Mode"
-  and al,0xFE     
+  mov eax, cr0
+  and al, 0xFE     
   mov  cr0, eax 
   sti
   
@@ -182,12 +183,12 @@ read_loop:
   push esi
   call read_sector
   ; moving 512 bytes from low memory to high memory
-  mov ecx ,64
+  mov ecx, 128
   movesector:
-   movq   mm0 , qword[ds:si] 
-   movq  qword[es:edi] ,mm0
-   add edi , 8
-   add esi , 8
+   mov   ebx , dword[ds:si] 
+   mov  dword[es:edi], ebx
+   add edi , 4
+   add esi , 4
    loop movesector
   pop esi
   pop ecx
@@ -383,6 +384,11 @@ align 8
 main64:
  ; We need to page more memory
  call paging
+ ; Initialize CMOS shutdown code to 0ah
+ mov al, 0fh
+ out 070h, al
+ mov al, 0ah
+ out 071h, al
  ; When the signal INIT is sent, the execution starts in 2000h address 
  mov rsi , 2000h
  mov [rsi] , byte 0eah

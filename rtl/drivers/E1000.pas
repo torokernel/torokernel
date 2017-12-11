@@ -42,6 +42,11 @@ uses
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 type
   PE1000 = ^TE1000;
   PE1000RxDesc = ^TE1000RxDesc;
@@ -488,7 +493,7 @@ var
   Packet: PPacket;
   Data, P: PByteArray;
   // this flag is used to drop packets in some situation
-  dropflag: Boolean = false;
+  dropflag: Boolean = False;
 begin
   // Find the head, tail and current descriptors
   {$IFDEF DebugE1000} Head := E1000ReadRegister(Net, E1000_REG_RDH); {$ENDIF}
@@ -506,14 +511,14 @@ begin
   if (RxDesc.Status and E1000_RX_STATUS_DONE) = 0 then
   begin
      {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE exiting\n', []); {$ENDIF}
-     dropflag := true;
+     dropflag := True;
   end;
 
   // this driver does not hable such a kind of packets
   if (RxDesc.Status and  E1000_RX_STATUS_EOP) = 0 then
   begin
     {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_EOP exiting\n', []); {$ENDIF}
-    dropflag := true;
+    dropflag := True;
   end;
 
   if dropflag then
@@ -541,8 +546,8 @@ begin
   // set up the packet for higher layer
   Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
   Packet.size:= RxDesc.Length;
-  Packet.Delete:= false;
-  Packet.Ready:= false;
+  Packet.Delete:= False;
+  Packet.Ready:= False;
   Packet.Next:= nil;
 
   // copy to the buffer
@@ -559,7 +564,7 @@ begin
   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
 
   // report to kernel
-  EnqueueIncomingPacket(Packet);
+  EnqueueeIncomingPacket(Packet);
 end;
 
 // Read all the packets in the reception ring

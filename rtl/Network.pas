@@ -273,7 +273,7 @@ procedure NetworkInit; // used by kernel
 // Network Interface Driver
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 function DequeueOutgoingPacket: PPacket; // Called by ne2000irqhandler.Ne2000Handler
-procedure EnqueueIncomingPacket(Packet: PPacket); // Called by ne2000irqhandler.Ne2000Handler.ReadPacket
+procedure EnqueueeIncomingPacket(Packet: PPacket); // Called by ne2000irqhandler.Ne2000Handler.ReadPacket
 procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
@@ -288,6 +288,11 @@ function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 
 implementation
+
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
 
 var
   DedicateNetworks: array[0..MAX_CPU-1] of TNetworkDedicate;
@@ -502,14 +507,12 @@ function TCP_Checksum(SourceIP, DestIp: TIPAddress; PData: PChar; Len: Word): WO
 var
   PseudoHeader: TPseudoHeader;
 begin
-  // Setup psueudo-header
   FillChar(PseudoHeader, SizeOf(PseudoHeader), 0);
   PseudoHeader.SourceIP := SourceIP;
   PseudoHeader.TargetIP := DestIP;
   PseudoHeader.TCPLen := Swap(Word(Len));
   PseudoHeader.Cero := 0;
   PseudoHeader.Protocol := IP_TYPE_TCP;
-  // Calculate the checksum
   TCP_Checksum := CalculateChecksum(@PseudoHeader,PData,Len, SizeOf(PseudoHeader));
 end;
 
@@ -544,8 +547,8 @@ end;
 
 procedure TCPSendPacket(Flags: LongInt; Socket: PSocket); forward;
 
-// Enqueue Request for Connection to Local Socket
-procedure EnqueueTCPRequest(Socket: PSocket; Packet: PPacket);
+// Enqueuee Request for Connection to Local Socket
+procedure EnqueueeTCPRequest(Socket: PSocket; Packet: PPacket);
 var
   Buffer: Pointer;
   ClientSocket: PSocket;
@@ -567,7 +570,7 @@ begin
   // We have the max number of request for connections
   if Socket.ConnectionsQueueLen = Socket.ConnectionsQueueCount then
   begin
-    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d Queue is complete\n', [LocalPort]);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d Queue is complete\n', [LocalPort]);{$ENDIF}
     ToroFreeMem(Packet);
     Exit;
   end;
@@ -579,7 +582,7 @@ begin
   if ClientSocket=nil then
   begin
    ToroFreeMem(Packet);
-   {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
+   {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
    Exit;
   end;
 
@@ -589,7 +592,7 @@ begin
   begin
     ToroFreeMem(ClientSocket);
     ToroFreeMem(Packet);
-    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
     Exit;
   end;
   // Create a new connection
@@ -597,7 +600,7 @@ begin
   ClientSocket.BufferLength := 0;
   ClientSocket.Buffer := Buffer;
   ClientSocket.BufferReader := ClientSocket.Buffer;
-  // Enqueue the socket to Network Service Structure
+  // Enqueuee the socket to Network Service Structure
   ClientSocket.Next := Service.ClientSocket;
   Service.ClientSocket := ClientSocket;
   ClientSocket.SocketType := SOCKET_STREAM;
@@ -614,9 +617,9 @@ begin
   ClientSocket.NeedFreePort := False;
   ClientSocket.AckTimeOUT := 0;
   ClientSocket.BufferSender := nil;
-  ClientSocket.RemoteClose := false;
+  ClientSocket.RemoteClose := False;
   // todo: to check if it is valid this 
-  ClientSocket.AckFlag := true; 
+  ClientSocket.AckFlag := True; 
   AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
   // we don't need the packet
   ToroFreeMem(Packet);
@@ -624,10 +627,10 @@ begin
   Socket.ConnectionsQueueCount := Socket.ConnectionsQueueCount+1;
   // Send the SYNACK confirmation
   // The socket waits in NEGOTIATION State for the confirmation with Remote ACK
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: sending SYNACK in Socket %h for new Socket Client %h\n', [PtrUInt(Socket), PtrUInt(ClientSocket)]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: sending SYNACK in Socket %h for new Socket Client %h\n', [PtrUInt(Socket), PtrUInt(ClientSocket)]);{$ENDIF}
   TCPSendPacket(TCP_SYNACK, ClientSocket);
   SetSocketTimeOut(ClientSocket, WAIT_ACK);
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: new socket %h to Port %d, Queue: %d\n', [PtrUInt(ClientSocket), LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: new socket %h to Port %d, Queue: %d\n', [PtrUInt(ClientSocket), LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
 end;
 
 // Send a packet using the local Network interface
@@ -668,7 +671,7 @@ begin
   CPUID:= GetApicid;
   Packet.Data := Pointer(PtrUInt(Packet)+SizeOf(TPacket));
   Packet.Size := SizeOf(TArpHeader)+SizeOf(TEthHeader);
-  Packet.Delete := true; 
+  Packet.Delete := True; 
   ARPPacket := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   EthPacket := Packet.Data;
   ARPPacket.Hardware := SwapWORD(1);
@@ -868,17 +871,17 @@ procedure ProcessARPPacket(Packet: PPacket); forward;
 
 // Inform to Kernel that a new Packet has been received
 // This has to be invoked by disabling interruption to prevent concurrent access
-procedure EnqueueIncomingPacket(Packet: PPacket);
+procedure EnqueueeIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
   EthPacket : PEthHeader;
 begin
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueeIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
   // If it is an ARP packet, we process it immediately
   EthPacket := Packet.Data;
   if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
   begin
-      {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+      {$IFDEF DebugNetwork}WriteDebug('EnqueueeIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
       ProcessARPPacket(Packet);
       Exit;
   end;
@@ -891,7 +894,7 @@ begin
     {$IFDEF DebugNetwork}
       if DedicateNetworks[GetApicId].NetworkInterface.IncomingPacketTail <> nil then
       begin
-        WriteDebug('EnqueueIncomingPacket: IncomingPacketTail <> nil\n', []);
+        WriteDebug('EnqueueeIncomingPacket: IncomingPacketTail <> nil\n', []);
       end;
     {$ENDIF}
   end else
@@ -988,7 +991,7 @@ begin
         ArpPacket.SenderIpAddr:=DedicateNetworks[CPUID].IpAddress;
         // the packet doesn't care, cause SysNetworkSend is async, I mark it as deletable
         // TODO: to check if we have to release the packet memory
-        Packet.Delete := true;
+        Packet.Delete := True;
 	{$IFDEF DebugNetwork} WriteDebug('ProcessARPPacket: Sending my ip\n', []); {$ENDIF}
         SysNetworkSend(Packet);
         // reply Request of Ip Address
@@ -1101,7 +1104,7 @@ begin
           // this socket will be closed
           Socket.State:= SCK_LOCALCLOSING;
           // remote host closed the conection
-	  Socket.RemoteClose := true;
+	  Socket.RemoteClose := True;
           Socket.DispatcherEvent:= DISP_ACCEPT;
         end else
         begin
@@ -1164,7 +1167,7 @@ begin
             begin
               Socket.State:= SCK_LOCALCLOSING;
               // remote host closed the conection
-	      Socket.RemoteClose := true;
+	      Socket.RemoteClose := True;
             end;
             {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
           end else begin
@@ -1185,7 +1188,7 @@ begin
                   // this socket will be closed
                   Socket.State:= SCK_LOCALCLOSING;
                   // remote host closed the conection
-		  Socket.RemoteClose := true;
+		  Socket.RemoteClose := True;
                   Socket.AckFlag := True;
 		  {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK to confirm ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
         end else
@@ -1317,7 +1320,7 @@ begin
         if ICMPHeader.tipe = ICMP_ECHO_REQUEST then
         begin
          // the kernel is in charge to free the packet
-         Packet.Delete := true;
+         Packet.Delete := True;
 	 ICMPHeader.tipe:= ICMP_ECHO_REPLY;
          ICMPHeader.checksum:= 0 ;
          Datalen:= SwapWORD(IPHeader.PacketLength) - SizeOf(TIPHeader);
@@ -1351,7 +1354,7 @@ begin
           {$IFDEF DebugNetwork} WriteDebug('ip: received TCP_SYN packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
           // Validate the request to Server Socket
           Socket:= ValidateTCPRequest(IPHeader.SourceIP,SwapWORD(TCPHeader.DestPort),SwapWORD(TCPHeader.SourcePort));
-          // Enqueue the request to socket
+          // Enqueuee the request to socket
           if Socket <> nil then
           begin
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to local port: %d, remote port: %d\n', [PtrUInt(Packet), Socket.SourcePORT, TCPHeader.SourcePort]); {$ENDIF}
@@ -1360,7 +1363,7 @@ begin
             AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to port: %d, adding MAC to table\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
             // Process the TCP part
-            EnqueueTCPRequest(Socket, Packet);
+            EnqueueeTCPRequest(Socket, Packet);
           end else
           begin
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet invalid\n', [PtrUInt(Packet)]); {$ENDIF}
@@ -1439,8 +1442,12 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch;
+      SysThreadSwitch(True);
       Continue;
+    end else
+    begin
+      // reset idle counter
+      SysThreadActive;
     end;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
@@ -1485,9 +1492,9 @@ begin
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
-  // initilization of Services for Packets Manipulation
+  // initialization of Services for Packets Manipulation
   NetworkServicesInit;
-  // driver internal initilization
+  // driver internal initialization
   DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   // cleaning the Socket table
   for I:= 0 to (MAX_SocketPORTS-1) do
@@ -1543,12 +1550,12 @@ begin
       _IPAddress(IP, Network.IpAddress);
       _IPAddress(Gateway, Network.Gateway);
       _IPAddress(Mask, Network.Mask);
-      WriteConsole('Network configuration :\n', []);
-      WriteConsole('Local IP  ... /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
+      WriteConsole('Network configuration:\n', []);
+      WriteConsole('Local IP: /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
 	  (Network.Ipaddress shr 8) and $ff, (Network.Ipaddress shr 16) and $ff, (Network.Ipaddress shr 24) and $ff ]);
-      WriteConsole('/nGateway   ... /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
+      WriteConsole('/nGateway: /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
 	  (Network.Gateway shr 8) and $ff, (Network.Gateway shr 16) and $ff, (Network.Gateway shr 24) and $ff ]);
-	  WriteConsole('/nMask      ... /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
+	  WriteConsole('/nMask: /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
 	  (Network.Mask shr 8) and $ff, (Network.Mask shr 16) and $ff, (Network.Mask shr 24) and $ff ]);
       {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: New Driver dedicated to CPU#%d\n', [CPUID]); {$ENDIF}
       Exit;
@@ -1558,7 +1565,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: fail, driver not found\n', []); {$ENDIF}
 end;
 
-// Initilization of Network structures
+// Initialization of Network structures
 procedure NetworkInit;
 var
   I: LongInt;
@@ -1681,7 +1688,7 @@ var
   Socket: PSocket;
   DoDispatcherFlushPacket: Boolean;
 begin
-  DoDispatcherFlushPacket := true;
+  DoDispatcherFlushPacket := True;
   Service := GetCurrentThread.NetworkService; // Get Network Service structure
   NextSocket := Service.ClientSocket; // Get Client queue
   // we will execute a handler for every socket depending of the EVENT
@@ -1752,14 +1759,14 @@ begin
               SetSocketTimeOut(Socket, WAIT_ACK);
               {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h in SCK_NEGOTIATION, setting new timeout\n', [PtrUInt(Socket)]); {$ENDIF}
               // don't flush buffer when exiting
-              DoDispatcherFlushPacket := false;
+              DoDispatcherFlushPacket := False;
             // This is due to RST packet
             end else if Socket.State = SCK_CLOSED then
             begin
               {$IFDEF DebugSocket} WriteDebug('NetworkDispatcher: Socket: %h, SCK_CLOSED, Freeing Socket\n', [PtrUInt(Socket)]); {$ENDIF}
               FreeSocket(Socket);
               // don't flush buffer when exiting
-              DoDispatcherFlushPacket := false;
+              DoDispatcherFlushPacket := False;
             end else
             begin
               // Nothing happened
@@ -1774,7 +1781,7 @@ begin
       DISP_CLOSE: Handler.DoClose(Socket); // Peer socket disconnected
       DISP_CONNECT: Handler.DoConnect(Socket);
     end;
-    // only flush if DoDispatcherFlushPacket is true
+    // only flush if DoDispatcherFlushPacket is True
     if DoDispatcherFlushPacket then
     begin
       DispatcherFlushPacket(Socket); // Send the packets in the buffer
@@ -1785,13 +1792,24 @@ end;
 
 // Do all internal job of service
 function DoNetworkService(Handler: PNetworkHandler): LongInt;
+var
+  Service: PNetworkService;
 begin
-  Handler.DoInit; // Initilization of Service
+  Handler.DoInit;
   {$IFDEF DebugSocket} WriteDebug('DoNetworkService: DoInit in Handler: %h\n', [PtrUInt(Handler)]); {$ENDIF} 
   while True do
   begin
-    NetworkDispatcher(Handler); // Fetch event for socket and dispatch
-    SysThreadSwitch;
+    // Fetch events for socket and dispatch
+    NetworkDispatcher(Handler);
+    Service := GetCurrentThread.NetworkService;
+    if (Service.ClientSocket = nil) then
+    begin
+      SysThreadSwitch (True);
+    end else
+    begin
+      // reset idle counter
+      SysThreadSwitch;
+    end;
   end;
   Result := 0;
 end;
@@ -1814,7 +1832,7 @@ begin
     ToroFreeMem(Service);
     Exit;
   end;
-  // Enqueue the Service Network structure
+  // Enqueuee the Service Network structure
   Thread.NetworkService := Service;
   Service.ServerSocket := nil;
   Service.ClientSocket := nil;
@@ -1842,7 +1860,7 @@ begin
   Socket.AckFlag := False;
   Socket.AckTimeOut := 0;
   Socket.BufferSender := nil;
-  Socket.RemoteClose := false;
+  Socket.RemoteClose := False;
   FillChar(Socket.DestIP, 0, SizeOf(TIPAddress));
   Socket.DestPort := 0 ;
   Result := Socket;
@@ -1910,10 +1928,10 @@ begin
   Socket.BufferLength := 0;
   Socket.BufferLength:=0;
   Socket.BufferReader:= Socket.Buffer;
-  // Enqueue the Thread Service structure to array of ports
+  // Enqueuee the Thread Service structure to array of ports
   Service := GetCurrentThread.NetworkService;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service ;
-  // Enqueue the socket
+  // Enqueuee the socket
   Socket.Next := Service.ClientSocket;
   Service.ClientSocket := Socket;
   {$IFDEF DebugNetwork} WriteDebug('SysSocketConnect: Connecting from Port %d to Port %d\n', [Socket.SourcePort, Socket.DestPort]); {$ENDIF}
@@ -1990,7 +2008,7 @@ begin
   // The port is busy
   if (Service <> nil) then
    Exit;
-  // Enqueue the Server Socket to Thread Network Service structure
+  // Enqueuee the Server Socket to Thread Network Service structure
   Service:= GetCurrentThread.NetworkService;
   Service.ServerSocket := Socket;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
@@ -2156,7 +2174,7 @@ begin
     Buffer.Packet := Packet;
     Buffer.NextBuffer := nil;
     Buffer.Attempts := 2;
-    // Enqueue Buffer
+    // Enqueuee Buffer
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqueing sender Buffer\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
 	if Socket.BufferSender = nil then
 	begin

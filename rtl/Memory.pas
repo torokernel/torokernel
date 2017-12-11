@@ -136,6 +136,11 @@ procedure MemoryInit;
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 const
   INITIAL_ALLOC_SIZE = 1024*1024; // 1MB
   INITIAL_MAXALLOC_BLOCKCOUNT = 1024; // foreach subsequent SX -> div 2
@@ -931,7 +936,7 @@ begin
   end;
 end;
 
-// Initilization of Memory Directory for every Core
+// Initialization of Memory Directory for every Core
 procedure MemoryInit;
 var
   MajorBlockSize: PtrUInt;

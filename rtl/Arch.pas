@@ -7,7 +7,7 @@
 // Changes :
 //
 // 18/01/2017 Adding DisableInt() and RestoreInt().
-// 11/12/2011 Fixed a bug at boot core initilization.
+// 11/12/2011 Fixed a bug at boot core initialization.
 // 08/08/2011 Fixed bugs caused for a wrong convention calling understanding.
 // 27/10/2009 Cache Managing Implementation.
 // 10/05/2009 SMP Initialization moved to Arch.pas. Supports Multicore.
@@ -115,9 +115,9 @@ procedure change_sp (new_esp : Pointer ) ;
 procedure Delay(ms: LongInt);
 procedure eoi;
 function GetApicID: Byte;
+function GetApicBaseAddr: pointer;
 function get_irq_master: Byte;
 function get_irq_slave: Byte;
-procedure hlt;
 procedure IrqOn(irq: Byte);
 procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
@@ -137,7 +137,7 @@ procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
-procedure InitCore(ApicID: Byte);
+function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
@@ -149,6 +149,9 @@ function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 procedure SetPageReadOnly(Add: Pointer);
 procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
+procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
+procedure mwait(ext: DWORD; hint: DWORD);
+procedure hlt; assembler;
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -162,6 +165,7 @@ const
   HasCacheHandler: Boolean = True;
   HasException: Boolean = True;
   HasFloatingPointUnit : Boolean = True;
+  INTER_CORE_IRQ = 80;
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
@@ -171,10 +175,17 @@ var
   LocalCpuSpeed: Int64 = 0;
   StartTime: TNow;
   Cores: array[0..MAX_CPU-1] of TCore;
-    
+  LargestMonitorLine: longint;
+  SmallestMonitorLine: longint;
+
 implementation
 
 uses Kernel, Console;
+
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
 
 const
   Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
@@ -355,8 +366,12 @@ begin
 	icrl := Pointer(icrlo_reg);
 	icrh := Pointer(icrhi_reg) ;
 	icrh^ := apicid shl 24 ;
-	// mode: init   , destination no shorthand
-	icrl^ := $500;
+	// INIT or LEVEL or ASSERT
+	icrl^ := $500 or $8000 or $4000;
+        DelayMicro(200);
+        // INIT or LEVEL
+        icrl^ := $500 or $8000;
+        DelayMicro(200);
 end;
 
 // Send the startup IPI for initialize for processor 
@@ -364,7 +379,6 @@ procedure send_apic_startup(apicid, vector: Byte);
 var
   icrl, icrh: ^DWORD;
 begin
-  Delay(10);
   icrl := Pointer(icrlo_reg);
   icrh := Pointer(icrhi_reg) ;
   icrh^ := apicid shl 24 ;
@@ -407,13 +421,10 @@ end;
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
 @spin:
-  nop
-  nop
-  nop
-  nop
   mov rax, cmpval
   {$IFDEF LINUX} lock cmpxchg [rdx], rsi {$ENDIF}
   {$IFDEF WINDOWS} lock cmpxchg [r8], rdx {$ENDIF}
+  pause
   jnz @spin
 end;
 
@@ -422,6 +433,23 @@ function GetApicID: Byte; inline;
 begin
   Result := PDWORD(apicid_reg)^ shr 24;
 end;
+
+// Get the apic base address
+function GetApicBaseAddr: pointer;
+var
+  basehigh, baselow: DWORD;
+begin
+  asm
+   mov ecx, 1bh
+   xor eax, eax
+   xor edx, edx
+   rdmsr
+   mov baselow, eax
+   mov basehigh, edx
+  end;
+  Result:= pointer((baselow and $fffff000) or ((basehigh and $f) shr 32));
+end;
+
 
 // Read the IPI delivery status
 // Check Delivery Status register
@@ -490,7 +518,7 @@ procedure RelocateAPIC;
 asm
   mov ecx, 27
   mov edx, 0
-  mov eax, Apic_Base
+//  mov eax, Apic_Base
   wrmsr
 end;
 
@@ -737,12 +765,6 @@ asm
   result := speed;
 end;
 
-// Stop the execution of CPU
-procedure hlt; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
-asm
-  hlt
-end;
-
 // Turn off Qemu VM
 // it is needed to add "-device isa-debug-exit,iobase=0xf4,iosize=0x04"
 procedure ShutdownInQemu;
@@ -769,11 +791,11 @@ function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm
   {$IFDEF WINDOWS} bt  [rcx], rdx {$ENDIF}
   {$IFDEF LINUX} bt [rdi], rsi {$ENDIF}
-  jc  @true
-  @false:
+  jc  @True
+  @False:
    mov rax , 0
    jmp @salir
-  @true:
+  @True:
     mov rax , 1
   @salir:
 end;
@@ -922,10 +944,6 @@ begin
 end;
 
 {$IFDEF FPC}
-procedure nolose; [public, alias: 'FPC_ABSMASK_DOUBLE'];
-begin
-end;
-
 procedure nolose2; [public, alias: 'FPC_EMPTYINTF'];
 begin
 end;
@@ -939,8 +957,6 @@ procedure nolose4;  [public, alias: 'FPC_DONEEXCEPTION'];
 begin
 
 end;
-
-
 {$ENDIF}
 
 // Procedures to capture unhandle interruptions
@@ -955,6 +971,13 @@ asm
   call EOI;
   db $48, $cf
 end;
+
+procedure Apic_IRQ_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
+asm
+  call eoi_apic
+  db $48, $cf
+end;
+
 
 // PCI bus access
 const
@@ -1030,7 +1053,7 @@ end;
 //------------------------------------------------------------------------------
 
 var
-  esp_tmp: Pointer; // Pointer to Stack for each CPU during SMP Initilization
+  esp_tmp: Pointer; // Pointer to Stack for each CPU during SMP Initialization
   start_stack: array[0..MAX_CPU-1] of array[1..size_start_stack] of Byte; // temporary stack for each CPU
 
 {$IFDEF FPC}
@@ -1040,9 +1063,9 @@ procedure boot_confirmation;
 var
   CpuID: Byte;
 begin
+  enable_local_apic;
   CpuID := GetApicID;
   Cores[CPUID].InitConfirmation := True;
-  enable_local_apic;
   Cores[CPUID].InitProc;
 end;
 
@@ -1089,32 +1112,29 @@ end;
 
 // Boot CPU using IPI messages.
 // Warning this procedure must be do it just one time per CPU
-procedure InitCore(ApicID: Byte);
-var
-  Attempt: LongInt;
+function InitCore(ApicID: Byte): Boolean;
 begin
-  // try two times to wake up each core
-  Attempt := 2;
-  while Attempt > 0 do
-  begin
-    // wakeup the remote core with IPI-INIT
-    send_apic_init(apicid);
-    Delay(10);
-    // send the first startup
-    send_apic_startup(ApicID, 2);
-    Delay(10);
-    // remote CPU read the IPI?
+  Result := True;
+  // wakeup the remote core with IPI-INIT
+  // send_apic_init already added some delay
+  send_apic_init(apicid);
+  Delay(10);
+  // send the first startup
+  send_apic_startup(ApicID, 2);
+  Delay(10);
+  // remote CPU read the IPI?
+  if not is_apic_ready then
+  begin // some problem ?? we wait
+    Delay(100);
+    // Serious problem -> exit
     if not is_apic_ready then
-    begin // some problem ?? we wait
-      Delay(100);
-      // Serious problem -> exit
-      if not is_apic_ready then
-        Exit;
+    begin
+     Result := False;
+     Exit;
     end;
-    send_apic_startup(ApicID, 2);
-    Delay(10);
-    Dec(Attempt);
   end;
+  send_apic_startup(ApicID, 2);
+  Delay(10);
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
@@ -1139,12 +1159,12 @@ begin
       Cores[cp.Apic_id].ApicID := cp.Apic_id;
       Cores[cp.Apic_id].Present := True;
       m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
-      // boot core doesn't need initilization
+      // boot core doesn't need initialization
       if (cp.flags and 2 ) = 2 then
       begin
         Cores[cp.Apic_id].CpuBoot := True ;
-        Cores[cp.Apic_id].InitConfirmation := true;
-	Cores[cp.Apic_id].Present := true;
+        Cores[cp.Apic_id].InitConfirmation := True;
+	Cores[cp.Apic_id].Present := True;
       end;
     end else
     begin
@@ -1281,8 +1301,8 @@ begin
                 if Processor.apicid = 0 then
                 begin
                   Cores[Processor.apicid].CPUBoot := True;
-                  Cores[Processor.apicid].InitConfirmation := true;
-		  Cores[Processor.apicid].Present := true;
+                  Cores[Processor.apicid].InitConfirmation := True;
+		  Cores[Processor.apicid].Present := True;
                 end;
               end;
             end;
@@ -1422,6 +1442,63 @@ begin
   FlushCr3;
 end;
 
+//
+// Monitor/MWait Support
+//
+
+// NOTE: addr must be set as a write-back memory
+procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
+begin
+If LargestMonitorLine <> 0 then
+begin
+  asm
+   mov rax, addr
+   mov ecx, ext
+   mov edx, hint
+   monitor
+  end;
+end;
+end;
+
+// NOTE: processor has to support mwait/monitor instrucctions
+procedure mwait(ext: DWORD; hint: DWORD);
+begin
+If LargestMonitorLine <> 0 then
+begin
+asm
+  mov ecx, ext
+  mov eax, hint
+  mwait
+end
+// halt if mwait is not supported
+end
+ else
+ begin
+  asm
+   hlt
+  end;
+end;
+  asm
+  hlt
+  end;
+end;
+
+// Check if Monitor/MWait is supported
+procedure MWaitInit;
+begin
+  asm
+    mov eax, 05h
+    cpuid
+    mov LargestMonitorLine, ebx
+    mov SmallestMonitorLine, eax
+  end;
+end;
+
+procedure hlt;assembler;
+asm
+  hlt
+end;
+
 // Architecture's variables initialization
 procedure ArchInit;
 var
@@ -1444,11 +1521,13 @@ begin
   // CPU Exceptions
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
+  CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
   Now(@StartTime);
+  enable_local_apic;
   SMPInitialization;
-  // initialization of Floating Point Unit
   SSEInit;
+  MWaitInit;
 end;
 
 end.

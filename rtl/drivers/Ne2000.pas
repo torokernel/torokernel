@@ -7,7 +7,7 @@
 // Changes:
 //
 // 06/03/2011: Fixed bug at the initialization.
-// 27/12/2009: Bug Fixed in Initilization process.
+// 27/12/2009: Bug Fixed in Initialization process.
 // 24/12/2008: Bug in Read procedure. In One irq I must read all the packets in the internal buffer
 //             of ne2000. It is a circular buffer.Some problems if Buffer Overflow happens .
 // 24/12/2007: Bug in size of Packets was solved.
@@ -46,6 +46,11 @@ uses
 implementation
 
 {$IFDEF DebugNe2000} uses Debug; {$ENDIF}
+
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
 
 type
   PNe2000 = ^TNe2000;
@@ -174,7 +179,7 @@ begin
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
   begin
-   net.OutgoingPackets := Packet; // Enqueue the packet
+   net.OutgoingPackets := Packet; // Enqueuee the packet
    {$IFDEF DebugNe2000}
      if (Net.OutgoingPacketTail <> nil) then
      begin
@@ -295,8 +300,8 @@ begin
       Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
       Packet.Size := Len;
       Packet.Next := nil;
-      Packet.Ready := false;
-      Packet.Delete := false;
+      Packet.Ready := False;
+      Packet.Delete := False;
       Data := Packet.Data;
       WritePort(Len, Net.iobase+REMOTEBYTECOUNT0);
       WritePort(Len shr 8, Net.iobase+REMOTEBYTECOUNT1);
@@ -312,7 +317,7 @@ begin
         Net.NextPacket := PSTART
       else
         Net.NextPacket := Next;
-      EnqueueIncomingPacket(Packet);
+      EnqueueeIncomingPacket(Packet);
     end;
     if Net.NextPacket = PSTART then
       WritePort(PSTOP-1, Net.iobase+BOUNDARY)

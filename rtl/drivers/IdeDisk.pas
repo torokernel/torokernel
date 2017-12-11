@@ -43,6 +43,11 @@ uses Console, Arch, FileSystem, Process, Debug;
 
 implementation
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 const
  // max number of drivers supported
  MAX_ATA_CONTROLLER= 4;

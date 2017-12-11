@@ -31,7 +31,6 @@
 
 program ToroThread;
 
-
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
@@ -45,37 +44,33 @@ program ToroThread;
 {$ENDIF}
 {%RunFlags BUILD-}
 
-
-
-
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
 uses
-  Kernel in 'rtl\Kernel.pas',
-  Process in 'rtl\Process.pas',
-  Memory in 'rtl\Memory.pas',
-  Debug in 'rtl\Debug.pas',
-  Arch in 'rtl\Arch.pas',
-  Filesystem in 'rtl\Filesystem.pas',
-  Console in 'rtl\Drivers\Console.pas';
-
+  Kernel in '..\rtl\Kernel.pas',
+  Process in '..\rtl\Process.pas',
+  Memory in '..\rtl\Memory.pas',
+  Debug in '..\rtl\Debug.pas',
+  Arch in '..\rtl\Arch.pas',
+  Filesystem in '..\rtl\Filesystem.pas',
+  Console in '..\rtl\Drivers\Console.pas';
 
 var
  tmp: TThreadID;
  var1, var2, var3: longint;
  // sincronization variable to avoid the execution of task2 and task1 at the same time
- n1: boolean = true;
- n2: boolean = false;
+ n1: boolean = True;
+ n2: boolean = False;
 
 // task 2
 function ThreadF2(Param: Pointer):PtrInt;
 begin
-  while true do
+  while True do
   begin
-    while n2=false do SysThreadSwitch;
+    while n2=False do SysThreadSwitch;
     var3:=var2+7;
-    n2:= false;
-    n1:= true ;
+    n2:= False;
+    n1:= True ;
   end;
   Result := 0;
 end;
@@ -84,7 +79,7 @@ end;
 // task3
 function ThreadF3(Param: Pointer):PtrInt;
 begin
-  while true do
+  while True do
   begin
       var1:=var3 mod 11;
       SysThreadSwitch;
@@ -107,15 +102,15 @@ begin
  
   // task1 is implemented using main thread in order to keep the scheduler
   // as stable as possible
-  while true do
+  while True do
   begin
-      while n1=false do SysThreadSwitch;
+      while n1=False do SysThreadSwitch;
       var2:=var1+5;
       // this WriteConsole() adds much noise given that it implements atomic operations
       WriteConsole('%d',[var1]);
       // syncro flags
-      n1:=false;
-      n2:=true;
+      n1:=False;
+      n2:=True;
   end;
 
 end.

@@ -77,6 +77,7 @@ type
     ThreadID: TThreadID; // thread identifier
     Next: PThread; 	 // Next and Previous are independant of the thread created from the Parent
     Previous: PThread;   // and are used for the scheduling to scan all threads for a CPU
+    NextPollingThread: Pthread; // next thread in polling queue
     Parent: Pthread;
     IOScheduler: IOInfo;
     State: Byte;
@@ -93,16 +94,23 @@ type
     StackSize: SizeUInt;
     ret_thread_sp: Pointer;
     sleep_rdtsc: Int64; // sleep counter
+    IdleTime: Int64;
+    IsPollThread: Boolean;
     // Interface between the threads with Network Sockets
     NetworkService: Pointer;
-    CPU: PCPU; // CPU on which is running this thread
+    CPU: PCPU; // CPU on which this thread is running
   end;
 
   // each CPU has this entry
   TCPU = record 
     ApicID: LongInt;
+    Idle: Boolean;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
+    PollingThreads: Pthread;
+    PollingThreadsTail: Pthread;
+    PollingThreadCount: LongInt;
+    PollingThreadTotal: Longint;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
   end;
 
@@ -125,6 +133,7 @@ const
   tsReady = 2 ;
   tsSuspended = 1 ;
   tsZombie = 4 ;
+  tsIdle = 6;
   
   
 // Interface function matching common declaration
@@ -137,9 +146,10 @@ procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
-procedure SysThreadSwitch;
+procedure SysThreadSwitch(const Idle: Boolean = False);
 procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString);
+procedure SysThreadActive;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -151,13 +161,18 @@ uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
   Console, Memory, lnfodwrfToro;
 
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushf;cli;end;}
+{$DEFINE RestoreInt := asm popf;end;}
+
 const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
   SPINLOCK_FREE = 3 ; // flags for spinlock
   SPINLOCK_BUSY = 4 ;
   EXCEP_TERMINATION = -1 ; // code of termination for exception
   THREADVAR_BLOCKSIZE: DWORD = 0 ; // size of local variables storage for every thread
-
+  WAIT_IDLE_THREAD_MS = 200;
   
 // private procedures 
 procedure SystemExit; forward;
@@ -725,6 +740,7 @@ end;
 procedure InitCores;
 var
   I, J: LongInt;
+  Attemps: Longint;
 begin
   WriteConsole('Multicore Initialization ...\n',[]);
   // cleaning all table
@@ -732,7 +748,12 @@ begin
   begin
     CPU[I].ApicID := 0 ;
     CPU[I].CurrentThread := nil;
-    CPU[I].Threads :=nil;
+    CPU[I].Threads := nil;
+    CPU[I].Idle:= False;
+    CPU[I].PollingThreads := nil;
+    CPU[I].PollingThreadsTail := nil;
+    CPU[I].PollingThreadCount:= 0;
+    CPU[I].PollingThreadTotal:= 0;
     for J := 0 to Max_CPU-1 do
     begin
       CPU[I].MsgsToBeDispatched[J] := nil;
@@ -749,20 +770,45 @@ begin
     if not Cores[I].CPUBoot and Cores[I].present then
     begin
       CPU[Cores[I].ApicID].ApicID := Cores[I].ApicID;
-      Cores[I].InitProc := @Scheduling; 
-      InitCore(Cores[I].ApicID); // initialize the CPU
+      Cores[I].InitProc := @Scheduling;
+      // try to initialize the CPU twice
+      for Attemps:= 0 to 1 do
+      begin
+        If not InitCore(Cores[I].ApicID) then
+        begin
+          WriteConsole('Core#%d ... /RHardware Issue\n/n', [Cores[I].ApicID]);
+          break;
+        end;
+        If Cores[I].InitConfirmation then
+         break;
+      end;
       if Cores[I].InitConfirmation then
-        WriteConsole('Core#%d ... /VRunning\n/n', [Cores[I].ApicID])
+        WriteConsole('Core#%d ... /VUp\n/n', [Cores[I].ApicID])
       else
-        WriteConsole('Core#%d ... /RFault\n/n', [Cores[I].ApicID]);
+        WriteConsole('Core#%d ... /RDown\n/n', [Cores[I].ApicID]);
     end else if Cores[I].CPUBoot then
-      WriteConsole('Core#0 ... /VRunning\n/n',[]);
+      WriteConsole('Core#0 ... /VUp\n/n',[]);
   end;
 end;
 
 //------------------------------------------------------------------------------
 // Threads list management
 //------------------------------------------------------------------------------
+
+
+// reset idle counter
+procedure SysThreadActive;
+var
+ T: PThread;
+begin
+  T := GetCurrentThread;
+  if (T.State = tsIdle) then
+  begin
+    T.IdleTime := 0;
+    T.state := tsReady;
+    T.CPU.PollingThreadCount -=1 ;
+  end;
+end;
 
 // Adds a thread to ready task queue
 procedure AddThreadReady(Thread: PThread);
@@ -801,7 +847,7 @@ begin
   Thread.Previous := nil;
 end;
 
-// Enqueu a New Msg to emigrate array
+// Enqueue a New Msg to emigrate array
 procedure AddThreadMsg(Msg: PThreadCreateMsg);
 var
   ApicID: LongInt;
@@ -813,6 +859,9 @@ begin
   FirstMsg := CurrentCPU.MsgsToBeDispatched[ApicID];
   Msg.Next := FirstMsg;
   CurrentCPU.MsgsToBeDispatched[ApicID] := Msg;
+  // wake up cpu
+  if CPU[ApicID].Idle then
+     send_apic_int(ApicID, INTER_CORE_IRQ);
 end;
 
 // Returns current Thread pointer running on this CPU
@@ -873,7 +922,7 @@ begin
     NewThread.StackSize := StackSize;
     NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
     NewThread.sleep_rdtsc := 0;
-    NewThread.FlagKill := false;
+    NewThread.FlagKill := False;
     NewThread.State := tsReady;
     NewThread.StartArg := Arg; // this argument we will read by thread main
     NewThread.ThreadFunc := ThreadFunction;
@@ -882,6 +931,9 @@ begin
     NewThread.ThreadID := TThreadID(NewThread);
     NewThread.CPU := @CPU[CPUID];
     NewThread.Parent :=  GetCurrentThread;
+    NewThread.IsPollThread := False;
+    NewThread.NextPollingThread:= nil;
+    NewThread.IdleTime:= 0;
     // when executing ret_to_thread  this stack is pushed in esp register
     // when scheduling() returns (is a procedure!) return to this eip pointer
     // when thread is executed for first time thread_sp_register pointer to stack base (or end)
@@ -931,7 +983,7 @@ begin
 end;
 
 
-// Kill current Thread and call to the scheduler if Schedule is true
+// Kill current Thread and call to the scheduler if Schedule is True
 procedure ThreadExit(Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
@@ -976,7 +1028,7 @@ begin
   end;
   {$IFDEF DebugProcess} WriteDebug('SysKillThread - sending signal to Thread: %h in CPU: %d \n', [ThreadID, Thread.CPU.ApicID]); {$ENDIF}
   // setting the kill flag 
-  Thread.FlagKill := true;
+  Thread.FlagKill := True;
   Result := 0;
 end;
 
@@ -1032,7 +1084,7 @@ end;
 // Scheduling model implementation
 //
 
-// Import remote thread create command parameters and execute them
+// Import on CurrentCPU pending threads from foreign CPUs
 procedure Inmigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
@@ -1049,6 +1101,17 @@ begin
        RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
        // wake up the parent
        RemoteMsgs.Parent.state := tsReady;
+       // wake up cpu if it is idle
+       if CPU[RemoteCpuID].Idle then
+       begin
+          send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
+       // check two times if cpu is idle
+       end else
+       begin
+           Delay(100);
+           if CPU[RemoteCpuID].Idle then
+             send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
+       end;
        RemoteMsgs := RemoteMsgs.Next;
       end;      
       CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] := nil;
@@ -1068,28 +1131,37 @@ begin
     begin
       CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] := CurrentCPU.MsgsToBeDispatched[RemoteCpuID];
       CurrentCPU.MsgsToBeDispatched[RemoteCpuID]:= nil;
+      // wake up cpu
+      if CPU[RemoteCpuID].Idle then
+         send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
       {$IFDEF DebugProcessEmigrating} WriteDebug('Emigrating - Switch Threads of DispatchArray[%d] to EmigrateArray[%d]\n', [CurrentCPU.ApicID, RemoteCpuID]); {$ENDIF}
     end;
   end;
 end;
 
-// This is the Scheduler
 // Schedule next thread, the current thread must be added in the appropriate list (CPU[].MsgsToBeDispatched) and have saved its registers
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;
-  CurrentThread: PThread;
+  CurrentThread, Th: PThread;
+  NextTurnHalt: Boolean;
 begin
+  NextTurnHalt:= False;
   CurrentCPU := @CPU[GetApicID];
+
   while True do
   begin
-    // in the first moment I am here
+    // go to save-power state if queue is empty
     if CurrentCPU.Threads = nil then
     begin
-	  {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
-      // spin of init
+      {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
       while CurrentCPU.Threads = nil do
-    		Inmigrating(CurrentCPU);
+      begin
+        CurrentCPU.Idle := True;
+        hlt;
+        CurrentCPU.Idle := False;
+        Inmigrating(CurrentCPU);
+      end;
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
       {$IFDEF DebugProcess} WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp)]); {$ENDIF}
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
@@ -1099,24 +1171,72 @@ begin
     Emigrating(CurrentCPU); // enqueue newly created threads to others CPUs
     Inmigrating(CurrentCPU); // Import new threads to CurrentCPU.Threads
     CurrentThread := CurrentCPU.CurrentThread;
+
     if Candidate = nil then
       Candidate := CurrentThread.Next;
+
     repeat
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
       if Candidate.State = tsReady then
+        Break
+      else if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
         Break
       else if (Candidate.State = tsIOPending) and not Candidate.IOScheduler.DeviceState^ then
       begin
         // the device has completed its operation -> Candidate thread is ready to continue its process
         Candidate.State:= tsReady;
-				Break;
+	Break;
       end else begin
     	Candidate := Candidate.Next;
       end;
     until Candidate = CurrentThread;
-    if Candidate.State <> tsReady then
+
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
+
+    if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
+      // do thing in this case
+    else
+    begin
+    if (Candidate.State <> tsReady) then
+    begin
+      // is the whole system in polling mode?
+      if (CurrentCPU.PollingThreadCount = CurrentCPU.PollingThreadTotal) and (CurrentCPU.PollingThreadCount <> 0) then
+      begin
+        {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
+        CurrentCPU.Idle := True;
+        hlt;
+        CurrentCPU.Idle := False;
+        {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
+        // when we wake up, we set all polling threads in ready state
+        Th := CurrentCPU.PollingThreads;
+        while Th <> nil do
+        begin
+         Th.State := tsReady;
+         Th.IdleTime := 0;
+         Dec(CurrentCPU.PollingThreadCount);
+         Th := th.NextPollingThread;
+        end;
+        Continue;
+      end;
+      // halt the core when there is no ready thread
+      // we do two turns before halt it
+      if NextTurnHalt then
+      begin
+        CurrentCPU.Idle := True;
+        hlt;
+        CurrentCPU.Idle := False;
+        NextTurnHalt:= False;
+      end else
+      begin
+         DelayMicro(50);
+         NextTurnHalt:= True;
+      end;
       Continue;
+    end;
+    end;
+    NextTurnHalt:= False;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess}WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(Candidate.ret_thread_sp)]);{$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate),Candidate.State,PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     SwitchStack(@CurrentThread.ret_thread_sp, @Candidate.ret_thread_sp);
@@ -1187,10 +1307,58 @@ begin
 end;
 
 // The current thread is remaining in tq_ready tail and the next thread is scheduled
-procedure SysThreadSwitch;
+procedure SysThreadSwitch(const Idle: Boolean = False);
+var
+ idletime: Int64;
+ tmp: PCPU;
+ Thread: PThread;
 begin
+  // thread is idle
+  if Idle then
+  begin
+     {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: Idle = True\n', []); {$ENDIF}
+     // the thread is enqueue first time
+     if not GetCurrentThread.IsPollThread then
+     begin
+      {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: IsPollThread = True\n', []); {$ENDIF}
+      Thread := GetCurrentThread;
+      tmp := Thread.CPU;
+      Thread.IsPollThread:= True;
+      Inc(tmp.PollingThreadTotal);
+      if tmp.PollingThreads = nil then
+      begin
+       tmp.PollingThreads := Thread;
+       tmp.PollingThreadsTail:= Thread;
+      end else begin
+       tmp.PollingThreadsTail.NextPollingThread := Thread;
+       tmp.PollingThreadsTail := Thread;
+      end;
+     end;
+     idletime := GetCurrentThread.IdleTime;
+     if (idletime = 0) then
+     begin
+       GetCurrentThread.IdleTime := read_rdtsc;
+       {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: setting GetCurrentThread.IdleTime = %d\n', [read_rdtsc]); {$ENDIF}
+     end else
+     begin
+       // it waits 200ms to set the thread in idle
+       if (read_rdtsc - idletime) > (LocalCpuSpeed * 1000)*WAIT_IDLE_THREAD_MS then
+       begin
+          if GetCurrentThread.State <> tsIdle then
+          begin
+           GetCurrentThread.State := tsIdle;
+           Inc(GetCurrentThread.CPU.PollingThreadCount);
+           {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread in idle state\n', []); {$ENDIF}
+          end;
+        end;
+     end;
+  end else
+  begin
+   {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread is active\n', []); {$ENDIF}
+   SysThreadActive;
+  end;
   Scheduling(nil);
-  // checking Kill flag
+  // checking kill flag
   if CPU[GetApicID].CurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} WriteDebug('Signaling - killing CurrentThread\n', []); {$ENDIF}
@@ -1280,7 +1448,7 @@ begin
   WriteConsole('Panic: ',[]);
   WriteConsole(Format,[]);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
-  while true do;
+  while True do;
 end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  

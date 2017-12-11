@@ -493,8 +493,9 @@ var
   Packet: PPacket;
   Data, P: PByteArray;
   // this flag is used to drop packets in some situation
-  dropflag: Boolean = False;
+  DropFlag: Boolean;
 begin
+  DropFlag:= false;
   // Find the head, tail and current descriptors
   {$IFDEF DebugE1000} Head := E1000ReadRegister(Net, E1000_REG_RDH); {$ENDIF}
   Tail := E1000ReadRegister(Net, E1000_REG_RDT);
@@ -511,17 +512,17 @@ begin
   if (RxDesc.Status and E1000_RX_STATUS_DONE) = 0 then
   begin
      {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE exiting\n', []); {$ENDIF}
-     dropflag := True;
+     DropFlag := True;
   end;
 
   // this driver does not hable such a kind of packets
   if (RxDesc.Status and  E1000_RX_STATUS_EOP) = 0 then
   begin
     {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_EOP exiting\n', []); {$ENDIF}
-    dropflag := True;
+    DropFlag := True;
   end;
 
-  if dropflag then
+  if DropFlag then
   begin
     // reset the descriptor
     RxDesc.Status := E1000_RX_STATUS_DONE;
@@ -564,7 +565,7 @@ begin
   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
 
   // report to kernel
-  EnqueueeIncomingPacket(Packet);
+  EnqueueIncomingPacket(Packet);
 end;
 
 // Read all the packets in the reception ring

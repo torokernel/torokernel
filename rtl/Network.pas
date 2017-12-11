@@ -273,7 +273,7 @@ procedure NetworkInit; // used by kernel
 // Network Interface Driver
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 function DequeueOutgoingPacket: PPacket; // Called by ne2000irqhandler.Ne2000Handler
-procedure EnqueueeIncomingPacket(Packet: PPacket); // Called by ne2000irqhandler.Ne2000Handler.ReadPacket
+procedure EnqueueIncomingPacket(Packet: PPacket); // Called by ne2000irqhandler.Ne2000Handler.ReadPacket
 procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
 function GetLocalMAC: THardwareAddress;
@@ -548,7 +548,7 @@ end;
 procedure TCPSendPacket(Flags: LongInt; Socket: PSocket); forward;
 
 // Enqueuee Request for Connection to Local Socket
-procedure EnqueueeTCPRequest(Socket: PSocket; Packet: PPacket);
+procedure EnqueueTCPRequest(Socket: PSocket; Packet: PPacket);
 var
   Buffer: Pointer;
   ClientSocket: PSocket;
@@ -871,7 +871,7 @@ procedure ProcessARPPacket(Packet: PPacket); forward;
 
 // Inform to Kernel that a new Packet has been received
 // This has to be invoked by disabling interruption to prevent concurrent access
-procedure EnqueueeIncomingPacket(Packet: PPacket);
+procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
   EthPacket : PEthHeader;
@@ -1363,7 +1363,7 @@ begin
             AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to port: %d, adding MAC to table\n', [PtrUInt(Packet), Socket.SourcePORT]); {$ENDIF}
             // Process the TCP part
-            EnqueueeTCPRequest(Socket, Packet);
+            EnqueueTCPRequest(Socket, Packet);
           end else
           begin
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet invalid\n', [PtrUInt(Packet)]); {$ENDIF}

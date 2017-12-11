@@ -77,8 +77,8 @@ type
     ThreadID: TThreadID; // thread identifier
     Next: PThread; 	 // Next and Previous are independant of the thread created from the Parent
     Previous: PThread;   // and are used for the scheduling to scan all threads for a CPU
-    NextPollingThread: Pthread; // next thread in polling queue
-    Parent: Pthread;
+    NextPollingThread: PThread; // next thread in polling queue
+    Parent: PThread;
     IOScheduler: IOInfo;
     State: Byte;
     PrivateHeap: Pointer;
@@ -107,8 +107,8 @@ type
     Idle: Boolean;
     CurrentThread: PThread; // thread running in this moment  , in this CPU
     Threads: PThread; // this tail is use by scheduler
-    PollingThreads: Pthread;
-    PollingThreadsTail: Pthread;
+    PollingThreads: PThread;
+    PollingThreadsTail: PThread;
     PollingThreadCount: LongInt;
     PollingThreadTotal: Longint;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
@@ -146,7 +146,7 @@ procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
-procedure SysThreadSwitch(const Idle: Boolean = False);
+procedure SysThreadSwitch(const Idle: Boolean);
 procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString);
 procedure SysThreadActive;
@@ -805,7 +805,7 @@ begin
   if (T.State = tsIdle) then
   begin
     T.IdleTime := 0;
-    T.state := tsReady;
+    T.State := tsReady;
     T.CPU.PollingThreadCount -=1 ;
   end;
 end;

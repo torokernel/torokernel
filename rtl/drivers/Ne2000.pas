@@ -317,7 +317,7 @@ begin
         Net.NextPacket := PSTART
       else
         Net.NextPacket := Next;
-      EnqueueeIncomingPacket(Packet);
+      EnqueueIncomingPacket(Packet);
     end;
     if Net.NextPacket = PSTART then
       WritePort(PSTOP-1, Net.iobase+BOUNDARY)

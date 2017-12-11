@@ -447,7 +447,7 @@ begin
    mov baselow, eax
    mov basehigh, edx
   end;
-  Result:= pointer((baselow and $fffff000) or ((basehigh and $f) shr 32));
+  Result:= pointer(PtrUInt((baselow and $fffff000) or ((basehigh and $f) shr 32)));
 end;
 
 
@@ -778,9 +778,11 @@ var
   l, h: QWORD;
 begin
   asm
+  xor rax, rax
+  xor rdx, rdx
   rdtsc
-  mov l, eax
-  mov h, edx
+  mov l, rax
+  mov h, rdx
   end;
   result := QWORD(h shl 32) or l;
 end;

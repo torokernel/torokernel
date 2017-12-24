@@ -39,7 +39,7 @@ program TorowithFileSystem;
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -57,7 +57,7 @@ uses
   ext2 in '..\rtl\drivers\ext2.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  E1000 in '..\rtl\Drivers\E1000.pas';
+  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
 // IP values
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
@@ -129,7 +129,7 @@ end;
 
 begin
   // Dedicate the e1000 network card to local cpu
-  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);

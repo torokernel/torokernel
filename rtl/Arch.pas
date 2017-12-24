@@ -123,12 +123,15 @@ procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
 function read_portb(port: Word): Byte;
+procedure read_portd(Data: Pointer; Port: Word);
 function read_rdtsc: Int64;
 procedure send_apic_init (apicid : Byte) ;
 procedure send_apic_startup (apicid , vector : Byte );
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 procedure SwitchStack(sv: Pointer; ld: Pointer);
 procedure write_portb(Data: Byte; Port: Word);
+procedure write_portd(const Data: Pointer; const Port: Word);
+procedure write_portw(Data: Word; Port: Word);
 procedure CaptureInt (int: Byte; Handler: Pointer);
 procedure CaptureException(Exception: Byte; Handler: Pointer);
 procedure ArchInit;
@@ -152,8 +155,9 @@ procedure eoi_apic;
 procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
 procedure mwait(ext: DWORD; hint: DWORD);
 procedure hlt; assembler;
-procedure read_portd(Data: Pointer; Port: Word);
-procedure write_portd(const Data: Pointer; const Port: Word);
+procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -1502,6 +1506,25 @@ procedure hlt;assembler;
 asm
   hlt
 end;
+
+//
+// Memory barriers API
+//
+procedure ReadBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+asm
+  lfence
+end;
+
+procedure ReadWriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+asm
+  mfence
+end;
+
+procedure WriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+asm
+  sfence
+end;
+
 
 // Architecture's variables initialization
 procedure ArchInit;

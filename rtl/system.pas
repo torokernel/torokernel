@@ -7761,6 +7761,10 @@ begin
 	Result := GetCurrentThreadID;
 end;
 
+procedure fpc_emptymethod;[public,alias : 'FPC_EMPTYMETHOD'];
+begin
+end;
+
 begin
   SysInitExceptions;
   StackLength := 1024;

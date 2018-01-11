@@ -649,6 +649,7 @@ asm
  push r9
  push r13
  push r14
+ push r15
  // protect the stack
  mov r15 , rsp
  mov rbp , r15
@@ -659,6 +660,7 @@ asm
  Call e1000handler
  mov rsp , rbp
  // restore the registers
+ pop r15
  pop r14
  pop r13
  pop r9

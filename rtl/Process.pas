@@ -165,6 +165,8 @@ uses
 {$DEFINE EnableInt := asm sti;end;}
 {$DEFINE DisableInt := asm pushf;cli;end;}
 {$DEFINE RestoreInt := asm popf;end;}
+{$DEFINE GetRBP := asm mov rbp_reg, rbp;end;}
+{$DEFINE StoreRBP := asm mov rbp, rbp_reg;end;}
 
 const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
@@ -1145,10 +1147,10 @@ var
   CurrentCPU: PCPU;
   CurrentThread, Th: PThread;
   NextTurnHalt: Boolean;
+  rbp_reg: pointer;
 begin
   NextTurnHalt:= False;
   CurrentCPU := @CPU[GetApicID];
-
   while True do
   begin
     // go to save-power state if queue is empty
@@ -1239,7 +1241,11 @@ begin
     {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate),Candidate.State,PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
       Exit;
-    SwitchStack(@CurrentThread.ret_thread_sp, @Candidate.ret_thread_sp);
+    // switch stack frame
+    GetRBP;
+    CurrentThread.ret_thread_sp := rbp_reg;
+    rbp_reg := Candidate.ret_thread_sp;
+    StoreRBP;
     Break;
   end;
 end;

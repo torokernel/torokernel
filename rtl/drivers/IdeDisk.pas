@@ -37,7 +37,7 @@ unit IdeDisk;
 interface
 
 {$I ..\Toro.inc}
-//{$DEFINE DebugIdeDisk}
+{$DEFINE DebugIdeDisk}
 
 uses Console, Arch, FileSystem, Process, Debug;
 
@@ -273,26 +273,26 @@ begin
   Result := (Temp and (1 shl 3)) <> 0;
 end;
 
-procedure ATAIn(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
+procedure ATAIn(Buffer: Pointer; IOPort: LongInt);
 asm // RCX: Buffer, RDX: IOPort
-  {$IFDEF DCC} push rdi {$ENDIF}
+   push rdi
   {$IFDEF LINUX} mov edx, IOPort {$ENDIF}
   mov rdi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256
   rep insw
-  {$IFDEF DCC} pop rdi {$ENDIF}
+  pop rdi
 end;
 
-procedure ATAOut(Buffer: Pointer; IOPort: LongInt); {$IFDEF Inline} inline;{$ENDIF}
+procedure ATAOut(Buffer: Pointer; IOPort: LongInt);
 asm // RCX: Buffer, RDX: IOPort
-  {$IFDEF DCC} push rsi {$ENDIF}
+  push rsi
   {$IFDEF LINUX} mov edx, IOPort {$ENDIF}
   mov rsi, Buffer
   add rdx, ATA_DATA
   mov rcx, 256
   rep outsw
-  {$IFDEF DCC} pop rsi {$ENDIF}
+  pop rsi
 end;
 
 // Prepare the Controller to Operation.
@@ -472,6 +472,7 @@ push r8
 push r9
 push r13
 push r14
+push r15
 // protect the stack
 mov r15 , rsp
 mov rbp , r15
@@ -484,6 +485,7 @@ call send_apic_int
 call eoi
 mov rsp , rbp
 // restore the registers
+pop r15
 pop r14
 pop r13
 pop r9
@@ -515,6 +517,7 @@ asm
   push r9
   push r13
   push r14
+  push r15
   // protect the stack
   mov r15 , rsp
   mov rbp , r15
@@ -531,6 +534,7 @@ asm
   Call ATAHandler
   mov rsp , rbp
   // restore the registers
+  pop r15
   pop r14
   pop r13
   pop r9
@@ -561,6 +565,7 @@ asm
   push r9
   push r13
   push r14
+  push r15
   // protect the stack
   mov r15 , rsp
   mov rbp , r15
@@ -577,6 +582,7 @@ asm
   Call ATAHandler
   mov rsp , rbp
   // restore the registers
+  pop r15
   pop r14
   pop r13
   pop r9
@@ -606,7 +612,7 @@ begin
   // sending Commands
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_READ);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: prepared and commands sent, Block:%d, Count:%d\n', [Block, Count]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('ATAReadBlock: prepared and commands sent, Block: %d, Count: %d, Buffer: %h\n', [Block, Count, PtrUInt(Buffer)]); {$ENDIF}
   repeat
     SysThreadSwitch; // wait for the irq
     if not ATADataReady(Ctr) or ATAError(Ctr) then
@@ -621,7 +627,7 @@ begin
   // returns the number of blocks read
   Result := ReadCount;
   FreeDevice(FileDesc.BlockDriver);
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATAReadBlock, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + ReadCount]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('ATAReadBlock:, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + ReadCount]); {$ENDIF}
 end;
 
 
@@ -640,6 +646,7 @@ begin
   Ctr.Driver.WaitOn.state := tsSuspended;
   ATAPrepare(Ctr,FileDesc.Minor,Block,Count);
   ATASendCommand(Ctr,ATA_WRITE);
+  {$IFDEF DebugIdeDisk} WriteDebug('ATAWriteBlock: prepared and commands sent, Block: %d, Count: %d, Buffer: %h\n', [Block, Count, PtrUInt(Buffer)]); {$ENDIF}
   // writing
   repeat
     DisableInt;

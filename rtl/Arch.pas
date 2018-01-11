@@ -152,6 +152,8 @@ procedure eoi_apic;
 procedure monitor(addr: pointer; ext: DWORD; hint: DWORD);
 procedure mwait(ext: DWORD; hint: DWORD);
 procedure hlt; assembler;
+procedure read_portd(Data: Pointer; Port: Word);
+procedure write_portd(const Data: Pointer; const Port: Word);
 
 const
   MP_START_ADD = $e0000; // we will start the search of mp_floating_point begin this address
@@ -341,20 +343,20 @@ end;
 
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-  {$IFDEF DCC} push rsi {$ENDIF} // it is obvious that rsi should also be saved for FPC
+        push rsi
   {$IFDEF LINUX} mov dx, port {$ENDIF}
 	mov rsi, data // DX=port
         outsd
-  {$IFDEF DCC} pop rsi {$ENDIF}
+        pop rsi
 end;
 
 procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
-  {$IFDEF DCC} push rdi {$ENDIF} // it is obvious that rdi should also be saved for FPC
+        push rdi
         {$IFDEF LINUX} mov dx, port {$ENDIF}
 	mov rdi, data // DX=port
 	insd
-  {$IFDEF DCC} pop rdi {$ENDIF}
+        pop rdi
 end;
 
 // Send init interrupt to apicid
@@ -446,7 +448,7 @@ begin
    rdmsr
    mov baselow, eax
    mov basehigh, edx
-  end;
+  end ['ECX', 'EAX', 'EDX'];
   Result:= pointer(PtrUInt((baselow and $fffff000) or ((basehigh and $f) shr 32)));
 end;
 
@@ -651,7 +653,7 @@ begin
   mov eax, 1
   cpuid
   mov features, edx
-  end;
+  end ['EAX', 'EDX'];
 
   // we verify if there is timecounter
   // if not we cannot calculate the speed so we exit
@@ -755,7 +757,7 @@ asm
   pop   ax
 @CPUS_SKP:
   mov speed, ax
-  end;
+  end ['EAX', 'EDX', 'EBX', 'ECX'];
   
   if speed = 0 then
   begin
@@ -783,7 +785,7 @@ begin
   rdtsc
   mov l, rax
   mov h, rdx
-  end;
+  end ['RAX', 'RDX'];
   result := QWORD(h shl 32) or l;
 end;
 
@@ -1458,7 +1460,7 @@ begin
    mov ecx, ext
    mov edx, hint
    monitor
-  end;
+  end ['RAX', 'ECX', 'EDX'];
 end;
 end;
 
@@ -1471,7 +1473,7 @@ asm
   mov ecx, ext
   mov eax, hint
   mwait
-end
+end ['ECX', 'EAX']
 // halt if mwait is not supported
 end
  else
@@ -1493,7 +1495,7 @@ begin
     cpuid
     mov LargestMonitorLine, ebx
     mov SmallestMonitorLine, eax
-  end;
+  end ['EAX', 'EBX'];
 end;
 
 procedure hlt;assembler;

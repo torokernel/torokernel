@@ -547,7 +547,7 @@ end;
 
 procedure TCPSendPacket(Flags: LongInt; Socket: PSocket); forward;
 
-// Enqueuee Request for Connection to Local Socket
+// Enqueue Request for Connection to Local Socket
 procedure EnqueueTCPRequest(Socket: PSocket; Packet: PPacket);
 var
   Buffer: Pointer;
@@ -570,7 +570,7 @@ begin
   // We have the max number of request for connections
   if Socket.ConnectionsQueueLen = Socket.ConnectionsQueueCount then
   begin
-    {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d Queue is complete\n', [LocalPort]);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d Queue is complete\n', [LocalPort]);{$ENDIF}
     ToroFreeMem(Packet);
     Exit;
   end;
@@ -582,7 +582,7 @@ begin
   if ClientSocket=nil then
   begin
    ToroFreeMem(Packet);
-   {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
+   {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
    Exit;
   end;
 
@@ -592,7 +592,7 @@ begin
   begin
     ToroFreeMem(ClientSocket);
     ToroFreeMem(Packet);
-    {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
+    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
     Exit;
   end;
   // Create a new connection
@@ -600,7 +600,7 @@ begin
   ClientSocket.BufferLength := 0;
   ClientSocket.Buffer := Buffer;
   ClientSocket.BufferReader := ClientSocket.Buffer;
-  // Enqueuee the socket to Network Service Structure
+  // Enqueue the socket to Network Service Structure
   ClientSocket.Next := Service.ClientSocket;
   Service.ClientSocket := ClientSocket;
   ClientSocket.SocketType := SOCKET_STREAM;
@@ -627,10 +627,10 @@ begin
   Socket.ConnectionsQueueCount := Socket.ConnectionsQueueCount+1;
   // Send the SYNACK confirmation
   // The socket waits in NEGOTIATION State for the confirmation with Remote ACK
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: sending SYNACK in Socket %h for new Socket Client %h\n', [PtrUInt(Socket), PtrUInt(ClientSocket)]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: sending SYNACK in Socket %h for new Socket Client %h\n', [PtrUInt(Socket), PtrUInt(ClientSocket)]);{$ENDIF}
   TCPSendPacket(TCP_SYNACK, ClientSocket);
   SetSocketTimeOut(ClientSocket, WAIT_ACK);
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueeTCPRequest: new socket %h to Port %d, Queue: %d\n', [PtrUInt(ClientSocket), LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: new socket %h to Port %d, Queue: %d\n', [PtrUInt(ClientSocket), LocalPort, Socket.ConnectionsQueueCount]);{$ENDIF}
 end;
 
 // Send a packet using the local Network interface
@@ -876,12 +876,12 @@ var
   PacketQueue: PPacket;
   EthPacket : PEthHeader;
 begin
-  {$IFDEF DebugNetwork}WriteDebug('EnqueueeIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+  {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
   // If it is an ARP packet, we process it immediately
   EthPacket := Packet.Data;
   if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
   begin
-      {$IFDEF DebugNetwork}WriteDebug('EnqueueeIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+      {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
       ProcessARPPacket(Packet);
       Exit;
   end;
@@ -894,7 +894,7 @@ begin
     {$IFDEF DebugNetwork}
       if DedicateNetworks[GetApicId].NetworkInterface.IncomingPacketTail <> nil then
       begin
-        WriteDebug('EnqueueeIncomingPacket: IncomingPacketTail <> nil\n', []);
+        WriteDebug('EnqueueIncomingPacket: IncomingPacketTail <> nil\n', []);
       end;
     {$ENDIF}
   end else
@@ -1354,7 +1354,7 @@ begin
           {$IFDEF DebugNetwork} WriteDebug('ip: received TCP_SYN packet %h\n', [PtrUInt(Packet)]); {$ENDIF}
           // Validate the request to Server Socket
           Socket:= ValidateTCPRequest(IPHeader.SourceIP,SwapWORD(TCPHeader.DestPort),SwapWORD(TCPHeader.SourcePort));
-          // Enqueuee the request to socket
+          // Enqueue the request to socket
           if Socket <> nil then
           begin
             {$IFDEF DebugNetwork} WriteDebug('ip: SYNC packet %h to local port: %d, remote port: %d\n', [PtrUInt(Packet), Socket.SourcePORT, TCPHeader.SourcePort]); {$ENDIF}
@@ -1832,7 +1832,7 @@ begin
     ToroFreeMem(Service);
     Exit;
   end;
-  // Enqueuee the Service Network structure
+  // Enqueue the Service Network structure
   Thread.NetworkService := Service;
   Service.ServerSocket := nil;
   Service.ClientSocket := nil;
@@ -1928,10 +1928,10 @@ begin
   Socket.BufferLength := 0;
   Socket.BufferLength:=0;
   Socket.BufferReader:= Socket.Buffer;
-  // Enqueuee the Thread Service structure to array of ports
+  // Enqueue the Thread Service structure to array of ports
   Service := GetCurrentThread.NetworkService;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service ;
-  // Enqueuee the socket
+  // Enqueue the socket
   Socket.Next := Service.ClientSocket;
   Service.ClientSocket := Socket;
   {$IFDEF DebugNetwork} WriteDebug('SysSocketConnect: Connecting from Port %d to Port %d\n', [Socket.SourcePort, Socket.DestPort]); {$ENDIF}
@@ -2008,7 +2008,7 @@ begin
   // The port is busy
   if (Service <> nil) then
    Exit;
-  // Enqueuee the Server Socket to Thread Network Service structure
+  // Enqueue the Server Socket to Thread Network Service structure
   Service:= GetCurrentThread.NetworkService;
   Service.ServerSocket := Socket;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
@@ -2174,7 +2174,7 @@ begin
     Buffer.Packet := Packet;
     Buffer.NextBuffer := nil;
     Buffer.Attempts := 2;
-    // Enqueuee Buffer
+    // Enqueue Buffer
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqueing sender Buffer\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
 	if Socket.BufferSender = nil then
 	begin

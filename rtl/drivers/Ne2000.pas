@@ -179,7 +179,7 @@ begin
   PacketQueue := Net.OutgoingPackets; // Queue of packets
   if PacketQueue = nil then
   begin
-   net.OutgoingPackets := Packet; // Enqueuee the packet
+   net.OutgoingPackets := Packet; // Enqueue the packet
    {$IFDEF DebugNe2000}
      if (Net.OutgoingPacketTail <> nil) then
      begin

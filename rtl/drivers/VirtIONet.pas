@@ -205,31 +205,22 @@ var
 begin
   vq := @Nic.VirtQueues[queue_index];
 
-  ReadWriteBarrier;
-
-  aval_index := vq.available.index;
+  index := vq.available.index mod vq.queue_size;
+  buffer_index := vq.next_buffer;
+  vq.available.rings[index] := buffer_index;
+  buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
 
   for i := 0 to (count-1) do
   begin
-    index := aval_index mod vq.queue_size;
-    buffer_index := vq.next_buffer;
-
-    buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
-    vq.available.rings[index]:= buffer_index;
-
-    ReadWriteBarrier;
-
-    next_buffer_index := (buffer_index + 1) mod vq.queue_size;
+    next_buffer_index:= (buffer_index +1) mod vq.queue_size;
     b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
 
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     tmp.flags := b.flags;
-
-    if (i <> (count-1)) then
-        tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
-
     tmp.next := next_buffer_index;
     tmp.length := b.size;
+    if (i <> (count-1)) then
+        tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
 
     // FIXME: use copy=false to use zero-copy approach
     if b.copy then
@@ -237,22 +228,17 @@ begin
        tmp.address:= PtrUInt (buf); // check this
        if (bi.buffer <> nil) then
            Move(b.buffer^, buf^, b.size);
+       Inc(buf, b.size);
     end else
        tmp.address:= PtrUInt(b.buffer);
 
-    ReadWriteBarrier;
-
-    vq.next_buffer := next_buffer_index;
-
-    aval_index := aval_index + 1;
+    buffer_index := next_buffer_index;
     {$IFDEF DebugVirtio}WriteDebug('VirtIOSendBuffer: queue: %d, vq.available.index: %d, vq.used.index: %d, vq.used.len: %d id: %d\n',[queue_index, vq.available.index, vq.used.index, vq.used.rings[(vq.used.index-1) mod vq.queue_size].length, vq.used.rings[(vq.used.index-1) mod vq.queue_size].index]);{$ENDIF}
   end;
 
   ReadWriteBarrier;
-
-  vq.available.index:= vq.available.index + count;
-
-  ReadWriteBarrier;
+  vq.next_buffer := buffer_index;
+  vq.available.index:= vq.available.index + 1;
 
   // device tells us that notification are not needed
   if (vq.used.flags and 1 <> 1) then
@@ -548,7 +534,7 @@ begin
            NicVirtIO.VirtQueues[j].lock:= 0;
            write_portd(@buffPage, PtrUInt(NicVirtIO.Regs) + $08);
            NicVirtIO.VirtQueues[j].available.flags := 0;
-           {$IFDEF DebugVirtio}WriteDebug('VirtIONet: queue: /V%d/n, size: /V%d/n\n',[j, QueueSize]);{$ENDIF}
+           {$IFDEF DebugVirtio}WriteDebug('VirtIONet: queue: %d, size: %d\n',[j, QueueSize]);{$ENDIF}
          end;
 
          write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK, PtrUInt(NicVirtIO.Regs) + $12);

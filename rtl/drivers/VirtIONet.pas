@@ -161,13 +161,14 @@ begin
 end;
 
 
-procedure VirtIOCleanUsedBuffers(Nic: PVirtIONetwork; queue_index: word);
+// Process transmission buffers
+procedure VirtIOProcessTx(Nic: PVirtIONetwork);
 var
   vq: PVirtQueue;
   index, norm_index, buffer_index: Word;
   tmp: PQueueBuffer;
 begin
-  vq := @Nic.VirtQueues[queue_index];
+  vq := @Nic.VirtQueues[1];
 
   {$IFDEF DebugVirtio}WriteDebug('VirtIOCleanUsedBuffers: queue: %d, last_used: %d, used_idx: %d\n',[queue_index, vq.last_used_index, vq.used.index]);{$ENDIF}
 
@@ -185,7 +186,7 @@ begin
     norm_index := index mod vq.queue_size;
     buffer_index := vq.used.rings[norm_index].index;
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    // free buffer
+    // mark buffer as free
     tmp.length:= 0;
     inc(index);
   end;
@@ -253,6 +254,7 @@ type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
 
+// Process reception buffers
 procedure VirtIOProcessRx(Net: PVirtIONetwork);
 var
   Packet: PPacket;
@@ -353,8 +355,8 @@ begin
   r := read_portb(PtrUInt(NicVirtIO.Regs) + $13);
   if (r and 1 = 1) then
   begin
-     VirtIOProcessRx(@NicVirtIO);
-     VirtIOCleanUsedBuffers (@NicVirtIO,1);
+     VirtIOProcessRx (@NicVirtIO);
+     VirtIOProcessTx (@NicVirtIO);
   end;
   {$IFDEF DebugVirtio}WriteDebug('VirtIOHandler: used.flags:%d, ava.flags:%d, r:%d\n',[NicVirtIO.VirtQueues[1].used.flags, NicVirtIO.VirtQueues[1].available.flags, r]);{$ENDIF}
   eoi;
@@ -379,7 +381,6 @@ begin
   n.checksum_offset := 0;
   n.checksum_start := 0;
 
-  // first buffer is header and the second is the packet
   bi[0].buffer := @n;
   bi[0].size := sizeof(TNetHeader);
   bi[0].flags := 0;
@@ -395,8 +396,11 @@ begin
   // The outgoingPacket queue is not really used
   // it does not verify if a packet has been sent
   Net.OutgoingPackets:= Packet;
+
   // queu_index = 1 is the tx
   VirtIOSendBuffer(@NicVirtIO, 1, @bi[0], 2);
+
+  // dequeue to avoid leaks
   DequeueOutgoingPacket;
 
   RestoreInt;
@@ -473,7 +477,7 @@ begin
     // looking for ethernet network card
     if (PciCard.mainclass = $02) and (PciCard.subclass = $00) then
     begin
-      // looking for e1000 card
+      // looking for virtio card
       if (PciCard.vendor = $1AF4) and (PciCard.device >= $1000) and (PciCard.device <= $103f) then
       begin
          NicVirtIO.IRQ := PciCard.irq;

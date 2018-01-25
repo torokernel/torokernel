@@ -606,15 +606,21 @@ end;
      WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
      WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
      WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-     WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
-  WriteConsole('Backtrace:\n',[]);
-  PrintBackTraceStr(pointer(rip_reg));
-  get_caller_stackinfo(pointer(rbp_reg), addr);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  // FIXME: check if rip_reg is valid
+  if (rip_reg <> 0) then
   begin
-       get_caller_stackinfo(pointer(rbp_reg), addr);
-       PrintBackTraceStr(addr);
+    WriteConsole('Backtrace:\n',[]);
+    {$IFDEF DebugCrash}
+     WriteDebug('Backtrace:\n',[]);
+    {$ENDIF}
+    PrintBackTraceStr(pointer(rip_reg));
+    get_caller_stackinfo(pointer(rbp_reg), addr);
+    while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+    begin
+     get_caller_stackinfo(pointer(rbp_reg), addr);
+     PrintBackTraceStr(addr);
+    end;
   end;
   ExceptionHandler;
 end;

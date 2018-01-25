@@ -39,7 +39,7 @@ program TorowithFileSystem;
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -57,7 +57,8 @@ uses
   ext2 in '..\rtl\drivers\ext2.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  E1000 in '..\rtl\Drivers\E1000.pas';
+  //E1000 in '..\rtl\Drivers\E1000.pas';
+  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
 // IP values
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
@@ -67,10 +68,10 @@ const
 var
   HttpServer: PSocket;
   Buffer: char;
-  buff: array[0..500] of char;
+  Buf: array[0..500] of char;
   tmp: THandle;
   HttpHandler: TNetworkHandler;
-  count: longint = 0;
+  BufLen: longint = 0;
 
 // Socket initialization
 procedure HttpInit;
@@ -100,9 +101,11 @@ begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsole ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   // we keep reading until there is no more data
-  while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
+  while SysSocketRecv(Socket, @Buffer, 1, 0) <> 0 do
+  begin
+  end;
   // we send the whole file
-  SysSocketSend(Socket, @buff[0], count, 0);
+  SysSocketSend(Socket, @Buf[0], BufLen, 0);
   WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
@@ -128,8 +131,8 @@ begin
 end;
 
 begin
-  // Dedicate the e1000 network card to local cpu
-  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+  //DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
@@ -137,7 +140,7 @@ begin
   // we mount locally
   SysMount('ext2','ATA0',5);
 
-  // we set the call backs used by the kernel
+  // Setup callbacks used by the Http APIs
   HttpHandler.DoInit := @HttpInit;
   HttpHandler.DoAccept := @HttpAccept;
   HttpHandler.DoTimeOut := @HttpTimeOut;
@@ -150,7 +153,7 @@ begin
   if (tmp <> 0) then
   begin
     // we read the whole file
-    count := SysReadFile(tmp,sizeof(buff),@buff);
+    BufLen := SysReadFile(tmp,sizeof(Buf), @Buf);
     // we close the file
     SysCloseFile(tmp);
   end else

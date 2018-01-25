@@ -171,6 +171,8 @@ begin
 
   {$IFDEF DebugVirtio}WriteDebug('VirtIOCleanUsedBuffers: queue: %d, last_used: %d, used_idx: %d\n',[queue_index, vq.last_used_index, vq.used.index]);{$ENDIF}
 
+  ReadWriteBarrier;
+
   if (vq.last_used_index = vq.used.index) then
   begin
      Exit;
@@ -201,7 +203,6 @@ var
   b: PBufferInfo;
   i: LongInt;
   tmp: PQueueBuffer;
-  aval_index: longint;
 begin
   vq := @Nic.VirtQueues[queue_index];
 
@@ -252,7 +253,7 @@ type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
 
-procedure ReadPacket(Net: PVirtIONetwork);
+procedure VirtIOProcessRx(Net: PVirtIONetwork);
 var
   Packet: PPacket;
   rx: PVirtQueue;
@@ -287,15 +288,20 @@ begin
   // read until queue is empty
   while (rx.last_used_index <> rx.used.index) do
   begin
+    ReadWriteBarrier;
+
     index := rx.last_used_index mod rx.queue_size;
     buffer_index := rx.used.rings[index].index;
 
     buf := rx.buffers;
     Inc(buf, buffer_index);
+
     P := Pointer(buf.address+sizeof(TNetHeader));
     Len := rx.used.rings[index].length-sizeof(TNetHeader);
 
     Packet := ToroGetMem(Len+SizeOf(TPacket));
+
+    {$IFDEF DebugVirtio}WriteDebug('VirtIOReadPacket: buf.length: %d, buf.flags: %d, add: %d, buffer_index: %d\n', [buf.length,buf.flags, buf.address, buffer_index]);{$ENDIF}
 
     if (Packet <> nil) then
     begin
@@ -312,9 +318,11 @@ begin
 
     rx.last_used_index:= rx.last_used_index + 1;
 
+    // return the buffer
     bi.size := FRAME_SIZE;
-    bi.buffer := nil;
+    bi.buffer := Pointer(buf.address);
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi.copy:= false;
 
     VirtIOSendBuffer(Net,0,@bi,1);
 
@@ -345,8 +353,7 @@ begin
   r := read_portb(PtrUInt(NicVirtIO.Regs) + $13);
   if (r and 1 = 1) then
   begin
-     ReadPacket(@NicVirtIO);
-     VirtIOCleanUsedBuffers (@NicVirtIO,0);
+     VirtIOProcessRx(@NicVirtIO);
      VirtIOCleanUsedBuffers (@NicVirtIO,1);
   end;
   {$IFDEF DebugVirtio}WriteDebug('VirtIOHandler: used.flags:%d, ava.flags:%d, r:%d\n',[NicVirtIO.VirtQueues[1].used.flags, NicVirtIO.VirtQueues[1].available.flags, r]);{$ENDIF}

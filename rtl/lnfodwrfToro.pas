@@ -33,7 +33,7 @@ type
 
 uses Console, Debug;
 
-function GetLineInfo(addr:ptruint;var func,source:string;var line:longint) : boolean;
+function GetLineInfo(addr:ptruint;var func,source: shortstring;var line:longint) : boolean;
 procedure PrintBackTraceStr(addr: Pointer);
 
 
@@ -189,7 +189,7 @@ begin
 end;
 
 
-function Init(aBase, aLimit : Int64) : Boolean;
+function Init(aBase, aLimit : Int64): Boolean; overload;
 begin
   base := aBase;
   limit := aLimit;
@@ -200,7 +200,7 @@ begin
   index := 0;
 end;
 
-function Init(aBase : Int64) : Boolean;
+function Init(aBase : Int64): Boolean; overload;
 begin
   Init := Init(aBase, limit - (aBase - base));
 end;
@@ -225,7 +225,7 @@ end;
 
 { Returns the next Byte from the input stream, or -1 if there has been
   an error }
-function ReadNext() : Longint; inline;
+function ReadNext(): Longint; overload; inline;
 var
   t: ^byte;
 begin
@@ -256,7 +256,7 @@ end;
 { Reads the next size bytes into dest. Returns True if successful,
   False otherwise. Note that dest may be partially overwritten after
   returning False. }
-function ReadNext(var dest; size : SizeInt) : Boolean;
+function ReadNext(var dest; size : SizeInt): Boolean; overload;
 var
   bytesread, totalread : SizeInt;
   r: Boolean;
@@ -343,7 +343,7 @@ end;
 { Reads an address from the current input stream }
 function ReadAddress() : PtrUInt;
 begin
-  ReadNext(ReadAddress, sizeof(ReadAddress));
+  ReadNext(Result, SizeOf(Result));
 end;
 
 
@@ -380,7 +380,7 @@ end;
 { Reads an unsigned Half from the current input stream }
 function ReadUHalf() : Word;
 begin
-  ReadNext(ReadUHalf, sizeof(ReadUHalf));
+  ReadNext(Result, SizeOf(Result));
 end;
 
 
@@ -424,11 +424,13 @@ end;
 
 { Skips all line info directory entries }
 procedure SkipDirectories();
-var s : ShortString;
+var
+  s: ShortString;
 begin
   while (True) do begin
     s := ReadString();
-    if (s = '') then break;
+    if Length(S) = 0 then
+      Break;
     DEBUG_WRITELN('Skipping directory : ', s);
   end;
 end;
@@ -449,7 +451,8 @@ var s : ShortString;
 begin
   while (True) do begin
     s := ReadString();
-    if (s = '') then break;
+    if Length(s) = 0 then
+      Break;
     DEBUG_WRITELN('Skipping filename : ', s);
     SkipLEB128(); { skip the directory index for the file }
     SkipLEB128(); { skip last modification time for file }
@@ -462,7 +465,7 @@ begin
   CalculateAddressIncrement := (Int64(opcode) - header.opcode_base) div header.line_range * header.minimum_instruction_length;
 end;
 
-function GetFullFilename(const filenameStart, directoryStart : Int64; const file_id : DWord) : ShortString;
+function GetFullFilename(const filenameStart, directoryStart : Int64; const file_id : DWord) : shortstring;
 var
   i : DWord;
   filename, directory : ShortString;
@@ -475,33 +478,36 @@ begin
   while (i <= file_id) do begin
     filename := ReadString();
     DEBUG_WRITELN('Found "', filename, '"');
-    if (filename = '') then break;
+    if Length(filename) = 0 then
+      Break;
     dirindex := ReadLEB128(); { read the directory index for the file }
     SkipLEB128(); { skip last modification time for file }
     SkipLEB128(); { skip length of file }
     inc(i);
   end;
   { if we could not find the file index, exit }
-  if (filename = '') then begin
-    GetFullFilename := '(Unknown file)';
-    exit;
+  if Length(filename) = 0 then
+  begin
+    Result := '(Unknown file)';
+    Exit;
   end;
 
   Seek(directoryStart);
   i := 1;
   while (i <= dirindex) do begin
     directory := ReadString();
-    if (directory = '') then break;
+    if Length(directory) = 0 then
+      Break;
     inc(i);
   end;
-  if (directory<>'') and (directory[length(directory)]<>'/') then
-    directory:=directory+'/';
-  GetFullFilename := directory + filename;
+  if (Length(directory) <> 0) and (directory[length(directory)]<>'/') then
+    directory := directory+'/';
+  Result := directory + filename;
 end;
 
 
 function ParseCompilationUnit(const addr : PtrUInt; const file_offset : QWord;
-  var source : String; var line : longint; var found : Boolean) : QWord;
+  var source: ShortString; var line: longint; var found : Boolean) : QWord;
 var
   state : TMachineState;
   { we need both headers on the stack, although we only use the 64 bit one internally }
@@ -749,7 +755,7 @@ begin
   end;
 end;
 
-function GetLineInfo(addr : ptruint; var func, source : string; var line : longint) : boolean;
+function GetLineInfo(addr : ptruint; var func, source: shortstring; var line : longint) : boolean;
 var
   current_offset : QWord;
   end_offset : QWord;
@@ -770,8 +776,7 @@ begin
 
   while (current_offset < end_offset) and (not found) do begin
     Init(current_offset, end_offset - current_offset);
-    current_offset := ParseCompilationUnit(addr, current_offset,
-      source, line, found);
+    current_offset := ParseCompilationUnit(addr, current_offset, source, line, found);
   end;
 
   GetLineInfo:=True;
@@ -781,7 +786,7 @@ end;
 procedure PrintBackTraceStr(addr: Pointer);
 var
   func,
-  source : string;
+  source: shortstring;
   line   : longint;
   Store  : TBackTraceStrFunc;
   Success : boolean;

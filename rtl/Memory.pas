@@ -43,7 +43,7 @@ unit Memory;
 
 interface
 
-uses  
+uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
   Arch, Console;
 
@@ -51,8 +51,11 @@ const
   MAX_SX = 30; // Size indeX used to access MemoryAllocator directory
   XHEAP_INITIAL_CAPACITY = 1024*128; // 256KB including TXHeap record
   XHEAP_MAX_CHUNKS = 128;
+  XHEAP_MAX_LARGEBLOCKS = 128; // meaning 128x1MB+
   XHEAP_MAX_STACK = 128;
   XHEAP_CHUNK_CAPACITY = 1024*1024; // 1MB
+  POOLHEAP_MAX = 1024; // 1024 heap of 128K per NUMA node -> 128MB
+  POOLHEAP_MAXCHUNK = 128; // 128 chunks of 1MB per NUMA node -> 128MB
 
 type
   TBlockHeader = UInt64;
@@ -61,11 +64,19 @@ type
   PPointerArray = ^TPointerArray;
   PXHeap = ^TXHeap;
   TXHeap = record // Private heap
+    MemoryAllocator: Byte; // used to return heap to proper MemoryAllocators[MemoryAllocator].PoolHeap
     ChunkCount: Integer;
     ChunkIndex: Integer;
     ChunkOffset: PtrUInt;
     ChunkCapacity: PtrUInt;
+    {$IFNDEF RELEASE}
+      ChunkWaterMark: Integer; // !!! only for debug purpose
+      ChunkStackLevel: Integer; // !!! only for debug purpose
+      ChunkStackLevelWaterMark: Integer; // !!! only for debug purpose
+    {$ENDIF}
     Chunks: array[0..XHEAP_MAX_CHUNKS-1] of Pointer; // Each chunk is 1MB
+    LargeBlockCount: Integer;
+    LargeBlocks: array[0..XHEAP_MAX_LARGEBLOCKS-1] of Pointer; // Each chunk is 1MB
     Root: PXHeap;
     StackHeaps: array[0..XHEAP_MAX_STACK-1] of PXHeap; // only for RootHeap, Pool of StackHeap used by every call to XScratchStack
     StackHeapCount: Integer;
@@ -74,6 +85,9 @@ type
     StatsSize: Integer; // Size allocated
     StatsTotal: Integer; // Total of blocks allocated
     StatsVirtualAllocSize: Int64; // Count of VirtualAlloc is ChunkIndex+1
+    {$IFNDEF RELEASE}
+      WaterMark: PtrUInt; // only for debug purpose to track infinite growing Private/Scratch
+    {$ENDIF}
   end;
   TBlockList = record
     MaxAllocBlockCount: Cardinal; // 1024 default
@@ -94,11 +108,13 @@ type
     CurrentVirtualAlloc: Integer; // for this CPU
     TotalVirtualAlloc: Integer; // for this CPU
   	Current: Integer; // Counter to track the current number of allocated blocks
-    CurrentAllocatedSize: Integer;
+    CurrentAllocatedSize: PtrUInt;
     Total: Integer; // Counter to track the total number of memory allocations
     FreeCount: Integer; // for this CPU
-    FreeSize: Cardinal; // for this CPU
+    FreeSize: PtrUInt; // for this CPU
   	Directory: array[0..MAX_SX-1] of TBlockList; // Index is the SX (Size indeX)
+    PoolHeap: TBlockList; // Blocks of XHEAP_INITIAL_CAPACITY (128KB)
+    PoolHeapChunk: TBlockList; // Blocks of XHEAP_CHUNK_CAPACITY (1MB)
   end;
   PMemoryAllocator = ^TMemoryAllocator;
   TMemoryAllocators = array[0..MAX_CPU-1] of TMemoryAllocator;
@@ -122,14 +138,17 @@ function GetPointerSize(P: Pointer): Integer;
 function IsPrivateHeap(P: Pointer): Byte; inline;
 function XHeapAcquire(CPU: Byte): PXHeap;
 function XHeapAlloc(Heap: PXHeap; Size: PtrUInt): Pointer;
-procedure XHeapRelease(Heap: PXHeap);
+procedure XHeapFree(Heap: PXHeap; P: Pointer);
 function XHeapRealloc(Heap: PXHeap; P: Pointer; NewSize: PtrUInt): Pointer;
+procedure XHeapRelease(Heap: PXHeap);
 function XHeapStack(Heap: PXHeap): PXHeap;
 function XHeapUnstack(Heap: PXHeap): PXHeap;
 
 function ToroGetMem(Size: PtrUInt): Pointer;
 function ToroFreeMem(P: Pointer): Integer;
+function NumaFreeMem(P: Pointer): Integer;
 function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
+function NumaReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
 function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 procedure MemoryInit;
@@ -175,6 +194,11 @@ var
 // TODO: inline this function
 function GetSX(Size: PtrUInt): Byte;
 begin
+  if Size = 0 then
+  begin
+    Result := 0;
+    Exit;
+  end;
   if Size < MAPSX_COUNT*8 then
   begin
     Result := MapSX[(Size-1) div 8]; // KW 20110804 changed from MapSX[Size div 8]
@@ -270,27 +294,72 @@ begin
   Heap.ChunkIndex := 0;
   Heap.ChunkOffset := SizeOf(TXHeap);
   Heap.ChunkCapacity := XHEAP_INITIAL_CAPACITY-SizeOf(TXHeap);
+  Heap.LargeBlockCount := 0;
 end;
 
 function XHeapAcquire(CPU: Byte): PXHeap;
+var
+  {$IFDEF HEAP_STATS2} BlockList: PBlockList; {$ENDIF}
+  MemoryAllocator: PMemoryAllocator;
 begin
-  Result := ToroGetMem(XHEAP_INITIAL_CAPACITY);
+  Result := nil;
+  MemoryAllocator := @MemoryAllocators[CPU];
+  if MemoryAllocator.PoolHeap.Count > 0 then
+  begin
+    Result := MemoryAllocator.PoolHeap.List[MemoryAllocator.PoolHeap.Count-1];
+    Result.MemoryAllocator := CPU;
+    Dec(MemoryAllocator.PoolHeap.Count);
+  end;
+  if Result = nil then
+  begin
+    Result := ToroGetMem(XHEAP_INITIAL_CAPACITY);
+    Result.MemoryAllocator := CPU;
+  end;
   XHeapReset(Result);
   Result.Chunks[0] := Pointer(PtrUInt(Result)+SizeOf(TXHeap));
-{$IFDEF XHEAP_STATS}
-  Result.StatsVirtualAllocSize := XHEAP_INITIAL_CAPACITY;
-  Inc(XHeapStatsCurrent);
-  Inc(XHeapStatsTotal);
-  Inc(XHeapStatsCurrentVirtualAllocCount);
-  Inc(XHeapStatsCurrentVirtualAllocSize, XHEAP_INITIAL_CAPACITY);
-  Inc(XHeapStatsTotalVirtualAllocCount);
-  Inc(XHeapStatsTotalVirtualAllocSize, XHEAP_INITIAL_CAPACITY);
-{$ENDIF}
-{$IFDEF XHEAP_STATS2}
-  Result.StatsCurrent := 0;
-  Result.StatsSize := 0;
-  Result.StatsTotal := 0;
-{$ENDIF}
+  Result.ChunkCount := 1;
+  Result.Root := nil;
+  Result.StackHeapIndex := 0;
+  Result.StackHeapCount := 1;
+  Result.StackHeaps[0] := Result;
+  {$IFDEF XHEAP_STATS2}
+    Result.StatsCurrent := 0;
+    Result.StatsSize := 0;
+    Result.StatsTotal := 0;
+  {$ENDIF}
+  {$IFDEF HEAP_STATS}
+    Dec(MemoryAllocator.FreeSize, XHEAP_INITIAL_CAPACITY);
+    Inc(MemoryAllocator.CurrentAllocatedSize, XHEAP_INITIAL_CAPACITY);
+  {$ENDIF}
+  {$IFDEF HEAP_STATS2}
+    Dec(MemoryAllocator.FreeCount);
+    Inc(MemoryAllocator.Current);
+    Inc(MemoryAllocator.Total);
+    BlockList := @MemoryAllocator.PoolHeap;
+    Inc(BlockList.Current); // Counters do not need to be under Lock
+    Inc(BlockList.Total);
+  {$ENDIF}
+end;
+
+function XHeapAddChunk(Heap: PXHeap): Pointer;
+begin
+  Result := nil;
+  if Heap.ChunkIndex >= XHEAP_MAX_CHUNKS-1 then
+    Exit;
+  Inc(Heap.ChunkIndex);
+  Result:= ToroGetMem(XHEAP_CHUNK_CAPACITY);
+  if Result = nil then
+    Exit;
+  Heap.Chunks[Heap.ChunkIndex] := Result;
+  Heap.ChunkCapacity := XHEAP_CHUNK_CAPACITY;
+  Heap.ChunkOffset := 0;
+  {$IFDEF XHEAP_STATS}
+    Inc(Heap.StatsVirtualAllocSize, Heap.ChunkCapacity);
+    Inc(XHeapStatsCurrentVirtualAllocCount);
+    Inc(XHeapStatsCurrentVirtualAllocSize, Heap.ChunkCapacity);
+    Inc(XHeapStatsTotalVirtualAllocCount);
+    Inc(XHeapStatsTotalVirtualAllocSize, Heap.ChunkCapacity);
+  {$ENDIF}
 end;
 
 function XHeapAlloc(Heap: PXHeap; Size: PtrUInt): Pointer;
@@ -301,28 +370,25 @@ begin
   SizeMod8 := Size mod 8;
   if SizeMod8 > 0 then 
     Inc(Size, 8-SizeMod8); // Align to 8 byte upper boundary
+  if Size+BLOCK_HEADER_SIZE >= MINIMUM_VIRTUALALLOC_SIZE then
+  begin
+    if Heap.LargeBlockCount >= XHEAP_MAX_LARGEBLOCKS then
+    begin
+      Result := nil; // it will raise OutOfMemory by XAlloc
+      Exit;
+    end;
+    Result := ToroGetMem(Size);
+    Heap.LargeBlocks[Heap.LargeBlockCount] := Result;
+    // NOTE: for large blocks allocated on private heap, the programmer must only use XFree(Heap, P) and not FreeMem(P)
+    Inc(Heap.LargeBlockCount);
+    Exit;
+  end;
   BlockSize := Size+BLOCK_HEADER_SIZE;
   if Heap.ChunkOffset+BlockSize >= Heap.ChunkCapacity then
   begin
-    if Heap.ChunkIndex >= XHEAP_MAX_CHUNKS-1 then
-    begin
-      Result := nil;
-      Exit;
-    end;
-    Inc(Heap.ChunkIndex);
-    Result:= ToroGetMem(XHEAP_CHUNK_CAPACITY);
+    Result := XHeapAddChunk(Heap);
     if Result = nil then
       Exit;
-    Heap.Chunks[Heap.ChunkIndex] := Result;
-    Heap.ChunkCapacity := XHEAP_CHUNK_CAPACITY;
-    Heap.ChunkOffset := 0;
-{$IFDEF XHEAP_STATS}
-    Inc(Heap.StatsVirtualAllocSize, Heap.ChunkCapacity);
-    Inc(XHeapStatsCurrentVirtualAllocCount);
-    Inc(XHeapStatsCurrentVirtualAllocSize, Heap.ChunkCapacity);
-    Inc(XHeapStatsTotalVirtualAllocCount);
-    Inc(XHeapStatsTotalVirtualAllocSize, Heap.ChunkCapacity);
-{$ENDIF}
   end;
   Result := Pointer(PtrUInt(Heap.Chunks[Heap.ChunkIndex])+Heap.ChunkOffset+BLOCK_HEADER_SIZE);
   SetHeaderPrivate(0, Size, Result);
@@ -334,7 +400,24 @@ begin
 {$ENDIF}
 end;
 
- function XHeapRealloc(Heap: PXHeap; P: Pointer; NewSize: PtrUInt): Pointer;
+procedure XHeapFree(Heap: PXHeap; P: Pointer);
+var
+  Index, Index2: Integer;
+begin
+  for Index := Heap.LargeBlockCount-1 downto 0 do
+  begin
+    if Heap.LargeBlocks[Index] = P then
+    begin
+      for Index2 := Index to Heap.LargeBlockCount-2 do
+        Heap.LargeBlocks[Index2] := Heap.LargeBlocks[Index2+1];
+      Dec(Heap.LargeBlockCount);
+      ToroFreeMem(P);
+      Break;
+    end;
+  end;
+end;
+
+function XHeapRealloc(Heap: PXHeap; P: Pointer; NewSize: PtrUInt): Pointer;
 var
   CPU: Byte;
   IsFree: Byte;
@@ -366,31 +449,141 @@ begin
   ToroFreeMem(P);
 end;
 
-procedure XHeapRelease(Heap: PXHeap);
+
+procedure BlockListExpand(BlockList: PBlockList);
+var
+  NewCapacity: Cardinal;
+  NewList: PPointerArray;
+begin
+  NewCapacity := BlockList.Capacity*2;
+  NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
+  Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
+  ToroFreeMem(BlockList.List);
+  {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  BlockList.Capacity := NewCapacity;
+  BlockList.List := NewList;
+end;
+
+// Called by DistributeChunk and FreeMem
+procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
+begin
+  if BlockList.Count >= BlockList.Capacity then
+  begin
+    //WriteConsole('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
+    //Exit;
+    BlockListExpand(BlockList);
+  end;
+  BlockList.List^[BlockList.Count] := P;
+  Inc(BlockList.Count);
+  {$IFDEF DebugMemory} WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
+end;
+
+procedure PoolHeapRelease(MemoryAllocator: PMemoryAllocator; Heap: PXHeap);
+begin
+  if MemoryAllocator.PoolHeap.Count < POOLHEAP_MAX then
+  begin
+    BlockListAdd(@MemoryAllocator.PoolHeap, Heap);
+    {$IFDEF HEAP_STATS}
+      Dec(MemoryAllocator.CurrentAllocatedSize, XHEAP_INITIAL_CAPACITY);
+      Inc(MemoryAllocator.FreeSize, XHEAP_INITIAL_CAPACITY);
+    {$ENDIF}
+    {$IFDEF HEAP_STATS2}
+      Dec(MemoryAllocator.Current);
+      Inc(MemoryAllocator.FreeCount);
+      Dec(MemoryAllocator.PoolHeap.Current);
+    {$ENDIF}
+    Exit;
+  end;
+  ToroFreeMem(Heap);
+  {$IFDEF XHEAP_STATS}
+    Dec(XHeapStatsCurrentVirtualAllocCount);
+    Dec(XHeapStatsCurrentVirtualAllocSize, XHEAP_INITIAL_CAPACITY);
+  {$ENDIF}
+  {$IFDEF HEAP_STATS}
+    Dec(CurrentVirtualAllocated, XHEAP_INITIAL_CAPACITY);
+    Dec(MemoryAllocator.CurrentAllocatedSize, XHEAP_INITIAL_CAPACITY);
+  {$ENDIF}
+  {$IFDEF HEAP_STATS2}
+    Dec(MemoryAllocator.CurrentVirtualAlloc);
+    Dec(MemoryAllocator.Current);
+    Dec(MemoryAllocator.PoolHeap.CurrentVirtualAlloc);
+    Dec(MemoryAllocator.PoolHeap.Current);
+  {$ENDIF}
+end;
+
+procedure PoolHeapChunkRelease(MemoryAllocator: PMemoryAllocator; Chunk: Pointer);
+begin
+  if MemoryAllocator.PoolHeapChunk.Count < POOLHEAP_MAXCHUNK then
+  begin
+    BlockListAdd(@MemoryAllocator.PoolHeapChunk, Chunk);
+    {$IFDEF HEAP_STATS}
+      Dec(MemoryAllocator.CurrentAllocatedSize, XHEAP_CHUNK_CAPACITY);
+      Inc(MemoryAllocator.FreeSize, XHEAP_CHUNK_CAPACITY);
+    {$ENDIF}
+    {$IFDEF HEAP_STATS2}
+      Dec(MemoryAllocator.Current);
+      Inc(MemoryAllocator.FreeCount);
+      Dec(MemoryAllocator.PoolHeapChunk.Current);
+    {$ENDIF}
+    Exit;
+  end;
+  ToroFreeMem(Chunk);
+  {$IFDEF XHEAP_STATS}
+    Dec(XHeapStatsCurrentVirtualAllocCount);
+    Dec(XHeapStatsCurrentVirtualAllocSize, XHEAP_CHUNK_CAPACITY);
+  {$ENDIF}
+  {$IFDEF HEAP_STATS}
+    Dec(CurrentVirtualAllocated, XHEAP_CHUNK_CAPACITY);
+    Dec(MemoryAllocator.CurrentAllocatedSize, XHEAP_CHUNK_CAPACITY);
+  {$ENDIF}
+  {$IFDEF HEAP_STATS2}
+    Dec(MemoryAllocator.CurrentVirtualAlloc);
+    Dec(MemoryAllocator.Current);
+    Dec(MemoryAllocator.PoolHeapChunk.CurrentVirtualAlloc);
+    Dec(MemoryAllocator.PoolHeapChunk.Current);
+  {$ENDIF}
+end;
+
+procedure XHeapReleaseStackHeaps(Heap: PXHeap);
 var
   I: Integer;
 begin
+  for I := 1 to Heap.StackHeapCount-1 do // First Index is the Heap itself
+    XHeapRelease(Heap.StackHeaps[I]);
+end;
+
+procedure XHeapRelease(Heap: PXHeap);
+var
+  Chunk: Pointer;
+  I: Integer;
+  MemoryAllocator: PMemoryAllocator;
+begin
   if Heap = nil then
     Exit;
+  MemoryAllocator := @MemoryAllocators[Heap.MemoryAllocator];
 {$IFDEF XHEAP_STATS2}
   Inc(XHeapStatsTotalCount, Heap.StatsTotal);
   Inc(XHeapStatsTotalSize, Heap.StatsSize);
 {$ENDIF}
-  for I := 1 to Heap.ChunkIndex do // First Index is the Heap itself
+  for I := 0 to Heap.LargeBlockCount-1 do
+    ToroFreeMem(Heap.LargeBlocks[I]);
+  for I := 1 to Heap.ChunkCount-1 do // First Index is the Heap itself
   begin
-   // TODO: release in PoolChunks upto a threshold
-   ToroFreeMem(Heap.Chunks[I]);
+    Chunk := Heap.Chunks[I];
+    PoolHeapChunkRelease(MemoryAllocator, Chunk);
   end;
-{$IFDEF XHEAP_STATS}
-  Dec(XHeapStatsCurrent);
-  Dec(XHeapStatsCurrentVirtualAllocCount, Heap.ChunkIndex+1);
-  if Heap.ChunkIndex+1 > XHeapStatsMaxVirtualAllocCount then
-    XHeapStatsMaxVirtualAllocCount := Heap.ChunkIndex+1;
-  Dec(XHeapStatsCurrentVirtualAllocSize, Heap.StatsVirtualAllocSize);
-{$ENDIF}
+  if Heap.Root = nil then
+    XHeapReleaseStackHeaps(Heap);
+  {$IFDEF XHEAP_STATS}
+    if Heap.ChunkIndex+1 > XHeapStatsMaxVirtualAllocCount then
+      XHeapStatsMaxVirtualAllocCount := Heap.ChunkCount;
+  {$ENDIF}
+  Heap.ChunkCount := 0;
   Heap.ChunkIndex := -1;
   Heap.ChunkOffset := 0;
-  ToroFreeMem(Heap);
+  Heap.LargeBlockCount := 0;
+  PoolHeapRelease(MemoryAllocator, Heap);
 end;
 
 // Heap cannot be nil
@@ -423,41 +616,18 @@ end;
 // Heap cannot be nil
 function XHeapUnstack(Heap: PXHeap): PXHeap;
 var
+  I: Integer;
   Root: PXHeap;
 begin
   if Heap.Root = nil then
     Root := Heap
   else
     Root := Heap.Root;
+  for I := 0 to Heap.LargeBlockCount-1 do
+    ToroFreeMem(Heap.LargeBlocks[I]);
+  Heap.LargeBlockCount := 0;
   Dec(Root.StackHeapIndex);
   Result := Root.StackHeaps[Root.StackHeapIndex];
-end;
-
-// Called by DistributeChunk and FreeMem
-procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
-// var
-//  NewCapacity: Cardinal;
-//  NewList: PPointerArray;
-begin
-  if BlockList.Count >= BlockList.Capacity then
-  begin
-     WriteConsole('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
-    {$IFDEF DebugMemory} WriteDebug('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []); {$ENDIF}
-   (* // TODO: Need to handle to realloc BlockList in case the actual capacity is reached 
-    NewCapacity := BlockList.Capacity*2;
-    NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
-    Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
-    ToroFreeMem(BlockList.List);
-    {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
-    {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
-	BlockList.Capacity := NewCapacity;
-    BlockList.List := NewList;
-   	*)
-	Exit;
-  end;
-  BlockList.List^[BlockList.Count] := P;
-  Inc(BlockList.Count);
-  {$IFDEF DebugMemory} WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
 
 // Called by ToroGetMem->ObtainFromLargerChunk and by MemoryInit->DistributeMemoryRegions->InitializeDirectory
@@ -537,9 +707,7 @@ begin
   SplitChunk(MemoryAllocator, Chunk, ChunkSize);
 end;
 
-//
 // Returns a pointer to a block of memory of len at least equal than Size
-//
 function ToroGetMem(Size: PtrUInt): Pointer;
 var
   BlockList: PBlockList;
@@ -559,7 +727,7 @@ begin
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
-	RestoreInt;
+	  RestoreInt;
     Exit;
   end;
   CPU := GetApicID;
@@ -571,49 +739,49 @@ begin
   {$ENDIF}
   BlockList := @MemoryAllocator.Directory[SX];
   if BlockList.Count = 0 then
-   begin
+  begin
      {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
       Result := ObtainFromLargerChunk(SX, MemoryAllocator);
 	  // no more memory
       if Result = nil then
 	  begin
 		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
-	    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
 		RestoreInt;
-        Exit;
-	  end;
-	  {$IFDEF DebugMemory}
-	   	// This helps to find corruptions in the headers
-		GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
-		WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]); 
-	  {$ENDIF}
-	  // If block is not free, we raise an exception 
-	  if IsFree(Result)=0 then 
-	  begin
-		WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
-	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
-		Result := nil; 
-		RestoreInt;
-		Exit;
-	  end;
-	  ResetFreeFlag(Result);
-     {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
-     {$IFDEF HEAP_STATS2}
-      Inc(MemoryAllocator.Current);
-      Inc(MemoryAllocator.Total);
-      Inc(BlockList.Current); // Counters do not need to be under Lock
-      Inc(BlockList.Total);
-     {$ENDIF}
-     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	  RestoreInt;
-	  Exit;
-    end;
-    Result := BlockList.List^[BlockList.Count-1];
-   {$IFDEF DebugMemory}
-		// This helps to find corruptions in the headers
-		GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
-		WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]); 
-   {$ENDIF}
+    Exit;
+	 end;
+  {$IFDEF DebugMemory}
+	  // This helps to find corruptions in the headers
+    GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
+    WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
+  {$ENDIF}
+  // If block is not free, we raise an exception
+  if IsFree(Result)=0 then
+  begin
+    WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
+    Result := nil;
+    RestoreInt;
+    Exit;
+  end;
+  ResetFreeFlag(Result);
+  {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
+  {$IFDEF HEAP_STATS2}
+    Inc(MemoryAllocator.Current);
+    Inc(MemoryAllocator.Total);
+    Inc(BlockList.Current); // Counters do not need to be under Lock
+    Inc(BlockList.Total);
+  {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
+  RestoreInt;
+  Exit;
+  end;
+  Result := BlockList.List^[BlockList.Count-1];
+  {$IFDEF DebugMemory}
+  // This helps to find corruptions in the headers
+  GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
+  WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
+  {$ENDIF}
 	// If block is not free, we raise an exception 
 	if IsFree(Result)=0 then 
 	begin
@@ -623,8 +791,8 @@ begin
 		RestoreInt;
 		Exit;
 	end;
-    ResetFreeFlag(Result);
-    Dec(BlockList.Count);
+  ResetFreeFlag(Result);
+  Dec(BlockList.Count);
   {$IFDEF HEAP_STATS}
     Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
     Dec(MemoryAllocator.FreeSize, DirectorySX[SX]);
@@ -655,7 +823,6 @@ begin
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
-  
   if IsFree = FLAG_FREE then // already free
   begin
     WriteConsole('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
@@ -693,6 +860,11 @@ begin
   Result := 0;
   RestoreInt;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
+end;
+
+function NumaFreeMem(P: Pointer): Integer;
+begin
+  Result := ToroFreeMem(P);
 end;
 
 // Returns free block of memory filling with zeros
@@ -735,6 +907,11 @@ begin
     Exit;
 	Move(PByte(P)^, PByte(Result)^, OldSize); 
   ToroFreeMem(P);
+end;
+
+function NumaReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
+begin
+  Result := ToroReAllocMem(P, NewSize);
 end;
 
 //
@@ -854,9 +1031,21 @@ begin
   SplitChunk(MemoryAllocator, Chunk, ChunkSize);
 end;
 
+procedure InitBlockList(BlockList: PBlockList; MaxAllocBlockCount: Cardinal);
+begin
+  BlockList.MaxAllocBlockCount := MaxAllocBlockCount;
+  BlockList.CurrentVirtualAlloc := 0;
+  BlockList.TotalVirtualAlloc := 0;
+  BlockList.Current := 0;
+  BlockList.Total := 0;
+  BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
+  BlockList.Count := 0;
+  BlockList.List := ToroGetMem(BlockList.Capacity*SizeOf(Pointer));
+end;
+
 // Distribution of Memory for every core
 // called by MemoryInit
-// TODO: to add more debug info here
+// TODO: add more debug info here
 procedure DistributeMemoryRegions;
 var
   Amount, Counter: PtrUInt;
@@ -895,10 +1084,9 @@ begin
         // the amount is assigned to the directory
         InitializeDirectory(MemoryAllocator, StartAddress, Counter);
         // same region block
-        StartAddress:= Pointer(PtrUInt(StartAddress) + Counter);
+        StartAddress := Pointer(PtrUInt(StartAddress) + Counter);
         MemoryAllocator.EndAddress := StartAddress;
-        // change the cpu
-        Counter := 0;
+        Break; // Next CPU
       end else if Amount = Counter then
       begin
         InitializeDirectory(MemoryAllocator, StartAddress, Amount);
@@ -933,6 +1121,8 @@ begin
         StartAddress := Pointer(Buff.Base);
       end;
     end;
+    InitBlockList(@MemoryAllocator.PoolHeap, 0);
+    InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
   end;
 end;
 

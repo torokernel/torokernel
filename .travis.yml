@@ -15,6 +15,26 @@ env:
   matrix:
     - LAZ_VER=1.8.0 LAZ_ENV=wine WINEARCH=win64 LAZ_OPT="--os=win64 --cpu=x86_64"
 
+before_deploy:
+      - git config --local user.name "Travis CI"
+      - git config --local user.email "matiasevara@gmail.com"
+      - export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
+      - git tag $GIT_TAG -m "Generated tag from TravisCI for build $TRAVIS_BUILD_NUMBER"
+
+deploy:
+  provider: releases
+  api_key:
+    secure: $GH_TOKEN
+  file: 
+    - ./examples/ToroHello.img
+    - ./examples/ToroException.img
+    - ./examples/TorowithFileSystem.img
+    - ./examples/ToroPing.img
+    - ./examples/ToroFiles.img
+  on:
+     branch: master
+  skip_cleanup: true
+
 before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &

@@ -31,7 +31,7 @@ interface
 {$I ..\Toro.inc}
 
 {$IFDEF DEBUG}
-        {$DEFINE DebugVirtio}
+        //{$DEFINE DebugVirtio}
 {$ENDIF}
 
 uses
@@ -170,7 +170,7 @@ var
 begin
   vq := @Nic.VirtQueues[1];
 
-  {$IFDEF DebugVirtio}WriteDebug('VirtIOCleanUsedBuffers: queue: %d, last_used: %d, used_idx: %d\n',[queue_index, vq.last_used_index, vq.used.index]);{$ENDIF}
+  {$IFDEF DebugVirtio}WriteDebug('VirtIOProcessTx: queue: %d, last_used: %d, used_idx: %d\n',[1, vq.last_used_index, vq.used.index]);{$ENDIF}
 
   ReadWriteBarrier;
 
@@ -303,7 +303,7 @@ begin
 
     Packet := ToroGetMem(Len+SizeOf(TPacket));
 
-    {$IFDEF DebugVirtio}WriteDebug('VirtIOReadPacket: buf.length: %d, buf.flags: %d, add: %d, buffer_index: %d\n', [buf.length,buf.flags, buf.address, buffer_index]);{$ENDIF}
+    {$IFDEF DebugVirtio}WriteDebug('VirtIOProcessRx: buf.length: %d, buf.flags: %d, add: %d, buffer_index: %d\n', [buf.length,buf.flags, buf.address, buffer_index]);{$ENDIF}
 
     if (Packet <> nil) then
     begin
@@ -370,7 +370,7 @@ var
 begin
   if (Packet.Size > 1792) then
   begin
-     {$IFDEF DebugVirtio}WriteDebug('packet too long\n',[]);{$ENDIF}
+     {$IFDEF DebugVirtio}WriteDebug('virtIOSend: packet too long\n',[]);{$ENDIF}
      Exit;
   end;
 

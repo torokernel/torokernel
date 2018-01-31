@@ -1478,7 +1478,9 @@ begin
   if HasException then
     InitializeExceptions;
   InitCores;
-  {$IFDEF DebugProcess} WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]); {$ENDIF}
+  {$IFDEF DEBUG}
+     WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]);
+  {$ENDIF}
   // functions to manipulate threads. Transparent for pascal programmers
 {$IFDEF FPC}
 

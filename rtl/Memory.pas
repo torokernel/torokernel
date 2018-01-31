@@ -107,12 +107,12 @@ type
     Initialized: Boolean; // Was Internal Tables initialized ?
     CurrentVirtualAlloc: Integer; // for this CPU
     TotalVirtualAlloc: Integer; // for this CPU
-  	Current: Integer; // Counter to track the current number of allocated blocks
+    Current: Integer; // Counter to track the current number of allocated blocks
     CurrentAllocatedSize: PtrUInt;
     Total: Integer; // Counter to track the total number of memory allocations
     FreeCount: Integer; // for this CPU
     FreeSize: PtrUInt; // for this CPU
-  	Directory: array[0..MAX_SX-1] of TBlockList; // Index is the SX (Size indeX)
+    Directory: array[0..MAX_SX-1] of TBlockList; // Index is the SX (Size indeX)
     PoolHeap: TBlockList; // Blocks of XHEAP_INITIAL_CAPACITY (128KB)
     PoolHeapChunk: TBlockList; // Blocks of XHEAP_CHUNK_CAPACITY (1MB)
   end;
@@ -765,7 +765,13 @@ begin
     Exit;
   end;
   ResetFreeFlag(Result);
-  {$IFDEF HEAP_STATS} Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]); {$ENDIF}
+  {$IFDEF HEAP_STATS}
+    Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
+    Dec(MemoryAllocator.FreeSize, DirectorySX[SX]);
+      {$IFDEF InformMemory}
+      WriteDebug('ToroGetMem: CurrentAllocatedSize: %dB, FreeSize: %dB\n', [MemoryAllocator.CurrentAllocatedSize, MemoryAllocator.FreeSize]);
+    {$ENDIF}
+  {$ENDIF}
   {$IFDEF HEAP_STATS2}
     Inc(MemoryAllocator.Current);
     Inc(MemoryAllocator.Total);
@@ -796,6 +802,9 @@ begin
   {$IFDEF HEAP_STATS}
     Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
     Dec(MemoryAllocator.FreeSize, DirectorySX[SX]);
+    {$IFDEF InformMemory}
+      WriteDebug('ToroGetMem: CurrentAllocatedSize: %dB, FreeSize: %dB\n', [MemoryAllocator.CurrentAllocatedSize, MemoryAllocator.FreeSize]);
+    {$ENDIF}
   {$ENDIF}
   {$IFDEF HEAP_STATS2}
     Inc(MemoryAllocator.Current);
@@ -1131,7 +1140,7 @@ procedure MemoryInit;
 var
   MajorBlockSize: PtrUInt;
   SizeDiv8: Cardinal;
-  SX: Byte;
+  SX, J: Byte;
 begin
   FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
@@ -1153,6 +1162,10 @@ begin
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
   // Linear Assignation for every Core
   MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
+  for J := 0 to (CPU_COUNT-1) do
+  begin
+    MemoryAllocators[J].FreeSize:= MemoryPerCpu;
+  end;
   WriteConsole('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
   WriteConsole('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
   DistributeMemoryRegions; // Initialization of Directory for every Core

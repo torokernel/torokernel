@@ -226,6 +226,11 @@ begin
             end;
             J:=J+1;
           end;
+        'r':
+          begin
+            DebugPrintDecimal (read_rdtsc);
+            J:=J+1;
+          end;
         't': begin
                Now(@tmp);
 			   if (tmp.Day < 10) then DebugPrintDecimal  (0);
@@ -270,7 +275,11 @@ begin
   SpinLock (3,4,LockDebug);
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
-  WriteSerial('\t CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
+  {$IFDEF UseStampCounterinDebug}
+     WriteSerial('[\r] CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
+  {$ELSE}
+     WriteSerial('[\t] CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
+  {$ENDIF}
   WriteSerial (Format, Args);
   LockDebug := 3;
   RestoreInt;

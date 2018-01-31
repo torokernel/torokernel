@@ -21,4 +21,7 @@
 //{$DEFINE DebugNetwork}
 //{$DEFINE DebugSocket}
 //{$DEFINE DebugNe2000}
+//{$DEFINE HEAP_STATS}
+//{$DEFINE InformMemory}
+//{$DEFINE UseStampCounterinDebug}
 

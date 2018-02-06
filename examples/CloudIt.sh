@@ -42,8 +42,17 @@ else
 fi
 
 # this avoids to regenerate the image
-if [ "$#" -eq 2 ]; then
-   if [ "$2" = "onlykvm" ]; then
+if [ "$#" -ge 2 ]; then
+    if [ "$2" = "onlykvm" ]; then
+       # download release if it is indicated
+       if [ "$#" -eq 4 ]; then
+          if [ "$3" = "release" ]; then
+	     wget "https://github.com/MatiasVara/torokernel/releases/download/master-""$4""/""$appimg" -O "$appimg"
+          else
+	     echo "Parameter: $3 not recognized"
+	     exit 1
+          fi
+       fi
     # check if image exists
     if [ ! -f $appimg ]; then
        echo "$appimg does not exist, exiting"

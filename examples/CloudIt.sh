@@ -80,8 +80,10 @@ rm -f $appimg
 rm -f $app "$app.o"
 
 if [ -f $applpi ]; then
-   # force to compile the application
-   wine c:/lazarus/lazbuild.exe $applpi
+   # force to compile the application by using the image 
+   cd ..
+   sudo docker run -v $(pwd):/home/torokernel -w /home/torokernel/examples torokernel/ubuntu-for-toro bash -c "wine c:/lazarus/lazbuild.exe $applpi"
+   cd examples
 else
    echo "$applpi does not exist, exiting"
    exit 1

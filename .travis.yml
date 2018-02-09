@@ -27,10 +27,15 @@ deploy:
     secure: $GH_TOKEN
   file: 
     - ./examples/ToroHello.img
+    - ./examples/ToroHello.img.sha256
     - ./examples/ToroException.img
+    - ./examples/ToroException.img.sha256
     - ./examples/TorowithFileSystem.img
+    - ./examples/TorowithFileSystem.img.sha256
     - ./examples/ToroPing.img
+    - ./examples/ToroPing.img.sha256
     - ./examples/ToroFiles.img
+    - ./examples/ToroFiles.img.sha256
   on:
      branch: master
   skip_cleanup: true
@@ -47,7 +52,12 @@ install:
 
 script:
   # Build all test projects
-  - lazbuild $LAZ_OPT ./examples/*.lpi               
+  - lazbuild $LAZ_OPT ./examples/*.lpi
+  - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
+  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
+  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
+  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
+  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
   
 notifications:
   email:

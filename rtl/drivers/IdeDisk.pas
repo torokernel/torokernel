@@ -347,9 +347,9 @@ begin
           Ctr.Minors[Minor+I].FileDesc.Minor:=Minor+I;
 	  Ctr.Minors[Minor+I].FileDesc.BlockSize:= BLKSIZE;
           Ctr.Minors[Minor+I].FileDesc.Next:=nil;
-	  WriteConsole('IdeDisk: /V', []);
-          WriteConsole(ATANames[Ctr.Driver.Major], []);
-	  WriteConsole('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
+	  WriteConsoleF('IdeDisk: /V', []);
+          WriteConsoleF(ATANames[Ctr.Driver.Major], []);
+	  WriteConsoleF('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
 	  {$IFDEF DebugIdeDisk} WriteDebug('ATADetectPartition: Controller: %d, Disk: %d --> Ok\n', [Ctr.Driver.Major, Minor+I]); {$ENDIF}
         end;
         Inc(Entry);
@@ -393,9 +393,9 @@ begin
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.BlockSize:= BLKSIZE;
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Next:= nil;
         {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo*5]); {$ENDIF}
-        WriteConsole('IdeDisk: /V', []);
-        WriteConsole(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
-        WriteConsole('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
+        WriteConsoleF('IdeDisk: /V', []);
+        WriteConsoleF(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
+        WriteConsoleF('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
         ATADetectPartition(@ATAControllers[ControllerNo], DriveNo*5);
       end
       {$IFDEF DebugIdeDisk}
@@ -674,7 +674,7 @@ end;
 // Detection of IDE devices.
 procedure IDEInit;
 begin
-  WriteConsole('Looking for ATA-IDE Disk ...\n',[]);
+  WriteConsoleF('Looking for ATA-IDE Disk ...\n',[]);
   // standart ATA interface
   // master controller
   ATAControllers[0].IOPort := $1f0;

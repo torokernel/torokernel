@@ -78,7 +78,7 @@ end;
 // callback when a new connection arrives
 function HttpAccept(Socket: PSocket): LongInt;
 begin
-  WriteConsole('New connection on port 80\n',[0]);
+  WriteConsoleF('New connection on port 80\n',[0]);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 500000);
   Result := 0;
@@ -90,7 +90,7 @@ begin
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer,1,0) <> 0 do;
   SysSocketSend(Socket, Welcome, strlen(Welcome), 0);
-  WriteConsole ('Closing conection\n',[]);
+  WriteConsoleF ('Closing conection\n',[]);
   // todo: this can close the socket two times!!!!!
   SysSocketClose(Socket);
   Result := 0;
@@ -99,7 +99,7 @@ end;
  // Peer socket disconnected
 function HttpClose(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('Remote Host Closed the conection\n',[]);
+  WriteConsoleF ('Remote Host Closed the conection\n',[]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -107,7 +107,7 @@ end;
  // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('Closing connection for timeout\n',[]);
+  WriteConsoleF ('Closing connection for timeout\n',[]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -117,7 +117,7 @@ var
 begin
   // Dedicate the ne2000 network card to local cpu
   DedicateNetwork('ne2000', LocalIP, Gateway, MaskIP, nil);
-  WriteConsole('Listening at port 80\n',[0]);
+  WriteConsoleF('Listening at port 80\n',[0]);
   // we set the call backs used by the kernel
   HttpHandler.DoInit := @HttpInit;
   HttpHandler.DoAccept := @HttpAccept;

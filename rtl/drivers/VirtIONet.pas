@@ -486,7 +486,7 @@ begin
          // Enable bus mastering for this device
          PciSetMaster(PciCard);
 
-         WriteConsole('VirtIONet: /Vfound/n, irq: /V%d/n, ioport: /V%h/n\n',[NicVirtIO.IRQ, PtrUInt(NicVirtIO.Regs)]);
+         WriteConsoleF('VirtIONet: /Vfound/n, irq: /V%d/n, ioport: /V%h/n\n',[NicVirtIO.IRQ, PtrUInt(NicVirtIO.Regs)]);
 
          // reset device
          write_portb(0, PtrUInt(NicVirtIO.Regs) + $12);
@@ -511,9 +511,9 @@ begin
          // check if driver accepted features
          if (tmp and VIRTIO_FEATURES_OK = 0) then
          begin
-            WriteConsole('VirtIONet: driver did not accept features\n',[]);
+            WriteConsoleF('VirtIONet: driver did not accept features\n',[]);
             Exit;
-         end else WriteConsole('VirtIONet: driver accepted features\n',[]);
+         end else WriteConsoleF('VirtIONet: driver accepted features\n',[]);
 
          // setup virt queues
          for j:= 0 to 15 do
@@ -555,7 +555,7 @@ begin
 
          If (rx = nil) or (tx = nil) then
          begin
-            WriteConsole('VirtIONet: tx or rx queue not found, aborting\n',[]);
+            WriteConsoleF('VirtIONet: tx or rx queue not found, aborting\n',[]);
             Continue;
          end;
 
@@ -604,7 +604,7 @@ begin
            NicVirtIO.Driverinterface.HardAddress[j] := read_portb(PtrUInt(NicVirtIO.Regs) + $14 + j);
          end;
 
-         WriteConsole('VirtIONet: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicVirtIO.Driverinterface.HardAddress[0], NicVirtIO.Driverinterface.HardAddress[1],NicVirtIO.Driverinterface.HardAddress[2], NicVirtIO.Driverinterface.HardAddress[3], NicVirtIO.Driverinterface.HardAddress[4], NicVirtIO.Driverinterface.HardAddress[5]]);
+         WriteConsoleF('VirtIONet: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicVirtIO.Driverinterface.HardAddress[0], NicVirtIO.Driverinterface.HardAddress[1],NicVirtIO.Driverinterface.HardAddress[2], NicVirtIO.Driverinterface.HardAddress[3], NicVirtIO.Driverinterface.HardAddress[4], NicVirtIO.Driverinterface.HardAddress[5]]);
 
          // capture the interrupt
          CaptureInt(32+NicVirtIO.IRQ, @VirtIONetIrqHandler);
@@ -619,7 +619,7 @@ begin
          Net.Reset:= @virtIOReset;
          Net.TimeStamp := 0;
          RegisterNetworkInterface(Net);
-         WriteConsole('VirtIONet: driver registered\n',[]);
+         WriteConsoleF('VirtIONet: driver registered\n',[]);
       end;
     end;
     PciCard := PciCard.Next;

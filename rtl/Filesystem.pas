@@ -668,7 +668,7 @@ begin
   FileSystem := FindFileSystemDriver(Storage, FileSystemName, BlockName, Minor, FileBlock);
   if FileSystem = nil then
   begin
-    WriteConsole('CPU#%d: SysMount Failed, unknown filesystem!\n', [GetApicID]);
+    WriteConsoleF('CPU#%d: SysMount Failed, unknown filesystem!\n', [GetApicID]);
     {$IFDEF DebugFS} WriteDebug('CPU#%d: Mounting FileSystem -> Failed\n', [GetApicID]); {$ENDIF}
   Exit;
   end;
@@ -676,7 +676,7 @@ begin
   if SuperBlock = nil then
   begin // not enough memory
     {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []); {$ENDIF}
-     WriteConsole('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []);
+     WriteConsoleF('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []);
     Exit;
   end;
   SuperBlock.BlockDevice := FileBlock;
@@ -691,14 +691,14 @@ begin
   Storage.FileSystemMounted:= SuperBlock;
   if FileSystem.ReadSuper(SuperBlock) = nil then
   begin
-    WriteConsole('CPU#%d: Fail Reading SuperBlock\n', [GetApicID]);
+    WriteConsoleF('CPU#%d: Fail Reading SuperBlock\n', [GetApicID]);
     ToroFreeMem(SuperBlock);
     Storage.FileSystemMounted := nil;
     {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, Cannot read SuperBlock -> Failed\n', []); {$ENDIF}
     Exit;
   end;
   {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
-  WriteConsole('SysMount: Filesystem /Vmounted/n on CPU#%d\n', [GetApicID]);
+  WriteConsoleF('SysMount: Filesystem /Vmounted/n on CPU#%d\n', [GetApicID]);
 end;
 
 // Return the last Inode of path
@@ -1025,7 +1025,7 @@ procedure FileSystemInit;
 var
   I: LongInt;
 begin
-  WriteConsole('Loading Virtual FileSystem ...\n',[]);
+  WriteConsoleF('Loading Virtual FileSystem ...\n',[]);
   for I := 0 to MAX_CPU-1 do
   begin
     Storages[I].BlockFiles := nil;

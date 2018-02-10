@@ -87,7 +87,7 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
+  WriteConsoleF('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 20000);
   Result := 0;
@@ -99,14 +99,14 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
+  WriteConsoleF ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer, 1, 0) <> 0 do
   begin
   end;
   // we send the whole file
   SysSocketSend(Socket, @Buf[0], BufLen, 0);
-  WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
+  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -117,7 +117,7 @@ var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsole ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
+  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -125,7 +125,7 @@ end;
  // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
-  WriteConsole ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
+  WriteConsoleF ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -157,11 +157,11 @@ begin
     // we close the file
     SysCloseFile(tmp);
   end else
-      WriteConsole ('index.html not found\n',[]);
+      WriteConsoleF ('index.html not found\n',[]);
 
   // we register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
-  WriteConsole('\t /VToroWebServer/n: listening ...\n',[]);
+  WriteConsoleF('\t /VToroWebServer/n: listening ...\n',[]);
 
   // main thread goes to sleep
   SysSuspendThread(0);

@@ -101,7 +101,7 @@ end;
 // It has to enable the interruptions and finish the thread who made the exception
 procedure MyOwnHandler;
 begin
-  WriteConsole('Hello from My Handler!\n',[]);
+  WriteConsoleF('Hello from My Handler!\n',[]);
   // enable interruptions
   asm
      sti

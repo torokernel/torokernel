@@ -294,7 +294,7 @@ begin
   write_portb (0, BASE_COM_PORT+1);
   write_portb (1, BASE_COM_PORT);
   write_portb (3, BASE_COM_PORT+3);
-  WriteConsole ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
+  WriteConsoleF ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
   WriteDebug('Initialization of debugging console.\n',[]);
   {$IFDEF DebugCrash}
      WriteDebug('Crash dumping is Enabled\n',[]);

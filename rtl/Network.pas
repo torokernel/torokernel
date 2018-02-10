@@ -1476,9 +1476,9 @@ var
   ThreadID: TThreadID;
 begin
   if PtrUInt(BeginThread(nil, 10*1024, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    WriteConsole('Networks Packets Service .... Thread: %d\n',[ThreadID])
+    WriteConsoleF('Networks Packets Service .... Thread: %d\n',[ThreadID])
   else
-    WriteConsole('Networks Packets Service .... /VFailed!/n\n',[]);
+    WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
 end;
 
 // Initialize the dedicated network interface
@@ -1530,10 +1530,10 @@ begin
       if @Handler <> nil then
       begin
         if PtrUInt(BeginThread(nil, 10*1024, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
-          WriteConsole('Network Packets Service .... Thread %d\n',[ThreadID])
+          WriteConsoleF('Network Packets Service .... Thread %d\n',[ThreadID])
         else
         begin
-          WriteConsole('Network Packets Service .... /RFail!/n\n',[]);
+          WriteConsoleF('Network Packets Service .... /RFail!/n\n',[]);
           exit;
         end;
       end else
@@ -1550,12 +1550,12 @@ begin
       _IPAddress(IP, Network.IpAddress);
       _IPAddress(Gateway, Network.Gateway);
       _IPAddress(Mask, Network.Mask);
-      WriteConsole('Network configuration:\n', []);
-      WriteConsole('Local IP: /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
+      WriteConsoleF('Network configuration:\n', []);
+      WriteConsoleF('Local IP: /V%d.%d.%d.%d\n', [Network.Ipaddress and $ff,
 	  (Network.Ipaddress shr 8) and $ff, (Network.Ipaddress shr 16) and $ff, (Network.Ipaddress shr 24) and $ff ]);
-      WriteConsole('/nGateway: /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
+      WriteConsoleF('/nGateway: /V%d.%d.%d.%d\n', [Network.Gateway and $ff,
 	  (Network.Gateway shr 8) and $ff, (Network.Gateway shr 16) and $ff, (Network.Gateway shr 24) and $ff ]);
-	  WriteConsole('/nMask: /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
+	  WriteConsoleF('/nMask: /V%d.%d.%d.%d/n\n', [Network.Mask and $ff,
 	  (Network.Mask shr 8) and $ff, (Network.Mask shr 16) and $ff, (Network.Mask shr 24) and $ff ]);
       {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: New Driver dedicated to CPU#%d\n', [CPUID]); {$ENDIF}
       Exit;
@@ -1570,7 +1570,7 @@ procedure NetworkInit;
 var
   I: LongInt;
 begin
-  WriteConsole('Loading Network Stack ...\n',[]);
+  WriteConsoleF('Loading Network Stack ...\n',[]);
   // Clean tables
   for I := 0 to (MAX_CPU-1) do
   begin

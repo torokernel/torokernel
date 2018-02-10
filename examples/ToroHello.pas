@@ -52,7 +52,7 @@ uses
   Console in '..\rtl\Drivers\Console.pas';
 
 begin
-  WriteConsole('/RHello World, I am TORO !!!\n',[]);
+  WriteConsoleF('/RHello World, I am TORO !!!\n',[]);
   // Halt core
   While True do hlt;
 end.

@@ -48,7 +48,7 @@ uses
 // Called from Arch
 procedure KernelStart;
 begin
-  WriteConsole('/c/VLoading Toro ...\n/n',[]);
+  WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   // CPU must be initialized before DebugInit
   FillChar(CPU, sizeof(CPU),0);

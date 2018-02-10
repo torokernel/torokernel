@@ -53,7 +53,7 @@ uses
   Console in 'rtl\Drivers\Console.pas';
 
 begin
-  WriteConsole('\c/vPress a Key ...\n',[0]);
+  WriteConsoleF('\c/vPress a Key ...\n',[0]);
   EnabledConsole;
   while True do
     SysThreadSwitch;

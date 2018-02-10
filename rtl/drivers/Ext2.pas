@@ -225,19 +225,19 @@ begin
   Result := nil;
   if bh=nil then
   begin
-    WriteConsole('Ext2ReadSuper: Unabled to read SuperBlock\n',[]);
+    WriteConsoleF('Ext2ReadSuper: Unabled to read SuperBlock\n',[]);
     Exit;
   end;
   SuperExt2:= bh.data;
   if SuperExt2.magic <> $EF53 then
   begin
     PutBlock(Super.BlockDevice,bh);
-    WriteConsole('Ext2ReadSuper: Bad magic number in SuperBlock\n',[]);
+    WriteConsoleF('Ext2ReadSuper: Bad magic number in SuperBlock\n',[]);
     Exit;
   end else if (SuperExt2.log_block_size>2) then
   begin
     PutBlock(Super.BlockDevice,bh);
-    WriteConsole('Ext2ReadSuper: Logical Block Size is not supported\n',[]);
+    WriteConsoleF('Ext2ReadSuper: Logical Block Size is not supported\n',[]);
     Exit;
   end;
   case SuperExt2.log_block_size of
@@ -277,7 +277,7 @@ begin
   begin
     ToroFreeMem(SpbInfo);
     PutBlock(Super.BlockDevice,bh);
-    WriteConsole('Ext2ReadSuper: Not memory for Descriptor\n',[]);
+    WriteConsoleF('Ext2ReadSuper: Not memory for Descriptor\n',[]);
     Exit;
   end;
   pDesc:= @SpbInfo.Group_Desc;
@@ -287,7 +287,7 @@ begin
     pDesc^ := GetBlock(Super.BlockDevice, SuperExt2.first_data_block+i+1, Super.BlockSize);
     if pDesc = nil then
     begin
-      WriteConsole('Ext2ReadSuper: Error reading Block Descriptors\n',[]);
+      WriteConsoleF('Ext2ReadSuper: Error reading Block Descriptors\n',[]);
       ToroFreeMem(SpbInfo);
       PutBlock(Super.BlockDevice,bh);
       Exit;
@@ -1357,7 +1357,7 @@ end;
 // Initialization of Ext2 Filesystem
 
 initialization
-  WriteConsole('Ext2 driver ... /Vinstalled/n\n',[]);
+  WriteConsoleF('Ext2 driver ... /Vinstalled/n\n',[]);
   Ext2Driver.name := 'ext2';
   Ext2Driver.ReadSuper := @Ext2ReadSuper;
   Ext2Driver.CreateInode := @Ext2CreateInode;

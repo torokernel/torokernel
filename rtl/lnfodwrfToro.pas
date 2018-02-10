@@ -217,7 +217,7 @@ begin
   index := newIndex;
   //system.seek(e.f, base + index);
   pointtosection := pointer (base + index);
-  //WriteConsole('Seek base=%d, index=%d\n',[base, index]);
+  //WriteConsoleF('Seek base=%d, index=%d\n',[base, index]);
   EBufCnt := 0;
   EBufPos := 0;
 end;
@@ -588,7 +588,7 @@ begin
   fillchar(numoptable, sizeof(numoptable), #0);
   ReadNext(numoptable, header64.opcode_base-1);
  { for i := 1 to header64.opcode_base-1 do begin
-    //WriteConsole('Opcode[%d] - %d\n', [i,numoptable[i]]);
+    //WriteConsoleF('Opcode[%d] - %d\n', [i,numoptable[i]]);
   end;
   }
   DEBUG_WRITELN('Reading directories...');
@@ -605,7 +605,7 @@ begin
   end;
   opcode := ReadNext();
   while (opcode <> -1) and (not found) do begin
-    ////WriteConsole('Next opcode: %d\n',[opcode]);
+    ////WriteConsoleF('Next opcode: %d\n',[opcode]);
     case (opcode) of
       { extended opcode }
       0 : begin
@@ -622,14 +622,14 @@ begin
           end;
           DW_LNE_SET_ADDRESS : begin
             state.address := ReadAddress();
-            //WriteConsole('DW_LNE_SET_ADDRESS (%h)\n', [state.address]);
+            //WriteConsoleF('DW_LNE_SET_ADDRESS (%h)\n', [state.address]);
           end;
           DW_LNE_DEFINE_FILE : begin
             //s := ReadString();
             SkipLEB128();
             SkipLEB128();
             SkipLEB128();
-            //WriteConsole('DW_LNE_DEFINE_FILE (%p)\n', [PtrUInt(@s)]);
+            //WriteConsoleF('DW_LNE_DEFINE_FILE (%p)\n', [PtrUInt(@s)]);
           end;
           else begin
             DEBUG_WRITELN('Unknown extended opcode (opcode ', extended_opcode, ' length ', extended_opcode_length, ')');
@@ -678,7 +678,7 @@ begin
       end;
       DW_LNS_FIXED_ADVANCE_PC : begin
         inc(state.address, ReadUHalf());
-        //WriteConsole('DW_LNS_FIXED_ADVANCE_PC (%h)\n', [state.address]);
+        //WriteConsoleF('DW_LNS_FIXED_ADVANCE_PC (%h)\n', [state.address]);
       end;
       DW_LNS_SET_PROLOGUE_END : begin
         state.prolouge_end := True;
@@ -694,7 +694,7 @@ begin
       end;
       else begin { special opcode }
         if (opcode < header64.opcode_base) then begin
-          //WriteConsole('Unknown standard opcode %d skipping\n', [opcode]);
+          //WriteConsoleF('Unknown standard opcode %d skipping\n', [opcode]);
           for i := 1 to numoptable[opcode] do
             SkipLEB128();
         end else begin
@@ -703,7 +703,7 @@ begin
           inc(state.address, addrIncrement);
           lineIncrement := header64.line_base + (adjusted_opcode mod header64.line_range);
           inc(state.line, lineIncrement);
-          //WriteConsole('Special opcode %d, address increment: %d, new line: %d\n', [opcode, addrIncrement, lineIncrement]);
+          //WriteConsoleF('Special opcode %d, address increment: %d, new line: %d\n', [opcode, addrIncrement, lineIncrement]);
           state.basic_block := False;
           state.prolouge_end := False;
           state.epilouge_begin := False;
@@ -713,7 +713,7 @@ begin
     end;
 
     if (state.append_row) then begin
-      //WriteConsole('Current state : address = %h\n', [state.address]);
+      //WriteConsoleF('Current state : address = %h\n', [state.address]);
       DEBUG_COMMENT ' file_id = ', state.file_id, ' line = ', state.line, ' column = ', state.column,
       DEBUG_COMMENT  ' is_stmt = ', state.is_stmt, ' basic_block = ', state.basic_block,
       DEBUG_COMMENT  ' end_sequence = ', state.end_sequence, ' prolouge_end = ', state.prolouge_end,
@@ -730,7 +730,7 @@ begin
       if (state.address >= addr) then
       begin
         found:=True;
-        //WriteConsole('Found state.address=%h, addr=%h\n',[state.address, addr]);
+        //WriteConsoleF('Found state.address=%h, addr=%h\n',[state.address, addr]);
       end
       else
         begin
@@ -798,11 +798,11 @@ begin
   Success:=GetLineInfo(ptruint(addr), func, source, line);
   if Success then
   begin
-    WriteConsole('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@source[1]), line]);
+    WriteConsoleF('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@source[1]), line]);
     WriteDebug('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@source[1]),line]);
   end else
   begin
-    WriteConsole('[%h] in ??:??\n',[PtrUInt(addr)]);
+    WriteConsoleF('[%h] in ??:??\n',[PtrUInt(addr)]);
     WriteDebug('[%h] in ??:??\n',[PtrUInt(addr)]);
   end;
   BackTraceStrFunc := Store;

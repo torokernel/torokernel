@@ -470,7 +470,7 @@ procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
   if BlockList.Count >= BlockList.Capacity then
   begin
-    //WriteConsole('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
+    //WriteConsoleF('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
     //Exit;
     BlockListExpand(BlockList);
   end;
@@ -745,7 +745,7 @@ begin
 	  // no more memory
       if Result = nil then
 	  begin
-		WriteConsole('ToroGetMem: we ran out of memory!!!\n', []);
+		WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
 		RestoreInt;
     Exit;
@@ -758,7 +758,7 @@ begin
   // If block is not free, we raise an exception
   if IsFree(Result)=0 then
   begin
-    WriteConsole('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
+    WriteConsoleF('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
     Result := nil;
     RestoreInt;
@@ -791,7 +791,7 @@ begin
 	// If block is not free, we raise an exception 
 	if IsFree(Result)=0 then 
 	begin
-		WriteConsole('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
+		WriteConsoleF('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
 	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
 		Result := nil; 
 		RestoreInt;
@@ -834,7 +834,7 @@ begin
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
   if IsFree = FLAG_FREE then // already free
   begin
-    WriteConsole('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
+    WriteConsoleF('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
 	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
     Result := -1; // Invalid pointer operation
     RestoreInt;
@@ -1166,8 +1166,8 @@ begin
   begin
     MemoryAllocators[J].FreeSize:= MemoryPerCpu;
   end;
-  WriteConsole('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
-  WriteConsole('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

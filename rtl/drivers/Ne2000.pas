@@ -118,7 +118,7 @@ begin
    // initialize network driver
    CPU := GetApicid; 
    IrqOn(NicNE2000.IRQ);
-   WriteConsole('ne2000: /Vstarted/n on Core #%d\n',[CPU]);
+   WriteConsoleF('ne2000: /Vstarted/n on Core #%d\n',[CPU]);
 end;
 
 procedure WritePort(Data: Byte; Port: Word);
@@ -295,7 +295,7 @@ begin
 	  // todo: null memory scenario 
 	  // if Packet = nil then 
 	  // begin
-	  // WriteConsole ('fullll\n',[]);
+	  // WriteConsoleF ('fullll\n',[]);
 	  // end;
       Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
       Packet.Size := Len;
@@ -441,11 +441,11 @@ begin
         Net.stop := @ne2000Stop;
         Net.Reset := @ne2000Reset;
         Net.TimeStamp := 0;
-        WriteConsole('ne2000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
+        WriteConsoleF('ne2000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
         InitNe2000(@NicNE2000);
         CaptureInt(32+NicNE2000.IRQ, @ne2000irqhandler);
         RegisterNetworkInterface(Net);
-        WriteConsole('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
+        WriteConsoleF('ne2000: mac /V%d:%d:%d:%d:%d:%d/n\n', [Net.Hardaddress[0], Net.Hardaddress[1],
         Net.Hardaddress[2], Net.Hardaddress[3], Net.Hardaddress[4], Net.Hardaddress[5]]);
         {$IFDEF DebugNe2000} WriteDebug('ne2000: detection finished, exiting\n', []); {$ENDIF}
         Exit; // Support only 1 NIC in this version

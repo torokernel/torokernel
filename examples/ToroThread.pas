@@ -90,7 +90,7 @@ end;
 
 begin
 
-  WriteConsole('\c',[0]);
+  WriteConsoleF('\c',[0]);
   // initial values
   var1:=0;
   var2:=4;
@@ -106,8 +106,8 @@ begin
   begin
       while n1=False do SysThreadSwitch;
       var2:=var1+5;
-      // this WriteConsole() adds much noise given that it implements atomic operations
-      WriteConsole('%d',[var1]);
+      // this WriteConsoleF() adds much noise given that it implements atomic operations
+      WriteConsoleF('%d',[var1]);
       // syncro flags
       n1:=False;
       n2:=True;

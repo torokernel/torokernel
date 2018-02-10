@@ -161,7 +161,7 @@ begin
 end;
 
 initialization
-WriteConsole('Detecting Pci devices ...\n',[]);
+WriteConsoleF('Detecting Pci devices ...\n',[]);
 PciDetect;
 
 end.

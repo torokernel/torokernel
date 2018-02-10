@@ -753,19 +753,19 @@ begin
         for I := 0 to 127 do
           e1000WriteRegister(@NicE1000, E1000_REG_MTA + (I * 4), 0);
 
-        WriteConsole('e1000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
-        WriteConsole('e1000: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]);
+        WriteConsoleF('e1000: /Vdetected/n, Irq:%d\n',[PciCard.irq]);
+        WriteConsoleF('e1000: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]);
         {$IFDEF DebugE1000} WriteDebug('e1000: mac %d:%d:%d:%d:%d:%d\n', [NicE1000.Driverinterface.HardAddress[0], NicE1000.Driverinterface.HardAddress[1],NicE1000.Driverinterface.HardAddress[2], NicE1000.Driverinterface.HardAddress[3], NicE1000.Driverinterface.HardAddress[4], NicE1000.Driverinterface.HardAddress[5]]); {$ENDIF}
 
         // buffer initialization
         if e1000initbuf(@NicE1000) then
         begin
-             WriteConsole('e1000: buffer init ... /VOk/n\n',[]);
+             WriteConsoleF('e1000: buffer init ... /VOk/n\n',[]);
              {$IFDEF DebugE1000} WriteDebug('e1000: initbuffer() sucesses\n', []); {$ENDIF}
         end
         else
         begin
-             WriteConsole('e1000: buffer init ... /RFault/n\n',[]);
+             WriteConsoleF('e1000: buffer init ... /RFault/n\n',[]);
              {$IFDEF DebugE1000} WriteDebug('e1000: initbuffer() fails, exiting\n', []); {$ENDIF}
              continue;
         end;
@@ -780,12 +780,12 @@ begin
         i := e1000ReadRegister(@NicE1000, E1000_REG_STATUS);
         if (i and 3 <> 0) then
         begin
-           WriteConsole('e1000: link is /VUp/n, speed: %d\n', [(i and (3 shl 6)) shr 6]);
+           WriteConsoleF('e1000: link is /VUp/n, speed: %d\n', [(i and (3 shl 6)) shr 6]);
            {$IFDEF DebugE1000} WriteDebug('e1000: Link Up, speed: %d\n', [(i and (3 shl 6)) shr 6]); {$ENDIF}
         end
         else
         begin
-           WriteConsole('e1000: link is /RDown/n, speed: %d\n', [(i and (3 shl 6)) shr 6]);
+           WriteConsoleF('e1000: link is /RDown/n, speed: %d\n', [(i and (3 shl 6)) shr 6]);
            {$IFDEF DebugE1000} WriteDebug('e1000: Link Down, speed: %d\n', [(i and (3 shl 6)) shr 6]); {$ENDIF}
         end;
 

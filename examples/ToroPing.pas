@@ -74,10 +74,10 @@ begin
   _IPAddress (PingIP, PingIPDword);
   
   // I keep sending ICMP packets and waiting for an answer
-  WriteConsole ('\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
+  WriteConsoleF ('\t ToroPing: This test sends ICMP packets every %ds\n',[WAIT_FOR_PING]);
   while True do 
   begin
-   WriteConsole ('\t ToroPing: /Vsending/n ping to %d.%d.%d.%d, seq: %d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3],seq]);
+   WriteConsoleF ('\t ToroPing: /Vsending/n ping to %d.%d.%d.%d, seq: %d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3],seq]);
    ICMPSendEcho (PingIPDword,PingContent, 32,seq,0);
    PingPacket := ICMPPoolPackets;
    if (PingPacket <> nil) then 
@@ -86,10 +86,10 @@ begin
 	ICMP := Pointer(PtrUInt(PingPacket.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
 	if ((IP.SourceIP = PingIPDword) and (ICMP.seq = SwapWORD(seq))) then
 	begin
-	    WriteConsole ('\t ToroPing: /areceived/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
-	end else WriteConsole ('\t ToroPing: /rwrong/n received ping, seq=%d\n',[SwapWORD(ICMP.seq)]);
+	    WriteConsoleF ('\t ToroPing: /areceived/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
+	end else WriteConsoleF ('\t ToroPing: /rwrong/n received ping, seq=%d\n',[SwapWORD(ICMP.seq)]);
         ToroFreeMem (PingPacket); 
-   end else WriteConsole ('\t ToroPing: /rno received/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
+   end else WriteConsoleF ('\t ToroPing: /rno received/n ping from %d.%d.%d.%d\n',[PingIP[0],PingIP[1],PingIP[2],PingIP[3]]);
 
    // I increment the seq for next packet
    seq := seq + 1;

@@ -88,7 +88,7 @@ begin
     log := SysOpenFile ('/web/logs/log');
     if log = 0 then
     begin
-      WriteConsole ('logs not found\n',[]);
+      WriteConsoleF ('logs not found\n',[]);
     end else
     begin
       // end of file
@@ -106,7 +106,7 @@ begin
     // we close the file
     SysCloseFile(tmp);
   end else
-      WriteConsole ('index.html not found\n',[]);
+      WriteConsoleF ('index.html not found\n',[]);
 
   while True do
     SysThreadSwitch;

@@ -5,10 +5,10 @@
 // 
 // Changes:
 // 
-// 18/12/2016 Adding protection to WriteConsole()
-// 04/09/2016 Removing Printk_(), only WriteConsole() is used which is protected. 
-// 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsole() procedure. Printk_ is still free of protection.
-// 27/03/2009 Adding support for QWORD parameters in Printk_() and WriteConsole().
+// 18/12/2016 Adding protection to WriteConsoleF()
+// 04/09/2016 Removing Printk_(), only WriteConsoleF() is used which is protected. 
+// 11/12/2011 Implementing "Lock" for concurrent access to the console in WriteConsoleF() procedure. Printk_ is still free of protection.
+// 27/03/2009 Adding support for QWORD parameters in Printk_() and WriteConsoleF().
 // 08/02/2007 Rename to Console.pas  , new procedures to read and write the console by Matias Vara.
 //            The consoles's procedures are only for users, the kernel only need PrintK_().
 // 15/07/2006 The code was rewrited  by Matias Vara.
@@ -42,7 +42,7 @@ uses Arch, Process;
 
 procedure CleanConsole;
 procedure PrintDecimal(Value: PtrUInt);
-procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
+procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 procedure ReadConsole(out C: XChar);
 procedure ReadlnConsole(Format: PXChar);
 procedure DisabledConsole;
@@ -194,7 +194,7 @@ begin
 end;
 
 // Print to screen using format
-procedure WriteConsole(const Format: AnsiString; const Args: array of PtrUInt);
+procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 var
   ArgNo: LongInt;
   I, J: LongInt;

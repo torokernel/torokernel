@@ -59,8 +59,7 @@ const
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   // port wher the service listens
-  // TODO: to check why it does not work with 8080 or 8000
-  SERVICE_PORT = 5000;
+  SERVICE_PORT = 8000;
 
   // timeout in ms
   SERVICE_TIMEOUT = 20000;
@@ -227,7 +226,7 @@ begin
  end
  else begin
    StrConcat(HeaderOk,Answer,@dst[0]);
-   WriteConsoleF('Key: %p\n',[PtrUInt(Answer)]);
+   //WriteConsoleF('Key: %p\n',[PtrUInt(Answer)]);
    SendStream(Socket,@dst[0]);
  end;
 end;

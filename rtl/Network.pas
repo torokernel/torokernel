@@ -47,10 +47,10 @@ const
   // Sockets Types
   SOCKET_DATAGRAM = 1; // For datagrams like UDP
   SOCKET_STREAM = 2; // For connections like TCP
-  MAX_SocketPORTS = 10000; // Max number of ports supported
+  MAX_SocketPORTS = 20000; // Max number of ports supported
   MAX_WINDOW = $4000; // Max Window Size
   MTU = 1200; // MAX Size of packet for TCP Stack
-  USER_START_PORT = 7000; // First PORT used by GetFreePort
+  USER_START_PORT = 10000; // First PORT used by GetFreePort
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1; // Size of Sockets Bitmaps
   // Max Time that Network Card can be Inactive with packet in a Buffer,  in ms
   // TODO: This TIMER wont be necessary

@@ -1603,6 +1603,8 @@ procedure DispatcherFlushPacket(Socket: PSocket);
 var
   Buffer: PBufferSender;
   DataLen: UInt32;
+  TcpHeader: PTCPHeader;
+  TcpHeaderSize: LongInt;
 begin
   //{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   // sender Dispatcher can't send, we have to wait for remote host
@@ -1633,7 +1635,7 @@ begin
     Buffer := Socket.BufferSender;
     if Socket.AckFlag then
     begin // the packet has been sent correctly
-	  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h Packet %h correctly sent\n', [PtrUInt(Socket),PtrUInt(Buffer.Packet)]); {$ENDIF}
+      {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h Packet %h correctly sent\n', [PtrUInt(Socket),PtrUInt(Buffer.Packet)]); {$ENDIF}
       Socket.AckFlag := False; // clear the flag
       Socket.AckTimeOut:= 0;
       DataLen := Buffer.Packet.Size - (SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
@@ -1684,6 +1686,15 @@ begin
   end;
   Socket.ACKFlag := False;
   Socket.AckTimeOut := read_rdtsc + WAIT_ACK*LocalCPUSpeed*1000;
+
+  // update tcp header
+  TcpHeader:= Pointer(PtrUInt(Socket.BufferSender.Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
+  TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
+  TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
+  TcpHeaderSize := Socket.BufferSender.Packet.Size - SizeOf(TEthHeader) - SizeOf(TIPHeader);
+  TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), TcpHeaderSize);
+
+  // send packet
   IPSendPacket(Socket.BufferSender.Packet, Socket.DestIp, IP_TYPE_TCP);
   {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet)]); {$ENDIF}
 end;
@@ -2148,11 +2159,10 @@ begin
     // we can only send if the remote host can receiv
     if Fraglen > Socket.RemoteWinCount then
       Fraglen := Socket.RemoteWinCount;
-    Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen; // Decrement Remote Window Size
+    Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen;
     // Refresh the remote window size
     if Socket.RemoteWinCount = 0 then
       Socket.RemoteWinCount:= Socket.RemoteWinLen ;
-    // we need a new packet
     Packet := ToroGetMem(SizeOf(TPacket)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen);
     // we need a new packet structure
     Buffer := ToroGetMem(SizeOf(TBufferSender));
@@ -2162,27 +2172,19 @@ begin
     Packet.ready := False;
     Packet.Delete := False;
     Packet.Next := nil;
-    // Fill TCP paramters
     TcpHeader:= Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
     FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
-    // Copy user DATA to new packet
     Dest := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Moving from %h to %h len %d\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
 	Move(P^, Dest^, FragLen);
-    TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
-    TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
     TcpHeader.Flags := TCP_ACKPSH;
     TcpHeader.Header_Length := (SizeOf(TTCPHeader) div 4) shl 4;
     TcpHeader.SourcePort := SwapWORD(Socket.SourcePort);
     TcpHeader.DestPort := SwapWORD(Socket.DestPort);
-    // Local Window Size
     TcpHeader.Window_Size := SwapWORD(MAX_WINDOW - Socket.BufferLength);
-    TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), FragLen+SizeOf(TTCPHeader));
-    // Buffer Sender structure, the dispatcher works with that structure
     Buffer.Packet := Packet;
     Buffer.NextBuffer := nil;
     Buffer.Attempts := 2;
-    // Enqueue Buffer
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqueing sender Buffer\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
 	if Socket.BufferSender = nil then
 	begin
@@ -2199,7 +2201,6 @@ begin
 	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued last sender Buffer\n',[]);{$ENDIF}
     end;
 	{$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued sender Buffer\n',[]);{$ENDIF}
-    // Next data to send
     AddrLen := Addrlen - FragLen;
     P := P+FragLen;
   end;

@@ -121,14 +121,6 @@ begin
  SysSocketSend(Socket, Stream, Length(Stream), 0);
 end;
 
-procedure StrConcat(left, right, dst: pchar);
-begin
-  Move(left^,dst^,Length(left));
-  dst := dst + Length(left);
-  Move(right^,dst^,Length(right));
-  dst +=Length(right);
-  dst^ := #0;
-end;
 
 const
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 +
@@ -153,52 +145,6 @@ const
 var
    table: array[0..TABLE_LEN-1] of RegisterEntry;
 
-function StrCmp(p1, p2: pchar; Len: LongInt): Boolean;
-var
-   i: LongInt;
-begin
- result:= false;
- for i:= 0 to Len-1 do
- begin
-  if (p1^ <> p2^) then
-  begin
-    Exit;
-  end;
-  p1 += 1;
-  p2 += 1;
- end;
-result := true;
-end;
-
-// Print in decimal form
-procedure InttoStr(Value: PtrUInt; buff: pchar);
-var
-  I, Len: Byte;
-  // 21 is the max number of characters needed to represent 64 bits number in decimal
-  S: string[21];
-begin
-  Len := 0;
-  I := 21;
-  if Value = 0 then
-  begin
-    buff^ := '0';
-  end else
-  begin
-    while Value <> 0 do
-    begin
-      S[I] := AnsiChar((Value mod 10) + $30);
-      Value := Value div 10;
-      I := I-1;
-      Len := Len+1;
-    end;
-    S[0] := XChar(Len);
-   for I := (sizeof(S)-Len) to sizeof(S)-1 do
-   begin
-    buff^ := S[I];
-    buff +=1;
-   end;
-  end;
-end;
 
 function LookUp(entry: pchar): pchar;
 var
@@ -245,13 +191,17 @@ var
    value: array[0..ValueSize] of char;
    dst: array[0..(20+sizeof(HeaderOk))] of char;
 begin
-  // get the request
+
+ // get the request
   GetRequest(Socket, entry);
+
   // process it
   ProcessRequest(Socket, LookUp(@entry[0]));
+
   // finish
   FinishRequest(Socket);
   Result := 0;
+
 end;
 
 function ServiceClose(Socket: PSocket): LongInt;

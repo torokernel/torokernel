@@ -168,7 +168,7 @@ var
 begin
  if Answer = nil then
  begin
-   SendStream(Socket,HeaderNotFound);
+   SendStream(Socket, HeaderNotFound);
  end
  else begin
    StrConcat(HeaderOk,Answer,@dst[0]);
@@ -177,31 +177,9 @@ begin
  end;
 end;
 
-
 procedure FinishRequest(Socket: Psocket);
 begin
    SysSocketClose(Socket);
-end;
-
-
-// main service function
-function ServiceReceive(Socket: PSocket): LongInt;
-var
-   entry: array[0..KeySize] of char;
-   value: array[0..ValueSize] of char;
-   dst: array[0..(20+sizeof(HeaderOk))] of char;
-begin
-
- // get the request
-  GetRequest(Socket, entry);
-
-  // process it
-  ProcessRequest(Socket, LookUp(@entry[0]));
-
-  // finish
-  FinishRequest(Socket);
-  Result := 0;
-
 end;
 
 function ServiceClose(Socket: PSocket): LongInt;
@@ -214,6 +192,22 @@ function ServiceTimeOut(Socket: PSocket): LongInt;
 begin
   SysSocketClose(Socket);
   Result := 0;
+end;
+
+// main service function
+function ServiceReceive(Socket: PSocket): LongInt;
+var
+   entry: array[0..KeySize] of char;
+   value: array[0..ValueSize] of char;
+   dst: array[0..(20+sizeof(HeaderOk))] of char;
+begin
+ // get the request
+ GetRequest(Socket, entry);
+ // process it
+ ProcessRequest(Socket, LookUp(@entry[0]));
+ // finish
+ FinishRequest(Socket);
+ Result := 0;
 end;
 
 begin
@@ -241,7 +235,7 @@ begin
   // register the service
   SysRegisterNetworkService(@ServiceHandler);
 
-  WriteConsoleF('\t /VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
+  WriteConsoleF('\t/VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
 
   SysSuspendThread(0);
 end.

@@ -32,7 +32,7 @@ program ToroMicroservice;
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -50,7 +50,7 @@ uses
   ext2 in '..\rtl\drivers\ext2.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  E1000 in '..\rtl\Drivers\E1000.pas';
+  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
 
 const
   // TCP-Stack configuration values
@@ -227,7 +227,7 @@ begin
  end
  else begin
    StrConcat(HeaderOk,Answer,@dst[0]);
-   //WriteConsole('Key: %p\n',[PtrUInt(Answer)]);
+   WriteConsoleF('Key: %p\n',[PtrUInt(Answer)]);
    SendStream(Socket,@dst[0]);
  end;
 end;
@@ -238,14 +238,19 @@ begin
    SysSocketClose(Socket);
 end;
 
+
+// main service function
 function ServiceReceive(Socket: PSocket): LongInt;
 var
    entry: array[0..KeySize] of char;
    value: array[0..ValueSize] of char;
    dst: array[0..(20+sizeof(HeaderOk))] of char;
 begin
+  // get the request
   GetRequest(Socket, entry);
+  // process it
   ProcessRequest(Socket, LookUp(@entry[0]));
+  // finish
   FinishRequest(Socket);
   Result := 0;
 end;
@@ -264,14 +269,18 @@ end;
 
 begin
 
-   table[0].key := 'Mata';
-   table[0].value := 'casa';
+   // get this from file and parse it
+   table[0].key :=  'Mata';
+   // this must be 11 bytes long!!!
+   table[0].value := 'casa1234567';
 
    table[1].key := 'Juan';
+
+   // this must be 11 bytes long!!!
    table[1].value := 'nada';
 
   // dedicate the e1000 network card to local cpu
-  DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
+  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
   // set the callbacks used by the kernel
   ServiceHandler.DoInit := @ServiceInit;
@@ -283,8 +292,7 @@ begin
   // register the service
   SysRegisterNetworkService(@ServiceHandler);
 
-  WriteConsole('\t /VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
+  WriteConsoleF('\t /VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
 
-  while True do
-    SysThreadSwitch;
+  SysSuspendThread(0);
 end.

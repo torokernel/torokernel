@@ -170,11 +170,18 @@ end;
 procedure PrintHexa(Value: PtrUInt);
 var
   I: Byte;
+  P: Boolean;
 begin
+  P := False;
   PutC('0');
   PutC('x');
   for I := SizeOf(PtrUInt)*2-1 downto 0 do
-    PutC(HEX_CHAR[(Value shr (I*4)) and $0F]);
+  begin
+   if not(P) and (HEX_CHAR[(Value shr (I*4)) and $0F] <> '0') then
+     P:= True;
+   if P then
+     PutC(HEX_CHAR[(Value shr (I*4)) and $0F]);
+  end;
 end;
 
 procedure PrintString(const S: AnsiString);

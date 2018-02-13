@@ -170,6 +170,9 @@ type
     Next: PNetworkInterface;
   end;
 
+  PTANetworkService = ^TANetworkService;
+  TANetworkService = array[0..0] of PNetworkService;
+
   TNetworkDedicate = record
     NetworkInterface: PNetworkInterface; // Hardware Driver
     IpAddress: TIPAddress; // Internet Protocol Address
@@ -178,10 +181,10 @@ type
     TranslationTable: PMachine;
     // Table of Sockets sorted by port
     // Sockets for conections
-    SocketStream: array[0..MAX_SocketPORTS-1] of PNetworkService;
+    SocketStream: PTANetworkService;
     SocketStreamBitmap: array[0..SZ_SocketBitmap] of Byte;
     // Sockets for Datagram
-    SocketDatagram: array[0..MAX_SocketPORTS-1] of PNetworkService;
+    SocketDatagram: PTANetworkService;
     SocketDatagramBitmap: array[0..SZ_SocketBitmap] of Byte;
   end;
   PNetworkDedicate = ^TNetworkDedicate;
@@ -1487,22 +1490,27 @@ var
   I, CPUID: LongInt;
 begin
   CPUID := GetApicid;
-  // cleaning  packet queue
+  Result := false;
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
-  // initialization of Services for Packets Manipulation
-  NetworkServicesInit;
-  // driver internal initialization
-  DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
-  // cleaning the Socket table
+  DedicateNetworks[CPUID].SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if DedicateNetworks[CPUID].SocketStream = nil then
+    Exit;
+  DedicateNetworks[CPUID].SocketDatagram := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if DedicateNetworks[CPUID].SocketDatagram = nil then
+  begin
+    ToroFreeMem(DedicateNetworks[CPUID].SocketStream);
+    Exit;
+  end;
   for I:= 0 to (MAX_SocketPORTS-1) do
   begin
     DedicateNetworks[CPUID].SocketStream[I]:=nil;
     DedicateNetworks[CPUID].SocketDatagram[I]:=nil;
   end;
-  // the drivers is sending and receiving packets
+  NetworkServicesInit;
+  DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   Result:= True;
 end;
 

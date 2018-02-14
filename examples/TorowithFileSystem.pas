@@ -68,10 +68,11 @@ const
 var
   HttpServer: PSocket;
   Buffer: char;
-  Buf: array[0..500] of char;
+  Buf: ^Char;
   tmp: THandle;
   HttpHandler: TNetworkHandler;
   BufLen: longint = 0;
+  idx: TInode;
 
 // Socket initialization
 procedure HttpInit;
@@ -106,6 +107,7 @@ begin
   end;
   // we send the whole file
   SysSocketSend(Socket, @Buf[0], BufLen, 0);
+  // generar bien el emcabezao!!!!!
   WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
@@ -137,29 +139,30 @@ begin
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
-  // we mount locally
   SysMount('ext2','ATA0',5);
 
-  // Setup callbacks used by the Http APIs
-  HttpHandler.DoInit := @HttpInit;
-  HttpHandler.DoAccept := @HttpAccept;
+  HttpHandler.DoInit    := @HttpInit;
+  HttpHandler.DoAccept  := @HttpAccept;
   HttpHandler.DoTimeOut := @HttpTimeOut;
   HttpHandler.DoReceive := @HttpReceive;
-  HttpHandler.DoClose := @HttpClose;
+  HttpHandler.DoClose   := @HttpClose;
 
-  // we open the file which is used as main page for the webserver
+  if SysStatFile('/web/index.html', @idx) = 0 then
+  begin
+    WriteConsoleF ('index.html not found\n',[]);
+  end else
+    Buf := ToroGetMem(idx.Size);
+
   tmp := SysOpenFile('/web/index.html');
 
   if (tmp <> 0) then
   begin
-    // we read the whole file
-    BufLen := SysReadFile(tmp,sizeof(Buf), @Buf);
-    // we close the file
+    BufLen := SysReadFile(tmp,idx.Size, Buf);
     SysCloseFile(tmp);
   end else
       WriteConsoleF ('index.html not found\n',[]);
 
-  // we register the web service which listens on port 80
+  // register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
   WriteConsoleF('\t /VToroWebServer/n: listening ...\n',[]);
 

@@ -1121,12 +1121,26 @@ begin
       end;
     SCK_TRANSMITTING: // Client Socket is connected to remote Host
       begin
-      // TODO: we aren't checking if ACK number is correct
        if TCPHeader.flags = TCP_ACK then
        begin
-         DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
-         Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
-	 Socket.AckFlag := True;
+           DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
+           Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
+           Socket.AckFlag := True;
+           if (DataSize <> 0) then
+           begin
+            Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
+            Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
+            Move(Source^, Dest^, DataSize);
+            Socket.BufferLength := Socket.BufferLength + DataSize;
+	    // We switch the state only if the dispatcher is waiting for an event
+            if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
+	    begin
+              Socket.DispatcherEvent := DISP_RECEIVE;
+	      {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
+	    end;
+            // we confirm the ACKPSH
+            TCPSendPacket(TCP_ACK, Socket);
+           end;
 	 {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
         // TODO: to implement zero window condition check
 		//
@@ -2176,8 +2190,12 @@ begin
     FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
     Dest := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Moving from %h to %h len %d\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
-	Move(P^, Dest^, FragLen);
-    TcpHeader.Flags := TCP_ACKPSH;
+    Move(P^, Dest^, FragLen);
+    // only last packet has psh
+    if AddrLen <= MTU then
+      TcpHeader.Flags := TCP_ACKPSH
+    else
+      TcpHeader.Flags := TCP_ACK;
     TcpHeader.Header_Length := (SizeOf(TTCPHeader) div 4) shl 4;
     TcpHeader.SourcePort := SwapWORD(Socket.SourcePort);
     TcpHeader.DestPort := SwapWORD(Socket.DestPort);

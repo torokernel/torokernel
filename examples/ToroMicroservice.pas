@@ -5,7 +5,7 @@
 //
 // Changes :
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -72,11 +72,10 @@ const
 var
   ServiceServer: PSocket;
   Buffer: char;
-  buff: array[0..500] of char;
   tmp: THandle;
   ServiceHandler: TNetworkHandler;
   count: longint = 0;
-
+  idx, idx2: TInode;
 
 // Service Initialization
 procedure ServiceInit;
@@ -94,15 +93,15 @@ begin
 end;
 
 
-procedure GetRequest(Socket: PSocket; buffer: pchar);
+procedure GetRequest(Socket: PSocket; buffer: pchar; Len: LongInt);
 var
    i: longint = 0;
    line: boolean = true;
    buf: char;
 begin
- while SysSocketRecv(Socket, @buf,1,0) <> 0 do
+ while (SysSocketRecv(Socket, @buf,1,0) <> 0) or line do
  begin
-  if (i>4) and (buf = #32) then
+  if ((i>4) and (buf = #32)) or (Len = 0) then
   begin
    line := false;
    buffer^ := #0;
@@ -111,6 +110,7 @@ begin
   begin
    buffer^ := buf;
    buffer +=1;
+   Len := Len - 1;
   end;
   i+=1;
  end;
@@ -123,28 +123,25 @@ end;
 
 
 const
-  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 +
-             'Content-length: 11'#13#10'Connection: close'#13#10 +
-             'Server: ToroMicroserver'#13#10''#13#10;
+  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
 
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
 
-  KeySize = 4;
-  ValueSize = 10;
+  KeySize = 15 * 1024;
+  ValueSize = 15 * 1024;
 
 type
   RegisterEntry = record
-    key: array[0..KeySize] of char;
-    value: array[0..ValueSize] of char;
+    key: array[0..KeySize-1] of char;
+    value: array[0..ValueSize-1] of char;
   end;
 
 const
   TABLE_LEN = 2 ;
 
-
 var
    table: array[0..TABLE_LEN-1] of RegisterEntry;
-
 
 function LookUp(entry: pchar): pchar;
 var
@@ -164,16 +161,30 @@ end;
 
 procedure ProcessRequest (Socket: PSocket; Answer: pchar);
 var
-   dst: array[0..(20+sizeof(HeaderOk))] of char;
+   dst, tmp: ^char;
+   anssizechar: array[0..10] of char;
+   AnsSize: LongInt;
 begin
  if Answer = nil then
  begin
    SendStream(Socket, HeaderNotFound);
  end
  else begin
-   StrConcat(HeaderOk,Answer,@dst[0]);
-   //WriteConsoleF('Key: %p\n',[PtrUInt(Answer)]);
-   SendStream(Socket,@dst[0]);
+   AnsSize := strlen(Answer);
+   InttoStr(AnsSize,@anssizechar[0]);
+
+   dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
+   tmp := dst;
+
+   StrConcat(HeaderOk, @anssizechar[0], dst);
+   dst := dst + StrLen(@anssizechar[0]) + StrLen(HeaderOk);
+   StrConcat(dst, ContentOK, dst);
+
+   dst := dst +   StrLen(ContentOK) ;
+
+   StrConcat(dst, Answer, dst);
+
+   SendStream(Socket,tmp);
  end;
 end;
 
@@ -197,45 +208,93 @@ end;
 // main service function
 function ServiceReceive(Socket: PSocket): LongInt;
 var
-   entry: array[0..KeySize] of char;
+   entry: ^char;
    value: array[0..ValueSize] of char;
    dst: array[0..(20+sizeof(HeaderOk))] of char;
 begin
+
+ entry := ToroGetMem(KeySize);
+
  // get the request
- GetRequest(Socket, entry);
+ GetRequest(Socket, entry, KeySize);
+
+ WriteConsoleF('recibido %d\n',[StrLen(entry)]);
+
  // process it
- ProcessRequest(Socket, LookUp(@entry[0]));
+ ProcessRequest(Socket, LookUp(entry));
+
  // finish
  FinishRequest(Socket);
+
+ ToroFreeMem(entry);
+
  Result := 0;
 end;
 
 begin
-
    // get this from file and parse it
-   table[0].key :=  'Mata';
-   // this must be 11 bytes long!!!
-   table[0].value := 'casa1234567';
+  // TODO: get values from disk
+  // NOTE: key and value must be least than 15kb!
+  //table[0].key :=  'Mata';
+  //table[0].value := 'casa12345';
+  table[1].key := 'Juan';
+  table[1].value := 'nada';
 
-   table[1].key := 'Juan';
+    // Dedicate the ide disk to local cpu
+  DedicateBlockDriver('ATA0',0);
 
-   // this must be 11 bytes long!!!
-   table[1].value := 'nada';
+  SysMount('ext2','ATA0',5);
 
   // dedicate the e1000 network card to local cpu
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
+  if SysStatFile('/web/key', @idx) = 0 then
+  begin
+    WriteConsoleF ('index.html not found\n',[]);
+  end;
+  //else
+   // Buf := ToroGetMem(idx.Size);
+
+  tmp := SysOpenFile('/web/key');
+
+  if (tmp <> 0) then
+  begin
+    SysReadFile(tmp, idx.Size, @table[0].key);
+    SysCloseFile(tmp);
+  end else
+      WriteConsoleF ('key not found\n',[]);
+
+  WriteConsoleF('Key size %d\n',[idx.Size]);
+
+  if SysStatFile('/web/value', @idx2) = 0 then
+  begin
+    WriteConsoleF ('index.html not found\n',[]);
+  end;
+  //end else
+  //  Buf := ToroGetMem(idx.Size);
+
+  tmp := SysOpenFile('/web/value');
+
+  if (tmp <> 0) then
+  begin
+    SysReadFile(tmp, idx2.Size, @table[0].value);
+    SysCloseFile(tmp);
+  end else
+      WriteConsoleF ('value not found\n',[]);
+
+  WriteConsoleF('Value size %d\n',[idx2.Size]);
+
   // set the callbacks used by the kernel
-  ServiceHandler.DoInit := @ServiceInit;
-  ServiceHandler.DoAccept := @ServiceAccept;
+  ServiceHandler.DoInit    := @ServiceInit;
+  ServiceHandler.DoAccept  := @ServiceAccept;
   ServiceHandler.DoTimeOut := @ServiceTimeOut;
   ServiceHandler.DoReceive := @ServiceReceive;
-  ServiceHandler.DoClose := @ServiceClose;
+  ServiceHandler.DoClose   := @ServiceClose;
 
   // register the service
   SysRegisterNetworkService(@ServiceHandler);
 
-  WriteConsoleF('\t/VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
+  WriteConsoleF('\t /VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);
 
   SysSuspendThread(0);
 end.

@@ -24,7 +24,7 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="13">
+    <Units Count="14">
       <Unit0>
         <Filename Value="ToroMicroservice.pas"/>
         <IsPartOfProject Value="True"/>
@@ -77,6 +77,10 @@
         <Filename Value="..\rtl\drivers\E1000.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit12>
+      <Unit13>
+        <Filename Value="..\rtl\drivers\VirtIONet.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit13>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -94,11 +98,6 @@
         <OptimizationLevel Value="2"/>
       </Optimizations>
     </CodeGeneration>
-    <Linking>
-      <Debugging>
-        <GenerateDebugInfo Value="False"/>
-      </Debugging>
-    </Linking>
     <Other>
       <Verbosity>
         <ShowHints Value="False"/>

@@ -3,7 +3,6 @@
 //
 // This is a
 //
-// Changes :
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -59,7 +58,7 @@ const
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   // port wher the service listens
-  SERVICE_PORT = 8000;
+  SERVICE_PORT = 80;
 
   // timeout in ms
   SERVICE_TIMEOUT = 20000;
@@ -69,29 +68,47 @@ const
 
   CRLF = #13#10;
 
+  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+
+  HeaderNotFound = 'HTTP/1.0 404'#13#10;
+
+  KeySize = 15 * 1024;
+  ValueSize = 15 * 1024;
+
+  TABLE_LEN = 1 ;
+
+
+type
+    RegisterEntry = record
+      key: pchar;
+      value: pchar;
+    end;
+
+    TMicroserviceFunction = Function (Ask : Pchar) : Pchar;
+
 var
-  ServiceServer: PSocket;
-  Buffer: char;
-  tmp: THandle;
-  ServiceHandler: TNetworkHandler;
-  count: longint = 0;
-  idx, idx2: TInode;
+   ServiceServer: PSocket;
+   tmp: THandle;
+   ServiceHandler: TNetworkHandler;
+   idx, idx2: TInode;
+   table: array[0..TABLE_LEN-1] of RegisterEntry;
+   MyMicroFunction : TMicroserviceFunction;
 
 // Service Initialization
 procedure ServiceInit;
 begin
-  ServiceServer := SysSocket(SOCKET_STREAM);
-  ServiceServer.Sourceport := SERVICE_PORT;
-  SysSocketListen(ServiceServer, SERVICE_QUEUELEN);
+ ServiceServer := SysSocket(SOCKET_STREAM);
+ ServiceServer.Sourceport := SERVICE_PORT;
+ SysSocketListen(ServiceServer, SERVICE_QUEUELEN);
 end;
 
 // A new connection arrives
 function ServiceAccept(Socket: PSocket): LongInt;
 begin
-  SysSocketSelect(Socket, SERVICE_TIMEOUT);
-  Result := 0;
+ SysSocketSelect(Socket, SERVICE_TIMEOUT);
+ Result := 0;
 end;
-
 
 procedure GetRequest(Socket: PSocket; buffer: pchar; Len: LongInt);
 var
@@ -103,14 +120,14 @@ begin
  begin
   if ((i>4) and (buf = #32)) or (Len = 0) then
   begin
-   line := false;
-   buffer^ := #0;
+    line := false;
+    buffer^ := #0;
   end;
   if (i>4) and line then
   begin
-   buffer^ := buf;
-   buffer +=1;
-   Len := Len - 1;
+    buffer^ := buf;
+    buffer +=1;
+    Len := Len - 1;
   end;
   i+=1;
  end;
@@ -121,41 +138,19 @@ begin
  SysSocketSend(Socket, Stream, Length(Stream), 0);
 end;
 
-
-const
-  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
-  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
-
-  HeaderNotFound = 'HTTP/1.0 404'#13#10;
-
-  KeySize = 15 * 1024;
-  ValueSize = 15 * 1024;
-
-type
-  RegisterEntry = record
-    key: array[0..KeySize-1] of char;
-    value: array[0..ValueSize-1] of char;
-  end;
-
-const
-  TABLE_LEN = 2 ;
-
-var
-   table: array[0..TABLE_LEN-1] of RegisterEntry;
-
 function LookUp(entry: pchar): pchar;
 var
    i: LongInt;
 begin
-     for i:= 0 to (TABLE_LEN-1) do
-     begin
-       if StrCmp(entry, @table[i].key[0], 4) then
-       begin
-         Result := @table[i].value[0];
-         Exit;
-       end;
-     end;
-     result := nil;
+ for i:= 0 to (TABLE_LEN-1) do
+ begin
+  if StrCmp(entry, @table[i].key[0], 4) then
+  begin
+    Result := @table[i].value[0];
+    Exit;
+  end;
+ end;
+ Result := nil;
 end;
 
 
@@ -172,18 +167,13 @@ begin
  else begin
    AnsSize := strlen(Answer);
    InttoStr(AnsSize,@anssizechar[0]);
-
    dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
    tmp := dst;
-
    StrConcat(HeaderOk, @anssizechar[0], dst);
    dst := dst + StrLen(@anssizechar[0]) + StrLen(HeaderOk);
    StrConcat(dst, ContentOK, dst);
-
-   dst := dst +   StrLen(ContentOK) ;
-
+   dst := dst + StrLen(ContentOK) ;
    StrConcat(dst, Answer, dst);
-
    SendStream(Socket,tmp);
  end;
 end;
@@ -205,84 +195,62 @@ begin
   Result := 0;
 end;
 
-// main service function
 function ServiceReceive(Socket: PSocket): LongInt;
 var
    entry: ^char;
-   value: array[0..ValueSize] of char;
-   dst: array[0..(20+sizeof(HeaderOk))] of char;
 begin
-
  entry := ToroGetMem(KeySize);
-
  // get the request
  GetRequest(Socket, entry, KeySize);
-
- WriteConsoleF('recibido %d\n',[StrLen(entry)]);
-
+ WriteConsoleF('receibod: %d\n',[strlen(entry)]);
  // process it
- ProcessRequest(Socket, LookUp(entry));
-
+ ProcessRequest(Socket, MyMicroFunction(entry));
  // finish
  FinishRequest(Socket);
-
  ToroFreeMem(entry);
-
  Result := 0;
 end;
 
 begin
-   // get this from file and parse it
-  // TODO: get values from disk
-  // NOTE: key and value must be least than 15kb!
-  //table[0].key :=  'Mata';
-  //table[0].value := 'casa12345';
-  table[1].key := 'Juan';
-  table[1].value := 'nada';
-
-    // Dedicate the ide disk to local cpu
+  // dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
   SysMount('ext2','ATA0',5);
 
-  // dedicate the e1000 network card to local cpu
+  // dedicate the virtio network card to local cpu
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
+  // open the key
   if SysStatFile('/web/key', @idx) = 0 then
   begin
     WriteConsoleF ('index.html not found\n',[]);
-  end;
-  //else
-   // Buf := ToroGetMem(idx.Size);
+  end else
+    Table[0].key := ToroGetMem(idx.Size);
 
   tmp := SysOpenFile('/web/key');
 
   if (tmp <> 0) then
   begin
-    SysReadFile(tmp, idx.Size, @table[0].key);
+    SysReadFile(tmp, idx.Size, Table[0].key);
     SysCloseFile(tmp);
   end else
       WriteConsoleF ('key not found\n',[]);
 
-  WriteConsoleF('Key size %d\n',[idx.Size]);
-
+  // open value
   if SysStatFile('/web/value', @idx2) = 0 then
   begin
     WriteConsoleF ('index.html not found\n',[]);
-  end;
-  //end else
-  //  Buf := ToroGetMem(idx.Size);
+  end else
+    Table[0].value := ToroGetMem(idx2.Size);
 
   tmp := SysOpenFile('/web/value');
 
   if (tmp <> 0) then
   begin
-    SysReadFile(tmp, idx2.Size, @table[0].value);
+    SysReadFile(tmp, idx2.Size, Table[0].value);
     SysCloseFile(tmp);
   end else
       WriteConsoleF ('value not found\n',[]);
-
-  WriteConsoleF('Value size %d\n',[idx2.Size]);
 
   // set the callbacks used by the kernel
   ServiceHandler.DoInit    := @ServiceInit;
@@ -290,6 +258,9 @@ begin
   ServiceHandler.DoTimeOut := @ServiceTimeOut;
   ServiceHandler.DoReceive := @ServiceReceive;
   ServiceHandler.DoClose   := @ServiceClose;
+
+  // the microservice function
+  MyMicroFunction := @LookUp;
 
   // register the service
   SysRegisterNetworkService(@ServiceHandler);

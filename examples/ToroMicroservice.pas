@@ -195,6 +195,9 @@ begin
   Result := 0;
 end;
 
+var
+   connectionCount: Longint = 0;
+
 function ServiceReceive(Socket: PSocket): LongInt;
 var
    entry: ^char;
@@ -202,11 +205,13 @@ begin
  entry := ToroGetMem(KeySize);
  // get the request
  GetRequest(Socket, entry, KeySize);
- WriteConsoleF('receibod: %d\n',[strlen(entry)]);
+ // WriteConsoleF('received: %d\n',[strlen(entry)]);
  // process it
  ProcessRequest(Socket, MyMicroFunction(entry));
  // finish
  FinishRequest(Socket);
+ connectionCount := connectionCount + 1;
+ WriteConsoleF('\t Connection %d, received: %d bytes\n',[connectionCount, strlen(entry)]);
  ToroFreeMem(entry);
  Result := 0;
 end;

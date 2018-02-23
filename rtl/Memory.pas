@@ -45,7 +45,7 @@ interface
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Arch, Console;
+  Arch, Process, Console;
 
 const
   MAX_SX = 30; // Size indeX used to access MemoryAllocator directory
@@ -457,6 +457,7 @@ var
 begin
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
+  Panic (NewList = nil, 'Toro ran out of memory\n');
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
   ToroFreeMem(BlockList.List);
   {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
@@ -690,6 +691,12 @@ begin
 	 WriteDebug('ObtainFromLargerChunk: dump list %h\n', [PtrUInt(ChunkBlockList.List^[j])]);
 	end;
   {$ENDIF}
+  // ran out of memory
+  if Chunk = nil then
+  begin
+    Result := nil;
+    Exit;
+  end;
   Dec(ChunkBlockList.Count);
   ChunkSize := DirectorySX[ChunkSX];
   // update the size of block in the header

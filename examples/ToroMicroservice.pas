@@ -116,6 +116,7 @@ var
    line: boolean = true;
    buf: char;
 begin
+ // TODO: to check line and the size of the answer
  while (SysSocketRecv(Socket, @buf,1,0) <> 0) or line do
  begin
   if ((i>4) and (buf = #32)) or (Len = 0) then
@@ -165,6 +166,7 @@ begin
    SendStream(Socket, HeaderNotFound);
  end
  else begin
+   // TODO: to check this
    AnsSize := strlen(Answer);
    InttoStr(AnsSize,@anssizechar[0]);
    dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
@@ -175,6 +177,7 @@ begin
    dst := dst + StrLen(ContentOK) ;
    StrConcat(dst, Answer, dst);
    SendStream(Socket,tmp);
+   ToroFreeMem(tmp);
  end;
 end;
 

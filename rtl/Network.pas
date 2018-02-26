@@ -223,6 +223,7 @@ type
     NeedFreePort: Boolean;
     DispatcherEvent: LongInt;
     TimeOut:Int64;
+    BufferSenderTail: PBufferSender;
     BufferSender: PBufferSender;
     AckFlag: Boolean;
     AckTimeOut: LongInt;
@@ -620,6 +621,7 @@ begin
   ClientSocket.NeedFreePort := False;
   ClientSocket.AckTimeOUT := 0;
   ClientSocket.BufferSender := nil;
+  ClientSocket.BufferSenderTail := nil;
   ClientSocket.RemoteClose := False;
   // todo: to check if it is valid this 
   ClientSocket.AckFlag := True; 
@@ -1653,6 +1655,10 @@ begin
       Socket.AckFlag := False; // clear the flag
       Socket.AckTimeOut:= 0;
       DataLen := Buffer.Packet.Size - (SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
+      if Socket.BufferSender = Socket.BufferSenderTail then
+      begin
+        Socket.BufferSenderTail := nil
+      end;
       Buffer := Socket.BufferSender.NextBuffer;
       ToroFreeMem(Socket.BufferSender.Packet); // Free the packet
       ToroFreeMem(Socket.BufferSender); // Free the Buffer
@@ -2204,21 +2210,19 @@ begin
     Buffer.NextBuffer := nil;
     Buffer.Attempts := 2;
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqueing sender Buffer\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
-	if Socket.BufferSender = nil then
-	begin
-      Socket.BufferSender := Buffer;
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing first %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
-    end
-	else
+    if Socket.BufferSender = nil then
     begin
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing in last buffer %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
-      TempBuffer := Socket.BufferSender;
-      while TempBuffer.NextBuffer <> nil do
-        TempBuffer := TempBuffer.NextBuffer;
-      TempBuffer.NextBuffer := Buffer;
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued last sender Buffer\n',[]);{$ENDIF}
+      Socket.BufferSender := Buffer;
+      Socket.BufferSenderTail := Buffer;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing first %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
+    end else
+    begin
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing in last buffer %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
+      Socket.BufferSenderTail.NextBuffer := Buffer;
+      Socket.BufferSenderTail := Buffer;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued last sender Buffer\n',[]);{$ENDIF}
     end;
-	{$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued sender Buffer\n',[]);{$ENDIF}
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued sender Buffer\n',[]);{$ENDIF}
     AddrLen := Addrlen - FragLen;
     P := P+FragLen;
   end;

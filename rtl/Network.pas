@@ -2164,7 +2164,6 @@ var
   P: PChar;
   Packet: PPacket;
   TCPHeader: PTCPHeader;
-  TempBuffer: PBufferSender;
 begin
   P := Addr;
   Result := AddrLen;

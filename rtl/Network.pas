@@ -830,7 +830,7 @@ begin
   TcpHeader.Window_Size := SwapWORD(MAX_WINDOW - Socket.BufferLength);
   TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), SizeOf(TTCPHeader));
   IPSendPacket(Packet, Socket.DestIp, IP_TYPE_TCP);
-  // Sequence Number depends of the flags in the TCP Header
+  // Sequence Number depends on the flags in the TCP Header
   if (Socket.State = SCK_NEGOTIATION) or (Socket.State = SCK_CONNECTING) or (Socket.State= SCK_LOCALCLOSING) or (Socket.State = SCK_PEER_DISCONNECTED) then
     Inc(Socket.LastSequenceNumber)
   else if Socket.State = SCK_TRANSMITTING then

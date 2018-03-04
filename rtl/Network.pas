@@ -231,6 +231,7 @@ type
     WinTimeOut: LongInt;
     WinCounter: LongInt;
     RemoteClose: Boolean;
+    UserDefined: pointer;
     Next: PSocket;
   end;
 
@@ -461,7 +462,7 @@ var
   pw: ^Word;
   loop: word;
   x, w: word;
-  csum: LongInt;
+  csum: DWord;
 begin
   CalculateChecksum := 0;
   csum := 0;
@@ -517,7 +518,7 @@ begin
   PseudoHeader.TCPLen := Swap(Word(Len));
   PseudoHeader.Cero := 0;
   PseudoHeader.Protocol := IP_TYPE_TCP;
-  TCP_Checksum := CalculateChecksum(@PseudoHeader,PData,Len, SizeOf(PseudoHeader));
+  Result := CalculateChecksum(@PseudoHeader, PData, Len, SizeOf(PseudoHeader));
 end;
 
 // Validate new Packet to Local Socket
@@ -1639,7 +1640,7 @@ begin
    //   Socket.WinTimeOut := WAIT_WIN*LocalCPUSpeed*1000;
 	//  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: checking if remote windows was refreshed , Socket %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   //  end;
-  	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]); {$ENDIF}
+  	{$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]);{$ENDIF}
     Exit;
   end;
   // the socket doesn't have packets to send
@@ -1678,7 +1679,7 @@ begin
       // TimeOut expired ?
       if Socket.AckTimeOut < read_rdtsc then
       begin
-        {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+        {$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
         Exit;
       end;
       // Hardware problem !!!
@@ -1699,7 +1700,7 @@ begin
         Socket.AckTimeOut := 0;
         // We have to CLOSE
         Socket.DispatcherEvent := DISP_CLOSE ;
-	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]); {$ENDIF}
+	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]);{$ENDIF}
       end else
         Dec(Buffer.Attempts);
     end;
@@ -1716,7 +1717,7 @@ begin
 
   // send packet
   IPSendPacket(Socket.BufferSender.Packet, Socket.DestIp, IP_TYPE_TCP);
-  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet)]); {$ENDIF}
+  {$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h, checksum: %d\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet), TcpHeader.Checksum]);{$ENDIF}
 end;
 
 // Dispatch every ready Socket to its associated Network Service

@@ -1,8 +1,6 @@
 //
 // ToroMicroservice.pas
 //
-// This is a
-//
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -58,7 +56,7 @@ const
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   // port wher the service listens
-  SERVICE_PORT = 80;
+  SERVICE_PORT = 8080;
 
   // timeout in ms
   SERVICE_TIMEOUT = 20000;
@@ -70,12 +68,11 @@ const
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
-
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
 
-  KeySize = 15 * 1024;
-  ValueSize = 15 * 1024;
-
+  // Table len and sizes of the Key and Value
+  KeySize = 5455;
+  ValueSize = 10509;
   TABLE_LEN = 1 ;
 
 
@@ -85,7 +82,15 @@ type
       value: pchar;
     end;
 
-    TMicroserviceFunction = Function (Ask : Pchar) : Pchar;
+    PRequest = ^TRequest;
+    TRequest = record
+      BufferStart: pchar;
+      BufferEnd: pchar;
+      counter: Longint;
+    end;
+
+    // Declaration of the function used for querying the microservice
+    TMicroserviceFunction = Function (Param : Pchar) : Pchar;
 
 var
    ServiceServer: PSocket;
@@ -105,33 +110,53 @@ end;
 
 // A new connection arrives
 function ServiceAccept(Socket: PSocket): LongInt;
+var
+   rq: PRequest;
 begin
+ rq := ToroGetMem(sizeof(TRequest));
+ rq.BufferStart := ToroGetMem(KeySize);
+ rq.BufferEnd := rq.BufferStart;
+ rq.counter:= 0;
+ Socket.UserDefined:= rq;
  SysSocketSelect(Socket, SERVICE_TIMEOUT);
  Result := 0;
 end;
 
-procedure GetRequest(Socket: PSocket; buffer: pchar; Len: LongInt);
+function GetRequest(Socket: PSocket): Boolean;
 var
-   i: longint = 0;
-   line: boolean = true;
+   i, Len: longint;
    buf: char;
+   rq: PRequest;
+   buffer: Pchar;
 begin
- // TODO: to check line and the size of the answer
- while (SysSocketRecv(Socket, @buf,1,0) <> 0) or line do
+ Result := False;
+ rq := Socket.UserDefined;
+ i := rq.counter;
+ buffer := rq.BufferEnd;
+ // Calculate len of the request
+ if i <> 0 then
+  Len :=  i - 4
+ else
+  Len := 0;
+ while (SysSocketRecv(Socket, @buf,1,0) <> 0)do
  begin
-  if ((i>4) and (buf = #32)) or (Len = 0) then
+  if ((i>4) and (buf = #32)) or (Len = KeySize) then
   begin
-    line := false;
     buffer^ := #0;
+    Result := True;
+    Exit;
   end;
-  if (i>4) and line then
+  if (i>4) then
   begin
+    Len := i - 4;
     buffer^ := buf;
     buffer +=1;
-    Len := Len - 1;
+    rq.BufferEnd += 1;
   end;
   i+=1;
  end;
+
+ rq.counter := i;
 end;
 
 procedure SendStream(Socket: Psocket; Stream: Pchar);
@@ -145,7 +170,7 @@ var
 begin
  for i:= 0 to (TABLE_LEN-1) do
  begin
-  if StrCmp(entry, @table[i].key[0], 4) then
+  if StrCmp(entry, @table[i].key[0], KeySize) then
   begin
     Result := @table[i].value[0];
     Exit;
@@ -166,7 +191,6 @@ begin
    SendStream(Socket, HeaderNotFound);
  end
  else begin
-   // TODO: to check this
    AnsSize := strlen(Answer);
    InttoStr(AnsSize,@anssizechar[0]);
    dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
@@ -193,7 +217,11 @@ begin
 end;
 
 function ServiceTimeOut(Socket: PSocket): LongInt;
+var
+   rq: PRequest;
 begin
+  rq := Socket.UserDefined;
+  ToroFreeMem(rq.BufferStart);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -203,19 +231,19 @@ var
 
 function ServiceReceive(Socket: PSocket): LongInt;
 var
-   entry: ^char;
+   rq : PRequest;
+   entry: PChar;
 begin
- entry := ToroGetMem(KeySize);
- // get the request
- GetRequest(Socket, entry, KeySize);
- // WriteConsoleF('received: %d\n',[strlen(entry)]);
- // process it
- ProcessRequest(Socket, MyMicroFunction(entry));
- // finish
- FinishRequest(Socket);
- connectionCount := connectionCount + 1;
- WriteConsoleF('\t Connection %d, received: %d bytes\n',[connectionCount, strlen(entry)]);
- ToroFreeMem(entry);
+ if GetRequest(Socket) then
+ begin
+   rq := Socket.UserDefined;
+   entry := rq.BufferStart;
+   ProcessRequest(Socket, MyMicroFunction(rq.BufferStart));
+   FinishRequest(Socket);
+   connectionCount := connectionCount + 1;
+   WriteConsoleF('\t Connection %d, received: %d bytes\n',[connectionCount, strlen(entry)]);
+   ToroFreeMem(rq.BufferStart);
+ end else SysSocketSelect(Socket, SERVICE_TIMEOUT);
  Result := 0;
 end;
 
@@ -231,7 +259,7 @@ begin
   // open the key
   if SysStatFile('/web/key', @idx) = 0 then
   begin
-    WriteConsoleF ('index.html not found\n',[]);
+    WriteConsoleF ('key not found\n',[]);
   end else
     Table[0].key := ToroGetMem(idx.Size);
 
@@ -242,12 +270,12 @@ begin
     SysReadFile(tmp, idx.Size, Table[0].key);
     SysCloseFile(tmp);
   end else
-      WriteConsoleF ('key not found\n',[]);
+      WriteConsoleF ('cannot open key\n',[]);
 
   // open value
   if SysStatFile('/web/value', @idx2) = 0 then
   begin
-    WriteConsoleF ('index.html not found\n',[]);
+    WriteConsoleF ('value not found\n',[]);
   end else
     Table[0].value := ToroGetMem(idx2.Size);
 
@@ -258,7 +286,7 @@ begin
     SysReadFile(tmp, idx2.Size, Table[0].value);
     SysCloseFile(tmp);
   end else
-      WriteConsoleF ('value not found\n',[]);
+      WriteConsoleF ('cannot open value\n',[]);
 
   // set the callbacks used by the kernel
   ServiceHandler.DoInit    := @ServiceInit;

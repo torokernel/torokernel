@@ -95,9 +95,14 @@
     </SearchPaths>
     <CodeGeneration>
       <Optimizations>
-        <OptimizationLevel Value="2"/>
+        <OptimizationLevel Value="0"/>
       </Optimizations>
     </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <GenerateDebugInfo Value="False"/>
+      </Debugging>
+    </Linking>
     <Other>
       <Verbosity>
         <ShowHints Value="False"/>

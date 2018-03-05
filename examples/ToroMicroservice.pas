@@ -222,6 +222,7 @@ var
 begin
   rq := Socket.UserDefined;
   ToroFreeMem(rq.BufferStart);
+  ToroFreeMem(rq);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -243,6 +244,7 @@ begin
    connectionCount := connectionCount + 1;
    WriteConsoleF('\t Connection %d, received: %d bytes\n',[connectionCount, strlen(entry)]);
    ToroFreeMem(rq.BufferStart);
+   ToroFreeMem(rq);
  end else SysSocketSelect(Socket, SERVICE_TIMEOUT);
  Result := 0;
 end;

@@ -866,6 +866,9 @@ begin
   {$IFDEF HEAP_STATS}
     Dec(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
     Inc(MemoryAllocator.FreeSize, DirectorySX[SX]);
+    {$IFDEF InformMemory}
+      WriteDebug('ToroFreeMem: CurrentAllocatedSize: %dB, FreeSize: %dB\n', [MemoryAllocator.CurrentAllocatedSize, MemoryAllocator.FreeSize]);
+    {$ENDIF}
   {$ENDIF}
   {$IFDEF HEAP_STATS2}
     Dec(MemoryAllocator.Current);
@@ -1017,7 +1020,7 @@ var
   BlockList: PBlockList;
   MaxAllocBlockCount: Integer;
   Shift: PtrUInt;
-  SX: Byte;
+  SX, bSX: Byte;
 begin
   {$IFDEF DebugMemory} WriteDebug('InitializeDirectory Chunk: %h Size: %d\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   // this is assignation is only for pointers's tables
@@ -1036,8 +1039,11 @@ begin
         MaxAllocBlockCount := MaxAllocBlockCount div 2;
       BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
       BlockList.Count := 0;
+      Chunk := Chunk + SizeOf(BLOCK_HEADER_SIZE);
+      bSX := GetSX(BlockList.Capacity*SizeOf(Pointer));
+      SetHeaderSX(GetApicId, bSX, 0, Chunk);
       BlockList.List := Chunk;
-      ChunkSize := ChunkSize-BlockList.Capacity*SizeOf(Pointer);
+      ChunkSize := ChunkSize - BlockList.Capacity*SizeOf(Pointer) - sizeof(BLOCK_HEADER_SIZE);
       {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}
       {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, BlockList.Capacity); {$ENDIF}
       Shift := BlockList.Capacity*SizeOf(Pointer);

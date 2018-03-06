@@ -682,9 +682,11 @@ begin
   while (ChunkSX < MAX_SX) and (MemoryAllocator.Directory[ChunkSX].Count = 0) do
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
+  // TODO: replace Panic() with something better
+  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory');
   // taking a block from the list 
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
-  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX]]); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d, Count: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX], ChunkBlockList.Count]); {$ENDIF}
   {$IFDEF DebugMemory}
 	for j:= 0 to (ChunkBlockList.Count-1) do
 	begin
@@ -1043,7 +1045,7 @@ begin
       bSX := GetSX(BlockList.Capacity*SizeOf(Pointer));
       SetHeaderSX(GetApicId, bSX, 0, Chunk);
       BlockList.List := Chunk;
-      ChunkSize := ChunkSize - BlockList.Capacity*SizeOf(Pointer) - sizeof(BLOCK_HEADER_SIZE);
+      ChunkSize := ChunkSize - DirectorySX[bSX] - sizeof(BLOCK_HEADER_SIZE);
       {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}
       {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, BlockList.Capacity); {$ENDIF}
       Shift := BlockList.Capacity*SizeOf(Pointer);

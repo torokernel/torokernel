@@ -163,6 +163,7 @@ begin
   begin
     indexSize := SysReadFile(tmp,idx.Size, Buf);
     SysCloseFile(tmp);
+    WriteConsoleF('\t /VToroWebServer/n: index.html loaded, size: %d bytes\n', [idx.Size]);
   end else
       WriteConsoleF ('index.html not found\n',[]);
 

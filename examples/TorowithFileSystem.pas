@@ -65,14 +65,19 @@ const
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
+  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+
 var
   HttpServer: PSocket;
   Buffer: char;
-  Buf: ^Char;
+  Buf, HttpContent: ^Char;
   tmp: THandle;
   HttpHandler: TNetworkHandler;
-  BufLen: longint = 0;
   idx: TInode;
+  BuffLeninChar: array[0..10] of char;
+  indexSize: Longint;
+  HttpContentLen : Longint;
 
 // Socket initialization
 procedure HttpInit;
@@ -106,8 +111,7 @@ begin
   begin
   end;
   // we send the whole file
-  SysSocketSend(Socket, @Buf[0], BufLen, 0);
-  // generar bien el emcabezao!!!!!
+  SysSocketSend(Socket, HttpContent, HttpContentLen, 0);
   WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
@@ -157,10 +161,21 @@ begin
 
   if (tmp <> 0) then
   begin
-    BufLen := SysReadFile(tmp,idx.Size, Buf);
+    indexSize := SysReadFile(tmp,idx.Size, Buf);
     SysCloseFile(tmp);
   end else
       WriteConsoleF ('index.html not found\n',[]);
+
+  // build the http header
+  InttoStr(indexSize, @BuffLeninChar[0]);
+  HttpContentLen := StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Buf);
+  HttpContent := ToroGetMem(HttpContentLen);
+  StrConcat(HeaderOk, @BuffLeninChar[0], HttpContent);
+  HttpContent := HttpContent + StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk);
+  StrConcat(HttpContent, ContentOK, HttpContent);
+  HttpContent := HttpContent + StrLen(ContentOK) ;
+  StrConcat(HttpContent, Buf, HttpContent);
+  ToroFreeMem(Buf);
 
   // register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);

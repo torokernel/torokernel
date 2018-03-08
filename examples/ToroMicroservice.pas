@@ -56,7 +56,7 @@ const
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   // port wher the service listens
-  SERVICE_PORT = 8080;
+  SERVICE_PORT = 80;
 
   // timeout in ms
   SERVICE_TIMEOUT = 20000;
@@ -70,9 +70,8 @@ const
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
 
-  // Table len and sizes of the Key and Value
+  // Table len and Key size
   KeySize = 5455;
-  ValueSize = 10509;
   TABLE_LEN = 1 ;
 
 
@@ -170,6 +169,8 @@ var
 begin
  for i:= 0 to (TABLE_LEN-1) do
  begin
+  if strlen(entry) <> KeySize then
+    Continue;
   if StrCmp(entry, @table[i].key[0], KeySize) then
   begin
     Result := @table[i].value[0];
@@ -258,7 +259,10 @@ begin
   // dedicate the virtio network card to local cpu
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
-  // open the key
+  // TODO:
+  // init table
+  // key size dinamic
+  // get the key
   if SysStatFile('/web/key', @idx) = 0 then
   begin
     WriteConsoleF ('key not found\n',[]);
@@ -274,7 +278,7 @@ begin
   end else
       WriteConsoleF ('cannot open key\n',[]);
 
-  // open value
+  // get the value
   if SysStatFile('/web/value', @idx2) = 0 then
   begin
     WriteConsoleF ('value not found\n',[]);

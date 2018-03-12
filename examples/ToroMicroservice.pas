@@ -1,6 +1,11 @@
 //
 // ToroMicroservice.pas
 //
+// This example shows the use of Toro to run a microservice to access a table.
+// The microservice filters the request to get the string after the GET command.
+// The string is used a key to query a table and returns the value. The microservice
+// relies on a generic function named "MyMicroFunction(Pchar): Pchar" to process the
+// request and returns a string. From the output string, the http response is generated
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -70,8 +75,7 @@ const
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
 
-  // Table len and Key size
-  KeySize = 5455;
+  MaxKeySize = 5455;
   TABLE_LEN = 1 ;
 
 
@@ -113,7 +117,7 @@ var
    rq: PRequest;
 begin
  rq := ToroGetMem(sizeof(TRequest));
- rq.BufferStart := ToroGetMem(KeySize);
+ rq.BufferStart := ToroGetMem(MaxKeySize);
  rq.BufferEnd := rq.BufferStart;
  rq.counter:= 0;
  Socket.UserDefined:= rq;
@@ -139,7 +143,7 @@ begin
   Len := 0;
  while (SysSocketRecv(Socket, @buf,1,0) <> 0)do
  begin
-  if ((i>4) and (buf = #32)) or (Len = KeySize) then
+  if ((i>4) and (buf = #32)) or (Len = MaxKeySize) then
   begin
     buffer^ := #0;
     Result := True;
@@ -165,15 +169,17 @@ end;
 
 function LookUp(entry: pchar): pchar;
 var
-   i: LongInt;
+   i, EntryLen, TableEntryLen: LongInt;
 begin
+ EntryLen := strlen(entry);
  for i:= 0 to (TABLE_LEN-1) do
  begin
-  if strlen(entry) <> KeySize then
+   TableEntryLen := strlen(table[i].key);
+  if EntryLen <> TableEntryLen then
     Continue;
-  if StrCmp(entry, @table[i].key[0], KeySize) then
+  if StrCmp(entry, table[i].key, EntryLen) then
   begin
-    Result := @table[i].value[0];
+    Result := table[i].value;
     Exit;
   end;
  end;
@@ -259,10 +265,6 @@ begin
   // dedicate the virtio network card to local cpu
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
 
-  // TODO:
-  // init table
-  // key size dinamic
-  // get the key
   if SysStatFile('/web/key', @idx) = 0 then
   begin
     WriteConsoleF ('key not found\n',[]);
@@ -278,7 +280,6 @@ begin
   end else
       WriteConsoleF ('cannot open key\n',[]);
 
-  // get the value
   if SysStatFile('/web/value', @idx2) = 0 then
   begin
     WriteConsoleF ('value not found\n',[]);

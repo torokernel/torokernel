@@ -394,6 +394,9 @@ Function  hexStr(Val:int64;cnt:byte):shortstring;
 Function  OctStr(Val:int64;cnt:byte):shortstring;
 Function  binStr(Val:int64;cnt:byte):shortstring;
 Function  hexStr(Val:Pointer):shortstring;
+procedure InttoStr(Value: PtrUInt; buff: pchar);
+procedure StrConcat(left, right, dst: pchar);
+function StrCmp(p1, p2: pchar; Len: LongInt): Boolean;
 
 { Char functions }
 Function chr(b : byte) : Char;      [INTERNPROC: fpc_in_chr_byte];
@@ -3278,6 +3281,61 @@ begin
         inc(pc);
       end;
    end;
+end;
+
+procedure InttoStr(Value: PtrUInt; buff: pchar);
+var
+  I, Len: Byte;
+  // 21 is the max number of characters needed to represent 64 bits number in decimal
+  S: string[21];
+begin
+  Len := 0;
+  I := 21;
+  if Value = 0 then
+  begin
+    buff^ := '0';
+  end else
+  begin
+    while Value <> 0 do
+    begin
+      S[I] := AnsiChar((Value mod 10) + $30);
+      Value := Value div 10;
+      I := I-1;
+      Len := Len+1;
+    end;
+    S[0] := Char(Len);
+   for I := (sizeof(S)-Len) to sizeof(S)-1 do
+   begin
+    buff^ := S[I];
+    buff +=1;
+   end;
+  end;
+end;
+
+procedure StrConcat(left, right, dst: pchar);
+begin
+  Move(left^,dst^,Length(left));
+  dst := dst + Length(left);
+  Move(right^,dst^,Length(right));
+  dst +=Length(right);
+  dst^ := #0;
+end;
+
+function StrCmp(p1, p2: pchar; Len: LongInt): Boolean;
+var
+   i: LongInt;
+begin
+ result:= false;
+ for i:= 0 to Len-1 do
+ begin
+  if (p1^ <> p2^) then
+  begin
+    Exit;
+  end;
+  p1 += 1;
+  p2 += 1;
+ end;
+result := true;
 end;
 
 

@@ -45,7 +45,7 @@ interface
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Arch, Console;
+  Arch, Process, Console;
 
 const
   MAX_SX = 30; // Size indeX used to access MemoryAllocator directory
@@ -457,6 +457,7 @@ var
 begin
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
+  Panic (NewList = nil, 'Toro ran out of memory\n');
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
   ToroFreeMem(BlockList.List);
   {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
@@ -681,15 +682,23 @@ begin
   while (ChunkSX < MAX_SX) and (MemoryAllocator.Directory[ChunkSX].Count = 0) do
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
+  // TODO: replace Panic() with something better
+  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory');
   // taking a block from the list 
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
-  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX]]); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d, Count: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX], ChunkBlockList.Count]); {$ENDIF}
   {$IFDEF DebugMemory}
 	for j:= 0 to (ChunkBlockList.Count-1) do
 	begin
 	 WriteDebug('ObtainFromLargerChunk: dump list %h\n', [PtrUInt(ChunkBlockList.List^[j])]);
 	end;
   {$ENDIF}
+  // ran out of memory
+  if Chunk = nil then
+  begin
+    Result := nil;
+    Exit;
+  end;
   Dec(ChunkBlockList.Count);
   ChunkSize := DirectorySX[ChunkSX];
   // update the size of block in the header
@@ -859,6 +868,9 @@ begin
   {$IFDEF HEAP_STATS}
     Dec(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
     Inc(MemoryAllocator.FreeSize, DirectorySX[SX]);
+    {$IFDEF InformMemory}
+      WriteDebug('ToroFreeMem: CurrentAllocatedSize: %dB, FreeSize: %dB\n', [MemoryAllocator.CurrentAllocatedSize, MemoryAllocator.FreeSize]);
+    {$ENDIF}
   {$ENDIF}
   {$IFDEF HEAP_STATS2}
     Dec(MemoryAllocator.Current);
@@ -1010,7 +1022,7 @@ var
   BlockList: PBlockList;
   MaxAllocBlockCount: Integer;
   Shift: PtrUInt;
-  SX: Byte;
+  SX, bSX: Byte;
 begin
   {$IFDEF DebugMemory} WriteDebug('InitializeDirectory Chunk: %h Size: %d\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   // this is assignation is only for pointers's tables
@@ -1029,8 +1041,11 @@ begin
         MaxAllocBlockCount := MaxAllocBlockCount div 2;
       BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
       BlockList.Count := 0;
+      Chunk := Chunk + SizeOf(BLOCK_HEADER_SIZE);
+      bSX := GetSX(BlockList.Capacity*SizeOf(Pointer));
+      SetHeaderSX(GetApicId, bSX, 0, Chunk);
       BlockList.List := Chunk;
-      ChunkSize := ChunkSize-BlockList.Capacity*SizeOf(Pointer);
+      ChunkSize := ChunkSize - DirectorySX[bSX] - sizeof(BLOCK_HEADER_SIZE);
       {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}
       {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, BlockList.Capacity); {$ENDIF}
       Shift := BlockList.Capacity*SizeOf(Pointer);

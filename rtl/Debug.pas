@@ -124,11 +124,18 @@ end;
 procedure DebugPrintHexa(const Value: PtrUInt);
 var
   I: Byte;
+  P: Boolean;
 begin
+  P := False;
   SendChar('0');
   SendChar('x');
   for I := SizeOf(PtrUInt)*2-1 downto 0 do
-    SendChar(HEX_CHAR[Value shr (I*4) and $F]);
+  begin
+   if not(P) and (HEX_CHAR[(Value shr (I*4)) and $0F] <> '0') then
+     P:= True;
+   if P then
+     SendChar(HEX_CHAR[(Value shr (I*4)) and $0F]);
+  end;
 end;
 
 procedure DebugPrintString(const S: shortstring);

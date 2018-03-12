@@ -47,10 +47,10 @@ const
   // Sockets Types
   SOCKET_DATAGRAM = 1; // For datagrams like UDP
   SOCKET_STREAM = 2; // For connections like TCP
-  MAX_SocketPORTS = 10000; // Max number of ports supported
+  MAX_SocketPORTS = 20000; // Max number of ports supported
   MAX_WINDOW = $4000; // Max Window Size
   MTU = 1200; // MAX Size of packet for TCP Stack
-  USER_START_PORT = 7000; // First PORT used by GetFreePort
+  USER_START_PORT = 10000; // First PORT used by GetFreePort
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1; // Size of Sockets Bitmaps
   // Max Time that Network Card can be Inactive with packet in a Buffer,  in ms
   // TODO: This TIMER wont be necessary
@@ -170,6 +170,9 @@ type
     Next: PNetworkInterface;
   end;
 
+  PTANetworkService = ^TANetworkService;
+  TANetworkService = array[0..0] of PNetworkService;
+
   TNetworkDedicate = record
     NetworkInterface: PNetworkInterface; // Hardware Driver
     IpAddress: TIPAddress; // Internet Protocol Address
@@ -178,10 +181,10 @@ type
     TranslationTable: PMachine;
     // Table of Sockets sorted by port
     // Sockets for conections
-    SocketStream: array[0..MAX_SocketPORTS-1] of PNetworkService;
+    SocketStream: PTANetworkService;
     SocketStreamBitmap: array[0..SZ_SocketBitmap] of Byte;
     // Sockets for Datagram
-    SocketDatagram: array[0..MAX_SocketPORTS-1] of PNetworkService;
+    SocketDatagram: PTANetworkService;
     SocketDatagramBitmap: array[0..SZ_SocketBitmap] of Byte;
   end;
   PNetworkDedicate = ^TNetworkDedicate;
@@ -220,6 +223,7 @@ type
     NeedFreePort: Boolean;
     DispatcherEvent: LongInt;
     TimeOut:Int64;
+    BufferSenderTail: PBufferSender;
     BufferSender: PBufferSender;
     AckFlag: Boolean;
     AckTimeOut: LongInt;
@@ -227,6 +231,7 @@ type
     WinTimeOut: LongInt;
     WinCounter: LongInt;
     RemoteClose: Boolean;
+    UserDefined: pointer;
     Next: PSocket;
   end;
 
@@ -457,7 +462,7 @@ var
   pw: ^Word;
   loop: word;
   x, w: word;
-  csum: LongInt;
+  csum: DWord;
 begin
   CalculateChecksum := 0;
   csum := 0;
@@ -513,7 +518,7 @@ begin
   PseudoHeader.TCPLen := Swap(Word(Len));
   PseudoHeader.Cero := 0;
   PseudoHeader.Protocol := IP_TYPE_TCP;
-  TCP_Checksum := CalculateChecksum(@PseudoHeader,PData,Len, SizeOf(PseudoHeader));
+  Result := CalculateChecksum(@PseudoHeader, PData, Len, SizeOf(PseudoHeader));
 end;
 
 // Validate new Packet to Local Socket
@@ -617,6 +622,7 @@ begin
   ClientSocket.NeedFreePort := False;
   ClientSocket.AckTimeOUT := 0;
   ClientSocket.BufferSender := nil;
+  ClientSocket.BufferSenderTail := nil;
   ClientSocket.RemoteClose := False;
   // todo: to check if it is valid this 
   ClientSocket.AckFlag := True; 
@@ -824,7 +830,7 @@ begin
   TcpHeader.Window_Size := SwapWORD(MAX_WINDOW - Socket.BufferLength);
   TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), SizeOf(TTCPHeader));
   IPSendPacket(Packet, Socket.DestIp, IP_TYPE_TCP);
-  // Sequence Number depends of the flags in the TCP Header
+  // Sequence Number depends on the flags in the TCP Header
   if (Socket.State = SCK_NEGOTIATION) or (Socket.State = SCK_CONNECTING) or (Socket.State= SCK_LOCALCLOSING) or (Socket.State = SCK_PEER_DISCONNECTED) then
     Inc(Socket.LastSequenceNumber)
   else if Socket.State = SCK_TRANSMITTING then
@@ -1118,12 +1124,26 @@ begin
       end;
     SCK_TRANSMITTING: // Client Socket is connected to remote Host
       begin
-      // TODO: we aren't checking if ACK number is correct
        if TCPHeader.flags = TCP_ACK then
        begin
-         DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
-         Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
-	 Socket.AckFlag := True;
+           DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
+           Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
+           Socket.AckFlag := True;
+           if (DataSize <> 0) then
+           begin
+            Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
+            Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
+            Move(Source^, Dest^, DataSize);
+            Socket.BufferLength := Socket.BufferLength + DataSize;
+	    // We switch the state only if the dispatcher is waiting for an event
+            if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
+	    begin
+              Socket.DispatcherEvent := DISP_RECEIVE;
+	      {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
+	    end;
+            // we confirm the ACKPSH
+            TCPSendPacket(TCP_ACK, Socket);
+           end;
 	 {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
         // TODO: to implement zero window condition check
 		//
@@ -1487,22 +1507,27 @@ var
   I, CPUID: LongInt;
 begin
   CPUID := GetApicid;
-  // cleaning  packet queue
+  Result := false;
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
   DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
-  // initialization of Services for Packets Manipulation
-  NetworkServicesInit;
-  // driver internal initialization
-  DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
-  // cleaning the Socket table
+  DedicateNetworks[CPUID].SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if DedicateNetworks[CPUID].SocketStream = nil then
+    Exit;
+  DedicateNetworks[CPUID].SocketDatagram := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if DedicateNetworks[CPUID].SocketDatagram = nil then
+  begin
+    ToroFreeMem(DedicateNetworks[CPUID].SocketStream);
+    Exit;
+  end;
   for I:= 0 to (MAX_SocketPORTS-1) do
   begin
     DedicateNetworks[CPUID].SocketStream[I]:=nil;
     DedicateNetworks[CPUID].SocketDatagram[I]:=nil;
   end;
-  // the drivers is sending and receiving packets
+  NetworkServicesInit;
+  DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   Result:= True;
 end;
 
@@ -1595,6 +1620,8 @@ procedure DispatcherFlushPacket(Socket: PSocket);
 var
   Buffer: PBufferSender;
   DataLen: UInt32;
+  TcpHeader: PTCPHeader;
+  TcpHeaderSize: LongInt;
 begin
   //{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   // sender Dispatcher can't send, we have to wait for remote host
@@ -1613,7 +1640,7 @@ begin
    //   Socket.WinTimeOut := WAIT_WIN*LocalCPUSpeed*1000;
 	//  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: checking if remote windows was refreshed , Socket %h\n', [PtrUInt(Socket)]); {$ENDIF} 
   //  end;
-  	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]); {$ENDIF}
+  	{$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]);{$ENDIF}
     Exit;
   end;
   // the socket doesn't have packets to send
@@ -1625,10 +1652,14 @@ begin
     Buffer := Socket.BufferSender;
     if Socket.AckFlag then
     begin // the packet has been sent correctly
-	  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h Packet %h correctly sent\n', [PtrUInt(Socket),PtrUInt(Buffer.Packet)]); {$ENDIF}
+      {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h Packet %h correctly sent\n', [PtrUInt(Socket),PtrUInt(Buffer.Packet)]); {$ENDIF}
       Socket.AckFlag := False; // clear the flag
       Socket.AckTimeOut:= 0;
       DataLen := Buffer.Packet.Size - (SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
+      if Socket.BufferSender = Socket.BufferSenderTail then
+      begin
+        Socket.BufferSenderTail := nil
+      end;
       Buffer := Socket.BufferSender.NextBuffer;
       ToroFreeMem(Socket.BufferSender.Packet); // Free the packet
       ToroFreeMem(Socket.BufferSender); // Free the Buffer
@@ -1648,7 +1679,7 @@ begin
       // TimeOut expired ?
       if Socket.AckTimeOut < read_rdtsc then
       begin
-        {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
+        {$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: CheckTimeOut exiting Socket %h\n', [PtrUInt(Socket)]);{$ENDIF}
         Exit;
       end;
       // Hardware problem !!!
@@ -1669,15 +1700,24 @@ begin
         Socket.AckTimeOut := 0;
         // We have to CLOSE
         Socket.DispatcherEvent := DISP_CLOSE ;
-	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]); {$ENDIF}
+	{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: 0 attemps Socket %h in state BLOCKED\n', [PtrUInt(Socket)]);{$ENDIF}
       end else
         Dec(Buffer.Attempts);
     end;
   end;
   Socket.ACKFlag := False;
   Socket.AckTimeOut := read_rdtsc + WAIT_ACK*LocalCPUSpeed*1000;
+
+  // update tcp header
+  TcpHeader:= Pointer(PtrUInt(Socket.BufferSender.Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
+  TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
+  TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
+  TcpHeaderSize := Socket.BufferSender.Packet.Size - SizeOf(TEthHeader) - SizeOf(TIPHeader);
+  TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), TcpHeaderSize);
+
+  // send packet
   IPSendPacket(Socket.BufferSender.Packet, Socket.DestIp, IP_TYPE_TCP);
-  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet)]); {$ENDIF}
+  {$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: Socket %h sending packet %h, checksum: %d\n', [PtrUInt(Socket), PtrUInt(Socket.BufferSender.Packet), TcpHeader.Checksum]);{$ENDIF}
 end;
 
 // Dispatch every ready Socket to its associated Network Service
@@ -2125,7 +2165,6 @@ var
   P: PChar;
   Packet: PPacket;
   TCPHeader: PTCPHeader;
-  TempBuffer: PBufferSender;
 begin
   P := Addr;
   Result := AddrLen;
@@ -2140,11 +2179,10 @@ begin
     // we can only send if the remote host can receiv
     if Fraglen > Socket.RemoteWinCount then
       Fraglen := Socket.RemoteWinCount;
-    Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen; // Decrement Remote Window Size
+    Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen;
     // Refresh the remote window size
     if Socket.RemoteWinCount = 0 then
       Socket.RemoteWinCount:= Socket.RemoteWinLen ;
-    // we need a new packet
     Packet := ToroGetMem(SizeOf(TPacket)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen);
     // we need a new packet structure
     Buffer := ToroGetMem(SizeOf(TBufferSender));
@@ -2154,44 +2192,37 @@ begin
     Packet.ready := False;
     Packet.Delete := False;
     Packet.Next := nil;
-    // Fill TCP paramters
     TcpHeader:= Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
     FillChar(TCPHeader^, SizeOf(TTCPHeader), 0);
-    // Copy user DATA to new packet
     Dest := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader));
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Moving from %h to %h len %d\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
-	Move(P^, Dest^, FragLen);
-    TcpHeader.AckNumber := SwapDWORD(Socket.LastAckNumber);
-    TcpHeader.SequenceNumber := SwapDWORD(Socket.LastSequenceNumber);
-    TcpHeader.Flags := TCP_ACKPSH;
+    Move(P^, Dest^, FragLen);
+    // only last packet has psh
+    if AddrLen <= MTU then
+      TcpHeader.Flags := TCP_ACKPSH
+    else
+      TcpHeader.Flags := TCP_ACK;
     TcpHeader.Header_Length := (SizeOf(TTCPHeader) div 4) shl 4;
     TcpHeader.SourcePort := SwapWORD(Socket.SourcePort);
     TcpHeader.DestPort := SwapWORD(Socket.DestPort);
-    // Local Window Size
     TcpHeader.Window_Size := SwapWORD(MAX_WINDOW - Socket.BufferLength);
-    TcpHeader.Checksum := TCP_CheckSum(DedicateNetworks[GetApicid].IpAddress, Socket.DestIp, PChar(TCPHeader), FragLen+SizeOf(TTCPHeader));
-    // Buffer Sender structure, the dispatcher works with that structure
     Buffer.Packet := Packet;
     Buffer.NextBuffer := nil;
     Buffer.Attempts := 2;
-    // Enqueue Buffer
     {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqueing sender Buffer\n',[PtrUInt(P),PtrUInt(Dest),FragLen]);{$ENDIF}
-	if Socket.BufferSender = nil then
-	begin
-      Socket.BufferSender := Buffer;
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing first %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
-    end
-	else
+    if Socket.BufferSender = nil then
     begin
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing in last buffer %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
-      TempBuffer := Socket.BufferSender;
-      while TempBuffer.NextBuffer <> nil do
-        TempBuffer := TempBuffer.NextBuffer;
-      TempBuffer.NextBuffer := Buffer;
-	  {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued last sender Buffer\n',[]);{$ENDIF}
+      Socket.BufferSender := Buffer;
+      Socket.BufferSenderTail := Buffer;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing first %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
+    end else
+    begin
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enquing in last buffer %h\n',[PtrUInt(Socket.BufferSender)]);{$ENDIF}
+      Socket.BufferSenderTail.NextBuffer := Buffer;
+      Socket.BufferSenderTail := Buffer;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued last sender Buffer\n',[]);{$ENDIF}
     end;
-	{$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued sender Buffer\n',[]);{$ENDIF}
-    // Next data to send
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSend: Enqued sender Buffer\n',[]);{$ENDIF}
     AddrLen := Addrlen - FragLen;
     P := P+FragLen;
   end;

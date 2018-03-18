@@ -723,7 +723,6 @@ var
   CPU: Byte;
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
-  //inttmp: Boolean;
   {$IFDEF DebugMemory}
    bCPU: Byte;
    bIsFree, bIsPrivateHeap: Byte; 
@@ -736,7 +735,7 @@ begin
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
-	  RestoreInt;
+    RestoreInt;
     Exit;
   end;
   CPU := GetApicID;
@@ -749,30 +748,23 @@ begin
   BlockList := @MemoryAllocator.Directory[SX];
   if BlockList.Count = 0 then
   begin
-     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
-      Result := ObtainFromLargerChunk(SX, MemoryAllocator);
-	  // no more memory
-      if Result = nil then
-	  begin
-		WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
+    Result := ObtainFromLargerChunk(SX, MemoryAllocator);
+    // no more memory
+    if Result = nil then
+    begin
+      WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
-		RestoreInt;
-    Exit;
-	 end;
+      RestoreInt;
+      Exit;
+    end;
   {$IFDEF DebugMemory}
-	  // This helps to find corruptions in the headers
+    // This helps to find corruptions in the headers
     GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
     WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
   // If block is not free, we raise an exception
-  if IsFree(Result)=0 then
-  begin
-    WriteConsoleF('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
-    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
-    Result := nil;
-    RestoreInt;
-    Exit;
-  end;
+  Panic(IsFree(Result)=0,'ToroGetMem: the memory block list has been corrupted\n');
   ResetFreeFlag(Result);
   {$IFDEF HEAP_STATS}
     Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
@@ -797,15 +789,8 @@ begin
   GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
   WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
-	// If block is not free, we raise an exception 
-	if IsFree(Result)=0 then 
-	begin
-		WriteConsoleF('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
-	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
-		Result := nil; 
-		RestoreInt;
-		Exit;
-	end;
+  // If block is not free, we raise an exception
+  Panic(IsFree(Result)=0, 'ToroGetMem: the memory block list has been corrupted\n');
   ResetFreeFlag(Result);
   Dec(BlockList.Count);
   {$IFDEF HEAP_STATS}
@@ -823,7 +808,7 @@ begin
     Inc(BlockList.Total);
   {$ENDIF}
   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	RestoreInt;
+    RestoreInt;
 end;
 
 //
@@ -841,14 +826,7 @@ begin
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
-  if IsFree = FLAG_FREE then // already free
-  begin
-    WriteConsoleF('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
-	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
-    Result := -1; // Invalid pointer operation
-    RestoreInt;
-    Exit;
-  end;
+  Panic(IsFree = FLAG_FREE, 'ToroFreeMem: memory block list corrupted\n');
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
   begin
     SetFreeFlag(P); // not necessary, just in case we want to check that a block is not freed twice
@@ -877,7 +855,6 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
- 
   Result := 0;
   RestoreInt;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}

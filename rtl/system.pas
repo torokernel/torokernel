@@ -3294,6 +3294,8 @@ begin
   if Value = 0 then
   begin
     buff^ := '0';
+    buff  := buff + 1;
+    buff^ := #0;
   end else
   begin
     while Value <> 0 do
@@ -3309,6 +3311,7 @@ begin
     buff^ := S[I];
     buff +=1;
    end;
+   buff^ := #0;
   end;
 end;
 

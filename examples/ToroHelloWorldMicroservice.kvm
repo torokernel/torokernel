@@ -1,0 +1,1 @@
+--vcpus=1 --ram=512  --graphics vnc --network=bridge:toro-bridge,model=virtio-net

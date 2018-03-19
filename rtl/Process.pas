@@ -1452,7 +1452,7 @@ begin
   hlt;
 end;
 
-// A Panic condition has been reached, halt the core
+// A Panic condition has been reached, stops core execution
 // TODO: add parameters
 procedure Panic(const cond: Boolean; const Format: AnsiString);
 var
@@ -1464,14 +1464,16 @@ begin
   WriteConsoleF('/RPanic/n:\n',[]);
   WriteConsoleF(Format,[]);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
+  {$IFDEF DebugCrash}
   WriteConsoleF('Backtrace:\n',[]);
+  // FIXME: Print the whole stack
   GetRBP;
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
-  begin
-   get_caller_stackinfo(pointer(rbp_reg), addr);
-   PrintBackTraceStr(addr);
-  end;
-  hlt;
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(addr);
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(addr);
+  {$ENDIF}
+  while true do;
 end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  

@@ -683,7 +683,7 @@ begin
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
   // TODO: replace Panic() with something better
-  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory');
+  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory\n');
   // taking a block from the list 
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
   {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d, Count: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX], ChunkBlockList.Count]); {$ENDIF}

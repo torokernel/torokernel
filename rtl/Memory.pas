@@ -1044,86 +1044,50 @@ begin
   BlockList.List := ToroGetMem(BlockList.Capacity*SizeOf(Pointer));
 end;
 
-// Distribution of Memory for every core
-// called by MemoryInit
-// TODO: add more debug info here
+// This is called by MemoryInit()
+// It distributes the physical memory for each core
+// It split the first block that above $100000 and with the AVAILABLE flag
+// TODO: To test in a system with more than 3.5 Gb physical memory
 procedure DistributeMemoryRegions;
 var
-  Amount, Counter: PtrUInt;
+  AssignableMemory: QWord;
   Buff: TMemoryRegion;
-  CPU, ID: Cardinal;
+  ID, CPU: LongInt;
   MemoryAllocator: PMemoryAllocator;
   StartAddress: Pointer;
 begin
-  // I am thinking that the regions are sorted
-  // Looking for the first ID available
   ID := 1;
-  // First Region must start at ALLOC_MEMORY_START
-  // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
   while GetMemoryRegion(ID, @Buff) <> 0 do
   begin
-    if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.Length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
+    if (Buff.Flag = MEM_AVAILABLE) and (Buff.Base >= $10000) then
       Break;
     Inc(ID);
   end;
-  // free memory on region
-  Amount := Buff.Length;
-  // allocation start here
+  Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n');
+  AssignableMemory := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
+  MemoryPerCpu := AssignableMemory div CPU_COUNT;
+  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$IFDEF DebugMemory}
+    WriteDebug('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
+    WriteDebug('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$ENDIF}
   StartAddress := Pointer(ALLOC_MEMORY_START);
-  for CPU := 0 to CPU_COUNT-1 do
+  for CPU := 0 to (CPU_COUNT-1) do
   begin
     MemoryAllocator := @MemoryAllocators[CPU];
     MemoryAllocator.StartAddress := StartAddress;
-    MemoryAllocator.Size := MemoryPerCPU;
-    // assignation per CPU
-    Counter := MemoryPerCpu;
-    while Counter <> 0 do
-    begin
-      if Amount > Counter then
-      begin
-        Amount := Amount - Counter;
-        // the amount is assigned to the directory
-        InitializeDirectory(MemoryAllocator, StartAddress, Counter);
-        // same region block
-        StartAddress := Pointer(PtrUInt(StartAddress) + Counter);
-        MemoryAllocator.EndAddress := StartAddress;
-        Break; // Next CPU
-      end else if Amount = Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + Amount);
-        // change the cpu
-        Counter := 0;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new assignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base)
-      end else if Amount < Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        Counter := Counter-Amount;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new asignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base);
-      end;
-    end;
+    MemoryAllocator.Size := MemoryPerCpu;
+    MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + MemoryAllocator.Size - 1);
+    MemoryAllocator.FreeSize := MemoryAllocator.Size;
+    WriteConsoleF('Core#%d, StartAddress: /V%h/n, EndAddress: /V%h/n\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
+    {$IFDEF DebugMemory}
+      WriteDebug('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
+    {$ENDIF}
+    InitializeDirectory(MemoryAllocator, StartAddress, MemoryAllocator.Size);
     InitBlockList(@MemoryAllocator.PoolHeap, 0);
     InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
+    StartAddress := Pointer(PtrUInt(MemoryAllocator.EndAddress) + 1);
   end;
 end;
 
@@ -1132,7 +1096,11 @@ procedure MemoryInit;
 var
   MajorBlockSize: PtrUInt;
   SizeDiv8: Cardinal;
-  SX, J: Byte;
+  SX: Byte;
+  {$IFDEF DebugMemory}
+   ID: LongInt;
+   Buff: TMemoryRegion;
+  {$ENDIF}
 begin
   FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
@@ -1152,14 +1120,19 @@ begin
     MapSX[SizeDiv8] := SX;
   end;
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
-  // Linear Assignation for every Core
-  MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
-  for J := 0 to (CPU_COUNT-1) do
-  begin
-    MemoryAllocators[J].FreeSize:= MemoryPerCpu;
-  end;
-  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
-  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$IFDEF DebugMemory}
+   // memory map
+   ID := 1;
+   WriteDebug('Memory Map\n',[]);
+   while GetMemoryRegion(ID, @Buff) <> 0 do
+   begin
+     if Buff.Flag = MEM_RESERVED then
+       WriteDebug('%h:%h, Flags: Reserved\n',[Buff.Base,Buff.Base + Buff.Length -1])
+     else
+       WriteDebug('%h:%h, Flags: Free\n',[Buff.Base,Buff.Base + Buff.Length -1]);
+     Inc(ID);
+   end;
+  {$ENDIF}
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

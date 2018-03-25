@@ -175,6 +175,11 @@ begin
   P := False;
   PutC('0');
   PutC('x');
+  if (Value = 0) then
+  begin
+    Putc('0');
+    Exit;
+  end;
   for I := SizeOf(PtrUInt)*2-1 downto 0 do
   begin
    if not(P) and (HEX_CHAR[(Value shr (I*4)) and $0F] <> '0') then

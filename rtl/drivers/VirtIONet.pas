@@ -537,6 +537,7 @@ begin
          rx.Buffer := Pointer(PtrUint(rx.Buffer) + (4096 - PtrUInt(rx.Buffer) mod 4096));
          rx.chunk_size := FRAME_SIZE;
          rx.available.index := 0;
+         rx.used.index := 0;
 
          ReadWriteBarrier;
 

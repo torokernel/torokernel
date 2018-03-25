@@ -453,31 +453,32 @@ end;
 procedure BlockListExpand(BlockList: PBlockList);
 var
   NewCapacity: Cardinal;
-  NewList: PPointerArray;
+  NewList, tmp: PPointerArray;
 begin
+  {$IFDEF DebugMemory}WriteDebug('BlockListExpand: BlockList: %h, Count: %d, Capacity: %d\n',[PtrUInt(BlockList), BlockList.Count, BlockList.Capacity]);{$ENDIF}
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
   Panic (NewList = nil, 'Toro ran out of memory\n');
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
-  ToroFreeMem(BlockList.List);
-  {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
-  {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  tmp := BlockList.List;
   BlockList.Capacity := NewCapacity;
   BlockList.List := NewList;
+  ToroFreeMem(tmp);
+  {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
 end;
 
 // Called by DistributeChunk and FreeMem
 procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
-  if BlockList.Count >= BlockList.Capacity then
+  {$IFDEF DebugMemory}WriteDebug('BlockListAdd: BlockList: %h, P: %h\n',[PtrUInt(BlockList), PtrUInt(P)]);{$ENDIF}
+  if BlockList.Count = BlockList.Capacity then
   begin
-    //WriteConsoleF('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
-    //Exit;
     BlockListExpand(BlockList);
   end;
   BlockList.List^[BlockList.Count] := P;
   Inc(BlockList.Count);
-  {$IFDEF DebugMemory} WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
+  {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
 
 procedure PoolHeapRelease(MemoryAllocator: PMemoryAllocator; Heap: PXHeap);
@@ -785,6 +786,7 @@ begin
   end;
   Result := BlockList.List^[BlockList.Count-1];
   {$IFDEF DebugMemory}
+  WriteDebug('ToroGetMem: Pointer: %h, %d\n',[PtrUInt(Result), BlockList.Count]);
   // This helps to find corruptions in the headers
   GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
   WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
@@ -825,7 +827,7 @@ var
 begin
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
-  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
+  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d, p: %h\n', [DirectorySX[SX], PtrUInt(P)]); {$ENDIF}
   Panic(IsFree = FLAG_FREE, 'ToroFreeMem: memory block list corrupted\n');
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
   begin

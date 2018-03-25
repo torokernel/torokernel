@@ -31,7 +31,7 @@ interface
 {$I ..\Toro.inc}
 
 {$IFDEF DEBUG}
-        {$DEFINE DebugVirtio}
+        //{$DEFINE DebugVirtio}
 {$ENDIF}
 
 uses

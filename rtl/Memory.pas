@@ -1016,6 +1016,7 @@ begin
     begin
       BlockList := @MemoryAllocator.Directory[SX];
       BlockList.MaxAllocBlockCount := MaxAllocBlockCount;
+      {$IFDEF DebugMemory} WriteDebug('InitializeDirectory: SX: %d, MaxAllocBlockCount: %d\n',[DirectorySX[SX], MaxAllocBlockCount]);{$ENDIF}
       if (MaxAllocBlockCount > 1) and ((SX+1) mod 4 = 0) then
         MaxAllocBlockCount := MaxAllocBlockCount div 2;
       BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)

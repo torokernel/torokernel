@@ -472,12 +472,13 @@ end;
 procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: BlockList: %h, P: %h\n',[PtrUInt(BlockList), PtrUInt(P)]);{$ENDIF}
-  if BlockList.Count = BlockList.Capacity then
+  BlockList.List^[BlockList.Count] := P;
+  Inc(BlockList.Count);
+  // to avoid race condition with GetMem(), expand before it is full
+  if (BlockList.Capacity - BlockList.Count = 1)  then
   begin
     BlockListExpand(BlockList);
   end;
-  BlockList.List^[BlockList.Count] := P;
-  Inc(BlockList.Count);
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
 
@@ -762,7 +763,7 @@ begin
   {$IFDEF DebugMemory}
     // This helps to find corruptions in the headers
     GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
-    WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
+    WriteDebug('ToroGetMem: Header SXSize %d - List SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
   // If block is not free, we raise an exception
   Panic(IsFree(Result)=0,'ToroGetMem: the memory block list has been corrupted\n');

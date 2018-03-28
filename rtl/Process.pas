@@ -1452,15 +1452,28 @@ begin
   hlt;
 end;
 
-// Just halt the system execution due to a Panic Condition
+// A Panic condition has been reached, stops core execution
+// TODO: add parameters
 procedure Panic(const cond: Boolean; const Format: AnsiString);
+var
+ rbp_reg: QWord;
+ addr: pointer;
 begin
   if not cond then exit;
   DisableInt;
-  WriteConsoleF('Panic: ',[]);
+  WriteConsoleF('/RPanic/n:\n',[]);
   WriteConsoleF(Format,[]);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
-  while True do;
+  {$IFDEF DebugCrash}
+  WriteConsoleF('Backtrace:\n',[]);
+  // FIXME: Print the whole stack
+  GetRBP;
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(addr);
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(addr);
+  {$ENDIF}
+  while true do;
 end;
 
 // Initialize all local structures and send the INIT IPI to all cpus  

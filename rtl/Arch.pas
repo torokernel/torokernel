@@ -175,7 +175,7 @@ const
 
 var
   CPU_COUNT: LongInt; // Number of CPUs detected while smp_init
-  AvailableMemory: QWord; // Memory in the system
+  AvailableMemory: QWord; // Free Memory after the first MB
   // LocalCpuSpeed has the speed of the local CPU in Mhz
   // It is used to calculate the delays
   LocalCpuSpeed: Int64 = 0;

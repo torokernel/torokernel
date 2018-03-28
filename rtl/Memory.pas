@@ -453,31 +453,33 @@ end;
 procedure BlockListExpand(BlockList: PBlockList);
 var
   NewCapacity: Cardinal;
-  NewList: PPointerArray;
+  NewList, tmp: PPointerArray;
 begin
+  {$IFDEF DebugMemory}WriteDebug('BlockListExpand: BlockList: %h, Count: %d, Capacity: %d\n',[PtrUInt(BlockList), BlockList.Count, BlockList.Capacity]);{$ENDIF}
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
   Panic (NewList = nil, 'Toro ran out of memory\n');
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
-  ToroFreeMem(BlockList.List);
-  {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
-  {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  tmp := BlockList.List;
   BlockList.Capacity := NewCapacity;
   BlockList.List := NewList;
+  ToroFreeMem(tmp);
+  {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
+  {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
 end;
 
 // Called by DistributeChunk and FreeMem
 procedure BlockListAdd(BlockList: PBlockList; P: Pointer);
 begin
-  if BlockList.Count >= BlockList.Capacity then
-  begin
-    //WriteConsoleF('BlockListAdd Capacity has been reached -> Severe corruption will occur\n', []);
-    //Exit;
-    BlockListExpand(BlockList);
-  end;
+  {$IFDEF DebugMemory}WriteDebug('BlockListAdd: BlockList: %h, P: %h\n',[PtrUInt(BlockList), PtrUInt(P)]);{$ENDIF}
   BlockList.List^[BlockList.Count] := P;
   Inc(BlockList.Count);
-  {$IFDEF DebugMemory} WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
+  // to avoid race condition with GetMem(), expand before it is full
+  if (BlockList.Capacity - BlockList.Count = 1)  then
+  begin
+    BlockListExpand(BlockList);
+  end;
+  {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
 
 procedure PoolHeapRelease(MemoryAllocator: PMemoryAllocator; Heap: PXHeap);
@@ -683,7 +685,7 @@ begin
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
   // TODO: replace Panic() with something better
-  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory');
+  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory\n');
   // taking a block from the list 
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
   {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d, Count: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX], ChunkBlockList.Count]); {$ENDIF}
@@ -723,7 +725,6 @@ var
   CPU: Byte;
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
-  //inttmp: Boolean;
   {$IFDEF DebugMemory}
    bCPU: Byte;
    bIsFree, bIsPrivateHeap: Byte; 
@@ -736,7 +737,7 @@ begin
   if Size > MAX_BLOCKSIZE then
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Size: %d , fail\n', [Size]); {$ENDIF}
-	  RestoreInt;
+    RestoreInt;
     Exit;
   end;
   CPU := GetApicID;
@@ -749,30 +750,23 @@ begin
   BlockList := @MemoryAllocator.Directory[SX];
   if BlockList.Count = 0 then
   begin
-     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
-      Result := ObtainFromLargerChunk(SX, MemoryAllocator);
-	  // no more memory
-      if Result = nil then
-	  begin
-		WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
+    {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
+    Result := ObtainFromLargerChunk(SX, MemoryAllocator);
+    // no more memory
+    if Result = nil then
+    begin
+      WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem: we ran out of memory!!!\n', []); {$ENDIF}
-		RestoreInt;
-    Exit;
-	 end;
+      RestoreInt;
+      Exit;
+    end;
   {$IFDEF DebugMemory}
-	  // This helps to find corruptions in the headers
+    // This helps to find corruptions in the headers
     GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
-    WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
+    WriteDebug('ToroGetMem: Header SXSize %d - List SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
   // If block is not free, we raise an exception
-  if IsFree(Result)=0 then
-  begin
-    WriteConsoleF('ToroGetMem: /Rwarning/n memory block list corrupted %h\n',[PtrUInt(Result)]);
-    {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory block corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
-    Result := nil;
-    RestoreInt;
-    Exit;
-  end;
+  Panic(IsFree(Result)=0,'ToroGetMem: the memory block list has been corrupted\n');
   ResetFreeFlag(Result);
   {$IFDEF HEAP_STATS}
     Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
@@ -793,19 +787,13 @@ begin
   end;
   Result := BlockList.List^[BlockList.Count-1];
   {$IFDEF DebugMemory}
+  WriteDebug('ToroGetMem: Pointer: %h, %d\n',[PtrUInt(Result), BlockList.Count]);
   // This helps to find corruptions in the headers
   GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
   WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
-	// If block is not free, we raise an exception 
-	if IsFree(Result)=0 then 
-	begin
-		WriteConsoleF('ToroGetMem: /Rwarning/n memory block corrupted %h\n',[PtrUInt(Result)]);
-	   {$IFDEF DebugMemory} WriteDebug('ToroGetMem: warning memory blocks list corrupted %h\n', [PtrUInt(Result)]); {$ENDIF}
-		Result := nil; 
-		RestoreInt;
-		Exit;
-	end;
+  // If block is not free, we raise an exception
+  Panic(IsFree(Result)=0, 'ToroGetMem: the memory block list has been corrupted\n');
   ResetFreeFlag(Result);
   Dec(BlockList.Count);
   {$IFDEF HEAP_STATS}
@@ -823,7 +811,7 @@ begin
     Inc(BlockList.Total);
   {$ENDIF}
   {$IFDEF DebugMemory} WriteDebug('ToroGetMem - Pointer: %h Size: %d SizeSX: %d\n', [PtrUInt(Result), Size, DirectorySX[SX]]); {$ENDIF}
-	RestoreInt;
+    RestoreInt;
 end;
 
 //
@@ -840,15 +828,8 @@ var
 begin
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
-  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d\n', [DirectorySX[SX]]); {$ENDIF}
-  if IsFree = FLAG_FREE then // already free
-  begin
-    WriteConsoleF('ToroFreeMem: /Rwarning/n memory block list corrupted pointer: %h, size: %d\n',[PtrUInt(P), Size]);
-	{$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Invalid pointer operation %h\n', [PtrUInt(P)]); {$ENDIF}
-    Result := -1; // Invalid pointer operation
-    RestoreInt;
-    Exit;
-  end;
+  {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d, p: %h\n', [DirectorySX[SX], PtrUInt(P)]); {$ENDIF}
+  Panic(IsFree = FLAG_FREE, 'ToroFreeMem: memory block list corrupted\n');
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
   begin
     SetFreeFlag(P); // not necessary, just in case we want to check that a block is not freed twice
@@ -877,7 +858,6 @@ begin
     Inc(MemoryAllocator.FreeCount);
     Dec(BlockList.Current);
   {$ENDIF}
- 
   Result := 0;
   RestoreInt;
     {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: Pointer %h, Size: %d\n', [PtrUInt(P), DirectorySX[SX]]); {$ENDIF}
@@ -1037,6 +1017,7 @@ begin
     begin
       BlockList := @MemoryAllocator.Directory[SX];
       BlockList.MaxAllocBlockCount := MaxAllocBlockCount;
+      {$IFDEF DebugMemory} WriteDebug('InitializeDirectory: SX: %d, MaxAllocBlockCount: %d\n',[DirectorySX[SX], MaxAllocBlockCount]);{$ENDIF}
       if (MaxAllocBlockCount > 1) and ((SX+1) mod 4 = 0) then
         MaxAllocBlockCount := MaxAllocBlockCount div 2;
       BlockList.Capacity := BLOCKLIST_INITIAL_CAPACITY; // Should be a SX (Size indeX)
@@ -1067,86 +1048,50 @@ begin
   BlockList.List := ToroGetMem(BlockList.Capacity*SizeOf(Pointer));
 end;
 
-// Distribution of Memory for every core
-// called by MemoryInit
-// TODO: add more debug info here
+// This is called by MemoryInit()
+// It distributes the physical memory for each core
+// It split the first block that above $100000 and with the AVAILABLE flag
+// TODO: To test in a system with more than 3.5 Gb physical memory
 procedure DistributeMemoryRegions;
 var
-  Amount, Counter: PtrUInt;
+  AssignableMemory: QWord;
   Buff: TMemoryRegion;
-  CPU, ID: Cardinal;
+  ID, CPU: LongInt;
   MemoryAllocator: PMemoryAllocator;
   StartAddress: Pointer;
 begin
-  // I am thinking that the regions are sorted
-  // Looking for the first ID available
   ID := 1;
-  // First Region must start at ALLOC_MEMORY_START
-  // Starts at ALLOC_MEMORY_START. The first ALLOC_MEMORY_START are used for internal usage
   while GetMemoryRegion(ID, @Buff) <> 0 do
   begin
-    if (Buff.Base < ALLOC_MEMORY_START) and (Buff.Base+Buff.Length-1 > ALLOC_MEMORY_START) and (Buff.Flag <> MEM_RESERVED) then
+    if (Buff.Flag = MEM_AVAILABLE) and (Buff.Base >= $10000) then
       Break;
     Inc(ID);
   end;
-  // free memory on region
-  Amount := Buff.Length;
-  // allocation start here
+  Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n');
+  AssignableMemory := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
+  MemoryPerCpu := AssignableMemory div CPU_COUNT;
+  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$IFDEF DebugMemory}
+    WriteDebug('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
+    WriteDebug('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$ENDIF}
   StartAddress := Pointer(ALLOC_MEMORY_START);
-  for CPU := 0 to CPU_COUNT-1 do
+  for CPU := 0 to (CPU_COUNT-1) do
   begin
     MemoryAllocator := @MemoryAllocators[CPU];
     MemoryAllocator.StartAddress := StartAddress;
-    MemoryAllocator.Size := MemoryPerCPU;
-    // assignation per CPU
-    Counter := MemoryPerCpu;
-    while Counter <> 0 do
-    begin
-      if Amount > Counter then
-      begin
-        Amount := Amount - Counter;
-        // the amount is assigned to the directory
-        InitializeDirectory(MemoryAllocator, StartAddress, Counter);
-        // same region block
-        StartAddress := Pointer(PtrUInt(StartAddress) + Counter);
-        MemoryAllocator.EndAddress := StartAddress;
-        Break; // Next CPU
-      end else if Amount = Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + Amount);
-        // change the cpu
-        Counter := 0;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new assignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base)
-      end else if Amount < Counter then
-      begin
-        InitializeDirectory(MemoryAllocator, StartAddress, Amount);
-        Counter := Counter-Amount;
-        // looking for a free block of memory
-        Inc(ID);
-        while GetMemoryRegion(ID, @Buff) <> 0 do
-        begin
-          if Buff.Flag = MEM_AVAILABLE then
-            Break;
-          Inc(ID);
-        end;
-        // new asignation of memory
-        Amount := Buff.Length;
-        StartAddress := Pointer(Buff.Base);
-      end;
-    end;
+    MemoryAllocator.Size := MemoryPerCpu;
+    MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + MemoryAllocator.Size - 1);
+    MemoryAllocator.FreeSize := MemoryAllocator.Size;
+    WriteConsoleF('Core#%d, StartAddress: /V%h/n, EndAddress: /V%h/n\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
+    {$IFDEF DebugMemory}
+      WriteDebug('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
+    {$ENDIF}
+    InitializeDirectory(MemoryAllocator, StartAddress, MemoryAllocator.Size);
     InitBlockList(@MemoryAllocator.PoolHeap, 0);
     InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
+    StartAddress := Pointer(PtrUInt(MemoryAllocator.EndAddress) + 1);
   end;
 end;
 
@@ -1155,7 +1100,11 @@ procedure MemoryInit;
 var
   MajorBlockSize: PtrUInt;
   SizeDiv8: Cardinal;
-  SX, J: Byte;
+  SX: Byte;
+  {$IFDEF DebugMemory}
+   ID: LongInt;
+   Buff: TMemoryRegion;
+  {$ENDIF}
 begin
   FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
@@ -1175,14 +1124,19 @@ begin
     MapSX[SizeDiv8] := SX;
   end;
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
-  // Linear Assignation for every Core
-  MemoryPerCpu := (AvailableMemory-ALLOC_MEMORY_START) div CPU_COUNT;
-  for J := 0 to (CPU_COUNT-1) do
-  begin
-    MemoryAllocators[J].FreeSize:= MemoryPerCpu;
-  end;
-  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
-  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  {$IFDEF DebugMemory}
+   // memory map
+   ID := 1;
+   WriteDebug('Memory Map\n',[]);
+   while GetMemoryRegion(ID, @Buff) <> 0 do
+   begin
+     if Buff.Flag = MEM_RESERVED then
+       WriteDebug('%h:%h, Flags: Reserved\n',[Buff.Base,Buff.Base + Buff.Length -1])
+     else
+       WriteDebug('%h:%h, Flags: Free\n',[Buff.Base,Buff.Base + Buff.Length -1]);
+     Inc(ID);
+   end;
+  {$ENDIF}
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

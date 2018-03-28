@@ -266,32 +266,15 @@ var
 begin
   rx := @Net.VirtQueues[0];
 
-  // disable interruptions
-  rx.used.flags := 1;
+  ReadWriteBarrier;
 
   // empty queue?
   if (rx.last_used_index = rx.used.index) then
-  begin
-     // enable interruptions
-     rx.used.flags := 0;
-     // mb
-     ReadWriteBarrier;
-     // recheck the empty condition
-     if (rx.last_used_index = rx.used.index) then
-     begin
-        Exit;
-     end else
-     begin
-       // disable
-       rx.used.flags := 1;
-     end;
-  end;
+  Exit;
 
   // read until queue is empty
   while (rx.last_used_index <> rx.used.index) do
   begin
-    ReadWriteBarrier;
-
     index := rx.last_used_index mod rx.queue_size;
     buffer_index := rx.used.rings[index].index;
 
@@ -330,21 +313,6 @@ begin
 
     // mb
     ReadWriteBarrier;
-
-    // empty queue?
-    if (rx.last_used_index = rx.used.index) then
-    begin
-     // enable interruptions
-     rx.used.flags := 0;
-     // mb
-     ReadWriteBarrier;
-     // recheck the empty condition
-     if (rx.last_used_index <> rx.used.index) then
-     begin
-       // disable
-       rx.used.flags := 1;
-     end;
-    end;
   end;
 end;
 
@@ -569,6 +537,7 @@ begin
          rx.Buffer := Pointer(PtrUint(rx.Buffer) + (4096 - PtrUInt(rx.Buffer) mod 4096));
          rx.chunk_size := FRAME_SIZE;
          rx.available.index := 0;
+         rx.used.index := 0;
 
          ReadWriteBarrier;
 

@@ -152,15 +152,6 @@ begin
  SysSocketSend(Socket, Stream, Length(Stream), 0);
 end;
 
-const
-  HelloWorldMsg = 'Hello World I am Toro!'#13#10;
-
-function PrintHelloWorld(entry: pchar): pchar;
-begin
- Result := HelloWorldMsg;
-end;
-
-
 procedure ProcessRequest (Socket: PSocket; Answer: pchar);
 var
    dst, tmp: ^char;
@@ -229,6 +220,14 @@ begin
    Socket.UserDefined := nil;
  end else SysSocketSelect(Socket, SERVICE_TIMEOUT);
  Result := 0;
+end;
+
+const
+  HelloWorldMsg = 'Hello World I am Toro!'#13#10;
+
+function PrintHelloWorld(entry: pchar): pchar;
+begin
+ Result := HelloWorldMsg;
 end;
 
 begin

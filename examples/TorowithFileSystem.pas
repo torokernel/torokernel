@@ -153,13 +153,13 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose   := @HttpClose;
 
-  if SysStatFile('/web/index.html', @idx) = 0 then
-  begin
-    WriteConsoleF ('index.html not found\n',[]);
-  end else
-    Buf := ToroGetMem(idx.Size);
+  //if SysStatFile('/web/index.html', @idx) = 0 then
+  //begin
+  //  WriteConsoleF ('index.html not found\n',[]);
+  //end else
+  //  Buf := ToroGetMem(idx.Size);
 
-  tmp := SysOpenFile('/web/index.html');
+  tmp := SysOpenFile('/test');
 
   if (tmp <> 0) then
   begin

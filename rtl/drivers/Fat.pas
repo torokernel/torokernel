@@ -66,6 +66,27 @@ type
     pbpb : pfat_boot_sector ;
   end;
 
+
+  pdirectory_entry = ^directory_entry ;
+
+  directory_entry = packed record
+    name : array[1..11] of char ;
+    attr : byte ;
+    res : array[1..10] of byte ;
+    mtime : word ;
+    mdate : word;
+    FATEntry  :word ;
+    size : dword ;
+  end;
+
+
+  fat_inode_info = record
+    dir_entry : pdirectory_entry ;
+    bh : PBufferHead ;
+    ino : dword ;
+    sb : psb_fat ;
+  end;
+
 function FatLoadTable (sb: PSuperBlock): boolean ;
 var
   j: LongInt;
@@ -105,11 +126,11 @@ begin
   // look for FAT16 string
   if (pfatboot.BS_FilSysType[1] = 'F') and (pfatboot.BS_FilSysType[5] = '6') then
   begin
-    WriteConsoleF('FatReadSuper: FAT16 partition found\n',[]);
     pfat := ToroGetMem(sizeof(super_fat));
     pfat.pbpb := pfatboot;
     Super.SbInfo:= pfat;
     Super.BlockSize:= pfat.pbpb.BPB_BytsPerSec;
+    WriteConsoleF('FatReadSuper: FAT16 partition found\n',[]);
     if not FatLoadTable(Super) then
     begin
       PutBlock(Super.BlockDevice,bh);
@@ -130,11 +151,154 @@ begin
 end;
 
 
-procedure FatReadInode(Inode: PInode);
+
+
+function FindRootDir (bh: PBufferHead; name: pchar; res : pdirectory_entry): dword;
+var count  , cont : dword ;
+    pdir : pdirectory_entry ;
+    plgdir : pvfatdirectory_entry ;
+    buff : string ;
+    lgcount : dword ;
 begin
-    WriteConsoleF('FatReadInode\n',[]);
+  pdir := bh^.data;
+  count := 1;
+  lgcount := 0;
+  repeat
+    case pdir^.nombre[1] of
+    #0 : begin
+     Result := -1;
+     Exit;
+    end;
+    #$E5 : lgcount := 0 ;
+    else
+      begin
+    { se encontro una entrada de nombre largo }
+    if (pdir^.atributos = $0F) and (count <= (512 div sizeof (directory_entry))) then
+     lgcount += 1
+      else
+       begin
+
+        { tiene entrada de nombre largo ? }
+        if (lgcount > 0 ) then
+         begin
+          plgdir := pointer (pdir);
+
+          buff := '';
+
+          { se trae todo el nombre }
+          for cont := 0 to (lgcount-1) do
+           begin
+            plgdir -= 1 ;
+            unicode_to_unix (plgdir,buff);
+           end;
+
+           { puede ocacionar problemas futuros !! }
+           strupper (@buff[1]);
+
+          { se compara y se sale }
+          if chararraycmp (@buff[1],name,byte(buff[0])) then
+           begin
+            res := pdir ;
+            exit(0);
+           end;
+
+         end
+          else { no tiene entrada de nombre largo }
+           begin
+
+             unix_name (@pdir^.nombre,buff);
+
+             { se compara solo con 11 caracteres }
+             if chararraycmp (@buff[1],name,byte(buff[0])) then
+              begin
+               res := pdir ;
+               exit(0);
+              end;
+
+           end;
+
+        lgcount := 0 ;
+       end;
+
+   end;
+ end; { case }
+
+pdir += 1 ;
+count += 1 ;
+
+until (count > (512 div sizeof (directory_entry))) ;
+
+res := nil ;
+exit(0);
+end;
+
+
+
+
+
+function FatLookUpInode(Ino: PInode; const Name: AnsiString): PInode;
+var
+  j, blk: LongInt;
+  ch: Byte;
+  NameFat: AnsiString;
+begin
+  Result := nil;
+  NameFat := Name;
+
+  // conver Name to upper case
+  for j:= 1 to Length(Name) do
+  begin
+   if (Name[j] >= 'a') or (Name[j] <= 'z') then
+   begin
+     ch := Byte(Name[j]) xor $20;
+     NameFat[j] := Char(ch);
+   end;
+  end;
+
+  SetLength(NameFat, Length(Name));
+
+  if Ino.ino = 1 then
+  begin
+
+    // root directory
+    for blk := 19 to 32 do
+    begin
+
+     bh := GetBlock (Ino.SuperBlock.BlockDevice, blk, Ino.SuperBlock.BlockSize);
+
+     find_rootdir (bh,@fat_entry,pdir);
+
+     // load the inode
+     if pdir <> nil then
+     begin
+
+     end;
+
+     put_block (bh);
+    end;
+
     while true do;
 
+    Exit
+  end else
+  begin
+
+  end;
+
+end;
+
+procedure FatReadInode(Inode: PInode);
+begin
+  if Inode.ino = 1 then
+  begin
+    Inode.InoInfo:= nil;
+    // the dir entry has 32 - 19 blocks
+    Inode.Size := 14 * Inode.SuperBlock.BlockSize;
+    Inode.Mode := INODE_DIR;
+    Inode.Count:= 0;
+    Exit;
+  end;
+  // TODO: to implement the others cases
 end;
 
 initialization
@@ -142,6 +306,7 @@ initialization
   FatDriver.name := 'fat';
   FatDriver.ReadSuper := @FatReadSuper;
   FatDriver.ReadInode := @FatReadInode;
+  FatDriver.LookUpInode := @FatLookUpInode;
   {Ext2Driver.CreateInode := @Ext2CreateInode;
   Ext2Driver.CreateInodeDir := @Ext2CreateInodeDir;
   Ext2Driver.ReadInode := @Ext2ReadInode;

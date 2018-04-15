@@ -157,13 +157,13 @@ begin
   //begin
   //  WriteConsoleF ('index.html not found\n',[]);
   //end else
-  //  Buf := ToroGetMem(idx.Size);
+  Buf := ToroGetMem(5);
 
-  tmp := SysOpenFile('/test');
+  tmp := SysOpenFile('/prueba');
 
   if (tmp <> 0) then
   begin
-    indexSize := SysReadFile(tmp,idx.Size, Buf);
+    indexSize := SysReadFile(tmp, 5, Buf);
     SysCloseFile(tmp);
     WriteConsoleF('\t /VToroWebServer/n: index.html loaded, size: %d bytes\n', [idx.Size]);
   end else

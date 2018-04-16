@@ -449,15 +449,15 @@ begin
 end;
 
 // TODO: to check this
-function GetFatSector (sb_fat: psb_fat; sector: DWORD): Word ;
+function GetFatSector (pfat: psb_fat; sector: DWORD): Word ;
 var lsb , msb  : byte ;
     offset: dword ;
     ret : word ;
 begin
- Sector -= ((sb_fat.pbpb.BPB_FATSz16 *2) + sb_fat.pbpb.BPB_RsvdSecCnt + (sb_fat.pbpb.BPB_RootEntCnt * 32) div sb_fat.pbpb.BPB_BytsPerSec) - 2 ;
+ Sector := ((Sector - ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec)) div pfat.pbpb.BPB_SecPerClus ) + 2;
  offset := (sector * 3 ) shr 1 ;
- lsb := PByte(Pointer(sb_fat.pfat) + offset)^;
- msb := PByte(Pointer(sb_fat.pfat) + offset + 1)^;
+ lsb := PByte(Pointer(pfat.pfat) + offset)^;
+ msb := PByte(Pointer(pfat.pfat) + offset + 1)^;
  if (sector mod 2 ) <>  0  then
   ret := ((msb shl 8 ) or lsb ) shr 4
  else
@@ -465,7 +465,7 @@ begin
  if (ret = $FFF) then
   Result := LAST_SECTOR_FAT
  else
-  Result := ((sb_fat.pbpb.BPB_FATSz16 *2) + sb_fat.pbpb.BPB_RsvdSecCnt + (sb_fat.pbpb.BPB_RootEntCnt * 32) div sb_fat.pbpb.BPB_BytsPerSec) - 2 + ret ;
+  Result := (ret - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec);
 end;
 
 
@@ -496,7 +496,6 @@ begin
    begin
     for j := nextCluster to (nextCluster + initblk - 1 ) do
     begin
-     // TODO: to check this function
      nextSector := GetFatSector(FileDesc.Inode.SuperBlock.SbInfo, j);
      if nextSector = LAST_SECTOR_FAT then
      begin
@@ -523,11 +522,7 @@ begin
     Inc(Buffer, FileDesc.Inode.SuperBlock.BlockSize);
    end else
    begin
-    //Move(PByte(bh.data+initoff)^, Pbyte(Buffer)^, cnt);
-    //error en el numero de sector!!
-      WriteConsoleF('NextSector: %d\n', [nextSector]);
-      WriteConsoleF('leyendo initoff: %p\n',[PtrUInt(Pointer(bh.data+initoff))]);
-  while true do;
+    Move(PByte(bh.data+initoff)^, Pbyte(Buffer)^, cnt);
     initoff := 0 ;
     Inc(FileDesc.FilePos, cnt);
     cnt := 0 ;

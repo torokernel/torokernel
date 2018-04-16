@@ -72,7 +72,7 @@ const
 var
   HttpServer: PSocket;
   Buffer: char;
-  Buf, HttpContent: ^Char;
+  Buf, HttpContent, tmp2: ^Char;
   tmp: THandle;
   HttpHandler: TNetworkHandler;
   idx: TInode;
@@ -153,17 +153,17 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose   := @HttpClose;
 
-  //if SysStatFile('/web/index.html', @idx) = 0 then
-  //begin
-  //  WriteConsoleF ('index.html not found\n',[]);
-  //end else
-  Buf := ToroGetMem(5);
+  if SysStatFile('/index.html', @idx) = 0 then
+  begin
+    WriteConsoleF ('index.html not found\n',[]);
+  end else
+  Buf := ToroGetMem(idx.Size + 3);
 
-  tmp := SysOpenFile('/prueba');
+  tmp := SysOpenFile('/index.html');
 
   if (tmp <> 0) then
   begin
-    indexSize := SysReadFile(tmp, 5, Buf);
+    indexSize := SysReadFile(tmp, idx.Size, Buf);
     SysCloseFile(tmp);
     WriteConsoleF('\t /VToroWebServer/n: index.html loaded, size: %d bytes\n', [idx.Size]);
   end else
@@ -173,11 +173,13 @@ begin
   InttoStr(indexSize, @BuffLeninChar[0]);
   HttpContentLen := StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Buf);
   HttpContent := ToroGetMem(HttpContentLen);
+  tmp2 := HttpContent;
   StrConcat(HeaderOk, @BuffLeninChar[0], HttpContent);
   HttpContent := HttpContent + StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk);
   StrConcat(HttpContent, ContentOK, HttpContent);
   HttpContent := HttpContent + StrLen(ContentOK) ;
   StrConcat(HttpContent, Buf, HttpContent);
+  HttpContent := tmp2;
   ToroFreeMem(Buf);
 
   // register the web service which listens on port 80

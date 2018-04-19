@@ -157,9 +157,9 @@ begin
   begin
     WriteConsoleF ('index.html not found\n',[]);
   end else
-  Buf := ToroGetMem(idx.Size + 3);
+  Buf := ToroGetMem(idx.Size);
 
-  tmp := SysOpenFile('/index.html');
+  tmp := SysOpenFile('/web/index.html');
 
   if (tmp <> 0) then
   begin

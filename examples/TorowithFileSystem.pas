@@ -39,7 +39,7 @@ program TorowithFileSystem;
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:ToroFiles -serial file:torodebug.txt}
 {$ELSE}
          {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
 {$ENDIF}
@@ -54,7 +54,8 @@ uses
   Filesystem in '..\rtl\Filesystem.pas',
   Pci in '..\rtl\Drivers\Pci.pas',
   Ide in '..\rtl\drivers\IdeDisk.pas',
-  ext2 in '..\rtl\drivers\ext2.pas',
+  //ext2 in '..\rtl\drivers\ext2.pas',
+  Fat in '..\rtl\drivers\Fat.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
   //E1000 in '..\rtl\Drivers\E1000.pas';
@@ -71,7 +72,7 @@ const
 var
   HttpServer: PSocket;
   Buffer: char;
-  Buf, HttpContent: ^Char;
+  Buf, HttpContent, tmp2: ^Char;
   tmp: THandle;
   HttpHandler: TNetworkHandler;
   idx: TInode;
@@ -143,7 +144,8 @@ begin
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
-  SysMount('ext2','ATA0',5);
+  //SysMount('ext2','ATA0',5);
+  SysMount('fat','ATA0',6);
 
   HttpHandler.DoInit    := @HttpInit;
   HttpHandler.DoAccept  := @HttpAccept;
@@ -151,17 +153,17 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose   := @HttpClose;
 
-  if SysStatFile('/web/index.html', @idx) = 0 then
+  if SysStatFile('/index.html', @idx) = 0 then
   begin
     WriteConsoleF ('index.html not found\n',[]);
   end else
-    Buf := ToroGetMem(idx.Size);
+  Buf := ToroGetMem(idx.Size);
 
   tmp := SysOpenFile('/web/index.html');
 
   if (tmp <> 0) then
   begin
-    indexSize := SysReadFile(tmp,idx.Size, Buf);
+    indexSize := SysReadFile(tmp, idx.Size, Buf);
     SysCloseFile(tmp);
     WriteConsoleF('\t /VToroWebServer/n: index.html loaded, size: %d bytes\n', [idx.Size]);
   end else
@@ -171,11 +173,13 @@ begin
   InttoStr(indexSize, @BuffLeninChar[0]);
   HttpContentLen := StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Buf);
   HttpContent := ToroGetMem(HttpContentLen);
+  tmp2 := HttpContent;
   StrConcat(HeaderOk, @BuffLeninChar[0], HttpContent);
   HttpContent := HttpContent + StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk);
   StrConcat(HttpContent, ContentOK, HttpContent);
   HttpContent := HttpContent + StrLen(ContentOK) ;
   StrConcat(HttpContent, Buf, HttpContent);
+  HttpContent := tmp2;
   ToroFreeMem(Buf);
 
   // register the web service which listens on port 80

@@ -147,13 +147,7 @@ begin
   //SysMount('ext2','ATA0',5);
   SysMount('fat','ATA0',6);
 
-  HttpHandler.DoInit    := @HttpInit;
-  HttpHandler.DoAccept  := @HttpAccept;
-  HttpHandler.DoTimeOut := @HttpTimeOut;
-  HttpHandler.DoReceive := @HttpReceive;
-  HttpHandler.DoClose   := @HttpClose;
-
-  if SysStatFile('/index.html', @idx) = 0 then
+  if SysStatFile('/web/index.html', @idx) = 0 then
   begin
     WriteConsoleF ('index.html not found\n',[]);
   end else
@@ -181,6 +175,12 @@ begin
   StrConcat(HttpContent, Buf, HttpContent);
   HttpContent := tmp2;
   ToroFreeMem(Buf);
+
+  HttpHandler.DoInit    := @HttpInit;
+  HttpHandler.DoAccept  := @HttpAccept;
+  HttpHandler.DoTimeOut := @HttpTimeOut;
+  HttpHandler.DoReceive := @HttpReceive;
+  HttpHandler.DoClose   := @HttpClose;
 
   // register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);

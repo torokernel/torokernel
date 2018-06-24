@@ -398,13 +398,30 @@ end;
 procedure AddTranslateIp(IP: TIPAddress; const HardAddres: THardwareAddress);
 var
   CPUID: LongInt;
-  Machine: PMachine;
+  Machine, PrevMachine: PMachine;
 begin
   Machine := LookIp(Ip);
   CPUID := GetApicid;
   if Machine = nil then
   begin
     Machine := ToroGetMem(SizeOf(TMachine));
+	if Machine = nil then
+	begin
+	  Machine := DedicateNetworks[CPUID].TranslationTable;
+	  PrevMachine := Machine;
+	  Panic (Machine = nil, 'AddTranslateIp: Run out of memory');
+	  while Machine.Next <> nil do
+	  begin
+	    PrevMachine := Machine;
+	    Machine := Machine.Next;
+	  end;
+	  PrevMachine.Next := nil;
+	  Machine.Next := DedicateNetworks[CPUID].TranslationTable;
+	  DedicateNetworks[CPUID].TranslationTable := Machine;
+	  Machine.IpAddress := Ip;
+          Machine.HardAddress := HardAddres;
+	  Exit;
+	end;
     Machine.IpAddress := Ip;
     Machine.HardAddress := HardAddres;
     Machine.Next := DedicateNetworks[CPUID].TranslationTable;
@@ -1040,6 +1057,7 @@ begin
             Socket.RemoteWinCount :=Socket.RemoteWinLen;
             Socket.State := SCK_TRANSMITTING;
             Socket.BufferLength := 0;
+			// TODO: this should be allocated before the connection is stablished
             Socket.Buffer := ToroGetMem(MAX_WINDOW);
             Socket.BufferReader := Socket.Buffer;
 			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for confirmation\n', [PtrUInt(Socket)]); {$ENDIF}
@@ -1946,7 +1964,6 @@ var
 begin
   CPUID:= GetApicid;
   Socket.Buffer := ToroGetMem(MAX_WINDOW);
-  // we haven't got memory
   if Socket.Buffer = nil then
   begin
     Result:=False;
@@ -2156,7 +2173,9 @@ begin
 end;
 
 // Send data to Remote Host using a Client Socket
-// every packet is sended with ACKPSH bit  , with the maximus size  possible.
+// every packet is sended with ACKPSH bit  , with the maximus size  possible
+//
+// TODO: to check the return values
 function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 var
   Buffer: PBufferSender;
@@ -2176,16 +2195,23 @@ begin
       FragLen:= MTU
     else
       FragLen:= Addrlen;
-    // we can only send if the remote host can receiv
     if Fraglen > Socket.RemoteWinCount then
       Fraglen := Socket.RemoteWinCount;
+	Packet := ToroGetMem(SizeOf(TPacket)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen);
+    if Packet = nil then
+	begin
+	  Exit;
+	end;
+    Buffer := ToroGetMem(SizeOf(TBufferSender));
+	if Buffer = nil then
+	begin
+	  ToroFreeMem(Packet);
+	  Exit;
+	end;
     Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen;
     // Refresh the remote window size
     if Socket.RemoteWinCount = 0 then
       Socket.RemoteWinCount:= Socket.RemoteWinLen ;
-    Packet := ToroGetMem(SizeOf(TPacket)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen);
-    // we need a new packet structure
-    Buffer := ToroGetMem(SizeOf(TBufferSender));
     // TODO : the syscall may retur nil
     Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
     Packet.Size := SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen;

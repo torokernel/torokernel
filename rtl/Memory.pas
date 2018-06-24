@@ -482,7 +482,6 @@ begin
   begin
     if not BlockListExpand(BlockList) then
       Panic(True, 'BlockListAdd: No enough memory for expanding a list\n');
-    end;
   end;
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;

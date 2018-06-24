@@ -272,7 +272,6 @@ begin
   SpbInfo.desc_per_block:= Super.BlockSize div sizeof(ext2_group_desc);
   db_count:= (SpbInfo.groups_count+SpbInfo.desc_per_block-1) div SpbInfo.desc_per_block;
   SpbInfo.Group_Desc:= ToroGetMem(db_count*sizeof(pointer));
-  // not enough memory ??
   if SpbInfo.Group_Desc=nil then
   begin
     ToroFreeMem(SpbInfo);

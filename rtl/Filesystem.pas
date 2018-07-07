@@ -429,7 +429,7 @@ begin
     Result := nil;
     Exit;
   end;
-  bh.data:= ToroGetMem(Size);
+  bh.data := ToroGetMem(Size);
   if bh.data = nil then
   begin
     ToroFreeMem(bh);
@@ -672,7 +672,7 @@ begin
     {$IFDEF DebugFS} WriteDebug('CPU#%d: Mounting FileSystem -> Failed\n', [GetApicID]); {$ENDIF}
   Exit;
   end;
-  SuperBlock:= ToroGetMem(SizeOf(TSuperBlock));
+  SuperBlock := ToroGetMem(SizeOf(TSuperBlock));
   if SuperBlock = nil then
   begin // not enough memory
     {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, SuperBlock=nil -> Failed\n', []); {$ENDIF}
@@ -926,10 +926,9 @@ var
   Ino: PInode;
 begin
   FileRegular := ToroGetMem(SizeOf(TFileRegular));
-  Result := 0;
-  // we don't have memory!
-  if FileRegular=nil then
+  if FileRegular = nil then
     Exit;
+  Result := 0;
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: opening path: %p\n', [PtrUInt(Path)]); {$ENDIF}
   Ino:= NameI(Path);
   // looking for the inode from the path

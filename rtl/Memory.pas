@@ -313,6 +313,10 @@ begin
   if Result = nil then
   begin
     Result := ToroGetMem(XHEAP_INITIAL_CAPACITY);
+    if Result = nil then
+    begin
+      Exit;
+    end;
     Result.MemoryAllocator := CPU;
   end;
   XHeapReset(Result);
@@ -347,7 +351,7 @@ begin
   if Heap.ChunkIndex >= XHEAP_MAX_CHUNKS-1 then
     Exit;
   Inc(Heap.ChunkIndex);
-  Result:= ToroGetMem(XHEAP_CHUNK_CAPACITY);
+  Result := ToroGetMem(XHEAP_CHUNK_CAPACITY);
   if Result = nil then
     Exit;
   Heap.Chunks[Heap.ChunkIndex] := Result;
@@ -378,6 +382,10 @@ begin
       Exit;
     end;
     Result := ToroGetMem(Size);
+    if Result = nil then
+    begin
+      Exit;
+    end;
     Heap.LargeBlocks[Heap.LargeBlockCount] := Result;
     // NOTE: for large blocks allocated on private heap, the programmer must only use XFree(Heap, P) and not FreeMem(P)
     Inc(Heap.LargeBlockCount);
@@ -459,7 +467,7 @@ begin
   Result := False;
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
-  If NewList = nil then
+  if NewList = nil then
     Exit;
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
   tmp := BlockList.List;
@@ -873,9 +881,9 @@ end;
 // Returns free block of memory filling with zeros
 function ToroAllocMem(Size: PtrUInt): Pointer;
 begin
-	Result := ToroGetMem(Size);
-	if Result <> nil then
-  	FillChar(Result^, Size, 0);
+  Result := ToroGetMem(Size);
+  if Result <> nil then
+     FillChar(Result^, Size, 0);
 end;
 
 // Expand (or truncate) the size of block pointed by p and return the new pointer
@@ -887,7 +895,7 @@ var
 	OldSize: PtrUInt;
   OldSX: Byte;
 begin
-	if P = nil then
+  if P = nil then
   begin
     Result := ToroGetMem(NewSize);
     Exit;

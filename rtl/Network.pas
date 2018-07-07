@@ -601,7 +601,7 @@ begin
   Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
   // Alloc memory for new socket
   ClientSocket := ToroGetMem(SizeOf(TSocket));
-  if ClientSocket=nil then
+  if ClientSocket = nil then
   begin
    ToroFreeMem(Packet);
    {$IFDEF DebugNetwork}WriteDebug('EnqueueTCPRequest: Fail connection to %d not memory\n', [LocalPort]);{$ENDIF}
@@ -826,7 +826,7 @@ var
   TCPHeader: PTCPHeader;
   Packet: PPacket;
 begin
-  Packet:= ToroGetMem(TCPPacketLen);
+  Packet := ToroGetMem(TCPPacketLen);
   if Packet = nil then
     Exit;
   Packet.Size := TCPPacketLen - SizeOf(TPacket);
@@ -1057,10 +1057,10 @@ begin
             Socket.RemoteWinCount :=Socket.RemoteWinLen;
             Socket.State := SCK_TRANSMITTING;
             Socket.BufferLength := 0;
-			// TODO: this should be allocated before the connection is stablished
+	    // TODO: this should be allocated before the connection is stablished
             Socket.Buffer := ToroGetMem(MAX_WINDOW);
             Socket.BufferReader := Socket.Buffer;
-			{$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for confirmation\n', [PtrUInt(Socket)]); {$ENDIF}
+	    {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for confirmation\n', [PtrUInt(Socket)]); {$ENDIF}
             // Confirm the connection sending a ACK
             TCPSendPacket(TCP_ACK, Socket);
           end;
@@ -1295,7 +1295,7 @@ begin
    end;
    // I get memory for the whole packet plus data
    Packet := ToroGetMem(ICMPPacketLen + len);
-   If Packet=nil then
+   If Packet = nil then
    begin
      Result := 1;
     exit;
@@ -1879,7 +1879,7 @@ var
   Thread: PThread;
   ThreadID: TThreadID; // FPC was using ThreadVar ThreadID
 begin
-  Service:= ToroGetMem(SizeOf(TNetworkService));
+  Service := ToroGetMem(SizeOf(TNetworkService));
   if Service = nil then
     Exit;
   // Create a Thread to make the job of service, it is created on LOCAL CPU

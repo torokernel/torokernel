@@ -24,6 +24,7 @@
 import sys
 import glob
 
+# TODO: To use regular expressions
 def checkgetmemnil(file):
   f = open (file, 'rU')
   nrline = 0

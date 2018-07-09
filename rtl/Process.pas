@@ -894,15 +894,15 @@ begin
   if CPUID = GetApicID then
   begin
     NewThread := ToroGetMem(SizeOf(TThread));
-    {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread: %h\n', [PtrUInt(NewThread)]); {$ENDIF}
     if NewThread = nil then
     begin
       {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread = nil\n', []); {$ENDIF}
       Result := nil;
       Exit;
     end;
-    NewThread^.StackAddress := ToroGetMem(StackSize);
-    if NewThread.StackAddress = nil  then
+    {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread: %h\n', [PtrUInt(NewThread)]); {$ENDIF}
+    NewThread.StackAddress := ToroGetMem(StackSize);
+    if NewThread.StackAddress = nil then
     begin
       {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.StackAddress = nil\n',[]); {$ENDIF}
       ToroFreeMem(NewThread);
@@ -1284,6 +1284,7 @@ var
 begin
   CpuID := GetApicID;
   CPU[CpuID].CurrentThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
+  Panic(CPU[CpuID].CurrentThread.TLS = nil, 'SysAllocateThreadVars: Out of memory');
   {$IFDEF DebugProcess} WriteDebug('SysAllocateThreadVars - TLS: %h Size: %d\n', [PtrUInt(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE]); {$ENDIF}
 end;
 

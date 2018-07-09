@@ -126,6 +126,7 @@ begin
   Result := False;
   sb_fat := sb.SbInfo;
   pfat := ToroGetMem(sb_fat^.pbpb^.bpb_fatsz16 * sb_fat^.pbpb^.bpb_bytspersec);
+  Panic ( pfat = nil, 'FatLoadTable: out of memory');
   for j:= 1 to sb_fat^.pbpb^.bpb_fatsz16 do
   begin
    bh := GetBlock(sb.BlockDevice, j,sb_fat^.pbpb^.bpb_bytspersec);
@@ -156,6 +157,7 @@ begin
   if (pfatboot.BS_FilSysType[1] = 'F') and (pfatboot.BS_FilSysType[5] = '6') then
   begin
     pfat := ToroGetMem(sizeof(super_fat));
+	Panic ( pfat = nil, 'FatReadSuper: out of memory');
     pfat.InodesQueue:= nil;
     pfat.InodesQueueTail:= nil;
     pfat.pbpb := pfatboot;
@@ -389,8 +391,12 @@ var
 begin
   Result := nil;
   NameFat := ToroGetMem(Length(Name)+1);
+  if NameFat = nil then
+  begin
+    Exit;
+  end;
   pfat := Ino.SuperBlock.SbInfo;
-  // conver Name to upper case
+  // convert Name to upper case
   for j:= 1 to Length(Name) do
   begin
    if (Name[j] >= 'a') or (Name[j] <= 'z') then

@@ -313,6 +313,10 @@ begin
   if Result = nil then
   begin
     Result := ToroGetMem(XHEAP_INITIAL_CAPACITY);
+    if Result = nil then
+    begin
+      Exit;
+    end;
     Result.MemoryAllocator := CPU;
   end;
   XHeapReset(Result);
@@ -347,7 +351,7 @@ begin
   if Heap.ChunkIndex >= XHEAP_MAX_CHUNKS-1 then
     Exit;
   Inc(Heap.ChunkIndex);
-  Result:= ToroGetMem(XHEAP_CHUNK_CAPACITY);
+  Result := ToroGetMem(XHEAP_CHUNK_CAPACITY);
   if Result = nil then
     Exit;
   Heap.Chunks[Heap.ChunkIndex] := Result;
@@ -378,6 +382,10 @@ begin
       Exit;
     end;
     Result := ToroGetMem(Size);
+    if Result = nil then
+    begin
+      Exit;
+    end;
     Heap.LargeBlocks[Heap.LargeBlockCount] := Result;
     // NOTE: for large blocks allocated on private heap, the programmer must only use XFree(Heap, P) and not FreeMem(P)
     Inc(Heap.LargeBlockCount);
@@ -449,21 +457,24 @@ begin
   ToroFreeMem(P);
 end;
 
-
-procedure BlockListExpand(BlockList: PBlockList);
+// Expand pointer array
+function BlockListExpand(BlockList: PBlockList): Boolean;
 var
   NewCapacity: Cardinal;
   NewList, tmp: PPointerArray;
 begin
   {$IFDEF DebugMemory}WriteDebug('BlockListExpand: BlockList: %h, Count: %d, Capacity: %d\n',[PtrUInt(BlockList), BlockList.Count, BlockList.Capacity]);{$ENDIF}
+  Result := False;
   NewCapacity := BlockList.Capacity*2;
   NewList := ToroGetMem(NewCapacity*SizeOf(Pointer));
-  Panic (NewList = nil, 'Toro ran out of memory\n');
+  if NewList = nil then
+    Exit;
   Move(BlockList.List^, NewList^, BlockList.Capacity*SizeOf(Pointer));
   tmp := BlockList.List;
   BlockList.Capacity := NewCapacity;
   BlockList.List := NewList;
   ToroFreeMem(tmp);
+  Result := True;
   {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
   {$IFDEF HEAP_STATS2} Inc(TotalVirtualAllocated, NewCapacity-BlockList.Capacity); {$ENDIF}
 end;
@@ -474,10 +485,11 @@ begin
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: BlockList: %h, P: %h\n',[PtrUInt(BlockList), PtrUInt(P)]);{$ENDIF}
   BlockList.List^[BlockList.Count] := P;
   Inc(BlockList.Count);
-  // to avoid race condition with GetMem(), expand before it is full
+  // expand before it is full to avoid race condition with GetMem()
   if (BlockList.Capacity - BlockList.Count = 1)  then
   begin
-    BlockListExpand(BlockList);
+    if not BlockListExpand(BlockList) then
+      Panic(True, 'BlockListAdd: No enough memory for expanding a list\n');
   end;
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
@@ -680,13 +692,14 @@ var
   {$ENDIF}
 begin
   ChunkSX := SX+1;
+  Result := nil;
   // looking for free blocks
   while (ChunkSX < MAX_SX) and (MemoryAllocator.Directory[ChunkSX].Count = 0) do
     Inc(ChunkSX);
   ChunkBlockList := @MemoryAllocator.Directory[ChunkSX];
-  // TODO: replace Panic() with something better
-  Panic(ChunkBlockList.Count = 0, 'ObtainFromLargerChunk: Toro ran out of memory\n');
-  // taking a block from the list 
+  // no more blocks for allocation
+  if ChunkBlockList.Count = 0 then
+    Exit;
   Chunk := ChunkBlockList.List^[ChunkBlockList.Count-1];
   {$IFDEF DebugMemory} WriteDebug('ObtainFromLargerChunk: Whole chunk: %h, Size: %d, Count: %d\n', [PtrUInt(Chunk),DirectorySX[ChunkSX], ChunkBlockList.Count]); {$ENDIF}
   {$IFDEF DebugMemory}
@@ -697,10 +710,7 @@ begin
   {$ENDIF}
   // ran out of memory
   if Chunk = nil then
-  begin
-    Result := nil;
     Exit;
-  end;
   Dec(ChunkBlockList.Count);
   ChunkSize := DirectorySX[ChunkSX];
   // update the size of block in the header
@@ -752,7 +762,7 @@ begin
   begin
     {$IFDEF DebugMemory} WriteDebug('ToroGetMem - SplitLargerChunk Size: %d SizeSX: %d\n', [Size, DirectorySX[SX]]); {$ENDIF}
     Result := ObtainFromLargerChunk(SX, MemoryAllocator);
-    // no more memory
+    // run out of memory
     if Result = nil then
     begin
       WriteConsoleF('ToroGetMem: we ran out of memory!!!\n', []);
@@ -871,9 +881,9 @@ end;
 // Returns free block of memory filling with zeros
 function ToroAllocMem(Size: PtrUInt): Pointer;
 begin
-	Result := ToroGetMem(Size);
-	if Result <> nil then
-  	FillChar(Result^, Size, 0);
+  Result := ToroGetMem(Size);
+  if Result <> nil then
+     FillChar(Result^, Size, 0);
 end;
 
 // Expand (or truncate) the size of block pointed by p and return the new pointer
@@ -885,7 +895,7 @@ var
 	OldSize: PtrUInt;
   OldSX: Byte;
 begin
-	if P = nil then
+  if P = nil then
   begin
     Result := ToroGetMem(NewSize);
     Exit;

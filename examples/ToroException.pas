@@ -108,18 +108,6 @@ begin
   end;
 end;
 
-// This procedure is a exception handler. 
-// It has to enable the interruptions and finish the thread who made the exception
-procedure MyOwnHandler;
-begin
-  WriteConsoleF('Hello from My Handler!\n',[]);
-  // enable interruptions
-  asm
-     sti
-  end;
-  ThreadExit(True);
-end;
-
 function Exception_Core2(Param: Pointer):PtrInt;
 begin
   //DoDivZero;

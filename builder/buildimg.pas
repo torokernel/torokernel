@@ -275,6 +275,7 @@ begin
     Exit;
   end else
     WriteLn(ELFFileName , ': ','Detected ELF64 format');
+    WriteLn('Note: Builder does not support Debug symbols in ELF64');
   // The Sections starts at the end of Program Headers
   FileInit := longint(ElfHeader.e_phoff)+ElfHeader.e_phentsize*ElfHeader.e_phnum;
   // Program Header array

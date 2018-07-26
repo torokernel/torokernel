@@ -29,7 +29,9 @@ program ToroHello;
  {$mode delphi}
 {$ENDIF}
 
-{$IMAGEBASE 4194304}
+{$IFDEF WIN64}
+  {$IMAGEBASE 4194304}
+{$ENDIF}
 
 // Configuring the RUN for Lazarus
 {$IFDEF WIN64}

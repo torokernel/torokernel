@@ -80,6 +80,8 @@
       </SyntaxOptions>
     </Parsing>
     <CodeGeneration>
+      <TargetCPU Value="x86_64"/>
+      <TargetOS Value="linux"/>
       <Optimizations>
         <OptimizationLevel Value="2"/>
       </Optimizations>
@@ -95,13 +97,15 @@
         <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
+      <CustomOptions Value="-Cg-"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) ../builder/build.pas"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../builder/build.exe 4 ToroException ../builder/boot.o ToroException.img"/>
+        <Command Value="../builder/build.exe 2 ToroException ../builder/boot.o ToroException.img"/>
+        <ScanForFPCMsgs Value="True"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

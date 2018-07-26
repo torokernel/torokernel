@@ -40,7 +40,9 @@ program ToroException;
 {%RunFlags BUILD-}
 
 // Adding support for FPC 2.0.4 ;)
-{$IMAGEBASE 4194304}
+{$IFDEF WIN64}
+  {$IMAGEBASE 4194304}
+{$ENDIF}
 
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
@@ -60,13 +62,18 @@ uses
 procedure DoDivZero;
 begin
     {$ASMMODE intel}
+    // finally statement is always executed
+    try
      asm
    	mov rbx, 1987
      	mov rax, 166
         mov rcx, 0
         mov rdx, 555
-   	div rcx
+    	div rcx
      end;
+    except
+       WriteConsoleF('Exception!\n',[]);
+    end;   
 end;
 
 
@@ -76,8 +83,12 @@ var
   p: ^longint;
 begin
   // this page is not present
-  p := pointer($ffffffffffffffff);
-  p^ := $1234;
+  try
+   p := pointer($ffffffffffffffff);
+   p^ := $1234;
+  except
+   WriteConsoleF('exception\n', []);
+  end;
 end;
 
 // Procedure that tests Protection Fault exception handler
@@ -119,10 +130,8 @@ begin
 end;
 
 begin
-  //CaptureInt(EXC_DIVBYZERO, @MyOwnHandler);
-  //tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
-  SysThreadSwitch;
-
+  // tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
+  // SysThreadSwitch;
   DoDivZero;
   //DoPageFault;
   //DoProtectionFault;

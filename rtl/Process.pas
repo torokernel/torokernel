@@ -264,13 +264,17 @@ end;
      WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
-  WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
-  begin
-       get_caller_stackinfo(pointer(rbp_reg), addr);
-       PrintBackTraceStr(addr);
-  end;
-  ExceptionHandler;
+  //WriteConsoleF('Backtrace:\n',[]);
+  //while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  //begin
+  //     get_caller_stackinfo(pointer(rbp_reg), addr);
+  //     PrintBackTraceStr(addr);
+  //end;
+  //ExceptionHandler;
+  // to understand better this
+  // this ends up calling longjump that never come back
+  raise TObject(nil);
+  // raise should clean the stack!!! by cleaning all the data that was put by the interruption
 end;
 
 procedure ExceptOVERFLOW;

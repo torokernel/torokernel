@@ -6066,7 +6066,7 @@ begin
   If _ExceptAddrStack=Nil then
     DoUnHandledException;
   ExceptObjectStack^.refcount := 0;
-  //longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
+  fpc_longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
 end;
 
 

@@ -382,6 +382,7 @@ var
 begin
   // Buffers in use
   bh := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
+  Result := nil;
   if bh <> nil then
   begin
     bh.Count := bh.Count+1;
@@ -405,14 +406,12 @@ begin
     bh := FileBlock.BufferCache.FreeBlocksCache;
     if bh = nil then
     begin
-      Result := nil;
       Exit;
     end;
     // last Block in Cache
     bh := bh.Prev;
     if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data) = 0 then
     begin
-      Result:=nil;
       Exit;
     end;
     bh.Count := 1;
@@ -426,14 +425,12 @@ begin
   bh := ToroGetMem(SizeOf(TBufferHead));
   if bh = nil then
   begin
-    Result := nil;
     Exit;
   end;
   bh.data := ToroGetMem(Size);
   if bh.data = nil then
   begin
     ToroFreeMem(bh);
-    Result := nil;
     Exit;
   end;
   bh.Count:= 1;
@@ -444,7 +441,6 @@ begin
   begin
     ToroFreeMem(bh.data);
     ToroFreeMem(bh);
-    Result := nil;
     Exit;
   end;
   AddBuffer(FileBlock.BufferCache.BlockCache,bh);

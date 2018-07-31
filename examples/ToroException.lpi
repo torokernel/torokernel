@@ -105,7 +105,6 @@
       </ExecuteBefore>
       <ExecuteAfter>
         <Command Value="../builder/build.exe 2 ToroException ../builder/boot.o ToroException.img"/>
-        <ScanForFPCMsgs Value="True"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

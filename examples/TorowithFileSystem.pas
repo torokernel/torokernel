@@ -35,13 +35,15 @@ program TorowithFileSystem;
  {$mode delphi}
 {$ENDIF}
 
-{$IMAGEBASE 4194304}
+{$IFDEF WIN64}
+  {$IMAGEBASE 4194304}
+{$ENDIF}
 
 // Configuring the run for Lazarus
 {$IFDEF WIN64}
           {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:ToroFiles -serial file:torodebug.txt}
 {$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -serial file:torodebug.txt}
+         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:ToroFiles -serial file:torodebug.txt}
 {$ENDIF}
 {%RunFlags BUILD-}
 

@@ -39,7 +39,6 @@ program ToroException;
 {$ENDIF}
 {%RunFlags BUILD-}
 
-// Adding support for FPC 2.0.4 ;)
 {$IFDEF WIN64}
   {$IMAGEBASE 4194304}
 {$ENDIF}
@@ -60,17 +59,15 @@ uses
 
 // Procedure that tests Division by zero exception handler
 procedure DoDivZero;
+var
+  Q, R: Longint;
 begin
     {$ASMMODE intel}
     // finally statement is always executed
     try
-     asm
-   	mov rbx, 1987
-     	mov rax, 166
-        mov rcx, 0
-        mov rdx, 555
-    	div rcx
-     end;
+      Q := 5;
+      R := 0;
+      R := Q div R;
     except
        WriteConsoleF('Exception!\n',[]);
     end;   

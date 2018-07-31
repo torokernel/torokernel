@@ -167,6 +167,40 @@ uses
 {$DEFINE RestoreInt := asm popf;end;}
 {$DEFINE GetRBP := asm mov rbp_reg, rbp;end;}
 {$DEFINE StoreRBP := asm mov rbp, rbp_reg;end;}
+{$DEFINE SaveContext:=
+ asm
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rdi
+  push rsi
+  push r8
+  push r9
+  push r10
+  push r11
+  push r12
+  push r13
+  push r14
+  push r15
+ end;}
+{$DEFINE RestoreContext:=
+asm
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop r11
+ pop r10
+ pop r9
+ pop r8
+ pop rsi
+ pop rdi
+ pop rdx
+ pop rcx
+ pop rbx
+ pop rax
+end;}
 
 const
   CPU_NIL: LongInt = -1; // cpu_emigrate register
@@ -1330,6 +1364,7 @@ var
  tmp: PCPU;
  Thread: PThread;
 begin
+  SaveContext;
   // thread is idle
   if Idle then
   begin
@@ -1381,6 +1416,7 @@ begin
     {$IFDEF DebugProcess} WriteDebug('Signaling - killing CurrentThread\n', []); {$ENDIF}
     ThreadExit(True);
   end;
+  RestoreContext;
 end;
 
 // The execution of threads starts here, global variables are initialized

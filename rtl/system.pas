@@ -204,6 +204,7 @@ var
   RandSeed: Cardinal;
   { Threading support }
   fpc_threadvar_relocate_proc: pointer; public name 'FPC_THREADVAR_RELOCATE';
+  emptyintf: pointer; public name 'FPC_EMPTYINTF';
 
 ThreadVar
   ThreadID: TThreadID;
@@ -494,7 +495,7 @@ Procedure fpc_longjmp (Var S : Jmp_buf; value : longint); compilerproc;
 
 const
    vmtInstanceSize         = 0;
-   vmtParent               = sizeof(ptrint)*2;
+   vmtParent               = sizeof(SizeInt)*2;
    { These were negative value's, but are now positive, else classes
      couldn't be used with shared linking which copies only all data from
      the .global directive and not the data before the directive (PFV) }
@@ -631,6 +632,10 @@ const
       class function GetInterfaceEntry(const iid : tguid) : pinterfaceentry;
       class function GetInterfaceEntryByStr(const iidstr : string) : pinterfaceentry;
       class function GetInterfaceTable : pinterfacetable;
+
+      function Equals(Obj: TObject) : boolean;virtual;
+      function GetHashCode: PtrInt;virtual;
+      function ToString: {$ifdef FPC_HAS_FEATURE_ANSISTRINGS}ansistring{$else FPC_HAS_FEATURE_ANSISTRINGS}shortstring{$endif FPC_HAS_FEATURE_ANSISTRINGS};virtual;
    end;
 
    IUnknown = interface
@@ -5242,38 +5247,29 @@ function aligntoptr(p : pointer) : pointer;inline;
 
         var
            intftable : pinterfacetable;
-           i : longint;
-{$ifdef FPC_REQUIRES_PROPER_ALIGNMENT}
-           IOffset : longint;
-{$endif FPC_REQUIRES_PROPER_ALIGNMENT}
+           i: longint;
+
         begin
           while assigned(objclass) do
             begin
                intftable:=pinterfacetable((pointer(objclass)+vmtIntfTable)^);
-               if assigned(intftable) then
+			   if assigned(intftable) then
                  for i:=0 to intftable^.EntryCount-1 do
-{$ifdef FPC_REQUIRES_PROPER_ALIGNMENT}
-                   begin
-                     move(intftable^.Entries[i].IOffset,IOffset,sizeof(longint));
-                     move(pointer(intftable^.Entries[i].VTable),ppointer(@(PChar(instance)[IOffset]))^,sizeof(pointer));
-                   end;
-{$else FPC_REQUIRES_PROPER_ALIGNMENT}
                    ppointer(@(PChar(instance)[intftable^.Entries[i].IOffset]))^:=
                      pointer(intftable^.Entries[i].VTable);
-{$endif FPC_REQUIRES_PROPER_ALIGNMENT}
                objclass:=pclass(pointer(objclass)+vmtParent)^;
             end;
         end;
 
       class function TObject.InitInstance(instance : pointer) : tobject;
-
         begin
            { the size is saved at offset 0 }
            fillchar(instance^, InstanceSize, 0);
            { insert VMT pointer into the new created memory area }
            { (in class methods self contains the VMT!)           }
            ppointer(instance)^:=pointer(self);
-           InitInterfacePointers(self,instance);
+		   { this is a work around }
+           { InitInterfacePointers(self,instance);}
            InitInstance:=TObject(Instance);
         end;
 
@@ -5804,6 +5800,24 @@ end;
       class function TObject.getinterfacetable : pinterfacetable;
         begin
           getinterfacetable:=pinterfacetable((pointer(Self)+vmtIntfTable)^);
+        end;
+
+      function TObject.Equals(Obj: TObject) : boolean;
+        begin
+		while true do;
+          result:=Obj=Self;
+        end;
+
+      function TObject.GetHashCode: PtrInt;
+        begin
+		  while true do;
+          result:=PtrInt(Self);
+        end;
+
+      function TObject.ToString: {$ifdef FPC_HAS_FEATURE_ANSISTRINGS}ansistring{$else FPC_HAS_FEATURE_ANSISTRINGS}shortstring{$endif FPC_HAS_FEATURE_ANSISTRINGS};
+        begin
+		while true do;
+          //result:=ClassName;
         end;
 
 {****************************************************************************
@@ -7293,6 +7307,7 @@ end;
 
 procedure fpc_raise_nested;[public,alias:'FPC_RAISE_NESTED']; compilerproc;
 begin
+   while true do;
   //Internal_PopSecondObjectStack.Free;
   //Internal_Reraise;
 end;
@@ -7435,8 +7450,8 @@ end;
 
 function GetMem(Size: PtrInt): Pointer;
 begin
-         Result := nil;
-	//Result := MemoryManager.GetMem(Size);
+    //     Result := nil;
+	Result := MemoryManager.GetMem(Size);
 end;
 
 function GetMemory(size:ptrint):pointer;

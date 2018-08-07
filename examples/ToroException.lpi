@@ -97,14 +97,16 @@
         <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
-      <CustomOptions Value="-Cg-"/>
+      <CustomOptions Value="-al
+-Cg-
+-sh"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) ../builder/build.pas"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../builder/build.exe 2 ToroException ../builder/boot.o ToroException.img"/>
+        <Command Value="../builder/build.exe 4 ToroException ../builder/boot.o ToroException.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

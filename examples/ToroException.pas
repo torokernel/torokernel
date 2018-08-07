@@ -46,6 +46,7 @@ program ToroException;
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
 uses
+  SysUtils,
   Kernel in '..\rtl\Kernel.pas',
   Process in '..\rtl\Process.pas',
   Memory in '..\rtl\Memory.pas',
@@ -114,10 +115,17 @@ begin
   Result := 0;
 end;
 
+Type EDivException = Class(Exception);
+
 begin
   // tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
   // SysThreadSwitch;
-  DoDivZero;
+  //DoDivZero;
+  try
+     Raise EDivException.Create ('Division by Zero would occur');
+  except
+    WriteConsoleF('Exception!\n',[]);
+  end;
   //DoPageFault;
   //DoProtectionFault;
   //DoIllegalInstruction;

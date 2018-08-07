@@ -5804,13 +5804,11 @@ end;
 
       function TObject.Equals(Obj: TObject) : boolean;
         begin
-		while true do;
           result:=Obj=Self;
         end;
 
       function TObject.GetHashCode: PtrInt;
         begin
-		  while true do;
           result:=PtrInt(Self);
         end;
 
@@ -6088,10 +6086,12 @@ Function fpc_Catches(Objtype : TClass) : TObject;[Public, Alias : 'FPC_CATCHES']
 var
   _Objtype : TExceptObjectClass;
 begin
+
   If ExceptObjectStack=Nil then
-   begin
-     halt (255);
-   end;
+  begin
+    halt (255);
+  end;
+
   _Objtype := TExceptObjectClass(Objtype);
   if Not ((_Objtype = TExceptObjectClass(CatchAllExceptions)) or
          (ExceptObjectStack^.FObject is _ObjType)) then
@@ -7463,15 +7463,15 @@ end;
 
 function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 begin
-	//Result := MemoryManager.g(P, NewSize);
-	Result := nil;
+	Result := MemoryManager.ReAllocMem(P, NewSize);
+	//Result := nil;
 end;
 
 { Needed for calls from Assembler }
 function fpc_getmem(size:ptrint):pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
-     Result := nil;
-     //Result := MemoryManager.GetMem(size);
+     //Result := nil;
+     Result := MemoryManager.GetMem(size);
 end;
 
 procedure fpc_freemem(p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];

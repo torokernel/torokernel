@@ -213,6 +213,7 @@ var
   Value: QWORD;
   Values: PXChar;
   tmp: TNow;
+  ValueSt: PAnsiString;
 begin
   DisableInt;
   SpinLock (3,4,LockConsole);
@@ -245,6 +246,11 @@ begin
      	  '%':
           begin
             PutC('%');
+          end;
+          's':
+          begin
+           ValueSt := Pointer(args[ArgNo]);
+           PrintString (ValueSt^);
           end;
         'p':
           begin

@@ -7123,7 +7123,8 @@ End;
 
 Procedure do_exit;[Public,Alias:'FPC_DO_EXIT'];
 begin
-  InternalExit;
+  // TODO: do the exit cleaner
+  // InternalExit;
   System_exit;
 end;
 
@@ -7289,7 +7290,6 @@ begin
   HandleErrorFrame(211,get_frame);
 end;
 
-
 Procedure fpc_assert(Const Msg,FName:Shortstring;LineNo:Longint;ErrorAddr:Pointer); [Public,Alias : 'FPC_ASSERT']; compilerproc;
 begin
   if pointer(AssertErrorProc)<>nil then
@@ -7298,18 +7298,20 @@ begin
     HandleErrorFrame(227,get_frame);
 end;
 
-
 Procedure SysAssert(Const Msg,FName:Shortstring;LineNo:Longint;ErrorAddr:Pointer);
 begin
   Halt(227);
 end;
-
 
 procedure fpc_raise_nested;[public,alias:'FPC_RAISE_NESTED']; compilerproc;
 begin
    while true do;
   //Internal_PopSecondObjectStack.Free;
   //Internal_Reraise;
+end;
+
+procedure fpc_doneexception;[public,alias:'FPC_DONEEXCEPTION'] compilerproc;
+begin
 end;
 
 
@@ -7437,14 +7439,14 @@ end;
 
 procedure FreeMem(P: Pointer; Size: PtrInt);
 begin
-	//MemoryManager.FreeMemSize(p,Size);
+	MemoryManager.FreeMem(p);
 end;
 
 { Delphi style }
 function FreeMem(P: Pointer): PtrInt;
 begin
-	//Freemem := MemoryManager.FreeMem(P);
-	Freemem := 0;
+	Freemem := MemoryManager.FreeMem(P);
+	//Freemem := 0;
 end;
 
 

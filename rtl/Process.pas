@@ -1484,12 +1484,11 @@ begin
 end;
 
 // When the initial thread exits, the system must be turned off
-procedure SystemExit;
+procedure SystemExit; [public, alias : 'SYSTEMEXIT'];
 begin
   // here is needed fs for sync procedures
-  {$IFDEF DebugProcess} WriteDebug('SystemExit\n', []); {$ENDIF}
-  WriteConsoleF('\nSystem Termination, please turn off or reboot\n', []);
-  {$IFDEF DebugProcess} WriteDebug('SystemExit - Debug end -> hlt\n', []); {$ENDIF}
+  {$IFDEF DebugProcess} WriteDebug('System_Exit due to ExitCode: %d\n', [ExitCode]); {$ENDIF}
+  WriteConsoleF('\nSystem_Exit due to ExitCode: %d\n', [ExitCode]);
   hlt;
 end;
 

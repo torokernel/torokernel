@@ -444,6 +444,7 @@ Procedure RunError(w:Word);
 Procedure RunError;{$ifdef SYSTEMINLINE}inline;{$endif}
 Procedure halt(errnum:byte);
 Procedure AddExitProc(Proc:TProcedure);
+Procedure System_exit; external name 'SYSTEMEXIT';
 
 { Need to be exported for threads unit }
 Procedure SysInitExceptions;
@@ -7066,10 +7067,6 @@ begin
          Procs[InitCount+1].FinalProc();
       end;
    end;
-end;
-
-procedure system_exit;
-begin
 end;
 
 {$IFDEF CPUX86_64}

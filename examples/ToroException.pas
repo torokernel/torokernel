@@ -2,11 +2,12 @@
 // Toro Exception Example
 //
 // Changes :
-// 
+//
+// 20.8.2018 Adding support of try..except block
 // 04.8.2017 Adding backtrace.
 // 24.8.2016 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -25,7 +26,6 @@
 //
 
 program ToroException;
-
 
 {$IFDEF FPC}
  {$mode delphi}
@@ -55,25 +55,27 @@ uses
   Filesystem in '..\rtl\Filesystem.pas',
   Console in '..\rtl\Drivers\Console.pas';
 
-//var
+// var
 //  tmp: TThreadID = 0;
+
+{$ASMMODE intel}
 
 // Procedure that tests Division by zero exception handler
 procedure DoDivZero;
 var
   Q, R: Longint;
 begin
-    {$ASMMODE intel}
-    // finally statement is always executed
     try
       Q := 5;
       R := 0;
       R := Q div R;
     except
-       WriteConsoleF('Exception!\n',[]);
-    end;   
+     on E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
+   end;
 end;
-
 
 // Procedure that tests Page Fault exception handler
 procedure DoPageFault;
@@ -85,48 +87,63 @@ begin
    p := pointer($ffffffffffffffff);
    p^ := $1234;
   except
-   WriteConsoleF('exception\n', []);
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
   end;
 end;
 
 // Procedure that tests Protection Fault exception handler
 procedure DoProtectionFault;
 begin
-  asm
-     mov ax, $20
-     mov ds, ax
+  try
+   asm
+      mov ax, $20
+      mov ds, ax
+   end;
+  except
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
   end;
 end;
 
 // Procedure that tests Illegal instruction exception handler
 procedure DoIllegalInstruction;
 begin
-  asm
-  db $ff, $ff
-  end;
+  try
+   asm
+    db $ff, $ff
+   end;
+  except
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
+   end;
 end;
 
 function Exception_Core2(Param: Pointer):PtrInt;
 begin
   //DoDivZero;
-  //DoPageFault;
-  DoProtectionFault;
+  DoPageFault;
+  //DoProtectionFault;
   //DoIllegalInstruction;
   Result := 0;
 end;
 
-Type EDivException = Class(Exception);
-
 begin
-  // tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
-  // SysThreadSwitch;
+  //tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
+  //SysThreadSwitch;
   //DoDivZero;
-  try
-     Raise EDivException.Create ('Division by Zero would occur');
-  except
-    WriteConsoleF('Exception!\n',[]);
-  end;
-  //DoPageFault;
+  //try
+  //   Raise EDivException.Create ('Division by Zero would occur');
+  //except
+  //  WriteConsoleF('Exception!\n',[]);
+  //end;
+  DoPageFault;
   //DoProtectionFault;
   //DoIllegalInstruction;
 end.

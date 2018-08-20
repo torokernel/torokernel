@@ -51,7 +51,7 @@ interface
 
 {$I Toro.inc}
 
-uses Arch;
+uses Arch, SysUtils;
 
 type
   PThread = ^TThread;
@@ -250,13 +250,8 @@ begin
   addr:=nextaddr;
 end;
 
-
-procedure ExceptionHandler;
-begin
-  EnableInt;
-  ThreadExit(True);
-end;
-
+Type
+  EDivException = Class(Exception);
 
 procedure ExceptDIVBYZERO;
 var rbx_reg: QWord;
@@ -298,18 +293,18 @@ end;
      WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
-  //WriteConsoleF('Backtrace:\n',[]);
-  //while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
-  //begin
-  //     get_caller_stackinfo(pointer(rbp_reg), addr);
-  //     PrintBackTraceStr(addr);
-  //end;
-  //ExceptionHandler;
-  // to understand better this
-  // this ends up calling longjump that never come back
-  raise TObject(nil);
-  // raise should clean the stack!!! by cleaning all the data that was put by the interruption
+  WriteConsoleF('Backtrace:\n',[]);
+  while rbp_reg <> 0 do
+  begin
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
+  end;
+  EnableInt;
+  Raise EDivException.Create ('Division by Zero');
 end;
+
+Type
+  EOverflowException = Class(Exception);
 
 procedure ExceptOVERFLOW;
 var rbx_reg: QWord;
@@ -352,13 +347,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EOverflowException.Create ('OverFlow');
 end;
+
+Type
+  EBoundException = Class(Exception);
 
 procedure ExceptBOUND;
 var rbx_reg: QWord;
@@ -401,14 +400,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EBoundException.Create ('Bound');
 end;
 
+Type
+  EIllegalInsException = Class(Exception);
 
 procedure ExceptILLEGALINS;
 var rbx_reg: QWord;
@@ -451,13 +453,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EIllegalInsException.Create ('Illegal Instruction');
 end;
+
+Type
+  EDevnotAvaException = Class(Exception);
 
 procedure ExceptDEVNOTAVA; 
 var rbx_reg: QWord;
@@ -500,13 +506,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EDevnotAvaException.Create ('Device not available');
 end;
+
+Type
+  EDFException = Class(Exception);
 
 procedure ExceptDF; 
 var rbx_reg: QWord;
@@ -549,13 +559,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EDFException.Create ('Double Fault');
 end;
+
+Type
+  ESTACKFAULTException = Class(Exception);
 
 procedure ExceptSTACKFAULT;
 var rbx_reg: QWord;
@@ -598,13 +612,17 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise ESTACKFAULTException.Create ('Stack Fault');
 end;
+
+Type
+  EGENERALPException = Class(Exception);
 
 procedure ExceptGENERALP;
 var rbx_reg: QWord;
@@ -645,24 +663,23 @@ end;
      WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
      WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
   {$ENDIF}
-  // FIXME: check if rip_reg is valid
-  if (rip_reg <> 0) then
+  WriteConsoleF('Backtrace:\n',[]);
+  {$IFDEF DebugCrash}
+    WriteDebug('Backtrace:\n',[]);
+  {$ENDIF}
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(pointer(rip_reg));
+  while rbp_reg <> 0 do
   begin
-    WriteConsoleF('Backtrace:\n',[]);
-    {$IFDEF DebugCrash}
-     WriteDebug('Backtrace:\n',[]);
-    {$ENDIF}
-    PrintBackTraceStr(pointer(rip_reg));
-    get_caller_stackinfo(pointer(rbp_reg), addr);
-    while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
-    begin
-     get_caller_stackinfo(pointer(rbp_reg), addr);
-     PrintBackTraceStr(addr);
-    end;
+       get_caller_stackinfo(pointer(rbp_reg), addr);
+       PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EGENERALPException.Create ('General Protection');
 end;
 
+Type
+  EPageFaultPException = Class(Exception);
 
 procedure ExceptPAGEFAULT;
 var rbx_reg: QWord;
@@ -708,15 +725,19 @@ end;
    WriteDebug('Backtrace:\n',[]);
  {$ENDIF}
  WriteConsoleF('Backtrace:\n',[]);
- PrintBackTraceStr(pointer(rip_reg));
  get_caller_stackinfo(pointer(rbp_reg), addr);
- while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+ PrintBackTraceStr(pointer(rip_reg));
+ while rbp_reg <> 0 do
  begin
      get_caller_stackinfo(pointer(rbp_reg), addr);
      PrintBackTraceStr(addr);
  end;
- ExceptionHandler;
+ EnableInt;
+ Raise EPageFaultPException.Create ('Page Fault');
 end;
+
+Type
+  EFPUException = Class(Exception);
 
 procedure ExceptFPUE;
 var rbx_reg: QWord;
@@ -759,12 +780,13 @@ end;
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
-  while (rbp_reg < (PtrUInt(CPU[GetApicid].CurrentThread.ret_thread_sp))) do
+  while rbp_reg <> 0 do
   begin
        get_caller_stackinfo(pointer(rbp_reg), addr);
        PrintBackTraceStr(addr);
   end;
-  ExceptionHandler;
+  EnableInt;
+  Raise EFPUException.Create ('FPU');
 end;
 
 

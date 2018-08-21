@@ -2,7 +2,7 @@
 #
 # travis.compile.py
 #
-# This script is compiles the builder and the examples. It is meant
+# This script compiles the builder and the examples. It is meant
 # to run during the ci process. 
 #
 # Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>

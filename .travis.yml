@@ -42,23 +42,17 @@ deploy:
 before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
-  - chmod +x ./examples/travis.install.py
+  - chmod +x ./ci/travis.install.py
+  - chmod +x ./ci/travis.compile.py
 
 install:
   # Install prerequisites (fpc/lazarus/wine/qemu)
-  - ./examples/travis.install.py
+  - ./ci/travis.install.py
 #  - /bin/bash -c "sudo apt-get install qemu-system-x86"
 
 script:
   # Build all test projects
- # - lazbuild $LAZ_OPT ./examples/*.lpi
-  - cd ./builder
-  - fpc build.pas
-  - cd ..
-  - cd ./examples
-  - ./Compile.sh ToroHello
-  - cd ..
-  - lazbuild $LAZ_OPT ./examples/ToroHello.lpi
+  - ./ci/travis.compile.py
   - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
 #  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
 #  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256

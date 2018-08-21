@@ -54,10 +54,10 @@ script:
   # Build all test projects
   - ./ci/travis.compile.py
   - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
-#  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
-#  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
-#  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
-#  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
+  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
+  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
+  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
+  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
   
 notifications:
   email:

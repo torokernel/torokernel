@@ -23,6 +23,7 @@
 #
 
 app="$1";
+appsrc="$app.pas";
 applpi="$app.lpi";
 appimg="$app.img";
 kvmfile="$app.kvm";
@@ -79,13 +80,11 @@ rm -f $appimg
 # remove the application
 rm -f $app "$app.o"
 
-if [ -f $applpi ]; then
-   # force to compile the application by using the image 
-   cd ..
-   sudo docker run -v $(pwd):/home/torokernel -w /home/torokernel/examples torokernel/ubuntu-for-toro bash -c "wine c:/lazarus/lazbuild.exe $applpi"
-   cd examples
+if [ -f $appsrc ]; then
+   fpc -TLinux -O2 $appsrc -o$app -Fu../rtl/ -Fu../rtl/drivers -MObjfpc
+   ../builder/build 4 $app ../builder/boot.o $appimg
 else
-   echo "$applpi does not exist, exiting"
+   echo "$appsrc does not exist, exiting"
    exit 1
 fi
 

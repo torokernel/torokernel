@@ -46,12 +46,9 @@ before_install:
   - chmod +x ./ci/travis.compile.py
 
 install:
-  # Install prerequisites (fpc/lazarus/wine/qemu)
   - ./ci/travis.install.py
-#  - /bin/bash -c "sudo apt-get install qemu-system-x86"
 
 script:
-  # Build all test projects
   - ./ci/travis.compile.py
   - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
   - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256

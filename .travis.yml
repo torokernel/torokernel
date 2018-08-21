@@ -10,10 +10,9 @@ os:
 
 env:
   global:
-    - WINEPREFIX=~/.winelaz
     - DISPLAY=:99.0
   matrix:
-    - LAZ_VER=1.8.0 LAZ_ENV=wine WINEARCH=win64 LAZ_OPT="--os=win64 --cpu=x86_64"
+    - LAZ_VER=1.8.2 LAZ_ENV=linux LAZ_OPT="--os=linux --cpu=x86_64"
 
 before_deploy:
       - git config --local user.name "Travis CI"
@@ -48,16 +47,23 @@ before_install:
 install:
   # Install prerequisites (fpc/lazarus/wine/qemu)
   - ./examples/travis.install.py
-  - /bin/bash -c "sudo apt-get install qemu-system-x86"
+#  - /bin/bash -c "sudo apt-get install qemu-system-x86"
 
 script:
   # Build all test projects
-  - lazbuild $LAZ_OPT ./examples/*.lpi
+ # - lazbuild $LAZ_OPT ./examples/*.lpi
+  - cd ./builder
+  - fpc build.pas
+  - cd ..
+  - cd ./examples
+  - ./Compile.sh ToroHello
+  - cd ..
+  - lazbuild $LAZ_OPT ./examples/ToroHello.lpi
   - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
-  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
-  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
-  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
-  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
+#  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
+#  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
+#  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
+#  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
   
 notifications:
   email:

@@ -48,8 +48,8 @@ uses
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
   Pci in '..\rtl\Drivers\Pci.pas',
-  Ide in '..\rtl\drivers\IdeDisk.pas',
-  ext2 in '..\rtl\drivers\ext2.pas',
+  IdeDisk in '..\rtl\Drivers\IdeDisk.pas',
+  Ext2 in '..\rtl\Drivers\Ext2.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
   VirtIONet in '..\rtl\Drivers\VirtIONet.pas';

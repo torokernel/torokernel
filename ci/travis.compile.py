@@ -17,7 +17,8 @@ def main():
         if names.endswith('.pas'):
               os.system ('fpc -TLinux -O2 ' + names + ' -o' + names[:-4] +' -Fu../rtl/ -Fu../rtl/drivers -MObjfpc') 
               os.system ('../builder/build 4 ' + names[:-4] +' ../builder/boot.o ' + names[:-4] + '.img')
-    return os.chdir(cwd)
+    os.chdir(cwd)
+    return 1
     
 
 if __name__ == '__main__':

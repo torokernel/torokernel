@@ -60,13 +60,13 @@ if [ "$#" -ge 2 ]; then
        exit 1
     fi
     # destroy any previous instance
-    sudo virsh destroy $app
-    sudo virsh undefine $app
+    virsh destroy $app
+    virsh undefine $app
     # VNC is open at port 590X
-    sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+    virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
     # show the serial console
     sleep 5
-    sudo virsh console $app
+    virsh console $app
     exit 0
    fi
  echo "Parameter: $2 not recognized"
@@ -89,12 +89,12 @@ else
 fi
 
 # destroy any previous instance
-sudo virsh destroy $app 
-sudo virsh undefine $app
+virsh destroy $app
+virsh undefine $app
 
 if [ -f $appimg ]; then
    # VNC is open at port 590X
-   sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+   virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
 else
    echo "$appimg does not exist, exiting"
    exit 1
@@ -102,4 +102,4 @@ fi
 
 # show the serial console
 sleep 5
-sudo virsh console $app
+virsh console $app

@@ -29,12 +29,9 @@ program ToroHelloWorldMicroservice;
   {$IMAGEBASE 4194304}
 {$ENDIF}
 
-// Configuring the run for Lazarus
-{$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
-{$ENDIF}
+
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
+
 {%RunFlags BUILD-}
 
 uses

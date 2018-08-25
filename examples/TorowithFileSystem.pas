@@ -39,12 +39,8 @@ program TorowithFileSystem;
   {$IMAGEBASE 4194304}
 {$ENDIF}
 
-// Configuring the run for Lazarus
-{$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-{$ENDIF}
+{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+
 {%RunFlags BUILD-}
 
 uses
@@ -56,8 +52,8 @@ uses
   Filesystem in '..\rtl\Filesystem.pas',
   Pci in '..\rtl\Drivers\Pci.pas',
   Ide in '..\rtl\drivers\IdeDisk.pas',
-  Ext2 in '..\rtl\drivers\Ext2.pas',
- // Fat in '..\rtl\drivers\Fat.pas',
+//  Ext2 in '..\rtl\drivers\Ext2.pas',
+  Fat in '..\rtl\drivers\Fat.pas',
   Console in '..\rtl\Drivers\Console.pas',
   Network in '..\rtl\Network.pas',
   //E1000 in '..\rtl\Drivers\E1000.pas';

@@ -31,12 +31,8 @@ program ToroException;
  {$mode delphi}
 {$ENDIF}
 
-// Configuring the RUN for Lazarus
-{$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -drive format=raw,file=ToroException.img}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ToroException.img}
-{$ENDIF}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ToroException.img}
+
 {%RunFlags BUILD-}
 
 {$IFDEF WIN64}

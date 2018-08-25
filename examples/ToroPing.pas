@@ -27,15 +27,9 @@ program ToroPing;
  {$mode delphi}
 {$ENDIF}
 
-// Configuring the RUN for Lazarus
-{$IFDEF WIN64}
-         {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
-{$ENDIF}
-{%RunFlags BUILD-}
+{%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
 
-{$IMAGEBASE 4194304}
+{%RunFlags BUILD-}
 
 // They are declared just the necessary units
 // The units used depend on the hardware in which you run the application

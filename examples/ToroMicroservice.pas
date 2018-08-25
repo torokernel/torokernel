@@ -30,14 +30,8 @@ program ToroMicroservice;
  {$mode delphi}
 {$ENDIF}
 
-{$IMAGEBASE 4194304}
+{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -serial file:torodebug.txt}
 
-// Configuring the run for Lazarus
-{$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -serial file:torodebug.txt}
-{$ENDIF}
 {%RunFlags BUILD-}
 
 uses

@@ -35,16 +35,8 @@ program ToroThread;
  {$mode delphi}
 {$ENDIF}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
+{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroThread.img}
 
-// Configuring the RUN for Lazarus
-{$IFDEF WIN64}
-          {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroThread.img}
-{$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroThread.img}
-{$ENDIF}
 {%RunFlags BUILD-}
 
 // they are declared just the necessary units

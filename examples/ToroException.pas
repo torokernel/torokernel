@@ -2,11 +2,12 @@
 // Toro Exception Example
 //
 // Changes :
-// 
+//
+// 20.8.2018 Adding support of try..except block
 // 04.8.2017 Adding backtrace.
 // 24.8.2016 First Version by Matias E. Vara.
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -26,7 +27,6 @@
 
 program ToroException;
 
-
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
@@ -39,12 +39,14 @@ program ToroException;
 {$ENDIF}
 {%RunFlags BUILD-}
 
-// Adding support for FPC 2.0.4 ;)
-{$IMAGEBASE 4194304}
+{$IFDEF WIN64}
+  {$IMAGEBASE 4194304}
+{$ENDIF}
 
 // they are declared just the necessary units
 // the units used depend the hardware where you are running the application
 uses
+  SysUtils,
   Kernel in '..\rtl\Kernel.pas',
   Process in '..\rtl\Process.pas',
   Memory in '..\rtl\Memory.pas',
@@ -53,22 +55,27 @@ uses
   Filesystem in '..\rtl\Filesystem.pas',
   Console in '..\rtl\Drivers\Console.pas';
 
-//var
+// var
 //  tmp: TThreadID = 0;
+
+{$ASMMODE intel}
 
 // Procedure that tests Division by zero exception handler
 procedure DoDivZero;
+var
+  Q, R: Longint;
 begin
-    {$ASMMODE intel}
-     asm
-   	mov rbx, 1987
-     	mov rax, 166
-        mov rcx, 0
-        mov rdx, 555
-   	div rcx
+    try
+      Q := 5;
+      R := 0;
+      R := Q div R;
+    except
+     on E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
      end;
+   end;
 end;
-
 
 // Procedure that tests Page Fault exception handler
 procedure DoPageFault;
@@ -76,55 +83,67 @@ var
   p: ^longint;
 begin
   // this page is not present
-  p := pointer($ffffffffffffffff);
-  p^ := $1234;
+  try
+   p := pointer($ffffffffffffffff);
+   p^ := $1234;
+  except
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
+  end;
 end;
 
 // Procedure that tests Protection Fault exception handler
 procedure DoProtectionFault;
 begin
-  asm
-     mov ax, $20
-     mov ds, ax
+  try
+   asm
+      mov ax, $20
+      mov ds, ax
+   end;
+  except
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
   end;
 end;
 
 // Procedure that tests Illegal instruction exception handler
 procedure DoIllegalInstruction;
 begin
-  asm
-  db $ff, $ff
-  end;
-end;
-
-// This procedure is a exception handler. 
-// It has to enable the interruptions and finish the thread who made the exception
-procedure MyOwnHandler;
-begin
-  WriteConsoleF('Hello from My Handler!\n',[]);
-  // enable interruptions
-  asm
-     sti
-  end;
-  ThreadExit(True);
+  try
+   asm
+    db $ff, $ff
+   end;
+  except
+   On E: Exception do
+     begin
+       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+     end;
+   end;
 end;
 
 function Exception_Core2(Param: Pointer):PtrInt;
 begin
   //DoDivZero;
-  //DoPageFault;
-  DoProtectionFault;
+  DoPageFault;
+  //DoProtectionFault;
   //DoIllegalInstruction;
   Result := 0;
 end;
 
 begin
-  //CaptureInt(EXC_DIVBYZERO, @MyOwnHandler);
   //tmp:= BeginThread(nil, 4096, Exception_Core2, nil, 1, tmp);
-  SysThreadSwitch;
-
-  DoDivZero;
-  //DoPageFault;
+  //SysThreadSwitch;
+  //DoDivZero;
+  //try
+  //   Raise EDivException.Create ('Division by Zero would occur');
+  //except
+  //  WriteConsoleF('Exception!\n',[]);
+  //end;
+  DoPageFault;
   //DoProtectionFault;
   //DoIllegalInstruction;
 end.

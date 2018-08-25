@@ -71,6 +71,9 @@ type
 const
   EBUF_SIZE = 100;
 
+  // Debug section is written at address $700000
+  DEBUG_MEMOFFS = $700000;
+
 //{$WARNING This code is not thread-safe, and needs improvement}
 var
   { the input file to read DWARF debug info from, i.e. paramstr(0) }
@@ -165,26 +168,25 @@ end;
 
 function OpenDwarf(addr : pointer) : boolean;
 var
-  p: ^longint;
+  p: ^QWord;
 begin
   // False by default
-  OpenDwarf:=False;
-
+  OpenDwarf := False;
   // Empty so can test if GetModuleByAddr has worked
   filename := '';
-
 {$ifdef DEBUG_LINEINFO}
   //writeln(stderr,filename,' Baseaddr: ',hexstr(ptruint(baseaddr),sizeof(baseaddr)*2));
 {$endif DEBUG_LINEINFO}
-
   lastfilename := filename;
-  // debug info is set up at address $600000
-  // this leaves 2MB for kernel + user code and data
-  p := pointer($600000 - sizeof(DWORD));
+  p := pointer(DEBUG_MEMOFFS - sizeof(QWord));
   dwarfsize := p^;
-  p := pointer($600000);
+  If dwarfsize = 0 then
+  begin
+    Exit;
+  end;
+  p := pointer(DEBUG_MEMOFFS);
   dwarfoffset := PtrUInt(p);
-  OpenDwarf:=True;
+  OpenDwarf := True;
   //lastopendwarf:=True;
 end;
 

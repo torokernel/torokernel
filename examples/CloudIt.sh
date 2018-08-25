@@ -23,6 +23,7 @@
 #
 
 app="$1";
+appsrc="$app.pas";
 applpi="$app.lpi";
 appimg="$app.img";
 kvmfile="$app.kvm";
@@ -59,13 +60,13 @@ if [ "$#" -ge 2 ]; then
        exit 1
     fi
     # destroy any previous instance
-    sudo virsh destroy $app
-    sudo virsh undefine $app
+    virsh destroy $app
+    virsh undefine $app
     # VNC is open at port 590X
-    sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+    virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
     # show the serial console
     sleep 5
-    sudo virsh console $app
+    virsh console $app
     exit 0
    fi
  echo "Parameter: $2 not recognized"
@@ -79,23 +80,21 @@ rm -f $appimg
 # remove the application
 rm -f $app "$app.o"
 
-if [ -f $applpi ]; then
-   # force to compile the application by using the image 
-   cd ..
-   sudo docker run -v $(pwd):/home/torokernel -w /home/torokernel/examples torokernel/ubuntu-for-toro bash -c "wine c:/lazarus/lazbuild.exe $applpi"
-   cd examples
+if [ -f $appsrc ]; then
+   fpc -TLinux -O2 $appsrc -o$app -Fu../rtl/ -Fu../rtl/drivers -MObjfpc
+   ../builder/build 4 $app ../builder/boot.o $appimg
 else
-   echo "$applpi does not exist, exiting"
+   echo "$appsrc does not exist, exiting"
    exit 1
 fi
 
 # destroy any previous instance
-sudo virsh destroy $app 
-sudo virsh undefine $app
+virsh destroy $app
+virsh undefine $app
 
 if [ -f $appimg ]; then
    # VNC is open at port 590X
-   sudo virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
+   virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
 else
    echo "$appimg does not exist, exiting"
    exit 1
@@ -103,4 +102,4 @@ fi
 
 # show the serial console
 sleep 5
-sudo virsh console $app
+virsh console $app

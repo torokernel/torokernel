@@ -29,13 +29,15 @@ program ToroHello;
  {$mode delphi}
 {$ENDIF}
 
-{$IMAGEBASE 4194304}
+{$IFDEF WIN64}
+  {$IMAGEBASE 4194304}
+{$ENDIF}
 
 // Configuring the RUN for Lazarus
 {$IFDEF WIN64}
           {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
 {$ELSE}
-         {%RunCommand qemu-system-x86_64 -m 512 -smp 1 -drive format=raw,file=ToroHello.img}
+         {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
 {$ENDIF}
 {%RunFlags BUILD-}
 

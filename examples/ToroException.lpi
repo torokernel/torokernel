@@ -80,6 +80,8 @@
       </SyntaxOptions>
     </Parsing>
     <CodeGeneration>
+      <TargetCPU Value="x86_64"/>
+      <TargetOS Value="linux"/>
       <Optimizations>
         <OptimizationLevel Value="2"/>
       </Optimizations>
@@ -95,6 +97,7 @@
         <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
+      <CustomOptions Value="-Cg-"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) ../builder/build.pas"/>
         <ShowAllMessages Value="True"/>

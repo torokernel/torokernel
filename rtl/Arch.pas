@@ -952,16 +952,7 @@ begin
 end;
 
 {$IFDEF FPC}
-procedure nolose2; [public, alias: 'FPC_EMPTYINTF'];
-begin
-end;
-
 procedure nolose3;  [public, alias: '__FPC_specific_handler'];
-begin
-
-end;
-
-procedure nolose4;  [public, alias: 'FPC_DONEEXCEPTION'];
 begin
 
 end;

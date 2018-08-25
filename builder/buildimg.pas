@@ -21,7 +21,7 @@
 unit BuildImg;
 
 {$IFDEF FPC}
-	{$mode objfpc} 
+	{$mode objfpc}
 {$ENDIF}
 
 interface
@@ -36,6 +36,9 @@ implementation
 const
    PEMAGIC= $00004550 ;
    ImageBase = $400000;
+
+   // Debug section is written at address $700000
+   DebugFileOff = $300000;
 
 type
  // head needed by Toro's Bootloader
@@ -119,6 +122,20 @@ end;
 end;
 
 
+ TELFSectionHeader = record { 64 bytes }
+
+ sh_name : dword;
+ sh_type : dword;
+ sh_flags: qword;
+ sh_addr : pointer;
+ sh_offset : pointer;
+ sh_size : qword;
+ sh_link : Dword;
+ sh_info : Dword;
+ sh_addraling : qword;
+ sh_entsize : qword;
+end;
+
  coffsymbol=packed record
    name    : array[0..3] of char; { real is [0..7], which overlaps the strofs ! }
    strofs  : longint;
@@ -142,8 +159,7 @@ var
 
 var
  PEOptHeader :  TImageOptionalHeader ;
-	
-// Translate the PE file to binary executable and save in kernel.bin file
+
 function PEtoKernelBin(const PEFileName: string): Boolean;
 var
   Buffer: PByte;
@@ -221,9 +237,9 @@ begin
              begin
                  PEKDebug := GetMem(PESections[I].PhysicalSize);
                  Seek(PEFile, PESections[I].PhysicalOffset);
-                 Seek(OutputFile, $200000 - sizeof (PESections[I].PhysicalSize));
+                 Seek(OutputFile, DebugFileOff - sizeof (PESections[I].PhysicalSize));
                  BlockWrite(OutputFile, PESections[I].PhysicalSize, sizeof (PESections[I].PhysicalSize));
-                 Seek(OutputFile, $200000);
+                 Seek(OutputFile, DebugFileOff);
                  try
                     BlockRead(PEFile, PEKDebug^ , PESections[I].PhysicalSize);
                     BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize);
@@ -246,45 +262,40 @@ begin
   Result := False;
 end;
 
-
-var
- ElfHeader:  TELFImageHeader;
- Elftext,Elfdata: TELFImageSectionHeader;
-
-// Translate the ELF file to binary executable and save in kernel.bin file
 function ELFtoKernelBin(const ELFFileName: string): Boolean;
 var
-  ELFFile: File;
-  OutputFile: File;
-  FileInit: Integer;
+  ELFFile, OutputFile: File;
+  FileInit, I: Integer;
   Buffer: PByte;
+  StrTable: PChar;
+  ElfHeader:  TELFImageHeader;
+  Elftext, Elfdata: TELFImageSectionHeader;
+  ElfDebug, ElfString: TELFSectionHeader;
+  PEKDebug: ^kerneldebuginfo;
 begin
-  Assign(ELFFile, ELFFileName); // PE file
+  Result := False;
+  Assign(ELFFile, ELFFileName);
   Reset(ELFFile, 1);
-  // temporal file
+
   Assign(OutputFile, 'kernel.bin');
-  Rewrite(OutputFile,1);
-  // reading elf header
+  Rewrite(OutputFile, 1);
   BlockRead(ELFFile, ElfHeader, SizeOf(ElfHeader));
-  // entry point
-  addmain := ELFHeader.e_entry;
-  // char indentification
+
   if not((char(ElfHeader.e_ident[1])='E') and (char(ElfHeader.e_ident[2])='L')) then
   begin
-    Result:=false;
+    Close(ELFFile);
+    Close(OutputFile);
     Exit;
   end else
     WriteLn(ELFFileName , ': ','Detected ELF64 format');
-  // The Sections starts at the end of Program Headers
+
+  addmain := ELFHeader.e_entry;
   FileInit := longint(ElfHeader.e_phoff)+ElfHeader.e_phentsize*ElfHeader.e_phnum;
-  // Program Header array
   Seek(ELFFile, longint(ElfHeader.e_phoff));
-  // .text section
   BlockRead(ELFFile,Elftext, Sizeof(Elftext));
-  // .data  section
   BlockRead(ELFFile,Elfdata, Sizeof(Elftext));
-  // making kernel.bin
-  // .text section
+
+  // copy .text section
   Seek(ELFFIle, longint(ELFtext.p_offset)+FileInit);
   Seek(OutputFile, longint(ELFtext.p_vaddr)-ImageBase+FileInit);
   GetMem(Buffer, ELFtext.p_filesz-FileInit);
@@ -295,9 +306,9 @@ begin
     FreeMem(Buffer);
   end;
   writeln('Writing .text section ...');
-  //
-  // making .data segment
-  //
+
+  // copy .data section
+  // we assume .data section is after .text
   Seek(ELFFIle, longint(ELFdata.p_offset));
   Seek(OutputFile, longint(ELFdata.p_vaddr)-ImageBase);
   GetMem(Buffer, ELFdata.p_filesz);
@@ -308,10 +319,47 @@ begin
     FreeMem(Buffer);
   end;
   WriteLn('Writing .data section ...');
-  // clocing files
+
+  // if exists, copy the debug section too
+  Seek (ELFFile, longint(ElfHeader.e_shoff) + ElfHeader.e_shstrndx * sizeof(ElfHeader));
+  BlockRead (ELFFile, ElfString, Sizeof(ElfString));
+  Seek(ELFFile, longint(ELFString.sh_offset));
+  GetMem(StrTable, ELFstring.sh_size);
+  BlockRead(ELFFile, StrTable^, ELFstring.sh_size);
+  Seek (ELFFile, longint(ElfHeader.e_shoff));
+  for I := 0 to ElfHeader.e_shnum - 1 do
+  begin
+    BlockRead (ELFFile, ElfDebug, Sizeof(ElfDebug));
+    if i <> ElfHeader.e_shstrndx then
+    begin
+      if pchar(StrTable + ElfDebug.sh_name) = '.debug_line' then
+      begin
+        PEKDebug := GetMem(ElfDebug.sh_size);
+        Seek(ELFFile, longint(ElfDebug.sh_offset));
+        Seek(OutputFile, DebugFileOff - sizeof (ElfDebug.sh_size));
+        // save size of the .debug_line section
+        BlockWrite(OutputFile, ElfDebug.sh_size, sizeof (QWORD));
+        Seek(OutputFile, DebugFileOff);
+        try
+         BlockRead(ELFFile, PEKDebug^ , ElfDebug.sh_size);
+         BlockWrite(OutputFile, PEKDebug^, ElfDebug.sh_size);
+        finally
+         FreeMem(PEKDebug);
+        end;
+        // warn if .debug_line section may overwrite other section
+        if ElfDebug.sh_size > 1024*1024 then
+          WriteLn('Writing ', pchar(StrTable + ElfDebug.sh_name),' section ... section size > 1MB!')
+        else
+          WriteLn('Writing ', pchar(StrTable + ElfDebug.sh_name),' section ... ');
+        Break;
+      end;
+    end;
+  end;
+
+  FreeMem(StrTable);
   Close(ELFFile);
   Close(OutputFile);
-  result:=true;
+  Result := True;
 end;
 
 //

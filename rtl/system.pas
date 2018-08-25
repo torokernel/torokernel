@@ -204,6 +204,7 @@ var
   RandSeed: Cardinal;
   { Threading support }
   fpc_threadvar_relocate_proc: pointer; public name 'FPC_THREADVAR_RELOCATE';
+  emptyintf: pointer; public name 'FPC_EMPTYINTF';
 
 ThreadVar
   ThreadID: TThreadID;
@@ -443,6 +444,7 @@ Procedure RunError(w:Word);
 Procedure RunError;{$ifdef SYSTEMINLINE}inline;{$endif}
 Procedure halt(errnum:byte);
 Procedure AddExitProc(Proc:TProcedure);
+Procedure System_exit; external name 'SYSTEMEXIT';
 
 { Need to be exported for threads unit }
 Procedure SysInitExceptions;
@@ -479,13 +481,12 @@ const
 
 Type
   jmp_buf = packed record
-    ebx,esi,edi : Longint;
-    bp,sp,pc : Pointer;
-    end;
+    rbx,rbp,r12,r13,r14,r15,rsp,rip : qword; 
+   end;
   PJmp_buf = ^jmp_buf;
 
-Function Setjmp (Var S : Jmp_buf) : longint;
-Procedure longjmp (Var S : Jmp_buf; value : longint);
+Function fpc_setjmp (Var S : Jmp_buf) : longint; compilerproc;
+Procedure fpc_longjmp (Var S : Jmp_buf; value : longint); compilerproc;
 
 
 
@@ -495,7 +496,7 @@ Procedure longjmp (Var S : Jmp_buf; value : longint);
 
 const
    vmtInstanceSize         = 0;
-   vmtParent               = sizeof(ptrint)*2;
+   vmtParent               = sizeof(SizeInt)*2;
    { These were negative value's, but are now positive, else classes
      couldn't be used with shared linking which copies only all data from
      the .global directive and not the data before the directive (PFV) }
@@ -632,6 +633,10 @@ const
       class function GetInterfaceEntry(const iid : tguid) : pinterfaceentry;
       class function GetInterfaceEntryByStr(const iidstr : string) : pinterfaceentry;
       class function GetInterfaceTable : pinterfacetable;
+
+      function Equals(Obj: TObject) : boolean;virtual;
+      function GetHashCode: PtrInt;virtual;
+      function ToString: {$ifdef FPC_HAS_FEATURE_ANSISTRINGS}ansistring{$else FPC_HAS_FEATURE_ANSISTRINGS}shortstring{$endif FPC_HAS_FEATURE_ANSISTRINGS};virtual;
    end;
 
    IUnknown = interface
@@ -5243,38 +5248,29 @@ function aligntoptr(p : pointer) : pointer;inline;
 
         var
            intftable : pinterfacetable;
-           i : longint;
-{$ifdef FPC_REQUIRES_PROPER_ALIGNMENT}
-           IOffset : longint;
-{$endif FPC_REQUIRES_PROPER_ALIGNMENT}
+           i: longint;
+
         begin
           while assigned(objclass) do
             begin
                intftable:=pinterfacetable((pointer(objclass)+vmtIntfTable)^);
-               if assigned(intftable) then
+			   if assigned(intftable) then
                  for i:=0 to intftable^.EntryCount-1 do
-{$ifdef FPC_REQUIRES_PROPER_ALIGNMENT}
-                   begin
-                     move(intftable^.Entries[i].IOffset,IOffset,sizeof(longint));
-                     move(pointer(intftable^.Entries[i].VTable),ppointer(@(PChar(instance)[IOffset]))^,sizeof(pointer));
-                   end;
-{$else FPC_REQUIRES_PROPER_ALIGNMENT}
                    ppointer(@(PChar(instance)[intftable^.Entries[i].IOffset]))^:=
                      pointer(intftable^.Entries[i].VTable);
-{$endif FPC_REQUIRES_PROPER_ALIGNMENT}
                objclass:=pclass(pointer(objclass)+vmtParent)^;
             end;
         end;
 
       class function TObject.InitInstance(instance : pointer) : tobject;
-
         begin
            { the size is saved at offset 0 }
            fillchar(instance^, InstanceSize, 0);
            { insert VMT pointer into the new created memory area }
            { (in class methods self contains the VMT!)           }
            ppointer(instance)^:=pointer(self);
-           InitInterfacePointers(self,instance);
+		   { this is a work around }
+           { InitInterfacePointers(self,instance);}
            InitInstance:=TObject(Instance);
         end;
 
@@ -5807,6 +5803,22 @@ end;
           getinterfacetable:=pinterfacetable((pointer(Self)+vmtIntfTable)^);
         end;
 
+      function TObject.Equals(Obj: TObject) : boolean;
+        begin
+          result:=Obj=Self;
+        end;
+
+      function TObject.GetHashCode: PtrInt;
+        begin
+          result:=PtrInt(Self);
+        end;
+
+      function TObject.ToString: {$ifdef FPC_HAS_FEATURE_ANSISTRINGS}ansistring{$else FPC_HAS_FEATURE_ANSISTRINGS}shortstring{$endif FPC_HAS_FEATURE_ANSISTRINGS};
+        begin
+		while true do;
+          //result:=ClassName;
+        end;
+
 {****************************************************************************
                                 Exception support
 ****************************************************************************}
@@ -5986,7 +5998,7 @@ begin
   if (RaiseProc <> nil) and (_ExceptObjectStack <> nil) then
     with _ExceptObjectStack^ do
       RaiseProc(FObject,Addr,FrameCount,Frames);
-  longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
+  fpc_longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
 end;
 
 
@@ -6001,7 +6013,7 @@ begin
     end
   else
     begin
-      //hp^:=hp^^.Next;
+      hp^:=hp^^.Next;
     end;
 end;
 
@@ -6067,7 +6079,7 @@ begin
   If _ExceptAddrStack=Nil then
     DoUnHandledException;
   ExceptObjectStack^.refcount := 0;
-  longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
+  fpc_longjmp(_ExceptAddrStack^.Buf^,FPC_Exception);
 end;
 
 
@@ -6075,10 +6087,12 @@ Function fpc_Catches(Objtype : TClass) : TObject;[Public, Alias : 'FPC_CATCHES']
 var
   _Objtype : TExceptObjectClass;
 begin
+
   If ExceptObjectStack=Nil then
-   begin
-     halt (255);
-   end;
+  begin
+    halt (255);
+  end;
+
   _Objtype := TExceptObjectClass(Objtype);
   if Not ((_Objtype = TExceptObjectClass(CatchAllExceptions)) or
          (ExceptObjectStack^.FObject is _ObjType)) then
@@ -7055,10 +7069,6 @@ begin
    end;
 end;
 
-procedure system_exit;
-begin
-end;
-
 {$IFDEF CPUX86_64}
 //procedure install_exception_handlers;forward;
 //procedure remove_exception_handlers;forward;
@@ -7110,7 +7120,8 @@ End;
 
 Procedure do_exit;[Public,Alias:'FPC_DO_EXIT'];
 begin
-  InternalExit;
+  // TODO: do the exit cleaner
+  // InternalExit;
   System_exit;
 end;
 
@@ -7276,7 +7287,6 @@ begin
   HandleErrorFrame(211,get_frame);
 end;
 
-
 Procedure fpc_assert(Const Msg,FName:Shortstring;LineNo:Longint;ErrorAddr:Pointer); [Public,Alias : 'FPC_ASSERT']; compilerproc;
 begin
   if pointer(AssertErrorProc)<>nil then
@@ -7285,11 +7295,22 @@ begin
     HandleErrorFrame(227,get_frame);
 end;
 
-
 Procedure SysAssert(Const Msg,FName:Shortstring;LineNo:Longint;ErrorAddr:Pointer);
 begin
   Halt(227);
 end;
+
+procedure fpc_raise_nested;[public,alias:'FPC_RAISE_NESTED']; compilerproc;
+begin
+   while true do;
+  //Internal_PopSecondObjectStack.Free;
+  //Internal_Reraise;
+end;
+
+procedure fpc_doneexception;[public,alias:'FPC_DONEEXCEPTION'] compilerproc;
+begin
+end;
+
 
 
 {*****************************************************************************
@@ -7297,7 +7318,7 @@ end;
 *****************************************************************************}
 
 
-function setjmp(var S : jmp_buf) : longint;assembler;[Public, alias : 'FPC_SETJMP'];nostackframe;
+function fpc_setjmp(var S : jmp_buf) : longint;assembler;[Public, alias : 'FPC_SETJMP'];nostackframe; compilerproc;
   asm
 {$ifdef win64}
     // Save registers.
@@ -7331,7 +7352,7 @@ function setjmp(var S : jmp_buf) : longint;assembler;[Public, alias : 'FPC_SETJM
   end;
 
 
-procedure longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'FPC_LONGJMP'];
+procedure fpc_longjmp(var S : jmp_buf;value : longint);assembler;[Public, alias : 'FPC_LONGJMP'];nostackframe; compilerproc;
   asm
 {$ifdef win64}
     // Restore registers.
@@ -7415,21 +7436,21 @@ end;
 
 procedure FreeMem(P: Pointer; Size: PtrInt);
 begin
-	//MemoryManager.FreeMemSize(p,Size);
+	MemoryManager.FreeMem(p);
 end;
 
 { Delphi style }
 function FreeMem(P: Pointer): PtrInt;
 begin
-	//Freemem := MemoryManager.FreeMem(P);
-	Freemem := 0;
+	Freemem := MemoryManager.FreeMem(P);
+	//Freemem := 0;
 end;
 
 
 function GetMem(Size: PtrInt): Pointer;
 begin
-         Result := nil;
-	//Result := MemoryManager.GetMem(Size);
+    //     Result := nil;
+	Result := MemoryManager.GetMem(Size);
 end;
 
 function GetMemory(size:ptrint):pointer;
@@ -7441,15 +7462,15 @@ end;
 
 function ReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 begin
-	//Result := MemoryManager.g(P, NewSize);
-	Result := nil;
+	Result := MemoryManager.ReAllocMem(P, NewSize);
+	//Result := nil;
 end;
 
 { Needed for calls from Assembler }
 function fpc_getmem(size:ptrint):pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
-     Result := nil;
-     //Result := MemoryManager.GetMem(size);
+     //Result := nil;
+     Result := MemoryManager.GetMem(size);
 end;
 
 procedure fpc_freemem(p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];

@@ -6,10 +6,6 @@
 // 80. When a connection arrives, we send the content of the file and we close the conection. The example
 // also logs into a file name /web/logs to show writting operations to ext2.
 //
-// Changes :
-//
-// 19 / 10 / 2017 v1.
-//
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
@@ -34,7 +30,6 @@ program TorowithFilesystemwithAffinity;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFilesystemwithAffinity.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses

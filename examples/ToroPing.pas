@@ -1,9 +1,6 @@
 //
 // Toro Ping example.
 //
-// Changes :
-// 08 / 12 / 2016 : First Version by Matias Vara
-//
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
@@ -28,7 +25,6 @@ program ToroPing;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
-
 {%RunFlags BUILD-}
 
 // They are declared just the necessary units

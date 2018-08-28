@@ -1,7 +1,7 @@
 //
 // Process.pas
 //
-// This unit contains the Scheduler, the Interruption Manager.
+// This unit contains the Scheduler and the Interruption Manager.
 // It also does the SMP initialization and contains the API for thread manipulation.
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>

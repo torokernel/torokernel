@@ -31,7 +31,6 @@ program ToroMicroservice;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses

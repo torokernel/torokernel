@@ -6,13 +6,7 @@
 // 80. When a connection arrives, we send the content of the file and we close the conection. The example
 // also logs into a file name /web/logs to show writting operations to ext2.
 //
-// Changes :
-//
-// 04 / 05 / 2017 v2.
-// 12 / 02 / 2017 Adding SysCreateFile().
-// 04 / 03 / 2017 v1.
-//
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -33,10 +27,6 @@ program TorowithFileSystem;
 
 {$IFDEF FPC}
  {$mode delphi}
-{$ENDIF}
-
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}

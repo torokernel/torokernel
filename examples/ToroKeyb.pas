@@ -1,10 +1,6 @@
 //
 // ToroKeyb
-// Example that shows the keyboard apis
-//
-// Changes :
-// 
-// 16/09/2011 First Version by Matias E. Vara.
+// Example that shows the use of a keyboard.
 //
 // Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -32,7 +28,6 @@ program ToroKeyb;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=ToroKeyb.img}
-
 {%RunFlags BUILD-}
 
 // They are declared just the necessary units

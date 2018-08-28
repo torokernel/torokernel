@@ -25,13 +25,7 @@ program ToroHelloWorldMicroservice;
  {$mode delphi}
 {$ENDIF}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
-
-
 {%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses

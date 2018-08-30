@@ -1,14 +1,7 @@
 //
-// Here is load all the modules of Toro .
+// This unit contains the initialization of the kernel.
 //
-// Changes :
-//
-// 26/02/2007 Toro 0.03 Version by Matias Vara.
-// 04/05/2007 Toro 0.02 Version by Matias Vara.
-// 18/01/2007 Some modification in Memoy Model
-// 21/08/2006 Memory model implement .
-//
-// Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasvara@yahoo.com>
 // All Rights Reserved
 //
 //
@@ -35,6 +28,7 @@ interface
 type
   PtrInt = Int64;
 {$ENDIF}
+
 // function InitSystem is declared only for compatibility
 function InitSystem(notused: pointer): PtrInt; external {$IFDEF DCC} '' {$ENDIF} name 'PASCALMAIN';
 procedure KernelStart;
@@ -45,13 +39,11 @@ uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
   
-// Called from Arch
 procedure KernelStart;
 begin
   WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
-  // CPU must be initialized before DebugInit
-  FillChar(CPU, sizeof(CPU),0);
+  FillChar(CPU, sizeof(CPU), 0);
   {$IFDEF DEBUG} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;

@@ -1,7 +1,7 @@
 //
 // Toro Ping example.
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -36,10 +36,10 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in  '..\rtl\Drivers\Pci.pas',
+  Pci in  '..\rtl\drivers\Pci.pas',
   Network in '..\rtl\Network.pas',
-  Console in '..\rtl\Drivers\Console.pas',
-  E1000 in '..\rtl\Drivers\E1000.pas';
+  Console in '..\rtl\drivers\Console.pas',
+  E1000 in '..\rtl\drivers\E1000.pas';
 
 const 
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);

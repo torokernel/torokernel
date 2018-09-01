@@ -35,10 +35,10 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
-  Console in '..\rtl\Drivers\Console.pas',
+  Pci in '..\rtl\drivers\Pci.pas',
+  Console in '..\rtl\drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
+  VirtIONet in '..\rtl\drivers\VirtIONet.pas';
 
 const
   // TCP-Stack configuration values

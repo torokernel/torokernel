@@ -1,10 +1,9 @@
 // Pci.pas
 //
+// This units contains the management of pci devices.
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-//
-// 07/ 05/ 2017 First version.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,7 +27,8 @@ Unit Pci;
 interface
 
 uses
-  Arch, Process, Console, Memory, Debug;
+ {$IFDEF DEBUG} Debug, {$ENDIF}
+  Arch, Process, Console, Memory;
 
 type
 PBusDevInfo = ^TBusDevInfo;
@@ -47,7 +47,6 @@ end;
 
 procedure PciSetMaster(dev: PBusDevInfo);
 
-// List of the pci devices
 var
   PCIDevices: PBusDevInfo = nil;
 
@@ -77,7 +76,6 @@ type
     Reserved: array [1..5] of Byte;
  end;
 
-// Detect all devices in PCI Buses
 // brute force algorithm to find pci devices
 procedure PciDetect;
 var
@@ -147,21 +145,19 @@ begin
   end;
 end;
 
-// PciSetMaster:
 // set a device as bus mastering. This is used for e1000 driver that runs
 // as master
-//
 procedure PciSetMaster(dev: PBusDevInfo);
 var
   Tmp: Word;
 begin
- Tmp := PciReadWord(dev.bus, dev.dev, dev.func, $4 );
- Tmp := Tmp or $4;
- PciWriteWord(dev.bus, dev.dev, dev.func, $4, Tmp);
+  Tmp := PciReadWord(dev.bus, dev.dev, dev.func, $4 );
+  Tmp := Tmp or $4;
+  PciWriteWord(dev.bus, dev.dev, dev.func, $4, Tmp);
 end;
 
 initialization
-WriteConsoleF('Detecting Pci devices ...\n',[]);
-PciDetect;
+  WriteConsoleF('Detecting Pci devices ...\n',[]);
+  PciDetect;
 
 end.

@@ -39,7 +39,7 @@ uses
   Debug in 'rtl\Debug.pas',
   Arch in 'rtl\Arch.pas',
   Filesystem in 'rtl\Filesystem.pas',
-  Console in 'rtl\Drivers\Console.pas';
+  Console in 'rtl\drivers\Console.pas';
 
 begin
   WriteConsoleF('\c/vPress a Key ...\n',[0]);

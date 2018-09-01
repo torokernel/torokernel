@@ -1,15 +1,8 @@
 //
 // Toro Exception Example
 //
-// Changes :
-//
-// 20.8.2018 Adding support of try..except block
-// 04.8.2017 Adding backtrace.
-// 24.8.2016 First Version by Matias E. Vara.
-//
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-//
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -32,15 +25,8 @@ program ToroException;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ToroException.img}
-
 {%RunFlags BUILD-}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
-
-// they are declared just the necessary units
-// the units used depend the hardware where you are running the application
 uses
   SysUtils,
   Kernel in '..\rtl\Kernel.pas',
@@ -49,7 +35,7 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Console in '..\rtl\Drivers\Console.pas';
+  Console in '..\rtl\drivers\Console.pas';
 
 // var
 //  tmp: TThreadID = 0;

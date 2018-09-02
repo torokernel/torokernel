@@ -29,7 +29,7 @@ interface
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Console, Arch, FileSystem, Process, Debug, Memory;
+  Console, Arch, FileSystem, Process, Memory;
 
 implementation
 

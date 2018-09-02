@@ -334,16 +334,17 @@ begin
   until (count > (512 div sizeof (directory_entry))) ;
 end;
 
-function GetFatSector (pfat: psb_fat; sector: DWORD): Word ;var lsb , msb  : byte ;
+function GetFatSector (pfat: psb_fat; Sector: DWORD): Word ;
 var
   lsb, msb: byte;
   ret: word;
+  offset: dword;
 begin
   Sector := ((Sector - ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec)) div pfat.pbpb.BPB_SecPerClus ) + 2;
-  offset := (sector * 3 ) shr 1 ;
+  offset := (Sector * 3 ) shr 1 ;
   lsb := PByte(Pointer(pfat.pfat) + offset)^;
   msb := PByte(Pointer(pfat.pfat) + offset + 1)^;
-  if (sector mod 2 ) <>  0  then
+  if (Sector mod 2 ) <>  0  then
     ret := ((msb shl 8) or lsb) shr 4
   else
     ret := ((msb shl 8) or lsb) and $FFF ;

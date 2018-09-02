@@ -42,7 +42,6 @@ var
   ImageSize: Integer;
   EFFileName: string;
   OutFileName: string;
-
 begin
   if (Paramcount < 4) then
   begin

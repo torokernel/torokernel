@@ -28,9 +28,7 @@ interface
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Arch,
-  Pci,
-  Console, Network, Process, Memory;
+  Arch, Pci, Console, Network, Process, Memory;
 
 implementation
 
@@ -260,7 +258,7 @@ begin
     begin
       Packet := ToroGetMem(Len+SizeOf(TPacket));
       {$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: getting %d bytes in %h\n', [Len,PtrUInt(Packet)]); {$ENDIF}
-      If Packet <> nil then
+      if Packet <> nil then
       begin
         Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
         Packet.Size := Len;
@@ -273,7 +271,7 @@ begin
         WritePort(4, Net.iobase+REMOTESTARTADDRESS0);
         WritePort(Net.NextPacket, Net.iobase+REMOTESTARTADDRESS1);
         WritePort(E8390_RREAD or E8390_START, Net.iobase+COMMAND);
-        for Count := 0 to Len - 1 do
+        for Count := 0 to Len-1 do
           Data^[Count] := ReadPort(Net.iobase+NE_DATA);
         {$IFDEF DebugNe2000} WriteDebug('ne2000_ReadPacket: getting %d bytes in %h\n', [Len,PtrUInt(Packet)]) {$ENDIF}
       end else

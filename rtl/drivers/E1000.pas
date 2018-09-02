@@ -338,7 +338,7 @@ begin
   {$IFDEF DebugE1000} WriteDebug('e1000: RxDesc base address: %d\n', [PtrUInt(Net.RxDesc)]); {$ENDIF}
 
   r := pointer(Net.RxDesc) ;
-  for I := 0 to (Net.RxDescCount*SizeOf(TE1000RxDesc)+16) - 1 do
+  for I := 0 to (Net.RxDescCount*SizeOf(TE1000RxDesc)+16)-1 do
     r[I] := #0;
 
   Net.RxBufferSize := E1000_RXDESC_NR * E1000_IOBUF_SIZE;
@@ -355,9 +355,7 @@ begin
 
   // aligned RxDesc address
   if (PtrUInt(Net.RxBuffer) mod 16 <> 0) then
-  begin
     Net.RxBuffer := Pointer(PtrUInt(Net.RxBuffer) + 16 - PtrUInt(Net.RxBuffer) mod 16);
-  end;
 
   {$IFDEF DebugE1000} WriteDebug('e1000: RxBuffer base address: %d\n', [PtrUInt(Net.RxBuffer)]); {$ENDIF}
 
@@ -381,15 +379,13 @@ begin
 
   // aligned TxDesc address
   if (PtrUInt(Net.TxDesc) mod 16 <> 0) then
-  begin
     Net.TxDesc := PE1000TxDesc(PtrUInt(Net.TxDesc) + 16 - PtrUInt(Net.TxDesc) mod 16);
-  end;
 
   {$IFDEF DebugE1000} WriteDebug('e1000: TxDesc base address: %d\n', [PtrUInt(Net.TxDesc)]); {$ENDIF}
 
   r := pointer(Net.TxDesc) ;
-  for I := 0 to (Net.TxDescCount*SizeOf(TE1000TxDesc)) - 1 do
-   r[I] := #0;
+  for I := 0 to (Net.TxDescCount*SizeOf(TE1000TxDesc))-1 do
+    r[I] := #0;
 
   Net.TxBufferSize := E1000_TXDESC_NR * E1000_IOBUF_SIZE;
   Net.TxBuffer := ToroGetMem(Net.TxBufferSize + 16);
@@ -478,8 +474,8 @@ begin
   // this never should happen
   if (RxDesc.Status and E1000_RX_STATUS_DONE) = 0 then
   begin
-     {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE Exiting\n', []); {$ENDIF}
-     DropFlag := True;
+    {$IFDEF DebugE1000} WriteDebug('e1000: new packet, E1000_RX_STATUS_DONE Exiting\n', []); {$ENDIF}
+    DropFlag := True;
   end;
 
   // this driver does not hable such a kind of packets
@@ -504,10 +500,10 @@ begin
 
   if Packet = nil then
   begin
-   RxDesc.Status := E1000_RX_STATUS_DONE;
-   E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
-   {$IFDEF DebugE1000} WriteDebug('e1000: no more memory, dropping packets\n', []); {$ENDIF}
-   Exit;
+    RxDesc.Status := E1000_RX_STATUS_DONE;
+    E1000WriteRegister(Net, E1000_REG_RDT, (Tail + 1) mod Net.RxDescCount);
+    {$IFDEF DebugE1000} WriteDebug('e1000: no more memory, dropping packets\n', []); {$ENDIF}
+    Exit;
   end;
 
   Packet.data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
@@ -556,12 +552,12 @@ end;
 procedure e1000Handler;
 var
   Packet: PPacket;
-  cause: LongInt;
+  Cause: LongInt;
 begin
   // Read the Interrupt Cause Read register
-  cause := E1000ReadRegister(@NicE1000, E1000_REG_ICR);
+  Cause := E1000ReadRegister(@NicE1000, E1000_REG_ICR);
   {$IFDEF DebugE1000} WriteDebug('e1000: Interruption, cause=%d\n', [cause]); {$ENDIF}
-  if cause <> 0 then
+  if Cause <> 0 then
   begin
     // link signal
     if (cause and E1000_REG_ICR_LSC) <> 0  then

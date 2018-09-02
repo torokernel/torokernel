@@ -125,7 +125,8 @@ var
 
 implementation
 
-uses Console, Memory, lnfodwrfToro;
+uses 
+  Console, Memory, lnfodwrfToro;
 
 {$MACRO ON}
 {$DEFINE EnableInt := asm sti;end;}
@@ -211,8 +212,8 @@ begin
   addr:=nextaddr;
 end;
 
-Type
-  EDivException = Class(Exception);
+type
+  EDivException = class(Exception);
 
 procedure ExceptDIVBYZERO;
 var
@@ -262,11 +263,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EDivException.Create ('Division by Zero');
+  raise EDivException.Create ('Division by Zero');
 end;
 
-Type
-  EOverflowException = Class(Exception);
+type
+  EOverflowException = class(Exception);
 
 procedure ExceptOVERFLOW;
 var
@@ -316,11 +317,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EOverflowException.Create ('OverFlow');
+  raise EOverflowException.Create ('OverFlow');
 end;
 
-Type
-  EBoundException = Class(Exception);
+type
+  EBoundException = class(Exception);
 
 procedure ExceptBOUND;
 var
@@ -370,11 +371,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EBoundException.Create ('Bound');
+  raise EBoundException.Create ('Bound');
 end;
 
-Type
-  EIllegalInsException = Class(Exception);
+type
+  EIllegalInsException = class(Exception);
 
 procedure ExceptILLEGALINS;
 var
@@ -424,11 +425,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EIllegalInsException.Create ('Illegal Instruction');
+  raise EIllegalInsException.Create ('Illegal Instruction');
 end;
 
-Type
-  EDevnotAvaException = Class(Exception);
+type
+  EDevnotAvaException = class(Exception);
 
 procedure ExceptDEVNOTAVA;
 var
@@ -478,11 +479,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EDevnotAvaException.Create ('Device not available');
+  raise EDevnotAvaException.Create ('Device not available');
 end;
 
-Type
-  EDFException = Class(Exception);
+type
+  EDFException = class(Exception);
 
 procedure ExceptDF;
 var
@@ -532,11 +533,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EDFException.Create ('Double Fault');
+  raise EDFException.Create ('Double Fault');
 end;
 
-Type
-  ESTACKFAULTException = Class(Exception);
+type
+  ESTACKFAULTException = class(Exception);
 
 procedure ExceptSTACKFAULT;
 var
@@ -586,11 +587,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise ESTACKFAULTException.Create ('Stack Fault');
+  raise ESTACKFAULTException.Create ('Stack Fault');
 end;
 
-Type
-  EGENERALPException = Class(Exception);
+type
+  EGENERALPException = class(Exception);
 
 procedure ExceptGENERALP;
 var
@@ -644,11 +645,11 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EGENERALPException.Create ('General Protection');
+  raise EGENERALPException.Create ('General Protection');
 end;
 
-Type
-  EPageFaultPException = Class(Exception);
+type
+  EPageFaultPException = class(Exception);
 
 procedure ExceptPAGEFAULT;
 var
@@ -703,11 +704,11 @@ begin
     PrintBackTraceStr(addr);
  end;
  EnableInt;
- Raise EPageFaultPException.Create ('Page Fault');
+ raise EPageFaultPException.Create ('Page Fault');
 end;
 
-Type
-  EFPUException = Class(Exception);
+type
+  EFPUException = class(Exception);
 
 procedure ExceptFPUE;
 var
@@ -757,7 +758,7 @@ begin
     PrintBackTraceStr(addr);
   end;
   EnableInt;
-  Raise EFPUException.Create ('FPU');
+  raise EFPUException.Create ('FPU');
 end;
 
 
@@ -984,9 +985,7 @@ begin
   ResumeTime := read_rdtsc + Miliseg * LocalCPUSpeed * 1000;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
   while ResumeTime > read_rdtsc do
-  begin
     Scheduling(nil);
-  end;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime exiting\n', []); {$ENDIF}
 end;
 
@@ -1048,11 +1047,8 @@ begin
     CurrentThread.state := tsSuspended;
     SysThreadSwitch;
     {$IFDEF DebugProcess} WriteDebug('SuspendThread: Current Threads was Suspended\n',[]); {$ENDIF}
-  end
-  else
-  begin
+  end else
     Thread.State := tsSuspended;
-  end;
   Result := 0;
 end;
 
@@ -1149,10 +1145,8 @@ begin
     Emigrating(CurrentCPU);
     Inmigrating(CurrentCPU);
     CurrentThread := CurrentCPU.CurrentThread;
-
     if Candidate = nil then
       Candidate := CurrentThread.Next;
-
     repeat
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
       if Candidate.State = tsReady then
@@ -1164,13 +1158,9 @@ begin
         Candidate.State := tsReady;
         Break;
       end else
-      begin
         Candidate := Candidate.Next;
-      end;
     until Candidate = CurrentThread;
-
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
-
     if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
     else
     begin
@@ -1422,9 +1412,7 @@ begin
   Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
   {$IFDEF DebugProcess}
     if LocalCpuSpeed = MAX_CPU_SPEED_MHZ then
-    begin
       WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
-    end;
   {$ENDIF}
   if HasException then
     InitializeExceptions;

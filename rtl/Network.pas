@@ -645,7 +645,7 @@ end;
 
 function GetLocalMAC: THardwareAddress;
 begin
-  Result:= DedicateNetworks[GetApicid].NetworkInterface.HardAddress;
+  Result := DedicateNetworks[GetApicid].NetworkInterface.HardAddress;
 end;
 
 function GetMacAddress(IP: TIPAddress): PMachine;
@@ -1321,10 +1321,8 @@ begin
     begin
       SysThreadSwitch(True);
       Continue;
-    end else
-    begin
-      SysThreadActive;
     end;
+    SysThreadActive;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1642,12 +1640,9 @@ begin
     NetworkDispatcher(Handler);
     Service := GetCurrentThread.NetworkService;
     if Service.ClientSocket = nil then
-    begin
-      SysThreadSwitch (True);
-    end else
-    begin
+      SysThreadSwitch(True)
+    else
       SysThreadSwitch;
-    end;
   end;
   Result := 0;
 end;
@@ -1726,7 +1721,7 @@ begin
       Exit;
     end;
   end;
-  Result := USER_START_PORT - 1;
+  Result := USER_START_PORT-1;
 end;
 
 function SysSocketConnect(Socket: PSocket): Boolean;
@@ -1947,7 +1942,7 @@ begin
     end;
     Socket.RemoteWinCount := Socket.RemoteWinCount - Fraglen;
     if Socket.RemoteWinCount = 0 then
-      Socket.RemoteWinCount := Socket.RemoteWinLen ;
+      Socket.RemoteWinCount := Socket.RemoteWinLen;
     Packet.Data := Pointer(PtrUInt(Packet) + SizeOf(TPacket));
     Packet.Size := SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTcpHeader)+FragLen;
     Packet.ready := False;

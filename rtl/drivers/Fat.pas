@@ -156,7 +156,7 @@ begin
   if (pfatboot.BS_FilSysType[1] = 'F') and (pfatboot.BS_FilSysType[5] = '6') then
   begin
     pfat := ToroGetMem(sizeof(super_fat));
-    Panic ( pfat = nil, 'FatReadSuper: out of memory');
+    Panic(pfat = nil, 'FatReadSuper: out of memory');
     pfat.InodesQueue:= nil;
     pfat.InodesQueueTail:= nil;
     pfat.pbpb := pfatboot;
@@ -189,45 +189,30 @@ begin
   for count := 0 to 4 do
   begin
     if longname^.name1[(count*2)+1] = #0 then
-    begin
-      Exit
-    end
-    else
-    begin
-      Dest[i] := longname^.name1[(count*2)+1] ;
-      Inc(i);
-    end;
+      Exit;
+    Dest[i] := longname^.name1[(count*2)+1] ;
+    Inc(i);
   end;
   for count := 0 to 5 do
   begin
    if longname^.name2[(count*2)+1] = #0 then
-   begin
-     Exit
-   end
-   else
-   begin
-     Dest[i] := longname^.name2[(count*2)+1] ;
-     Inc(i);
-   end;
+     Exit;
+   Dest[i] := longname^.name2[(count*2)+1] ;
+   Inc(i);
   end;
   for count := 0 to 1 do
   begin
     if longname^.name3[(count*2)+1] = #0 then
-    begin
-      Exit
-    end
-    else
-    begin
-      Dest[i] :=  longname^.name3[(count*2)+1] ;
-      Inc(i);
-    end;
+      Exit;
+    Dest[i] :=  longname^.name3[(count*2)+1] ;
+    Inc(i);
   end;
   Dest[i]:= #0;
 end;
 
 procedure UnixName (fatname: pchar; Dest: Pchar);
 var
-  tmp : array[0..11] of char;
+  tmp: array[0..11] of char;
   count, ret: dword;
 begin
   FillByte (tmp, 11, 32);
@@ -281,13 +266,14 @@ begin
 end;
 
 function FindDir (bh: PBufferHead; name: pchar; var res : pdirectory_entry): Boolean;
-var count, cont: dword;
-    pdir: pdirectory_entry;
-    plgdir: pvfatdirectory_entry;
-    buff: array[0..254] of char;
-    lgcount: dword ;
-    J: LongInt;
-    ch: Byte;
+var 
+  buff: array[0..254] of char;
+  ch: Byte;
+  count, cont: dword;
+  J: LongInt;
+  lgcount: dword ;
+  pdir: pdirectory_entry;
+  plgdir: pvfatdirectory_entry;
 begin
   Result := False;
   res := nil ;
@@ -296,8 +282,8 @@ begin
   lgcount := 0;
   repeat
     case pdir.name[1] of
-    #0 : Exit;
-    #$E5 : lgcount := 0 ;
+      #0 : Exit;
+      #$E5 : lgcount := 0 ;
     else
       begin
         if (pdir^.attr = $0F) and (count <= (512 div sizeof (directory_entry))) then
@@ -358,9 +344,9 @@ begin
   lsb := PByte(Pointer(pfat.pfat) + offset)^;
   msb := PByte(Pointer(pfat.pfat) + offset + 1)^;
   if (sector mod 2 ) <>  0  then
-    ret := ((msb shl 8 ) or lsb ) shr 4
+    ret := ((msb shl 8) or lsb) shr 4
   else
-    ret := ((msb shl 8) or lsb ) and $FFF ;
+    ret := ((msb shl 8) or lsb) and $FFF ;
   if ret = $FFF then
     Result := LAST_SECTOR_FAT
   else
@@ -413,7 +399,7 @@ begin
       PutBlock(Ino.SuperBlock.BlockDevice, bh);
     end;
     ToroFreeMem(NameFat);
-    Exit
+    Exit;
   end else
   begin
     FatInode := pfat.InodesQueue;
@@ -487,25 +473,24 @@ end;
 
 function FatReadFile(FileDesc: PFileRegular; Count: LongInt; Buffer: Pointer): longint;
 var
-  tmp: pfat_inode_info;
-  initblk, initoff, nextCluster, nextSector, Cnt: DWORD;
-  j: LongInt;
   bh: PBufferHead;
+  Cnt: DWORD;
+  initblk, initoff: DWORD;
+  j: LongInt;
+  nextCluster, nextSector: DWORD;
   pfat: psb_fat;
+  tmp: pfat_inode_info;
 begin
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
   begin
     {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: reading after end, pos:%d, size:%d\n', [FileDesc.FilePos, FileDesc.Inode.Size ]); {$ENDIF}
     Count:= FileDesc.Inode.Size - FileDesc.FilePos;
   end;
-
   pfat := FileDesc.Inode.SuperBlock.SbInfo;
-
   tmp := FileDesc.Inode.InoInfo;
   initblk := FileDesc.FilePos div FileDesc.Inode.SuperBlock.BlockSize;
   initoff := FileDesc.FilePos mod FileDesc.Inode.SuperBlock.BlockSize;
   nextCluster := tmp.dir_entry.FATEntry;
-
   If initblk = 0 then
    nextSector := (nextCluster - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec)
   else
@@ -520,15 +505,11 @@ begin
       end;
     end;
   end;
-
   cnt := Count ;
-
   repeat
     bh := GetBlock(FileDesc.Inode.SuperBlock.BlockDevice, nextSector, FileDesc.Inode.SuperBlock.BlockSize);
     if bh = nil then
-    begin
       Break;
-    end;
     if (cnt > FileDesc.Inode.SuperBlock.BlockSize) then
     begin
       Move (PByte(bh.data+initoff)^, Pbyte(Buffer)^, FileDesc.Inode.SuperBlock.BlockSize);
@@ -546,9 +527,7 @@ begin
     PutBlock(FileDesc.Inode.SuperBlock.BlockDevice, bh);
     nextSector :=  GetFatSector(FileDesc.Inode.SuperBlock.SbInfo,nextSector);
     if nextSector = LAST_SECTOR_FAT then
-    begin
       break;
-    end;
   until cnt = 0;
 
   Result := Count - cnt;

@@ -805,15 +805,15 @@ begin
   ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name);
   if ino <> nil then
   begin
-      {$IFDEF DebugFS} WriteDebug('SysCreateFile: file %p exists, exiting\n', [PtrUInt(SPath)]); {$ENDIF}
-      PutInode(Base);
-      Exit;
+    {$IFDEF DebugFS} WriteDebug('SysCreateFile: file %p exists, exiting\n', [PtrUInt(SPath)]); {$ENDIF}
+    PutInode(Base);
+    Exit;
   end;
   ino := Base.SuperBlock.FileSystemDriver.CreateInode(Base, Name);
   if ino = nil then
   begin
-     {$IFDEF DebugFS} WriteDebug('SysCreateFile: creating %p failed\n', [PtrUInt(SPath)]); {$ENDIF}
-      PutInode(Base);
+   {$IFDEF DebugFS} WriteDebug('SysCreateFile: creating %p failed\n', [PtrUInt(SPath)]); {$ENDIF}
+    PutInode(Base);
   end else
   begin
     PutInode(ino);

@@ -29,8 +29,7 @@ interface
 
 uses
   {$IFDEF DEBUG} Debug, {$ENDIF}
-  Console, Arch, FileSystem,
-  Process, Debug, Memory;
+  Console, Arch, FileSystem, Process, Debug, Memory;
 
 implementation
 
@@ -307,7 +306,7 @@ begin
   InoInfo := Inode.InoInfo;
   if (Inode.ino <> 2) and (inode.ino < 11) and (inode.ino > SbInfo.inodes_count) then
     Exit;
-  block_group := (Inode.ino - 1) div SbInfo.inodes_per_group;
+  block_group := (Inode.ino-1) div SbInfo.inodes_per_group;
   if block_group >= SbInfo.groups_count then
     Exit;
   group_desc := block_group div SbInfo.desc_per_block;
@@ -443,16 +442,16 @@ begin
   bitmap_size_in_blocks := ((SbInfo.inodes_per_group div 8) div Inode.SuperBlock.BlockSize)+1;
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: block_bitmap: %d\n', [block_bitmap]); {$ENDIF}
 
-  for k := 0 to bitmap_size_in_blocks - 1 do
+  for k := 0 to bitmap_size_in_blocks-1 do
   begin
     bh := GetBlock(Inode.SuperBlock.BlockDevice, block_bitmap+k, Inode.SuperBlock.BlockSize);
     p := bh.data;
-    for j := 0 to (Inode.SuperBlock.BlockSize * 8) - 1 do
+    for j := 0 to (Inode.SuperBlock.BlockSize*8)-1 do
     begin
       if (p[j div 8] and (1 shl (j mod 8))) = 0 then
       begin
         p[j div 8] := p[j div 8] or (1 shl (j mod 8));
-        nr_inode := SbInfo.inodes_per_group * block_group + k * (Inode.SuperBlock.BlockSize * 8) + j + 1;
+        nr_inode := SbInfo.inodes_per_group * block_group + k*(Inode.SuperBlock.BlockSize*8) + j + 1;
         {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: free Inode: %d\n', [nr_inode]); {$ENDIF}
         Dec(gdp^[desc].free_inodes_count);
         bh_gdp.Dirty := True;
@@ -501,9 +500,9 @@ var
 label do_inode;
 begin
   SbInfo := Inode.SuperBlock.SbInfo;
-  block_group := (Inode.ino - 1) div (SbInfo.inodes_per_group);
+  block_group := (Inode.ino-1) div (SbInfo.inodes_per_group);
   group_desc := block_group div SbInfo.desc_per_block;
-  desc := block_group and (SbInfo.desc_per_block - 1);
+  desc := block_group and (SbInfo.desc_per_block-1);
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: Inode: %d\n', [Inode.ino]); {$ENDIF}
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: groups_desc: %d, desc: %d\n', [group_desc,desc]); {$ENDIF}
   bh_gdp := Pointer(PtrUInt(SbInfo.group_desc)+group_desc);
@@ -517,11 +516,11 @@ begin
   block_bitmap := gdp^[desc].inode_bitmap;
   bitmap_size_in_blocks := ((SbInfo.inodes_per_group div 8) div Inode.SuperBlock.BlockSize)+1;
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInodeDir: block_bitmap: %d\n', [block_bitmap]); {$ENDIF}
-  for k := 0 to (bitmap_size_in_blocks-1) do
+  for k := 0 to bitmap_size_in_blocks-1 do
   begin
     bh := GetBlock(Inode.SuperBlock.BlockDevice, block_bitmap+k, Inode.SuperBlock.BlockSize);
     p := bh.data;
-    for j := 0 to (Inode.SuperBlock.BlockSize * 8) - 1 do
+    for j := 0 to (Inode.SuperBlock.BlockSize*8)-1 do
     begin
       if (p[j div 8] and (1 shl (j mod 8))) = 0 then
       begin
@@ -540,7 +539,7 @@ begin
         goto do_inode;
       end;
     end;
-  PutBlock(Inode.SuperBlock.BlockDevice, bh);
+    PutBlock(Inode.SuperBlock.BlockDevice, bh);
   end;
   Result := nil;
   Exit;
@@ -588,7 +587,7 @@ begin
     {$IFDEF DebugExt2FS} WriteDebug('Ext2FS: Invalid inode number\n',[]); {$ENDIF}
     Exit;
   end;
-  block_group := (Inode.ino - 1) div (SbInfo.inodes_per_group);
+  block_group := (Inode.ino-1) div (SbInfo.inodes_per_group);
   if block_group >= SbInfo.groups_count then
     Exit;
   group_desc := block_group div SbInfo.desc_per_block;
@@ -597,8 +596,8 @@ begin
   if bh = nil then
     Exit;
   gdp := bh.data;
-  Offset := (Inode.ino - 1) mod SbInfo.inodes_per_block * sizeof(ext2_inode);
-  block := gdp^[desc].inode_table + (((inode.ino - 1) mod SbInfo.inodes_per_group * sizeof(ext2_inode))
+  Offset := (Inode.ino-1) mod SbInfo.inodes_per_block * sizeof(ext2_inode);
+  block := gdp^[desc].inode_table + (((inode.ino-1) mod SbInfo.inodes_per_group * sizeof(ext2_inode))
             shr (SbInfo.log_block_size +10));
   bh := GetBlock(Inode.SuperBlock.BlockDevice, Block, Inode.SuperBlock.BlockSize);
   if bh = nil then
@@ -643,25 +642,25 @@ end;
 
 function AddFiletoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;
 var
-  last_i, J: Longint;
+  BufferHead : PBufferHead;
+  Entry: P_Ext2_Dir_Entry;
   InoInfo: ^ext2_inode_info;
-  bh : PBufferHead;
+  LastIndex, J: Longint;
   Offset: Longint;
-  entry: P_Ext2_Dir_Entry;
-  prev_rec_len: Word;
+  PreviousRecordLength: Word;
 begin
   InoInfo := Ino.InoInfo;
   Result := False;
-  last_i := Ino.Size div Ino.SuperBlock.BlockSize;
-  if last_i > 12 then
+  LastIndex := Ino.Size div Ino.SuperBlock.BlockSize;
+  if LastIndex > 12 then
   begin
     {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: directory too big!\n', []); {$ENDIF}
     Exit;
   end;
-  if InoInfo.data[last_i] <> 0 then
+  if InoInfo.data[LastIndex] <> 0 then
   begin
-    bh := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[last_i], Ino.SuperBlock.BlockSize);
-    if bh = nil then
+    BufferHead := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[LastIndex], Ino.SuperBlock.BlockSize);
+    if BufferHead = nil then
     begin
       {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: error when reading a block\n', []); {$ENDIF}
       Exit;
@@ -669,110 +668,110 @@ begin
     {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: getting Indice %d\n', [last_i]); {$ENDIF}
   end else
   begin
-    if not AddFreeBlocktoInode(Ino, last_i) then
+    if not AddFreeBlocktoInode(Ino, LastIndex) then
     begin
       {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: error when adding free block to inode\n', []); {$ENDIF}
       Exit;
     end;
-    bh := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[last_i], Ino.SuperBlock.BlockSize);
-    if bh = nil then
+    BufferHead := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[LastIndex], Ino.SuperBlock.BlockSize);
+    if BufferHead = nil then
     begin
       {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: error when reading a block\n', []); {$ENDIF}
       Exit;
     end;
     Ino.Size := Ino.Size + Ino.SuperBlock.BlockSize ;
-    end;
-    Offset := 0;
-    while Offset < Ino.SuperBlock.BlockSize do
-    begin
-      entry := Pointer(PtrUInt(bh.data)+Offset);
-      Offset := Offset + entry.rec_len;
-      {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: Offset: %d \n', [Offset]); {$ENDIF}
-    end;
-    prev_rec_len := entry.rec_len;
-    entry.rec_len := sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1 + 4 - (sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1) mod 4;
-    prev_rec_len := prev_rec_len - entry.rec_len;
-    {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
-    entry := Pointer(PtrUInt(entry)+ entry.rec_len);
-    entry.inode := Inode;
-    for J := 0 to Length(Name) do
-      entry.name[J] := name[J + 1];
-    entry.name_len := Length(Name);
-    entry.file_type := Ext2_FT_Reg;
-    entry.rec_len := prev_rec_len;
-    {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
-    bh.Dirty := True;
-    PutBlock (Ino.SuperBlock.BlockDevice, bh);
-    Ino.Dirty := True;
-    Result := True;
+  end;
+  Offset := 0;
+  while Offset < Ino.SuperBlock.BlockSize do
+  begin
+    Entry := Pointer(PtrUInt(BufferHead.data)+Offset);
+    Offset := Offset + Entry.rec_len;
+    {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: Offset: %d \n', [Offset]); {$ENDIF}
+  end;
+  PreviousRecordLength := Entry.rec_len;
+  Entry.rec_len := sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + Entry.name_len - 1 + 4 - (sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + Entry.name_len - 1) mod 4;
+  PreviousRecordLength := PreviousRecordLength - Entry.rec_len;
+  {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
+  Entry := Pointer(PtrUInt(Entry)+ Entry.rec_len);
+  Entry.inode := Inode;
+  for J := 0 to Length(Name) do
+    Entry.name[J] := name[J + 1];
+  Entry.name_len := Length(Name);
+  Entry.file_type := Ext2_FT_Reg;
+  Entry.rec_len := PreviousRecordLength;
+  {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
+  BufferHead.Dirty := True;
+  PutBlock (Ino.SuperBlock.BlockDevice, BufferHead);
+  Ino.Dirty := True;
+  Result := True;
 end;
 
 function AddDirtoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;
 var
-  last_i, J: Longint;
+  Entry: P_Ext2_Dir_Entry;
   InoInfo: ^ext2_inode_info;
-  bh : PBufferHead;
+  LastIndex, J: Longint;
+  BufferHead : PBufferHead;
   Offset: Longint;
-  entry: P_Ext2_Dir_Entry;
-  prev_rec_len: Word;
+  PreviousRecordLength: Word;
 begin
   InoInfo := Ino.InoInfo;
   Result := False;
-  last_i := Ino.Size div Ino.SuperBlock.BlockSize;
-  if last_i > 12 then
+  LastIndex := Ino.Size div Ino.SuperBlock.BlockSize;
+  if LastIndex > 12 then
   begin
     {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: directory too big!\n', []); {$ENDIF}
     Exit;
   end;
-  if InoInfo.data[last_i] <> 0 then
+  if InoInfo.data[LastIndex] <> 0 then
   begin
-    bh := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[last_i], Ino.SuperBlock.BlockSize);
-    if bh = nil then
+    BufferHead := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[LastIndex], Ino.SuperBlock.BlockSize);
+    if BufferHead = nil then
     begin
       {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: error when reading a block\n', []); {$ENDIF}
       Exit;
     end;
     {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: getting Indice %d\n', [last_i]); {$ENDIF}
-    end else
+  end else
+  begin
+    if not (AddFreeBlocktoInode(Ino, LastIndex)) then
     begin
-      if not (AddFreeBlocktoInode(Ino, last_i)) then
-      begin
-        {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: error when adding free block to inode\n', []); {$ENDIF}
-        Exit;
-      end;
-      bh := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[last_i], Ino.SuperBlock.BlockSize);
-      if bh = nil then
-      begin
-        {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: error when reading a block\n', []); {$ENDIF}
-        Exit;
-      end;
-      Ino.Size := Ino.Size + Ino.SuperBlock.BlockSize;
+      {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: error when adding free block to inode\n', []); {$ENDIF}
+      Exit;
     end;
-    Offset := 0;
-    while Offset < Ino.SuperBlock.BlockSize do
+    BufferHead := GetBlock(Ino.SuperBlock.BlockDevice,InoInfo.data[LastIndex], Ino.SuperBlock.BlockSize);
+    if BufferHead = nil then
     begin
-      entry:= Pointer(PtrUInt(bh.data)+Offset);
-      Offset := Offset + entry.rec_len;
-      {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: Offset: %d \n', [Offset]); {$ENDIF}
+      {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: error when reading a block\n', []); {$ENDIF}
+      Exit;
     end;
-    prev_rec_len := entry.rec_len;
-    entry.rec_len := sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1 + 4 - (sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1) mod 4;
-    prev_rec_len := prev_rec_len - entry.rec_len;
-    {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
-    entry := Pointer(PtrUInt(entry)+ entry.rec_len);
-    entry.inode := Inode;
-    for J := 0 to Length(Name) do
-      entry.name[J] := name[J + 1];
-    entry.name_len := Length(Name);
-    entry.file_type := Ext2_FT_Dir;
-    entry.rec_len:= prev_rec_len;
-    {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
-    bh.Dirty := True;
-    PutBlock (Ino.SuperBlock.BlockDevice, bh);
-    {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: old inode size: %d\n', [Ino.Size]); {$ENDIF}
-    Inc(InoInfo.links_count);
-    Ino.Dirty := True;
-    Result := True;
+    Ino.Size := Ino.Size + Ino.SuperBlock.BlockSize;
+  end;
+  Offset := 0;
+  while Offset < Ino.SuperBlock.BlockSize do
+  begin
+    Entry:= Pointer(PtrUInt(BufferHead.data)+Offset);
+    Offset := Offset + Entry.rec_len;
+    {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: Offset: %d \n', [Offset]); {$ENDIF}
+  end;
+  PreviousRecordLength := Entry.rec_len;
+  Entry.rec_len := sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + Entry.name_len - 1 + 4 - (sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + Entry.name_len - 1) mod 4;
+  PreviousRecordLength := PreviousRecordLength - Entry.rec_len;
+  {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
+  Entry := Pointer(PtrUInt(Entry)+ Entry.rec_len);
+  Entry.inode := Inode;
+  for J := 0 to Length(Name) do
+    Entry.name[J] := name[J + 1];
+  Entry.name_len := Length(Name);
+  Entry.file_type := Ext2_FT_Dir;
+  Entry.rec_len:= PreviousRecordLength;
+  {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: prev_rec_len: %d, entry.rec_len: %d \n', [prev_rec_len,entry.rec_len]); {$ENDIF}
+  BufferHead.Dirty := True;
+  PutBlock (Ino.SuperBlock.BlockDevice, BufferHead);
+  {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: old inode size: %d\n', [Ino.Size]); {$ENDIF}
+  Inc(InoInfo.links_count);
+  Ino.Dirty := True;
+  Result := True;
 end;
 
 function InitializeInodeDir(Ino: PInode; Inode: Longint): Boolean;
@@ -964,7 +963,7 @@ begin
 
   If ( I > 12) and (I <= (12 + Inode.SuperBlock.BlockSize div 4)) and (InoInfo.data[13] = 0) then
   begin
-    for k := 0 to (bitmap_size_in_blocks-1) do
+    for k := 0 to bitmap_size_in_blocks-1 do
     begin
       bh := GetBlock(Inode.SuperBlock.BlockDevice, block_bitmap+k, Inode.SuperBlock.BlockSize);
       p := bh.data;
@@ -994,12 +993,12 @@ begin
     Exit;
   end;
   do_direct:
-  for k := 0 to bitmap_size_in_blocks - 1 do
+  for k := 0 to bitmap_size_in_blocks-1 do
   begin
     bh := GetBlock(Inode.SuperBlock.BlockDevice, block_bitmap+k, Inode.SuperBlock.BlockSize);
     {$IFDEF DebugFS} WriteDebug('AddFreeBlocktoInode: getting block %d\n', [block_bitmap+k]); {$ENDIF}
     p := bh.data;
-    for j := 0 to ((Inode.SuperBlock.BlockSize * 8) -1) do
+    for j := 0 to (Inode.SuperBlock.BlockSize*8)-1 do
     begin
       if ((p[j div 8] and (1 shl (j mod 8))) = 0) then
       begin
@@ -1052,13 +1051,13 @@ begin
   begin
     nrfreeblks := start_block - ((FileDesc.Inode.Size div FileDesc.Inode.SuperBlock.BlockSize)+1);
     {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: populating Inode %d with %d blocks\n', [FileDesc.Inode.ino, nrfreeblks]); {$ENDIF}
-    for J := 0 to nrfreeblks - 1 do
+    for J := 0 to nrfreeblks-1 do
     begin
       ret := AddfreeblockToInode(FileDesc.Inode, J+1);
       if not ret then
       begin
         {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: fail at populating Inode %d\n', [FileDesc.Inode.ino]); {$ENDIF}
-         Result := 0;
+        Result := 0;
       end;
     end;
   end;
@@ -1103,21 +1102,15 @@ begin
     bh.Dirty := True;
     PutBlock(FileDesc.Inode.SuperBlock.BlockDevice,bh);
   end;
-
   Result := Len;
-
   if Result <> 0 then
-  begin
      FileDesc.Inode.MTime := Ext2GetSeconds;
-  end;
-
   // TODO: It updates the inode only if size increments, is that right?
   if FileDesc.FilePos > FileDesc.Inode.Size then
   begin
      FileDesc.Inode.Size := FileDesc.FilePos;
      Ext2WriteInode(FileDesc.Inode);
   end;
-
   {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: written %d, new inode size: %d\n', [Result,FileDesc.Inode.Size]); {$ENDIF}
 end;
 
@@ -1162,7 +1155,7 @@ begin
     end;
     PutBlock(FileDesc.Inode.SuperBlock.BlockDevice,bh);
   end;
-  Result := Count - Len;
+  Result := Count-Len;
   {$IFDEF DebugFS} WriteDebug('Ext2ReadFile: Result: %d, Filepos: %d\n', [Result, FileDesc.FilePos]); {$ENDIF}
 end;
 

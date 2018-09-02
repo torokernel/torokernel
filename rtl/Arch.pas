@@ -1094,8 +1094,8 @@ begin
       begin
         mp_apic_detect(Pointer(SizeUint(find.phys)));
         Exit;
-      end
-      else Exit;
+      end;
+      Exit;
     end;
     Inc(find);
    end;

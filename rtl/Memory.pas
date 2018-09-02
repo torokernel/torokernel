@@ -477,8 +477,8 @@ begin
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: BlockList: %h, P: %h\n',[PtrUInt(BlockList), PtrUInt(P)]);{$ENDIF}
   BlockList.List^[BlockList.Count] := P;
   Inc(BlockList.Count);
-  // expand before it is full to avoid race condition with GetMem()
-  if (BlockList.Capacity - BlockList.Count = 1)  then
+  // to avoid race condition with GetMem(), expand before it is full
+  if BlockList.Count = BlockList.Capacity-1 then
   begin
     if not BlockListExpand(BlockList) then
       Panic(True, 'BlockListAdd: No enough memory for expanding a list\n');
@@ -725,10 +725,10 @@ var
   MemoryAllocator: PMemoryAllocator;
   SX: Byte;
   {$IFDEF DebugMemory}
-   bCPU: Byte;
-   bIsFree, bIsPrivateHeap: Byte;
-   bSX: byte;
-   bSize: PtrUInt;
+    bCPU: Byte;
+    bIsFree, bIsPrivateHeap: Byte;
+    bSX: byte;
+    bSize: PtrUInt;
   {$ENDIF}
 begin
   DisableInt;

@@ -47,16 +47,16 @@ procedure DoDivZero;
 var
   Q, R: Longint;
 begin
-    try
-      Q := 5;
-      R := 0;
-      R := Q div R;
-    except
-     on E: Exception do
-     begin
-       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
-     end;
-   end;
+  try
+    Q := 5;
+    R := 0;
+    R := Q div R;
+  except
+    on E: Exception do
+    begin
+      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+    end;
+  end;
 end;
 
 // Procedure that tests Page Fault exception handler
@@ -66,13 +66,13 @@ var
 begin
   // this page is not present
   try
-   p := pointer($ffffffffffffffff);
-   p^ := $1234;
+    p := pointer($ffffffffffffffff);
+    p^ := $1234;
   except
-   On E: Exception do
-     begin
-       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
-     end;
+    on E: Exception do
+    begin
+      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+    end;
   end;
 end;
 
@@ -80,15 +80,15 @@ end;
 procedure DoProtectionFault;
 begin
   try
-   asm
+    asm
       mov ax, $20
       mov ds, ax
-   end;
+    end;
   except
-   On E: Exception do
-     begin
-       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
-     end;
+    on E: Exception do
+    begin
+      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+    end;
   end;
 end;
 
@@ -96,15 +96,15 @@ end;
 procedure DoIllegalInstruction;
 begin
   try
-   asm
-    db $ff, $ff
-   end;
+    asm
+      db $ff, $ff
+    end;
   except
-   On E: Exception do
-     begin
-       WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
-     end;
-   end;
+    on E: Exception do
+    begin
+      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+    end;
+  end;
 end;
 
 function Exception_Core2(Param: Pointer):PtrInt;

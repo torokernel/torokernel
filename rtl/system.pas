@@ -1404,6 +1404,8 @@ function  ThreadGetPriority (threadHandle : TThreadID): longint;
 function  GetCurrentThreadId : TThreadID;
 
 
+function InterLockedCompareExchange(var Target: longint; NewValue, Comperand : longint): longint; assembler;
+
 { this allows to do a lot of things in MT safe way }
 { it is also used to make the heap management      }
 { thread safe                                      }

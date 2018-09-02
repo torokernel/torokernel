@@ -64,9 +64,9 @@ const
 
 type
   TConsole = record
-  car: XChar;
-  form: Byte;
-end;
+    car: XChar;
+    form: Byte;
+  end;
 
 var
   LockConsole: UInt64 = 3;
@@ -206,7 +206,7 @@ begin
       if J > Length(Format) then
         Exit ;
       case Format[J] of
-        'c':
+        'c': 
            begin
              PutC(XChar(args[ArgNo]));
            end;
@@ -238,11 +238,11 @@ begin
                Inc(Values);
              end;
            end;
-      else
-      begin
-        Inc(J);
-        Continue;
-      end;
+        else
+        begin
+          Inc(J);
+          Continue;
+        end;
       end;
       Inc(J);
       Inc(ArgNo);
@@ -342,21 +342,21 @@ end;
 
 procedure KeyHandler;
 var
-  key: Byte;
-  pbuff: PXChar;
+  Key: Byte;
+  PBuff: PXChar;
 begin
   EOI;
   while (read_portb($64) and 1) = 1 do
   begin
-    key := read_portb($60);
-    key := 127 and key;
-    if key and 128 <> 0 then
+    Key := read_portb($60);
+    Key := 127 and Key;
+    if Key and 128 <> 0 then
       Exit;
-    case key of
+    case Key of
       29,42,58: Exit;
       14:
         begin
-          if x<>0 then
+          if x <> 0 then
           begin
             Dec(x);
             PutC(#0);
@@ -376,7 +376,7 @@ begin
           pbuff := @KeyBuffer[BufferCount];
           pbuff^ := #13;
           if ThreadinKey <> nil then
-            ThreadinKey.state:=tsReady;
+            ThreadinKey.state := tsReady;
         end;
       75,72,80,77: Continue;
       else
@@ -384,9 +384,9 @@ begin
         Inc(BufferCount);
         if BufferCount > SizeOf(KeyBuffer) then
           BufferCount := 1;
-        pbuff := @KeyBuffer[BufferCount];
-        pbuff^ := Char_Code[key];
-        PutC(pbuff^);
+        PBuff := @KeyBuffer[BufferCount];
+        PBuff^ := Char_Code[Key];
+        PutC(PBuff^);
         if ThreadinKey <> nil then
           ThreadinKey.state := tsReady;
       end;

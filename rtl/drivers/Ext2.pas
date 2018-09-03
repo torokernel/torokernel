@@ -1073,7 +1073,7 @@ begin
        if not ret then
        begin
          {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: failling at adding a free block\n', []); {$ENDIF}
-         exit;
+         Exit;
        end;
        real_block := Get_Real_Block(J, FileDesc.Inode);
        {$IFDEF DebugFS} WriteDebug('Ext2WriteFile: populating Indice %d with block %d\n', [J, real_block]); {$ENDIF}

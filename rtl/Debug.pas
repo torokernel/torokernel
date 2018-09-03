@@ -26,7 +26,7 @@ unit Debug;
 
 interface
 
-uses 
+uses
   Arch;
 
 procedure DebugInit;
@@ -35,7 +35,7 @@ procedure SetBreakPoint(Id: Qword);
 
 implementation
 
-uses 
+uses
   Console, Process;
 
 {$MACRO ON}
@@ -74,7 +74,7 @@ end;
 
 procedure SetBreakPoint(Id: Qword);
 var
-  tmp: Char; 
+  tmp: Char;
 begin
   WriteDebug('Debug: Breakpoint %d reached, press any key to continue\n',[Id]);
   DisableInt;
@@ -159,23 +159,23 @@ begin
     begin
       Inc(J);
       if J > Length(Format) then
-      	Exit ;
+        Exit ;
       case Format[J] of
         'c':
           begin
             SendChar(XChar(args[ArgNo]));
-	  end;
+          end;
         'h':
           begin
             Value := args[ArgNo];
             DebugPrintHexa(Value);
           end;
-     	'd':
+        'd':
           begin
             Value := args[ArgNo];
             DebugPrintDecimal (Value);
           end;
-     	'%':
+        '%':
           begin
             SendChar('%');
           end;
@@ -188,8 +188,8 @@ begin
               Inc(Values);
             end;
           end;
-      	else
-      	begin
+        else
+        begin
           Inc(J);
           Continue;
         end;
@@ -204,22 +204,22 @@ begin
       if J > Length(Format) then
         Exit ;
       case Format[J] of
-       	'c': 
+        'c':
           begin
             Inc(J);
           end;
-       	'n': 
+        'n':
           begin
             SendChar(XChar(13));
-       	    SendChar(XChar(10));
-	    Inc(J);
+            SendChar(XChar(10));
+            Inc(J);
           end;
-       	'\': 
+        '\':
           begin
             SendChar('\');
             Inc(J);
           end;
-       	'v':
+        'v':
           begin
             I := 1;
             while I < 10 do
@@ -234,37 +234,37 @@ begin
             DebugPrintDecimal (read_rdtsc);
             Inc(J);
           end;
-        't': 
+        't':
           begin
             Now(@tmp);
-            if tmp.Day < 10 then 
-	      DebugPrintDecimal  (0);
+            if tmp.Day < 10 then
+              DebugPrintDecimal  (0);
             DebugPrintDecimal (tmp.Day);
             SendChar('/');
-	    if tmp.Month < 10 then 
-	      DebugPrintDecimal  (0);
+            if tmp.Month < 10 then
+              DebugPrintDecimal  (0);
             DebugPrintDecimal (tmp.Month);
             SendChar('/');
             DebugPrintDecimal (tmp.Year);
             SendChar('-');
-            if tmp.Hour < 10 then 
-	      DebugPrintDecimal  (0);
+            if tmp.Hour < 10 then
+              DebugPrintDecimal  (0);
             DebugPrintDecimal(tmp.Hour);
             SendChar(':');
-            if tmp.Min < 10 then 
-	      DebugPrintDecimal  (0);
+            if tmp.Min < 10 then
+              DebugPrintDecimal  (0);
             DebugPrintDecimal(tmp.Min);
             SendChar(':');
-	    if tmp.Sec < 10 then 
-	      DebugPrintDecimal  (0);
+            if tmp.Sec < 10 then
+              DebugPrintDecimal  (0);
             DebugPrintDecimal (tmp.Sec);
             Inc(J);
           end;
-	else
-       	begin
+        else
+        begin
           SendChar('\');
           SendChar(Format[J]);
-      	end;
+        end;
       end;
       Continue;
     end;

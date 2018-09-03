@@ -41,163 +41,163 @@ implementation
 {$DEFINE RestoreInt := asm popf;end;}
 
 const
- MAX_ATA_CONTROLLER= 4; // number of supported drivers
- MAX_SATA_DISK = 32;
- MAX_ATA_MINORS = 10;
- NOT_FILESYSTEM = $ff;
+  MAX_ATA_CONTROLLER= 4; // number of supported drivers
+  MAX_SATA_DISK = 32;
+  MAX_ATA_MINORS = 10;
+  NOT_FILESYSTEM = $ff;
 
- // ATA Commands
- ATA_IDENTIFY = $EC;
- ATA_WRITE = $30;
- ATA_READ = $20;
+  // ATA Commands
+  ATA_IDENTIFY = $EC;
+  ATA_WRITE = $30;
+  ATA_READ = $20;
 
- // ATA Driver Type
- MASTER = 0;
- SLAVE = 1;
+  // ATA Driver Type
+  MASTER = 0;
+  SLAVE = 1;
 
- // size of physic blocks
- BLKSIZE = 512;
+  // size of physic blocks
+  BLKSIZE = 512;
 
- // nameing interface
- ATANAMES : array[0..3] of AnsiString = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
+  // nameing interface
+  ATANAMES : array[0..3] of AnsiString = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
 
- // ATA Ports
- ATA_DATA = 0;
- ATA_ERROR = 1;
- ATA_COUNT = 2;
- ATA_SECTOR = 3;
- ATA_CYLLOW = 4;
- ATA_CYLHIG = 5;
- ATA_DRIVHD = 6;
- ATA_CMD_STATUS = 7;
+  // ATA Ports
+  ATA_DATA = 0;
+  ATA_ERROR = 1;
+  ATA_COUNT = 2;
+  ATA_SECTOR = 3;
+  ATA_CYLLOW = 4;
+  ATA_CYLHIG = 5;
+  ATA_DRIVHD = 6;
+  ATA_CMD_STATUS = 7;
 
 type
- PIDEBlockDisk = ^TIDEBlockDisk;
- PIDEController = ^TIDEController;
- PPartitionEntry = ^TPartitionEntry;
+  PIDEBlockDisk = ^TIDEBlockDisk;
+  PIDEController = ^TIDEController;
+  PPartitionEntry = ^TPartitionEntry;
 
- TIDEBlockDisk = record
-   StartSector : LongInt;
-   Size: LongInt;
-   FsType: LongInt;
-   FileDesc: TFileBlock;
-   Next: PIDEBlockDisk;
- end;
+  TIDEBlockDisk = record
+    StartSector : LongInt;
+    Size: LongInt;
+    FsType: LongInt;
+    FileDesc: TFileBlock;
+    Next: PIDEBlockDisk;
+  end;
 
- TIDEController = record
-   IOPort: LongInt;
+  TIDEController = record
+    IOPort: LongInt;
     IRQ: LongInt;
     IrqReady: Boolean;
     IrqHandler: Pointer;
     Driver: TBlockDriver;
     Minors: array[0..MAX_ATA_MINORS-1] of TIDEBlockDisk;
- end;
+  end;
 
- DriverId = record
-  config         : word;    // General configuration (obselete)
-  cyls           : word;    // Number of cylinders
-  reserved2      : word;    // Specific configuration
-  heads          : word;    // Number of logical heads
-  track_Bytes    : word;    // Obsolete
-  sector_Bytes   : word;    // Obsolete
-  sectors        : word;    // Number of logical sectors per logical track
-  vendor0        : word;    // vendor unique
-  vendor1        : word;    // vendor unique
-  vendor2        : word;    // vendor unique
-  serial_no      : array[1..20] of XChar;    // Serial number
-  buf_type       : word;    // Obsolete
-  buf_size       : word;    // 512 Byte increments; 0 = not_specified
-  ecc_Bytes      : word;    // Obsolete
-  fw_rev         : array[1..8] of XChar;      // Firmware revision
-  model          : array[1..40] of XChar;     // Model number
-  max_mulsect    : Byte;    // read/write multiple support
-  vendor3        : Byte;    // vendor unique
-  dword_io       : word;    // 0 = not_implemented; 1 = implemented
-  vendor4        : Byte;    // vendor unique
-  capability     : Byte;    // bits 0:DMA 1:LBA 2:IORDYsw 3:IORDYsup
-  reserved50     : word;    // reserved (word 50)
-  vendor5        : Byte;    // vendor unique
-  tPIO           : Byte;    // 0=slow, 1=medium, 2=fast
-  vendor6        : Byte;    // vendor unique
-  tDMA           : Byte;    // vitesse du DMA ; 0=slow, 1=medium, 2=fast }
-  field_valid    : word;    // bits 0:cur_ok 1:eide_ok
-  cur_cyls       : word;    // cylindres logiques
-  cur_heads      : word;    // tetes logique
-  cur_sectors    : word;    // secteur logique par piste
-  cur_capacity0  : word;    // nombre total de secteur logique
-  cur_capacity1  : word;    // 2 words, misaligned int
-  multsect       : Byte;    // compteur secteur multiple courrant
-  multsect_valid : Byte;    // quand (bit0==1) multsect is ok
-  lba_capacity   : dword;   // nombre total de secteur
-  dma_1word      : word;    // informations sur le DMA single-word
-  dma_mword      : word;    // multiple-word dma info
-  eide_pio_modes : word;    // bits 0:mode3 1:mode4
-  eide_dma_min   : word;    // min mword dma cycle time (ns)
-  eide_dma_time  : word;    // recommended mword dma cycle time (ns)
-  eide_pio       : word;    // min cycle time (ns), no IORDY
-  eide_pio_iordy : word;    // min cycle time (ns), with IORDY
-  word69         : word;
-  word70         : word;
-  word71         : word;
-  word72         : word;
-  word73         : word;
-  word74         : word;
-  word75         : word;
-  word76         : word;
-  word77         : word;
-  word78         : word;
-  word79         : word;
-  word80         : word;
-  word81         : word;
-  command_sets   : word;    // bits 0:Smart 1:Security 2:Removable 3:PM
-  word83         : word;    // bits 14:Smart Enabled 13:0 zero
-  word84         : word;
-  word85         : word;
-  word86         : word;
-  word87         : word;
-  dma_ultra      : word;
-  word89         : word;
-  word90         : word;
-  word91         : word;
-  word92         : word;
-  word93         : word;
-  word94         : word;
-  word95         : word;
-  word96         : word;
-  word97         : word;
-  word98         : word;
-  word99         : word;
-  word100        : word;
-  word101        : word;
-  word102        : word;
-  word103        : word;
-  word104        : word;
-  word105        : word;
-  word106        : word;
-  word107        : word;
-  word108        : word;
-  word109        : word;
-  word110        : word;
-  word111        : word;
-  word112        : word;
-  word113        : word;
-  word114        : word;
-  word115        : word;
-  word116        : word;
-  word117        : word;
-  word118        : word;
-  word119        : word;
-  word120        : word;
-  word121        : word;
-  word122        : word;
-  word123        : word;
-  word124        : word;
-  word125        : word;
-  word126        : word;
-  word127        : word;
-  security       : word;    // bits 0:support 1:enable 2:locked 3:frozen
-  reserved       : array[1..127] of word;
- end;
+  DriverId = record
+    config         : word;    // General configuration (obselete)
+    cyls           : word;    // Number of cylinders
+    reserved2      : word;    // Specific configuration
+    heads          : word;    // Number of logical heads
+    track_Bytes    : word;    // Obsolete
+    sector_Bytes   : word;    // Obsolete
+    sectors        : word;    // Number of logical sectors per logical track
+    vendor0        : word;    // vendor unique
+    vendor1        : word;    // vendor unique
+    vendor2        : word;    // vendor unique
+    serial_no      : array[1..20] of XChar;    // Serial number
+    buf_type       : word;    // Obsolete
+    buf_size       : word;    // 512 Byte increments; 0 = not_specified
+    ecc_Bytes      : word;    // Obsolete
+    fw_rev         : array[1..8] of XChar;      // Firmware revision
+    model          : array[1..40] of XChar;     // Model number
+    max_mulsect    : Byte;    // read/write multiple support
+    vendor3        : Byte;    // vendor unique
+    dword_io       : word;    // 0 = not_implemented; 1 = implemented
+    vendor4        : Byte;    // vendor unique
+    capability     : Byte;    // bits 0:DMA 1:LBA 2:IORDYsw 3:IORDYsup
+    reserved50     : word;    // reserved (word 50)
+    vendor5        : Byte;    // vendor unique
+    tPIO           : Byte;    // 0=slow, 1=medium, 2=fast
+    vendor6        : Byte;    // vendor unique
+    tDMA           : Byte;    // vitesse du DMA ; 0=slow, 1=medium, 2=fast }
+    field_valid    : word;    // bits 0:cur_ok 1:eide_ok
+    cur_cyls       : word;    // cylindres logiques
+    cur_heads      : word;    // tetes logique
+    cur_sectors    : word;    // secteur logique par piste
+    cur_capacity0  : word;    // nombre total de secteur logique
+    cur_capacity1  : word;    // 2 words, misaligned int
+    multsect       : Byte;    // compteur secteur multiple courrant
+    multsect_valid : Byte;    // quand (bit0==1) multsect is ok
+    lba_capacity   : dword;   // nombre total de secteur
+    dma_1word      : word;    // informations sur le DMA single-word
+    dma_mword      : word;    // multiple-word dma info
+    eide_pio_modes : word;    // bits 0:mode3 1:mode4
+    eide_dma_min   : word;    // min mword dma cycle time (ns)
+    eide_dma_time  : word;    // recommended mword dma cycle time (ns)
+    eide_pio       : word;    // min cycle time (ns), no IORDY
+    eide_pio_iordy : word;    // min cycle time (ns), with IORDY
+    word69         : word;
+    word70         : word;
+    word71         : word;
+    word72         : word;
+    word73         : word;
+    word74         : word;
+    word75         : word;
+    word76         : word;
+    word77         : word;
+    word78         : word;
+    word79         : word;
+    word80         : word;
+    word81         : word;
+    command_sets   : word;    // bits 0:Smart 1:Security 2:Removable 3:PM
+    word83         : word;    // bits 14:Smart Enabled 13:0 zero
+    word84         : word;
+    word85         : word;
+    word86         : word;
+    word87         : word;
+    dma_ultra      : word;
+    word89         : word;
+    word90         : word;
+    word91         : word;
+    word92         : word;
+    word93         : word;
+    word94         : word;
+    word95         : word;
+    word96         : word;
+    word97         : word;
+    word98         : word;
+    word99         : word;
+    word100        : word;
+    word101        : word;
+    word102        : word;
+    word103        : word;
+    word104        : word;
+    word105        : word;
+    word106        : word;
+    word107        : word;
+    word108        : word;
+    word109        : word;
+    word110        : word;
+    word111        : word;
+    word112        : word;
+    word113        : word;
+    word114        : word;
+    word115        : word;
+    word116        : word;
+    word117        : word;
+    word118        : word;
+    word119        : word;
+    word120        : word;
+    word121        : word;
+    word122        : word;
+    word123        : word;
+    word124        : word;
+    word125        : word;
+    word126        : word;
+    word127        : word;
+    security       : word;    // bits 0:support 1:enable 2:locked 3:frozen
+    reserved       : array[1..127] of word;
+  end;
 
   TPartitionEntry = record
     boot: Byte;
@@ -434,50 +434,50 @@ end;
 
 procedure ATA0IrqDelivery; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
-// save registers
-push rbp
-push rax
-push rbx
-push rcx
-push rdx
-push rdi
-push rsi
-push r8
-push r9
-push r10
-push r11
-push r12
-push r13
-push r14
-push r15
-// protect the stack
-mov r15 , rsp
-mov rbp , r15
-sub r15 , 32
-mov  rsp , r15
-mov ecx, ATA0onCPUID
-mov edx, 76
-call send_apic_int
-call eoi
-mov rsp , rbp
-// restore the registers
-pop r15
-pop r14
-pop r13
-pop r12
-pop r11
-pop r10
-pop r9
-pop r8
-pop rsi
-pop rdi
-pop rdx
-pop rcx
-pop rbx
-pop rax
-pop rbp
-db $48
-db $cf
+  // save registers
+  push rbp
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rdi
+  push rsi
+  push r8
+  push r9
+  push r10
+  push r11
+  push r12
+  push r13
+  push r14
+  push r15
+  // protect the stack
+  mov r15 , rsp
+  mov rbp , r15
+  sub r15 , 32
+  mov  rsp , r15
+  mov ecx, ATA0onCPUID
+  mov edx, 76
+  call send_apic_int
+  call eoi
+  mov rsp , rbp
+  // restore the registers
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  pop r11
+  pop r10
+  pop r9
+  pop r8
+  pop rsi
+  pop rdi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  pop rbp
+  db $48
+  db $cf
 end;
 
 procedure ATA0IrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -617,10 +617,10 @@ begin
   {$IFDEF DebugIdeDisk} WriteDebug('ATAReadBlock:, Handle: %h, Begin Sector: %d, End Sector: %d\n', [PtrUint(FileDesc), Block, Block + ReadCount]); {$ENDIF}
 end;
 
-function ATAWriteBlock(FileDesc: PFileBlock;Block,Count: LongInt;Buffer: pointer):LongInt;
+function ATAWriteBlock(FileDesc: PFileBlock; Block,Count: LongInt; Buffer: Pointer): LongInt;
 var
- ncount: LongInt;
- Ctr: PIDEController;
+  ncount: LongInt;
+  Ctr: PIDEController;
 begin
   GetDevice(FileDesc.BlockDriver);
   Ctr:= @ATAControllers[FileDesc.BlockDriver.Major];

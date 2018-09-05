@@ -1,12 +1,9 @@
 //
 // Toro Hello World Example.
-// Clasical example using a minimal kernel to print "Hello World"
 //
-// Changes :
-// 
-// 16/09/2011 First Version by Matias E. Vara.
+// Clasical example using a minimal kernel to print "Hello World".
 //
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -29,13 +26,7 @@ program ToroHello;
  {$mode delphi}
 {$ENDIF}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
-
-
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
-
 {%RunFlags BUILD-}
 
 // They are declared just the necessary units
@@ -47,8 +38,8 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
-  Console in '..\rtl\Drivers\Console.pas';
+  Pci in '..\rtl\drivers\Pci.pas',
+  Console in '..\rtl\drivers\Console.pas';
 
 begin
   WriteConsoleF('/RHello World, I am TORO !!!\n',[]);

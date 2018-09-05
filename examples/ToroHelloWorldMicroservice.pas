@@ -25,13 +25,7 @@ program ToroHelloWorldMicroservice;
  {$mode delphi}
 {$ENDIF}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
-
-
 {%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses
@@ -41,10 +35,10 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
-  Console in '..\rtl\Drivers\Console.pas',
+  Pci in '..\rtl\drivers\Pci.pas',
+  Console in '..\rtl\drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
+  VirtIONet in '..\rtl\drivers\VirtIONet.pas';
 
 const
   // TCP-Stack configuration values

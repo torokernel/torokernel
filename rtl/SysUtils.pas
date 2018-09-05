@@ -39,6 +39,14 @@ type
     NegCurrFormat: Byte;
   end;
 
+  Int64Rec = packed record
+     case Integer of
+       0: (Lo, Hi: Cardinal);
+       1: (Words: array[0..3] of Word);
+       2: (Bytes: array[0..7] of Byte);
+  end;
+
+
 function CompareMem(P1, P2: Pointer; Length: Cardinal): Boolean;
 function CompareMemRange(P1, P2: Pointer; Length: Cardinal): Integer;
 function CompareStr(const S1, S2: string): Integer;

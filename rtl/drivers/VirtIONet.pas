@@ -1,11 +1,7 @@
 //
 // VirtIONet.pas
 //
-// Driver for virtio network card
-//
-// Changes:
-//
-// 20.01.2018 First version.
+// This unit contains the driver for virtio network card.
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -137,6 +133,8 @@ const
   VIRTIO_DESC_FLAG_WRITE_ONLY = 2;
   VIRTIO_DESC_FLAG_NEXT = 1;
   VIRTIO_NET_HDR_F_NEEDS_CSUM = 1;
+  TX_QUEUE = 1;
+  RX_QUEUE = 0;
 
 var
   NicVirtIO: TVirtIONetwork;
@@ -242,7 +240,7 @@ begin
   vq.next_buffer := buffer_index;
   vq.available.index:= vq.available.index + 1;
 
-  // device tells us that notification are not needed
+  // notification are not needed
   if (vq.used.flags and 1 <> 1) then
       write_portw(queue_index, PtrUInt(Nic.Regs) + $10);
 
@@ -254,7 +252,6 @@ type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
 
-// Process reception buffers
 procedure VirtIOProcessRx(Net: PVirtIONetwork);
 var
   Packet: PPacket;
@@ -270,9 +267,8 @@ begin
 
   // empty queue?
   if (rx.last_used_index = rx.used.index) then
-  Exit;
+    Exit;
 
-  // read until queue is empty
   while (rx.last_used_index <> rx.used.index) do
   begin
     index := rx.last_used_index mod rx.queue_size;
@@ -290,18 +286,18 @@ begin
 
     if (Packet <> nil) then
     begin
-       Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
-       Packet.size:= Len;
-       Packet.Delete:= False;
-       Packet.Ready:= False;
-       Packet.Next:= nil;
-       Data := Packet.data;
-       for I:= 0 to Len-1 do
-         Data^[I] := P^[I];
-       EnqueueIncomingPacket(Packet);
+      Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
+      Packet.size:= Len;
+      Packet.Delete:= False;
+      Packet.Ready:= False;
+      Packet.Next:= nil;
+      Data := Packet.data;
+      for I := 0 to Len-1 do
+        Data^[I] := P^[I];
+      EnqueueIncomingPacket(Packet);
     end;
 
-    rx.last_used_index:= rx.last_used_index + 1;
+    Inc(rx.last_used_index);
 
     // return the buffer
     bi.size := FRAME_SIZE;
@@ -309,9 +305,8 @@ begin
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy:= false;
 
-    VirtIOSendBuffer(Net,0,@bi,1);
+    VirtIOSendBuffer(Net, RX_QUEUE, @bi, 1);
 
-    // mb
     ReadWriteBarrier;
   end;
 end;
@@ -361,75 +356,66 @@ begin
 
   {$IFDEF DebugVirtio}WriteDebug('virtIOSend: sending packet size: %d\n',[Packet.Size]);{$ENDIF}
 
-  // The outgoingPacket queue is not really used
+  // The outgoingPacket queue is not used
   // it does not verify if a packet has been sent
   Net.OutgoingPackets:= Packet;
 
-  // queu_index = 1 is the tx
-  VirtIOSendBuffer(@NicVirtIO, 1, @bi[0], 2);
-
-  // dequeue to avoid leaks
+  VirtIOSendBuffer(@NicVirtIO, TX_QUEUE, @bi[0], 2);
   DequeueOutgoingPacket;
-
   RestoreInt;
 end;
 
 procedure VirtIONetIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
   {$IFDEF DCC} .noframe {$ENDIF}
- // save registers
- push rbp
- push rax
- push rbx
- push rcx
- push rdx
- push rdi
- push rsi
- push r8
- push r9
- push r10
- push r11
- push r12
- push r13
- push r14
- push r15
- // protect the stack
- mov r15 , rsp
- mov rbp , r15
- sub r15 , 32
- mov  rsp , r15
- xor rcx , rcx
- // call handler
- Call VirtIOHandler
- mov rsp , rbp
- // restore the registers
- pop r15
- pop r14
- pop r13
- pop r12
- pop r11
- pop r10
- pop r9
- pop r8
- pop rsi
- pop rdi
- pop rdx
- pop rcx
- pop rbx
- pop rax
- pop rbp
- db $48
- db $cf
+  // save registers
+  push rbp
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rdi
+  push rsi
+  push r8
+  push r9
+  push r10
+  push r11
+  push r12
+  push r13
+  push r14
+  push r15
+  mov r15 , rsp
+  mov rbp , r15
+  sub r15 , 32
+  mov  rsp , r15
+  xor rcx , rcx
+  Call VirtIOHandler
+  mov rsp , rbp
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  pop r11
+  pop r10
+  pop r9
+  pop r8
+  pop rsi
+  pop rdi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  pop rbp
+  db $48
+  db $cf
 end;
 
-
-// Find Virtio network devices on pci bus
 procedure FindVirtIOonPci;
 var
   PciCard: PBusDevInfo;
   features: dword;
   tmp: Byte;
-  j: longint;
+  j: LongInt;
   QueueSize: Word;
   sizeOfBuffers: DWORD;
   sizeofQueueAvailable: DWORD;
@@ -441,171 +427,167 @@ var
   rx: PVirtQueue;
   tx: PVirtQueue;
   bi: TBufferInfo;
-  tmp2: pointer;
-
+  tmp2: Pointer;
 begin
   PciCard := PCIDevices;
   DisableInt;
   while PciCard <> nil do
   begin
-    // looking for ethernet network card
     if (PciCard.mainclass = $02) and (PciCard.subclass = $00) then
     begin
-      // looking for virtio card
       if (PciCard.vendor = $1AF4) and (PciCard.device >= $1000) and (PciCard.device <= $103f) then
       begin
-         NicVirtIO.IRQ := PciCard.irq;
-         NicVirtIO.Regs:= Pointer(PtrUInt(PCIcard.io[0]));
+        NicVirtIO.IRQ := PciCard.irq;
+        NicVirtIO.Regs:= Pointer(PtrUInt(PCIcard.io[0]));
 
-         // Enable bus mastering for this device
-         PciSetMaster(PciCard);
+        PciSetMaster(PciCard);
+        WriteConsoleF('VirtIONet: /Vfound/n, irq: /V%d/n, ioport: /V%h/n\n',[NicVirtIO.IRQ, PtrUInt(NicVirtIO.Regs)]);
 
-         WriteConsoleF('VirtIONet: /Vfound/n, irq: /V%d/n, ioport: /V%h/n\n',[NicVirtIO.IRQ, PtrUInt(NicVirtIO.Regs)]);
+        // reset device
+        write_portb(0, PtrUInt(NicVirtIO.Regs) + $12);
 
-         // reset device
-         write_portb(0, PtrUInt(NicVirtIO.Regs) + $12);
+        // tell driver that we found it
+        write_portb(VIRTIO_ACKNOWLEDGE, PtrUInt(NicVirtIO.Regs) + $12);
+        write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER, PtrUInt(NicVirtIO.Regs) + $12);
 
-         // tell driver that we found it
-         write_portb(VIRTIO_ACKNOWLEDGE, PtrUInt(NicVirtIO.Regs) + $12);
-         write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER, PtrUInt(NicVirtIO.Regs) + $12);
+        // negotiation phase
+        read_portd(@features, PtrUInt(NicVirtIO.Regs));
 
-         // negotiation phase
-         read_portd(@features, PtrUInt(NicVirtIO.Regs));
+        // disable features
+        features := features and not ( (1 shl VIRTIO_RING_F_INDIRECT_DESC) or (1 shl VIRTIO_MAC) or (1 shl VIRTIO_CTRL_VQ)or (1 shl VIRTIO_CSUM) or (1 shl VIRTIO_GUEST_TSO4) or (1 shl VIRTIO_GUEST_TSO6) or (1 shl VIRTIO_GUEST_UFO) or (1 shl VIRTIO_EVENT_IDX) or (1 shl VIRTIO_MRG_RXBUF));
 
-         // disable features
-         features := features and not ( (1 shl VIRTIO_RING_F_INDIRECT_DESC) or (1 shl VIRTIO_MAC) or (1 shl VIRTIO_CTRL_VQ)or (1 shl VIRTIO_CSUM) or (1 shl VIRTIO_GUEST_TSO4) or (1 shl VIRTIO_GUEST_TSO6) or (1 shl VIRTIO_GUEST_UFO) or (1 shl VIRTIO_EVENT_IDX) or (1 shl VIRTIO_MRG_RXBUF));
+        write_portd(@features, PtrUInt(NicVirtIO.Regs) + $4);
 
-         write_portd(@features, PtrUInt(NicVirtIO.Regs) + $4);
+        {$IFDEF DebugVirtio}WriteDebug('VirtIONet: set features: %d\n',[features]);{$ENDIF}
 
-         {$IFDEF DebugVirtio}WriteDebug('VirtIONet: set features: %d\n',[features]);{$ENDIF}
+        write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK, PtrUInt(NicVirtIO.Regs) + $12);
+        tmp := read_portb(PtrUInt(NicVirtIO.Regs) + $12);
 
-         write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK, PtrUInt(NicVirtIO.Regs) + $12);
-         tmp := read_portb(PtrUInt(NicVirtIO.Regs) + $12);
+        // check if driver accepted features
+        if (tmp and VIRTIO_FEATURES_OK = 0) then
+        begin
+          WriteConsoleF('VirtIONet: driver did not accept features\n',[]);
+          Exit;
+        end
+        else
+          WriteConsoleF('VirtIONet: driver accepted features\n',[]);
 
-         // check if driver accepted features
-         if (tmp and VIRTIO_FEATURES_OK = 0) then
-         begin
-            WriteConsoleF('VirtIONet: driver did not accept features\n',[]);
-            Exit;
-         end else WriteConsoleF('VirtIONet: driver accepted features\n',[]);
+        // setup virt queues
+        for j:= 0 to 15 do
+        begin
+          FillByte(NicVirtIO.VirtQueues[j], sizeof(TVirtQueue),0);
+          write_portw(j,  PtrUInt(NicVirtIO.Regs) + $0E);
+          QueueSize := read_portw(PtrUInt(NicVirtIO.Regs) + $0C);
+          if QueueSize = 0 then Continue;
+          NicVirtIO.VirtQueues[j].queue_size:= QueueSize;
+          sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
+          sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));
+          sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
 
-         // setup virt queues
-         for j:= 0 to 15 do
-         begin
-           FillByte(NicVirtIO.VirtQueues[j], sizeof(TVirtQueue),0);
-           write_portw(j,  PtrUInt(NicVirtIO.Regs) + $0E);
-           QueueSize := read_portw(PtrUInt(NicVirtIO.Regs) + $0C);
-           if QueueSize = 0 then Continue;
-           NicVirtIO.VirtQueues[j].queue_size:= QueueSize;
-           sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
-           sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));
-           sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
+          // buff must be 4k aligned
+          buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096);
+          Panic (buff=nil, 'VirtIONet: no memory for VirtIO buffer\n');
+          FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096, 0);
+          buff := buff + (4096 - PtrUInt(buff) mod 4096);
+          buffPage := PtrUInt(buff) div 4096;
 
-           // buff must be 4k aligned
-           buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096);
-           Panic (buff=nil, 'VirtIONet: no memory for VirtIO buffer\n');
-           FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096, 0);
-           buff := buff + (4096 - PtrUInt(buff) mod 4096);
-           buffPage := PtrUInt(buff) div 4096;
+          // 16 bytes aligned
+          NicVirtIO.VirtQueues[j].buffers := PQueueBuffer(buff);
 
-           // 16 bytes aligned
-           NicVirtIO.VirtQueues[j].buffers := PQueueBuffer(buff);
+          // 2 bytes aligned
+          NicVirtIO.VirtQueues[j].available := @buff[sizeOfBuffers];
 
-           // 2 bytes aligned
-           NicVirtIO.VirtQueues[j].available := @buff[sizeOfBuffers];
+          // 4 bytes aligned
+          NicVirtIO.VirtQueues[j].used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not($0FFF))]) ;
+          NicVirtIO.VirtQueues[j].next_buffer:= 0;
+          NicVirtIO.VirtQueues[j].lock:= 0;
+          write_portd(@buffPage, PtrUInt(NicVirtIO.Regs) + $08);
+          NicVirtIO.VirtQueues[j].available.flags := 0;
+          {$IFDEF DebugVirtio}WriteDebug('VirtIONet: queue: %d, size: %d\n',[j, QueueSize]);{$ENDIF}
+        end;
 
-           // 4 bytes aligned
-           NicVirtIO.VirtQueues[j].used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not($0FFF))]) ;
-           NicVirtIO.VirtQueues[j].next_buffer:= 0;
-           NicVirtIO.VirtQueues[j].lock:= 0;
-           write_portd(@buffPage, PtrUInt(NicVirtIO.Regs) + $08);
-           NicVirtIO.VirtQueues[j].available.flags := 0;
-           {$IFDEF DebugVirtio}WriteDebug('VirtIONet: queue: %d, size: %d\n',[j, QueueSize]);{$ENDIF}
-         end;
+        write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK, PtrUInt(NicVirtIO.Regs) + $12);
 
-         write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK, PtrUInt(NicVirtIO.Regs) + $12);
+        rx := @NicVirtIO.VirtQueues[0];
+        tx := @NicVirtIO.VirtQueues[1];
 
-         rx := @NicVirtIO.VirtQueues[0];
-         tx := @NicVirtIO.VirtQueues[1];
+        If (rx = nil) or (tx = nil) then
+        begin
+          WriteConsoleF('VirtIONet: tx or rx queue not found, aborting\n',[]);
+          Continue;
+        end;
 
-         If (rx = nil) or (tx = nil) then
-         begin
-            WriteConsoleF('VirtIONet: tx or rx queue not found, aborting\n',[]);
-            Continue;
-         end;
+        rx.Buffer := ToroGetMem(rx.queue_size * FRAME_SIZE + 4096);
+        Panic (rx.Buffer=nil, 'VirtIONet: no memory for Rx buffer\n');
+        rx.Buffer := Pointer(PtrUint(rx.Buffer) + (4096 - PtrUInt(rx.Buffer) mod 4096));
+        rx.chunk_size := FRAME_SIZE;
+        rx.available.index := 0;
+        rx.used.index := 0;
 
-         rx.Buffer := ToroGetMem(rx.queue_size * FRAME_SIZE + 4096);
-         Panic (rx.Buffer=nil, 'VirtIONet: no memory for Rx buffer\n');
-         rx.Buffer := Pointer(PtrUint(rx.Buffer) + (4096 - PtrUInt(rx.Buffer) mod 4096));
-         rx.chunk_size := FRAME_SIZE;
-         rx.available.index := 0;
-         rx.used.index := 0;
+        ReadWriteBarrier;
 
-         ReadWriteBarrier;
+        write_portw(0, PtrUInt(NicVirtIO.Regs) + $10);
 
-         write_portw(0, PtrUInt(NicVirtIO.Regs) + $10);
+        // enable interruptions
+        rx.used.flags :=0;
 
-         // enable interruptions
-         rx.used.flags :=0;
+        // add all buffers in queue so we can receive data
+        bi.size:= FRAME_SIZE;
+        bi.buffer:= nil;
+        bi.flags:= VIRTIO_DESC_FLAG_WRITE_ONLY;
+        bi.copy:= True;
 
-         // add all buffers in queue so we can receive data
-         bi.size:= FRAME_SIZE;
-         bi.buffer:= nil;
-         bi.flags:= VIRTIO_DESC_FLAG_WRITE_ONLY;
-         bi.copy:= True;
+        for j := 0 to rx.queue_size - 1 do
+        begin
+          VirtIOSendBuffer(@NicVirtIO, 0, @bi, 1);
+        end;
 
-         for j:= 0 to (rx.queue_size-1) do
-         begin
-            VirtIOSendBuffer(@NicVirtIO, 0, @bi, 1);
-         end;
+        // setup send buffers
+        tx.buffer := ToroGetMem(FRAME_SIZE * tx.queue_size + 4096);
+        Panic (tx.buffer=nil, 'VirtIONet: no memory for Tx buffer\n');
+        tx.buffer := Pointer(PtrUInt(tx.buffer) + (4096 - PtrUInt(tx.buffer) mod 4096));
+        tx.chunk_size:= FRAME_SIZE;
+        tx.available.index:= 0;
 
-         // setup send buffers
-         tx.buffer := ToroGetMem(FRAME_SIZE * tx.queue_size + 4096);
-         Panic (tx.buffer=nil, 'VirtIONet: no memory for Tx buffer\n');
-         tx.buffer := Pointer(PtrUInt(tx.buffer) + (4096 - PtrUInt(tx.buffer) mod 4096));
-         tx.chunk_size:= FRAME_SIZE;
-         tx.available.index:= 0;
+        // enable interruption
+        tx.available.flags := 0;
 
-         // enable interruption
-         tx.available.flags := 0;
+        // init to zero
+        tx.used.flags := 0;
 
-         // init to zero
-         tx.used.flags := 0;
+        ReadWriteBarrier;
+        write_portw(1, PtrUInt(NicVirtIO.Regs) + $10);
 
-         ReadWriteBarrier;
+        // get mac address
+        for j := 0 to 5 do
+        begin
+          NicVirtIO.Driverinterface.HardAddress[j] := read_portb(PtrUInt(NicVirtIO.Regs) + $14 + j);
+        end;
 
-         write_portw(1, PtrUInt(NicVirtIO.Regs) + $10);
+        WriteConsoleF('VirtIONet: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicVirtIO.Driverinterface.HardAddress[0], NicVirtIO.Driverinterface.HardAddress[1],NicVirtIO.Driverinterface.HardAddress[2], NicVirtIO.Driverinterface.HardAddress[3], NicVirtIO.Driverinterface.HardAddress[4], NicVirtIO.Driverinterface.HardAddress[5]]);
 
-         // get mac address
-         for j:= 0 to 5 do
-         begin
-           NicVirtIO.Driverinterface.HardAddress[j] := read_portb(PtrUInt(NicVirtIO.Regs) + $14 + j);
-         end;
+        // capture the interrupt
+        CaptureInt(32+NicVirtIO.IRQ, @VirtIONetIrqHandler);
 
-         WriteConsoleF('VirtIONet: mac /V%d:%d:%d:%d:%d:%d/n\n', [NicVirtIO.Driverinterface.HardAddress[0], NicVirtIO.Driverinterface.HardAddress[1],NicVirtIO.Driverinterface.HardAddress[2], NicVirtIO.Driverinterface.HardAddress[3], NicVirtIO.Driverinterface.HardAddress[4], NicVirtIO.Driverinterface.HardAddress[5]]);
-
-         // capture the interrupt
-         CaptureInt(32+NicVirtIO.IRQ, @VirtIONetIrqHandler);
-
-         // registre network driver
-         Net := @NicVirtIO.Driverinterface;
-         Net.Name:= 'virtionet';
-         Net.MaxPacketSize:= FRAME_SIZE;
-         Net.start:= @virtIOStart;
-         Net.send:= @virtIOSend;
-         Net.stop:= @virtIOStop;
-         Net.Reset:= @virtIOReset;
-         Net.TimeStamp := 0;
-         RegisterNetworkInterface(Net);
-         WriteConsoleF('VirtIONet: driver registered\n',[]);
+        // registre network driver
+        Net := @NicVirtIO.Driverinterface;
+        Net.Name:= 'virtionet';
+        Net.MaxPacketSize:= FRAME_SIZE;
+        Net.start:= @virtIOStart;
+        Net.send:= @virtIOSend;
+        Net.stop:= @virtIOStop;
+        Net.Reset:= @virtIOReset;
+        Net.TimeStamp := 0;
+        RegisterNetworkInterface(Net);
+        WriteConsoleF('VirtIONet: driver registered\n',[]);
       end;
     end;
     PciCard := PciCard.Next;
-    end;
-    RestoreInt;
+  end;
+  RestoreInt;
 end;
 
 initialization
-    FindVirtIOonPci;
+  FindVirtIOonPci;
 
 end.

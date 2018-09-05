@@ -5,15 +5,7 @@
 // <PE file>    : Executable File. Formats supported : ELF-X86-64 and PECOFF64
 // <boot.o>   : path of bootloader's file.
 //
-// From Executable file returns a image for boot .
-//
-// Changes :
-// 27 / 08 / 2009 : Added support for ELF files.
-// 27 / 12 / 2006 : Variable image_base and EntryPoint support by  Matias Vara .
-// 02 / 12 / 2006 : reformat source code, naming convention, split main program and unit functions BuildBootableImage
-// 12 / 11 / 2006 : First version.
-//
-// Copyright (c) 2003-2010 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //

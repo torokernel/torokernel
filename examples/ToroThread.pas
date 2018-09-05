@@ -7,13 +7,8 @@
 // take in care about that stuff.
 // Besides, this is a good example about static scheduling where we are sure about the execution order previusly.
 //
-// Changes :
-// 
-// 22/06/2012 First Version by Matias E. Vara.
-//
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-//
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,7 +31,6 @@ program ToroThread;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroThread.img}
-
 {%RunFlags BUILD-}
 
 // they are declared just the necessary units
@@ -48,16 +42,14 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Console in '..\rtl\Drivers\Console.pas';
+  Console in '..\rtl\drivers\Console.pas';
 
 var
  tmp: TThreadID;
  var1, var2, var3: longint;
- // sincronization variable to avoid the execution of task2 and task1 at the same time
  n1: boolean = True;
  n2: boolean = False;
 
-// task 2
 function ThreadF2(Param: Pointer):PtrInt;
 begin
   while True do
@@ -70,8 +62,6 @@ begin
   Result := 0;
 end;
 
-
-// task3
 function ThreadF3(Param: Pointer):PtrInt;
 begin
   while True do
@@ -84,19 +74,14 @@ end;
 
 
 begin
-
   WriteConsoleF('\c',[0]);
-  // initial values
   var1:=0;
   var2:=4;
   var3:=11;
- 
-  // we create a remote thread
+
   tmp:= BeginThread(nil, 4096, ThreadF3, nil, 1, tmp);
   tmp:= BeginThread(nil, 4096, ThreadF2, nil, 1, tmp);
- 
-  // task1 is implemented using main thread in order to keep the scheduler
-  // as stable as possible
+
   while True do
   begin
       while n1=False do SysThreadSwitch;

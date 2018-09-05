@@ -1,9 +1,8 @@
 //
 // Unit BuildImg
 //
-// Copyright (c) 2003-2010 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
-//
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,7 +20,7 @@
 unit BuildImg;
 
 {$IFDEF FPC}
-	{$mode objfpc}
+  {$mode objfpc}
 {$ENDIF}
 
 interface
@@ -29,136 +28,119 @@ interface
 procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName, OutFilename : string);
 function ELFtoKernelBin(const ELFFileName: string): Boolean;
 
-
 implementation
 
-
 const
-   PEMAGIC= $00004550 ;
-   ImageBase = $400000;
+  PEMAGIC= $00004550 ;
+  ImageBase = $400000;
 
-   // Debug section is written at address $700000
-   DebugFileOff = $300000;
+  // Debug section is written at address $700000
+  DebugFileOff = $300000;
 
 type
- // head needed by Toro's Bootloader
- TBootHead = record
+  // head needed by Toro's Bootloader
+  TBootHead = record
 
- magic_boot: DWORD;
- add_main: DWORD;
- end_sector: DWORD;
- add_image: DWORD;
+  magic_boot: DWORD;
+  add_main: DWORD;
+  end_sector: DWORD;
+  add_image: DWORD;
 end;
 
- PBootHead = ^TBootHead;
+  PBootHead = ^TBootHead;
 
- //
- //  Structures for PECOFF files.
- //
- //
- TImageFileHeader = record
+  //  Structures for PECOFF files.
 
- Machine: Word;
- NumberOfSections: Word;
- TimeDateStamp : DWORD;
- PointerToSymbolTable : DWORD;
- NumberOfSymbols : DWORD;
- SizeOfOptionalHeader:word;
- Characteristics:word;
-end;
+  TImageFileHeader = record
+    Machine: Word;
+    NumberOfSections: Word;
+    TimeDateStamp : DWORD;
+    PointerToSymbolTable : DWORD;
+    NumberOfSymbols : DWORD;
+    SizeOfOptionalHeader:word;
+    Characteristics:word;
+  end;
 
- TImageOptionalHeader = record
+  TImageOptionalHeader = record
+    res : array[1..4] of DWORD;
+    AddressOfEntryPoint : DWORD;
+    BaseofCode : DWORD;
+    BaseofData : DWORD;
+    ImagenBase : DWORD;
+    res2 : array[1..17] of DWORD;
+  end;
 
- res : array[1..4] of DWORD;
- AddressOfEntryPoint : DWORD;
- BaseofCode : DWORD;
- BaseofData : DWORD;
- ImagenBase : DWORD;
- res2 : array[1..17] of DWORD;
-end;
+  TImageSectionHeader = record
+    Name: array[0..7] of Char;
+    VirtualSize: DWORD;
+    VirtualAddress: DWORD;
+    PhysicalSize: DWORD;
+    PhysicalOffset: DWORD;
+    peObjReserved: array[0..2] of DWORD;
+    peObjFlags: DWORD;
+  end;
 
- TImageSectionHeader = record
+  TELFImageHeader = record   { 52 bytes }
+    e_ident: array [0..15] of byte;
+    e_type: word;   { Object file type }
+    e_machine: word;
+    e_version: dword;
+    e_entry: pointer;
+    e_phoff: pointer;
+    e_shoff: pointer;
+    e_flags: dword;
+    e_ehsize: word;
+    e_phentsize: word;
+    e_phnum: word;
+    e_shentsize: word;
+    e_shnum: word;
+    e_shstrndx: word;
+  end;
 
- Name: array[0..7] of Char;
- VirtualSize: DWORD;
- VirtualAddress: DWORD;
- PhysicalSize: DWORD;
- PhysicalOffset: DWORD;
- peObjReserved: array[0..2] of DWORD;
- peObjFlags: DWORD;
-end;
-
- //
- // Structures for ELF files.
- //
- TELFImageHeader = record   { 52 bytes }
-
- e_ident     : array [0..15] of byte;
- e_type      : word;   { Object file type }
- e_machine   : word;
- e_version   : dword;
- e_entry     : pointer;
- e_phoff     : pointer;
- e_shoff     : pointer;
- e_flags     : dword;
- e_ehsize    : word;
- e_phentsize : word;
- e_phnum     : word;
- e_shentsize : word;
- e_shnum     : word;
- e_shstrndx  : word;
-end;
-
- TELFImageSectionHeader = record   { 32 bytes }
-
- p_type   : dword;
- p_flags  : dword;
- p_offset : pointer;
- p_vaddr  : pointer;
- p_paddr  : pointer;
- p_filesz : qword;
- p_memsz  : qword;
- p_align  : qword;
-end;
+  TELFImageSectionHeader = record   { 32 bytes }
+    p_type   : dword;
+    p_flags  : dword;
+    p_offset : pointer;
+    p_vaddr  : pointer;
+    p_paddr  : pointer;
+    p_filesz : qword;
+    p_memsz  : qword;
+    p_align  : qword;
+  end;
 
 
- TELFSectionHeader = record { 64 bytes }
+  TELFSectionHeader = record { 64 bytes }
+    sh_name: dword;
+    sh_type: dword;
+    sh_flags: qword;
+    sh_addr: pointer;
+    sh_offset: pointer;
+    sh_size: qword;
+    sh_link: Dword;
+    sh_info: Dword;
+    sh_addraling: qword;
+    sh_entsize: qword;
+  end;
 
- sh_name : dword;
- sh_type : dword;
- sh_flags: qword;
- sh_addr : pointer;
- sh_offset : pointer;
- sh_size : qword;
- sh_link : Dword;
- sh_info : Dword;
- sh_addraling : qword;
- sh_entsize : qword;
-end;
+  coffsymbol = packed record
+    name: array[0..3] of char; { real is [0..7], which overlaps the strofs ! }
+    strofs: PtrUInt;
+    value: PtrUInt;
+    section: smallint;
+    empty: word;
+    typ: byte;
+    aux: byte;
+   end;
 
- coffsymbol=packed record
-   name    : array[0..3] of char; { real is [0..7], which overlaps the strofs ! }
-   strofs  : longint;
-   value   : longint;
-   section : smallint;
-   empty   : word;
-   typ     : byte;
-   aux     : byte;
- end;
-
- kerneldebuginfo = record
-   magic: longint;
-   size: longint;
-   data: array of byte;
- end;
+  kerneldebuginfo = record
+    magic: PtrUInt;
+    size: PtrUInt;
+    data: array of byte;
+  end;
 
 var
- // Pointer to main() in the kernel
- addmain: pointer;
-
-
-var
- PEOptHeader :  TImageOptionalHeader ;
+  addmain: pointer;
+  PEOptHeader :  TImageOptionalHeader ;
 
 function PEtoKernelBin(const PEFileName: string): Boolean;
 var
@@ -171,44 +153,35 @@ var
   PEHeader: TImageFileHeader;
   PESections: ^TImageSectionHeader;
   PEKDebug: ^kerneldebuginfo;
-  value: Longint;
-  tmp: array [0..7] of char;
-  secnamebuf : array[0..255] of char;
-  secname    : string;
+  Value: Longint;
+  Tmp: array [0..7] of char;
+  SectionNameBuf: array[0..255] of char;
+  SectionName: string;
 begin
-  // PE file
   Assign(PEFile, PEFileName);
   Reset(PEFile, 1);
   while not Eof(PEFile) do
   begin
     BytesRead := 0;
     BlockRead(PEFile, Magic, SizeOf(Magic), BytesRead);
-    // looking for PE header
-    if Magic = PEMAGIC then // searching the PE section
+    if Magic = PEMAGIC then
     begin
       WriteLn(PEFileName , ': ', 'Detected PECOFF format');
-      Assign(OutputFile, 'kernel.bin'); // temp file
+      Assign(OutputFile, 'kernel.bin');
       Rewrite(OutputFile,1);
       BlockRead(PEFile, PEHeader, SizeOf(PEHeader), BytesRead); // PE header
       BlockRead(PEFile,PEOptHeader,SizeOf(PEOptHeader),BytesRead); // optional header
       addmain := Pointer(ImageBase + PEOptHeader.AddressOfEntryPoint); // point to start
       Seek(PEFile, filepos(PEFile)+PEHeader.SizeOfOptionalHeader-BytesRead); // position of PE sections
       PESections := GetMem(PEHeader.NumberOfSections * sizeof(TImageSectionHeader));
-
-      // reading the sections of PE file
-      for I:= 0 to (PEHeader.NumberOfSections-1) do
-      begin
+      for I := 0 to PEHeader.NumberOfSections-1 do
         BlockRead(PEFile, PESections[I], SizeOf(TImageSectionHeader), BytesRead);
-      end;
-
-      // the sections aren't sorted
-      for I:= 0 to (PEHeader.NumberOfSections-1) do
+      for I := 0 to PEHeader.NumberOfSections-1 do
       begin
         if (PESections[I].name='.text') or (PESections[I].name='.data') or (PESections[I].name='.rdata')then
         begin
-          writeln('Writing ',PESections[I].name,' section ...');
+          WriteLn('Writing ', PESections[I].name, ' section ...');
           Seek(PEFile, PESections[I].PhysicalOffset);
-          // Virtual Address is from ImageBase
           Seek(OutputFile, PESections[I].VirtualAddress);
           GetMem(Buffer, PESections[I].PhysicalSize);
           try
@@ -219,36 +192,37 @@ begin
           end;
         end else
         begin
-          if (PESections[I].name[0] = '/') then
+          if PESections[I].name[0] = '/' then
           begin
-             for J:= 1 to 7 do
-               tmp[J-1] := PESections[I].name[J];
-             Val (tmp, value, Code);
-             if Code=0 then
-             begin
-               FillChar(secnamebuf,sizeof(secnamebuf),0);
-               Seek(PEFile,PEHeader.PointerToSymbolTable+PEHeader.NumberOfSymbols*sizeof(coffsymbol)+value);
-               BlockRead(PEFile,secnamebuf,sizeof(secnamebuf));
-               secname:= strpas(secnamebuf);
-             end else secname:='';
-
-             // copy .debug_line section
-             if (secname = '.debug_line') then
-             begin
-                 PEKDebug := GetMem(PESections[I].PhysicalSize);
-                 Seek(PEFile, PESections[I].PhysicalOffset);
-                 Seek(OutputFile, DebugFileOff - sizeof (PESections[I].PhysicalSize));
-                 BlockWrite(OutputFile, PESections[I].PhysicalSize, sizeof (PESections[I].PhysicalSize));
-                 Seek(OutputFile, DebugFileOff);
-                 try
-                    BlockRead(PEFile, PEKDebug^ , PESections[I].PhysicalSize);
-                    BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize);
-                 finally
-                    FreeMem(PEKDebug);
-                 end;
-                 WriteLn('Writing ', secname,' section ...');
-             end else WriteLn('Ignoring ', secname,' section ... ');
-          end else writeln('Ignoring ',PESections[I].name,' section ... ');
+            for J:= 1 to 7 do
+              Tmp[J-1] := PESections[I].name[J];
+            Val (Tmp, Value, Code);
+            if Code=0 then
+            begin
+              FillChar(SectionNameBuf,sizeof(SectionNameBuf),0);
+              Seek(PEFile,PEHeader.PointerToSymbolTable+PEHeader.NumberOfSymbols*sizeof(coffsymbol)+Value);
+              BlockRead(PEFile,SectionNameBuf,sizeof(SectionNameBuf));
+              SectionName := strpas(SectionNameBuf);
+            end else
+              SectionName := '';
+            if SectionName = '.debug_line' then
+            begin
+              PEKDebug := GetMem(PESections[I].PhysicalSize);
+              Seek(PEFile, PESections[I].PhysicalOffset);
+              Seek(OutputFile, DebugFileOff-SizeOf(PESections[I].PhysicalSize));
+              BlockWrite(OutputFile, PESections[I].PhysicalSize, sizeof (PESections[I].PhysicalSize));
+              Seek(OutputFile, DebugFileOff);
+              try
+                BlockRead(PEFile, PEKDebug^ , PESections[I].PhysicalSize);
+                BlockWrite(OutputFile, PEKDebug^, PESections[I].PhysicalSize);
+              finally
+                FreeMem(PEKDebug);
+              end;
+              WriteLn('Writing ', SectionName,' section ...');
+            end else
+              WriteLn('Ignoring ', SectionName,' section ... ');
+          end else
+            WriteLn('Ignoring ',PESections[I].name,' section ... ');
         end;
       end;
       WriteLn('Building binary ... ');
@@ -265,7 +239,7 @@ end;
 function ELFtoKernelBin(const ELFFileName: string): Boolean;
 var
   ELFFile, OutputFile: File;
-  FileInit, I: Integer;
+  FileInit, I: LongInt;
   Buffer: PByte;
   StrTable: PChar;
   ElfHeader:  TELFImageHeader;
@@ -276,7 +250,6 @@ begin
   Result := False;
   Assign(ELFFile, ELFFileName);
   Reset(ELFFile, 1);
-
   Assign(OutputFile, 'kernel.bin');
   Rewrite(OutputFile, 1);
   BlockRead(ELFFile, ElfHeader, SizeOf(ElfHeader));
@@ -290,14 +263,14 @@ begin
     WriteLn(ELFFileName , ': ','Detected ELF64 format');
 
   addmain := ELFHeader.e_entry;
-  FileInit := longint(ElfHeader.e_phoff)+ElfHeader.e_phentsize*ElfHeader.e_phnum;
-  Seek(ELFFile, longint(ElfHeader.e_phoff));
+  FileInit := PtrUInt(ElfHeader.e_phoff)+ElfHeader.e_phentsize*ElfHeader.e_phnum;
+  Seek(ELFFile, PtrUInt(ElfHeader.e_phoff));
   BlockRead(ELFFile,Elftext, Sizeof(Elftext));
   BlockRead(ELFFile,Elfdata, Sizeof(Elftext));
 
   // copy .text section
-  Seek(ELFFIle, longint(ELFtext.p_offset)+FileInit);
-  Seek(OutputFile, longint(ELFtext.p_vaddr)-ImageBase+FileInit);
+  Seek(ELFFIle, PtrUInt(ELFtext.p_offset)+FileInit);
+  Seek(OutputFile, PtrUInt(ELFtext.p_vaddr)-ImageBase+FileInit);
   GetMem(Buffer, ELFtext.p_filesz-FileInit);
   try
     BlockRead(ELFFIle, Buffer^, ELFtext.p_filesz-FileInit);
@@ -305,12 +278,12 @@ begin
   finally
     FreeMem(Buffer);
   end;
-  writeln('Writing .text section ...');
+  WriteLn('Writing .text section ...');
 
   // copy .data section
   // we assume .data section is after .text
-  Seek(ELFFIle, longint(ELFdata.p_offset));
-  Seek(OutputFile, longint(ELFdata.p_vaddr)-ImageBase);
+  Seek(ELFFIle, PtrUInt(ELFdata.p_offset));
+  Seek(OutputFile, PtrUInt(ELFdata.p_vaddr)-ImageBase);
   GetMem(Buffer, ELFdata.p_filesz);
   try
     BlockRead(ELFFIle, Buffer^,ELFdata.p_filesz);
@@ -321,32 +294,32 @@ begin
   WriteLn('Writing .data section ...');
 
   // if exists, copy the debug section too
-  Seek (ELFFile, longint(ElfHeader.e_shoff) + ElfHeader.e_shstrndx * sizeof(ElfHeader));
+  Seek (ELFFile, PtrUInt(ElfHeader.e_shoff) + ElfHeader.e_shstrndx * sizeof(ElfHeader));
   BlockRead (ELFFile, ElfString, Sizeof(ElfString));
-  Seek(ELFFile, longint(ELFString.sh_offset));
+  Seek(ELFFile, PtrUInt(ELFString.sh_offset));
   GetMem(StrTable, ELFstring.sh_size);
   BlockRead(ELFFile, StrTable^, ELFstring.sh_size);
-  Seek (ELFFile, longint(ElfHeader.e_shoff));
+  Seek (ELFFile, PtrUInt(ElfHeader.e_shoff));
   for I := 0 to ElfHeader.e_shnum - 1 do
   begin
     BlockRead (ELFFile, ElfDebug, Sizeof(ElfDebug));
-    if i <> ElfHeader.e_shstrndx then
+    if I <> ElfHeader.e_shstrndx then
     begin
-      if pchar(StrTable + ElfDebug.sh_name) = '.debug_line' then
+      if PChar(StrTable + ElfDebug.sh_name) = '.debug_line' then
       begin
         PEKDebug := GetMem(ElfDebug.sh_size);
-        Seek(ELFFile, longint(ElfDebug.sh_offset));
+        Seek(ELFFile, PtrUInt(ElfDebug.sh_offset));
         Seek(OutputFile, DebugFileOff - sizeof (ElfDebug.sh_size));
         // save size of the .debug_line section
         BlockWrite(OutputFile, ElfDebug.sh_size, sizeof (QWORD));
         Seek(OutputFile, DebugFileOff);
         try
-         BlockRead(ELFFile, PEKDebug^ , ElfDebug.sh_size);
-         BlockWrite(OutputFile, PEKDebug^, ElfDebug.sh_size);
+          BlockRead(ELFFile, PEKDebug^ , ElfDebug.sh_size);
+          BlockWrite(OutputFile, PEKDebug^, ElfDebug.sh_size);
         finally
-         FreeMem(PEKDebug);
+          FreeMem(PEKDebug);
         end;
-        // warn if .debug_line section may overwrite other section
+        // warn if .debug_line section could overwrite other section
         if ElfDebug.sh_size > 1024*1024 then
           WriteLn('Writing ', pchar(StrTable + ElfDebug.sh_name),' section ... section size > 1MB!')
         else
@@ -362,29 +335,25 @@ begin
   Result := True;
 end;
 
-//
-// Makes a boot's image
-//
 procedure BuildBootableImage(ImageSize: Integer; const FEFileName, BootFileName, OutFileName : string);
 var
   BootFile: File;
   BootHead: PBootHead;
   Buffer: array[1..512] of Byte;
-  BytesRead: Integer;
-  Count: Integer;
+  BytesRead: LongInt;
+  Count: LongInt;
   KernelFile: File;
-  p: ^dword;
+  P: ^dword;
   ToroImageFile: File;
 begin
   if not(PEtoKernelBin(FEFileName)) then
   begin
-  if not(ELFtoKernelBin(FEFileName)) then
-  begin
-   writeln('Unknow Binary Format');
-   exit;
+    if not(ELFtoKernelBin(FEFileName)) then
+    begin
+      WriteLn('Unknow Binary Format');
+      Exit;
+    end;
   end;
-  end;
-  // Boot's image size
   ImageSize := (ImageSize * 1024 * 2 ) -2 ;
   Assign(ToroImageFile, OutFileName);
   Rewrite(ToroImageFile, 1);
@@ -407,46 +376,39 @@ begin
   Writeln('Building Image ... ');
   BytesRead := 0;
   BlockRead(BootFile, Buffer, SizeOf(Buffer), BytesRead); // copying Bootloader
-  p := @buffer[1];
+  P := @Buffer[1];
 
   // finding the Boot's Magic Number
-  while  (p^ <> $1987) and not(longint(p) = longint((@buffer[512])+1)) do
-    p := p + 1;
+  while  (P^ <> $1987) and not(PtrUInt(P) = PtrUInt((@Buffer[512])+1)) do
+    Inc(P);
 
-  // Invalid Bootloader
-  if (p^ <> $1987) then
+  if P^ <> $1987 then
   begin
     Close(BootFile);
     Close(ToroImageFile);
     Close (KernelFile);
-    writeln('Bad boot.bin file!!');
+    WriteLn('Bad boot.bin file!!');
     Exit;
   end;
 
-  // Information about the kernel.bin
-  BootHead := pointer(p);
+  BootHead := pointer(P);
   BootHead^.end_sector := FileSize(KernelFile) div 512+1;
 
-  // Address of Binary in memory
   BootHead^.add_image := ImageBase ;
-  BootHead^.add_main := dword(addmain);
+  BootHead^.add_main := DWORD(PtrUInt(addmain));
   BlockWrite(ToroImageFile, Buffer, BytesRead);
-  writeln('Entry point : ', BootHead^.add_main);
+  WriteLn('Entry point : ', BootHead^.add_main);
 
-  // second block of boot
   BlockRead(BootFile, Buffer, SizeOf(Buffer), BytesRead);
   BlockWrite(ToroImageFile, Buffer, BytesRead);
   repeat
     BlockRead(KernelFile, Buffer, SizeOf(Buffer),BytesRead);
-
     // some bugs here ever read and write 512 bytes !
     BlockWrite(ToroImageFile, Buffer, sizeof(Buffer));
-    Count := Count - 1 ;
-
+    Dec(Count);
     // the size is not correct if use BytesRead = 0
   until (Count=0);
 
-  // filling with zeros
   FillChar(Buffer, SizeOf(Buffer), 0);
   for Count := 1 to ImageSize do
     BlockWrite(ToroImageFile, Buffer, SizeOf(Buffer));

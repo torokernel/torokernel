@@ -757,51 +757,44 @@ begin
   end;
 end;
 
-function GetLineInfo(addr : ptruint; var func, source: shortstring; var line : longint) : boolean;
+function GetLineInfo(addr: ptruint; var func, source: shortstring; var line : longint) : boolean;
 var
-  current_offset : QWord;
-  end_offset : QWord;
-
-  found : Boolean;
-
+  EndOffset: QWord;
+  Found: Boolean;
+  Offset: QWord;
 begin
   func := '';
   source := '';
-  found := False;
+  Found := False;
   GetLineInfo:=False;
-
   if not OpenDwarf(pointer(addr)) then
-    exit;
-
-  current_offset := DwarfOffset;
-  end_offset := DwarfOffset + DwarfSize;
-
-  while (current_offset < end_offset) and (not found) do begin
-    Init(current_offset, end_offset - current_offset);
-    current_offset := ParseCompilationUnit(addr, current_offset, source, line, found);
+    Exit;
+  Offset := DwarfOffset;
+  EndOffset := DwarfOffset + DwarfSize;
+  while (Offset < EndOffset) and (not Found) do
+  begin
+    Init(Offset, EndOffset - Offset);
+    Offset := ParseCompilationUnit(addr, Offset, source, line, Found);
   end;
-
-  GetLineInfo:=True;
+  Result := True;
 end;
 
 
 procedure PrintBackTraceStr(addr: Pointer);
 var
-  func,
-  source: shortstring;
-  line   : longint;
-  Store  : TBackTraceStrFunc;
-  Success : boolean;
+  Func, Source: shortstring;
+  Line: LongInt;
+  Store: TBackTraceStrFunc;
+  Success: Boolean;
 begin
-  { reset to prevent infinite recursion if problems inside the code }
   Success:=False;
   Store := BackTraceStrFunc;
   BackTraceStrFunc := @SysBackTraceStr;
-  Success:=GetLineInfo(ptruint(addr), func, source, line);
+  Success:=GetLineInfo(ptruint(addr), Func, Source, Line);
   if Success then
   begin
-    WriteConsoleF('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@source[1]), line]);
-    WriteDebug('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@source[1]),line]);
+    WriteConsoleF('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@Source[1]), Line]);
+    WriteDebug('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@Source[1]),Line]);
   end else
   begin
     WriteConsoleF('[%h] in ??:??\n',[PtrUInt(addr)]);

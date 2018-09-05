@@ -6,13 +6,7 @@
 // 80. When a connection arrives, we send the content of the file and we close the conection. The example
 // also logs into a file name /web/logs to show writting operations to ext2.
 //
-// Changes :
-//
-// 04 / 05 / 2017 v2.
-// 12 / 02 / 2017 Adding SysCreateFile().
-// 04 / 03 / 2017 v1.
-//
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -35,12 +29,7 @@ program TorowithFileSystem;
  {$mode delphi}
 {$ENDIF}
 
-{$IFDEF WIN64}
-  {$IMAGEBASE 4194304}
-{$ENDIF}
-
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=TorowithFileSystem.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses
@@ -50,15 +39,15 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
+  Pci in '..\rtl\drivers\Pci.pas',
   Ide in '..\rtl\drivers\IdeDisk.pas',
-//  Ext2 in '..\rtl\drivers\Ext2.pas',
-  Fat in '..\rtl\drivers\Fat.pas',
-  Console in '..\rtl\Drivers\Console.pas',
+  Ext2 in '..\rtl\drivers\Ext2.pas',
+  // Fat in '..\rtl\drivers\Fat.pas',
+  Console in '..\rtl\drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  //E1000 in '..\rtl\Drivers\E1000.pas';
-  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
-// IP values
+  //E1000 in '..\rtl\drivers\E1000.pas';
+  VirtIONet in '..\rtl\drivers\VirtIONet.pas';
+
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
@@ -78,7 +67,6 @@ var
   indexSize: Longint;
   HttpContentLen : Longint;
 
-// Socket initialization
 procedure HttpInit;
 begin
   HttpServer := SysSocket(SOCKET_STREAM);
@@ -86,37 +74,31 @@ begin
   SysSocketListen(HttpServer, 50);
 end;
 
-// callback when a new connection arrives
 function HttpAccept(Socket: PSocket): LongInt;
 var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsoleF('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  // we wait for a new event or a timeout, i.e., 50s
   SysSocketSelect(Socket, 20000);
   Result := 0;
 end;
 
-// New data received from Socket, we can read the data and return to Network Service thread
 function HttpReceive(Socket: PSocket): LongInt;
 var
   tmpPing: array[0..3] of byte;
 begin
   _IPAddresstoArray (Socket.DestIp, tmpPing);
   WriteConsoleF ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  // we keep reading until there is no more data
   while SysSocketRecv(Socket, @Buffer, 1, 0) <> 0 do
   begin
   end;
-  // we send the whole file
   SysSocketSend(Socket, HttpContent, HttpContentLen, 0);
   WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketClose(Socket);
   Result := 0;
 end;
 
- // Peer socket disconnected
 function HttpClose(Socket: PSocket): LongInt;
 var
   tmpPing: array[0..3] of byte;
@@ -127,7 +109,6 @@ begin
   Result := 0;
 end;
 
- // TimeOut
 function HttpTimeOut(Socket: PSocket): LongInt;
 begin
   WriteConsoleF ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
@@ -161,7 +142,6 @@ begin
   end else
       WriteConsoleF ('index.html not found\n',[]);
 
-  // build the http header
   InttoStr(indexSize, @BuffLeninChar[0]);
   HttpContentLen := StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Buf);
   HttpContent := ToroGetMem(HttpContentLen);
@@ -180,10 +160,8 @@ begin
   HttpHandler.DoReceive := @HttpReceive;
   HttpHandler.DoClose   := @HttpClose;
 
-  // register the web service which listens on port 80
   SysRegisterNetworkService(@HttpHandler);
   WriteConsoleF('\t /VToroWebServer/n: listening ...\n',[]);
 
-  // main thread goes to sleep
   SysSuspendThread(0);
 end.

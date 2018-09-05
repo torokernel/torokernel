@@ -6,11 +6,7 @@
 // 80. When a connection arrives, we send the content of the file and we close the conection. The example
 // also logs into a file name /web/logs to show writting operations to ext2.
 //
-// Changes :
-//
-// 19 / 10 / 2017 v1.
-//
-// Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -34,7 +30,6 @@ program TorowithFilesystemwithAffinity;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64.exe -m 512 -smp 2 -drive format=raw,file=TorowithFilesystemwithAffinity.img -net nic,model=e1000 -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses
@@ -44,12 +39,12 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
-  IdeDisk in '..\rtl\Drivers\IdeDisk.pas',
-  Ext2 in '..\rtl\Drivers\Ext2.pas',
-  Console in '..\rtl\Drivers\Console.pas',
+  Pci in '..\rtl\drivers\Pci.pas',
+  IdeDisk in '..\rtl\drivers\IdeDisk.pas',
+  Ext2 in '..\rtl\drivers\Ext2.pas',
+  Console in '..\rtl\drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  E1000 in '..\rtl\Drivers\E1000.pas';
+  E1000 in '..\rtl\drivers\E1000.pas';
 
 var
   HttpServer: PSocket;

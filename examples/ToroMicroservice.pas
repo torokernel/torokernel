@@ -31,7 +31,6 @@ program ToroMicroservice;
 {$ENDIF}
 
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroMicroservice.img -serial file:torodebug.txt}
-
 {%RunFlags BUILD-}
 
 uses
@@ -41,15 +40,14 @@ uses
   Debug in '..\rtl\Debug.pas',
   Arch in '..\rtl\Arch.pas',
   Filesystem in '..\rtl\Filesystem.pas',
-  Pci in '..\rtl\Drivers\Pci.pas',
-  IdeDisk in '..\rtl\Drivers\IdeDisk.pas',
-  Ext2 in '..\rtl\Drivers\Ext2.pas',
-  Console in '..\rtl\Drivers\Console.pas',
+  Pci in '..\rtl\drivers\Pci.pas',
+  IdeDisk in '..\rtl\drivers\IdeDisk.pas',
+  Ext2 in '..\rtl\drivers\Ext2.pas',
+  Console in '..\rtl\drivers\Console.pas',
   Network in '..\rtl\Network.pas',
-  VirtIONet in '..\rtl\Drivers\VirtIONet.pas';
+  VirtIONet in '..\rtl\drivers\VirtIONet.pas';
 
 const
-  // TCP-Stack configuration values
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
@@ -86,7 +84,6 @@ type
       counter: Longint;
     end;
 
-    // Declaration of the function used for querying the microservice
     TMicroserviceFunction = Function (Param : Pchar) : Pchar;
 
 var
@@ -251,7 +248,6 @@ begin
 end;
 
 begin
-  // dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
   SysMount('ext2','ATA0',5);
@@ -289,17 +285,14 @@ begin
   end else
       WriteConsoleF ('cannot open value\n',[]);
 
-  // set the callbacks used by the kernel
   ServiceHandler.DoInit    := @ServiceInit;
   ServiceHandler.DoAccept  := @ServiceAccept;
   ServiceHandler.DoTimeOut := @ServiceTimeOut;
   ServiceHandler.DoReceive := @ServiceReceive;
   ServiceHandler.DoClose   := @ServiceClose;
 
-  // the microservice function
   MyMicroFunction := @LookUp;
 
-  // register the service
   SysRegisterNetworkService(@ServiceHandler);
 
   WriteConsoleF('\t /VToroService/n: listening on port %d ...\n',[SERVICE_PORT]);

@@ -193,6 +193,9 @@ var
   tmp: TNow;
   ValueSt: PAnsiString;
 begin
+  {$IFDEF ToroHeadLess}
+    Exit;
+  {$ENDIF}
   DisableInt;
   SpinLock (3,4,LockConsole);
 
@@ -477,18 +480,26 @@ end;
 
 procedure EnabledConsole;
 begin
-  // IRQ 1 is captured by BSP
-  IrqOn(1);
+  {$IFDEF ToroHeadLess}
+  {$ELSE}
+    IrqOn(1);
+  {$ENDIF}
 end;
 
 procedure DisabledConsole;
 begin
-  IrqOff(1);
+  {$IFDEF ToroHeadLess}
+  {$ELSE}
+    IrqOff(1);
+  {$ENDIF}
 end;
 
 procedure ConsoleInit;
 begin
-  CaptureInt(33,@IrqKeyb);
+  {$IFDEF ToroHeadLess}
+  {$ELSE}
+    CaptureInt(33,@IrqKeyb);
+  {$ENDIF}
 end;
 
 end.

@@ -11,6 +11,7 @@
 //{$DEFINE cpui386}
 //{$DEFINE CPUX86_64}
 //{$DEFINE DEBUG}
+{$DEFINE ToroHeadLess}
 //{$DEFINE DebugCrash}
 //{$DEFINE DebugArch}
 //{$DEFINE DebugFS}

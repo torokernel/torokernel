@@ -1207,6 +1207,7 @@ var
 begin
   IPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader));
   case IPHeader.protocol of
+    {$IFDEF EnablePing}
     IP_TYPE_ICMP :
       begin
         ICMPHeader := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader));
@@ -1230,6 +1231,7 @@ begin
           {$IFDEF DebugNetwork} WriteDebug('icmp: received ECHO REPLY\n', []); {$ENDIF}
         end else ToroFreeMem(Packet);
       end;
+    {$ENDIF}
     IP_TYPE_UDP:
       begin
         {$IFDEF DebugNetwork} WriteDebug('ip: received UDP packet %h\n', [PtrUInt(Packet)]); {$ENDIF}

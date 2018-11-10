@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Compiler Value="C:\fpcupdeluxe\fpc\bin\x86_64-win64\fpc.exe" Date="1291429943"/>
+  <Params Value=" -Tlinux -Px86_64 -MObjFPC -Scgi -Cg -O2 -vewnibq -vh- -FiC:\Users\Matias\Desktop\torokernel\torokernel-fixfornetworking\examples\ToroException\lib\x86_64-linux -FuC:\Users\Matias\Desktop\torokernel\torokernel-fixfornetworking\rtl -FuC:\Users\Matias\Desktop\torokernel\torokernel-fixfornetworking\rtl\drivers -FuC:\Users\Matias\Desktop\torokernel\torokernel-fixfornetworking\examples\ToroException\ -FUC:\Users\Matias\Desktop\torokernel\torokernel-fixfornetworking\examples\ToroException\lib\x86_64-linux\ -oToroException -Cg- ToroException.pas"/>
+</CONFIG>

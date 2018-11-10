@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="10"/>
+    <BuildModes Active="Default"/>
+    <Units Count="1">
+      <Unit0>
+        <Filename Value="TorowithFileSystemwithAffinity.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TorowithFilesystemwithAffinity"/>
+        <IsVisibleTab Value="True"/>
+        <TopLine Value="76"/>
+        <CursorPos X="42" Y="105"/>
+        <UsageCount Value="20"/>
+        <Loaded Value="True"/>
+      </Unit0>
+    </Units>
+    <JumpHistory HistoryIndex="-1"/>
+  </ProjectSession>
+</CONFIG>

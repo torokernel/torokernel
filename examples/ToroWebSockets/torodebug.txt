@@ -1,0 +1,440 @@
+[10/11/2018-17:43:42] CPU0 Thread#266549104 WebSocketsAccept...[10/11/2018-17:43:42] CPU0 Thread#266549104 WebSocketsAccept - ListWebSockets.Count: 1
+[10/11/2018-17:43:42] CPU0 Thread#266549104 ReceiveHandshake
+[10/11/2018-17:43:42] CPU0 Thread#266549104 WebSocket.Receive OK
+[10/11/2018-17:43:42] CPU0 Thread#266549104 ReceiveHandshake Headers: [10/11/2018-17:43:42] CPU0 Thread#266549104 GET /Smiley HTTP/1.1
+Host: 192.100.200.100:880
+Connection: Upgrade
+Pragma: no-cache
+Cache-Control: no-cache
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36
+Upgrade: websocket
+Origin: http://192.100.200.100
+Sec-WebSocket-Version: 13
+Accept-Encoding: gzip, deflate
+Accept-Language: en-GB,en;q=0.9,es-ES;q=0.8,es;q=0.7,fr-FR;q=0.6,fr;q=0.5,en-US;q=0.4
+Sec-WebSocket-Key: sAzlkoMriyZ195U8wEdv3Q==
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+
+[10/11/2018-17:43:42] CPU0 Thread#266549104 
+[10/11/2018-17:43:42] CPU0 Thread#266549104 Sec-WebSocket-Key: [10/11/2018-17:43:42] CPU0 Thread#266549104 sAzlkoMriyZ195U8wEdv3Q==[10/11/2018-17:43:42] CPU0 Thread#266549104 
+[10/11/2018-17:43:42] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:43:42] CPU0 Thread#266549104 BufferRead Size: 0
+[10/11/2018-17:43:42] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:43:42] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:43:42] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:43:42] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:43:42] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:43:42] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:43:42] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:43:42] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:43:42] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:43:44] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:43:44] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:43:44] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:43:44] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:43:44] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:43:44] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:43:44] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:43:44] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:43:44] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:43:47] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:43:47] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:43:47] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:43:47] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:43:47] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:43:47] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:43:47] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:43:47] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:43:47] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:43:50] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:43:50] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:43:50] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:43:50] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:43:50] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:43:50] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:43:50] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:43:50] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:43:50] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:02] CPU0 Thread#266549104 WebSocketsAccept...[10/11/2018-17:44:02] CPU0 Thread#266549104 WebSocketsAccept - ListWebSockets.Count: 2
+[10/11/2018-17:44:02] CPU0 Thread#266549104 ReceiveHandshake
+[10/11/2018-17:44:02] CPU0 Thread#266549104 WebSocket.Receive OK
+[10/11/2018-17:44:02] CPU0 Thread#266549104 ReceiveHandshake Headers: [10/11/2018-17:44:02] CPU0 Thread#266549104 GET /Smiley HTTP/1.1
+Host: 192.100.200.100:880
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Version: 13
+Origin: http://192.100.200.100
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: nxraBIBMkelEdOBkrvrLcg==
+Connection: keep-alive, Upgrade
+Pragma: no-cache
+Cache-Control: no-cache
+Upgrade: websocket
+
+[10/11/2018-17:44:02] CPU0 Thread#266549104 
+[10/11/2018-17:44:02] CPU0 Thread#266549104 Sec-WebSocket-Key: [10/11/2018-17:44:02] CPU0 Thread#266549104 nxraBIBMkelEdOBkrvrLcg==[10/11/2018-17:44:02] CPU0 Thread#266549104 
+[10/11/2018-17:44:02] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:02] CPU0 Thread#266549104 BufferRead Size: 0
+[10/11/2018-17:44:02] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:02] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:02] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:02] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:02] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:02] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:02] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:02] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:02] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:07] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:07] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:07] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:07] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:07] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:07] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:07] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:07] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:07] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:07] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:08] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:08] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:08] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:08] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:08] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:08] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:08] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:08] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:08] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:08] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:09] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:09] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:09] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:09] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:09] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:09] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:09] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:09] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:09] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:09] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:10] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:10] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:10] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:10] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:10] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:10] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:10] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:10] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:10] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:10] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:11] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:11] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:11] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:11] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:11] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:11] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 88
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:12] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:12] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:12] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:12] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:13] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:13] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:13] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:13] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:13] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:13] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:14] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:14] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:14] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:14] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:14] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:14] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 89
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 90
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:15] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:15] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:15] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 90
+[10/11/2018-17:44:15] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:15] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:16] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:16] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:16] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:16] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:16] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:16] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:16] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:16] CPU0 Thread#266549104 SendMessage - Socket #0xFFDEF60 Size: 90
+[10/11/2018-17:44:16] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:16] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:17] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFFDEF60
+[10/11/2018-17:44:17] CPU0 Thread#266549104 BufferRead Size: 6
+[10/11/2018-17:44:17] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 6
+[10/11/2018-17:44:17] CPU0 Thread#266549104 OpCode: 136
+[10/11/2018-17:44:17] CPU0 Thread#266549104 Length8: 0
+[10/11/2018-17:44:17] CPU0 Thread#266549104 ReceiveMessage - OpCode=8 -> ConnectionClose
+[10/11/2018-17:44:17] CPU0 Thread#266549104 CloseWebSocket: Socket 0xFFDEF60
+[10/11/2018-17:44:17] CPU0 Thread#266549104 CloseWebSocket - ListWebSockets.Count: 1
+[10/11/2018-17:44:17] CPU0 Thread#266549104 CloseWebSocket - SysSocketClose...
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:18] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:18] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:18] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:18] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:18] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:18] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:18] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:18] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:18] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:19] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:19] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:19] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:19] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:19] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:19] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived Done.
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - Socket #0xFF93F78
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 BufferRead Position: 0 / Size: 7
+[10/11/2018-17:44:19] CPU0 Thread#266549104 OpCode: 129
+[10/11/2018-17:44:19] CPU0 Thread#266549104 Length8: 1
+[10/11/2018-17:44:19] CPU0 Thread#266549104 ReceiveMessage - OpCode=9 -> Ping respond with Pong
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived...
+[10/11/2018-17:44:19] CPU0 Thread#266549104 SendMessage - Socket #0xFF93F78 Size: 90
+[10/11/2018-17:44:19] CPU0 Thread#266549104 DoMessageReceived Done.

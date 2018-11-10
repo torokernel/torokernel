@@ -33,11 +33,18 @@ def main():
     os.chdir (cwd)
     # build all the examples
     os.chdir (cwd + '/examples')
-    allfiles = os.listdir('.')
-    for names in allfiles:
-        if names.endswith('.pas'):
-              os.system ('fpc -TLinux -O2 ' + names + ' -o' + names[:-4] +' -Fu../rtl/ -Fu../rtl/drivers -MObjfpc') 
-              os.system ('../builder/build 4 ' + names[:-4] +' ../builder/boot.o ' + names[:-4] + '.img')
+    # get all files
+    alldirs = os.listdir('.')
+    for dir in alldirs:
+        # get directories only
+        if os.path.isdir(dir):
+            allfiles = os.listdir(dir)
+            for names in allfiles:
+                if names.endswith('.pas'):
+                    os.chdir (cwd + '/examples' + '/'+ dir)
+		    os.system ('fpc -TLinux -O2 ' + names + ' -o' + names[:-4] +' -Fu../../rtl/ -Fu../../rtl/drivers -MObjfpc') 
+                    os.system ('../../builder/build 4 ' + names[:-4] +' ../../builder/boot.o ' + names[:-4] + '.img')
+                    os.chdir (cwd + '/examples')
     os.chdir(cwd)
     return 1
     

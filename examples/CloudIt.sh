@@ -39,7 +39,7 @@ if [ -f $kvmfile ]; then
    kvmparam=`cat $kvmfile`
 else
    # parameters by default
-   kvmparam="--vcpus=2 --ram=512"
+   kvmparam="-m 256 -smp 1 -nographic"
 fi
 
 # this avoids to regenerate the image
@@ -59,14 +59,8 @@ if [ "$#" -ge 2 ]; then
        echo "$appimg does not exist, exiting"
        exit 1
     fi
-    # destroy any previous instance
-    virsh destroy $app
-    virsh undefine $app
-    # VNC is open at port 590X
-    virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
-    # show the serial console
-    sleep 5
-    virsh console $app
+    # launch qemu and exit
+    qemu-system-x86_64 -drive format=raw,file=$appimg $kvmparam
     exit 0
    fi
  echo "Parameter: $2 not recognized"
@@ -87,19 +81,4 @@ else
    echo "$appsrc does not exist, exiting"
    exit 1
 fi
-
-# destroy any previous instance
-virsh destroy $app
-virsh undefine $app
-
-if [ -f $appimg ]; then
-   # VNC is open at port 590X
-   virt-install --name=$app --disk path=$appimg,bus=ide $kvmparam --boot hd &
-else
-   echo "$appimg does not exist, exiting"
-   exit 1
-fi
-
-# show the serial console
-sleep 5
-virsh console $app
+qemu-system-x86_64 -drive format=raw,file=$appimg $kvmparam

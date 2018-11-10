@@ -1456,25 +1456,6 @@ var
   TcpHeader: PTCPHeader;
   TcpHeaderSize: LongInt;
 begin
-  //{$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: flushing on Socket: %h\n', [PtrUInt(Socket)]); {$ENDIF}
-  // while The WinFlag is up the timer 'll be refreshed
-  // prevent to send packet if remote host has closed the connnection
-  //if not Socket.AckFlag  {or (Socket.RemoteClose)}{and Socket.WinFlag} then
-  //begin
-    // todo: to implement this correctly
-    //if CheckTimeOut(Socket.WinCounter, Socket.WinTimeOut) then
-    // begin
-    //  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: checking if remote windows was refreshed , Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-    // we have to check if the remote window was refreshed
-    //   TCPSendPacket(TCP_ACK, Socket);
-    // set the timer again
-    //   Socket.WinCounter := read_rdtsc;
-    //   Socket.WinTimeOut := WAIT_WIN*LocalCPUSpeed*1000;
-    //  {$IFDEF DebugSocket} WriteDebug('DispatcherFlushPacket: checking if remote windows was refreshed , Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-    //  end;
-    {$IFDEF DebugSocket}WriteDebug('DispatcherFlushPacket: Socket %h AckFlag is %d and RemoteClose is %d\n', [PtrUInt(Socket), PtrUInt(Socket.AckFlag), PtrUInt(Socket.RemoteClose)]);{$ENDIF}
-    //Exit;
-  //end;
   if Socket.BufferSender = nil then
     Exit;
   if Socket.AckTimeOUT <> 0 then

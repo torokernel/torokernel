@@ -1,5 +1,5 @@
 //
-// ToroHelloWorldMicroservice.pas
+// HelloWorldMicroservice.pas
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -18,13 +18,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program ToroHelloWorldMicroservice;
+program HelloWorldMicroservice;
 
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=ToroHelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=HelloWorldMicroservice.img -net nic,model=virtio -net tap,ifname=TAP2 -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses

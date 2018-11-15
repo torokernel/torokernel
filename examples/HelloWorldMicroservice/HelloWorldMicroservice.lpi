@@ -6,7 +6,7 @@
     <General>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="ToroHelloWorldMicroservice"/>
+      <Title Value="HelloWorldMicroservice"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -26,7 +26,7 @@
     </RunParams>
     <Units Count="14">
       <Unit0>
-        <Filename Value="ToroHelloWorldMicroservice.pas"/>
+        <Filename Value="HelloWorldMicroservice.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
@@ -114,7 +114,7 @@
         <Command Value="$(CompPath) ../../builder/build.pas"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../../builder/build.exe 4 ToroHelloWorldMicroservice ../../builder/boot.o ToroHelloWorldMicroservice.img"/>
+        <Command Value="../../builder/build.exe 4 HelloWorldMicroservice ../../builder/boot.o HelloWorldMicroservice.img"/>
       </ExecuteAfter>
     </Other>
   </CompilerOptions>

@@ -28,7 +28,7 @@ interface
 //{$DEFINE DebugExt2FS}
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   Console, Arch, FileSystem, Process, Memory;
 
 implementation

@@ -25,12 +25,12 @@ unit IdeDisk;
 interface
 
 {$I ..\Toro.inc}
-{$IFDEF DEBUG}
+{$IFDEF EnableDebug}
 //{$DEFINE DebugIdeDisk}
 {$ENDIF}
 
 uses
- {$IFDEF DEBUG} Debug, {$ENDIF}
+ {$IFDEF EnableDebug} Debug, {$ENDIF}
   Console, Arch, FileSystem, Process;
 
 implementation

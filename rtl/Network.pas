@@ -28,7 +28,7 @@ interface
 {$I Toro.inc}
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   Arch, Process, Console, Memory;
 
 const

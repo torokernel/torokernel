@@ -1,0 +1,1 @@
+-m 512 -smp 2 -nographic

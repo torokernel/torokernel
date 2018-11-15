@@ -1,0 +1,50 @@
+<domain type="kvm">
+  <name>ToroWebSockets</name>
+  <uuid>71950992-93d4-4a55-804a-ff2808b9e9e9</uuid>
+  <memory>524288</memory>
+  <currentMemory>524288</currentMemory>
+  <vcpu>2</vcpu>
+  <os>
+    <type arch="x86_64">hvm</type>
+    <boot dev="hd"/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+  <cpu mode="custom" match="exact">
+    <model>Westmere-IBRS</model>
+  </cpu>
+  <clock offset="utc">
+    <timer name="rtc" tickpolicy="catchup"/>
+    <timer name="pit" tickpolicy="delay"/>
+    <timer name="hpet" present="no"/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <pm>
+    <suspend-to-mem enabled="no"/>
+    <suspend-to-disk enabled="no"/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/kvm-spice</emulator>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="raw"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroWebSockets/ToroWebSockets.img"/>
+      <target dev="hda" bus="ide"/>
+    </disk>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="raw"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroWebSockets/WebSocketsFiles.img"/>
+      <target dev="hdb" bus="ide"/>
+    </disk>
+    <interface type="bridge">
+      <source bridge="toro-bridge"/>
+      <mac address="52:54:00:f7:98:e7"/>
+      <model type="virtio-net-pci"/>
+    </interface>
+    <graphics type="vnc" port="-1"/>
+    <console type="pty"/>
+  </devices>
+</domain>

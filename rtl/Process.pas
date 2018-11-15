@@ -28,7 +28,7 @@ unit Process;
 interface
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   Arch, SysUtils;
 
 type
@@ -1412,12 +1412,12 @@ begin
   Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
   {$IFDEF DebugProcess}
     if LocalCpuSpeed = MAX_CPU_SPEED_MHZ then
-      WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ',[]);
+      WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ\n',[]);
   {$ENDIF}
   if HasException then
     InitializeExceptions;
   InitCores;
-  {$IFDEF DEBUG}
+  {$IFDEF EnableDebug}
     WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]);
   {$ENDIF}
 {$IFDEF FPC}

@@ -31,7 +31,7 @@
     <emulator>/usr/bin/kvm-spice</emulator>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw"/>
-      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroException/ToroException.img"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ExceptionHandling/ExceptionHandling.img"/>
       <target dev="hda" bus="ide"/>
     </disk>
     <graphics type="vnc" port="-1"/>

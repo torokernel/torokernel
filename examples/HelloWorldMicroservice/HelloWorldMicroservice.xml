@@ -31,7 +31,7 @@
     <emulator>/usr/bin/kvm-spice</emulator>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw"/>
-      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroHelloWorldMicroservice/ToroHelloWorldMicroservice.img"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/HelloWorldMicroservice/HelloWorldMicroservice.img"/>
       <target dev="hda" bus="ide"/>
     </disk>
     <interface type="bridge">

@@ -1,11 +1,10 @@
 #!/bin/bash
 #
-# CloudIt.sh <Application>
+# CloudIt.sh <Application> [CompilerOptions] [QemuOptions]
 #
-# Script to compile and run a Toro app in Linux. We base on wine 
-# to generate the image and on KVM/QEMU to run it.
+# Example: CloudIt.sh ToroHello "-dEnableDebug -dDebugProcess" "vnc :0"
 #
-# Copyright (c) 2003-2017 Matias Vara <matiasevara@gmail.com>
+# Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
 #
 # This program is free software: you can redistribute it and/or modify
@@ -31,7 +30,7 @@ qemufile="qemu.args";
 # check parameters
 if [ "$#" -lt 1 ]; then
    echo "Usage: CloudIt.sh ApplicationName [CompilerOptions] [QemuOptions]"
-   echo "Example: CloudIt.sh ToroHello \"-dEnableDebug -dDebugProcess\" \"\""
+   echo "Example: CloudIt.sh ToroHello \"-dEnableDebug -dDebugProcess\" "vnc :0"
    exit 1
 fi
 

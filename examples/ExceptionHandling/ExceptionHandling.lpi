@@ -10,7 +10,7 @@
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="ToroException"/>
+      <Title Value="ExceptionHandling"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -30,7 +30,7 @@
     </RunParams>
     <Units Count="8">
       <Unit0>
-        <Filename Value="ToroException.pas"/>
+        <Filename Value="ExceptionHandling.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
@@ -67,7 +67,7 @@
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename Value="ToroException" ApplyConventions="False"/>
+      <Filename Value="ExceptionHandling" ApplyConventions="False"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
@@ -104,7 +104,7 @@
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../../builder/build.exe 4 ToroException ../../builder/boot.o ToroException.img"/>
+        <Command Value="../../builder/build.exe 4 ExceptionHandling ../../builder/boot.o ExceptionHandling.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

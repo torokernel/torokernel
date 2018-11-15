@@ -1,5 +1,5 @@
 //
-// Toro Exception Example
+// Exception Handling
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -18,13 +18,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program ToroException;
+program ExceptionHandling;
 
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ToroException.img}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 2 -drive format=raw,file=ExceptionHandling.img}
 {%RunFlags BUILD-}
 
 uses

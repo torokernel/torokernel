@@ -1,5 +1,5 @@
 //
-// Toro Ping example.
+// Ping
 //
 // Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -18,13 +18,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program ToroPing;
+program Ping;
 
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=ToroPing.img}
+{%RunCommand qemu-system-x86_64.exe -m 256 -smp 2 -net nic,model=e1000 -net tap,ifname=TAP2 -serial file:torodebug.txt -drive format=raw,file=Ping.img}
 {%RunFlags BUILD-}
 
 // They are declared just the necessary units

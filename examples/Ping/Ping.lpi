@@ -10,7 +10,7 @@
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="ToroPing"/>
+      <Title Value="Ping"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -30,7 +30,7 @@
     </RunParams>
     <Units Count="11">
       <Unit0>
-        <Filename Value="ToroPing.pas"/>
+        <Filename Value="Ping.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
@@ -79,7 +79,7 @@
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename Value="ToroPing" ApplyConventions="False"/>
+      <Filename Value="Ping" ApplyConventions="False"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
@@ -115,7 +115,7 @@
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../../builder/build.exe 2 ToroPing ../../builder/boot.o ToroPing.img"/>
+        <Command Value="../../builder/build.exe 2 Ping ../../builder/boot.o Ping.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

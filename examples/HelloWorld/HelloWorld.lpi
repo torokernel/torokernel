@@ -10,7 +10,7 @@
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="ToroHello"/>
+      <Title Value="HelloWorld"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -30,7 +30,7 @@
     </RunParams>
     <Units Count="9">
       <Unit0>
-        <Filename Value="ToroHello.pas"/>
+        <Filename Value="HelloWorld.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
@@ -71,7 +71,7 @@
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename Value="ToroHello" ApplyConventions="False"/>
+      <Filename Value="HelloWorld" ApplyConventions="False"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
@@ -105,7 +105,7 @@
         <CompileReasons Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../../builder/build.exe 2 ToroHello ../../builder/boot.o ToroHello.img"/>
+        <Command Value="../../builder/build.exe 2 HelloWorld ../../builder/boot.o HelloWorld.img"/>
         <ShowAllMessages Value="True"/>
         <CompileReasons Run="False"/>
       </ExecuteAfter>

@@ -1,5 +1,5 @@
 //
-// Toro Hello World Example.
+// Hello World Example
 //
 // Clasical example using a minimal kernel to print "Hello World".
 //
@@ -20,13 +20,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program ToroHello;
+program HelloWorld;
 
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=ToroHello.img}
+{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img}
 {%RunFlags BUILD-}
 
 // only include the needed units

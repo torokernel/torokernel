@@ -1,1 +1,0 @@
--smp 1 -m 256 -nographic -net nic,model=virtio -net tap,ifname=tap0

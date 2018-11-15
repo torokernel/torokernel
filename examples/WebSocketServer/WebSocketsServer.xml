@@ -31,12 +31,12 @@
     <emulator>/usr/bin/kvm-spice</emulator>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw"/>
-      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroWebSockets/ToroWebSockets.img"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/WebSocketsServer/WebSocketsServer.img"/>
       <target dev="hda" bus="ide"/>
     </disk>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw"/>
-      <source file="/root/torokernel/torokernel-fixfornetworking/examples/ToroWebSockets/WebSocketsFiles.img"/>
+      <source file="/root/torokernel/torokernel-fixfornetworking/examples/WebSocketsServer/WebSocketsFiles.img"/>
       <target dev="hdb" bus="ide"/>
     </disk>
     <interface type="bridge">

@@ -6,7 +6,7 @@
     <General>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="ToroWebSockets"/>
+      <Title Value="WebSocketsServer"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -19,15 +19,9 @@
     <PublishOptions>
       <Version Value="2"/>
     </PublishOptions>
-    <RunParams>
-      <local>
-        <FormatVersion Value="1"/>
-        <HostApplicationFilename Value="C:\toro\examples\_ToroWebSockets.ext2.cmd"/>
-      </local>
-    </RunParams>
     <Units Count="16">
       <Unit0>
-        <Filename Value="ToroWebSockets.pas"/>
+        <Filename Value="WebSocketsServer.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
@@ -130,7 +124,7 @@
         <Command Value="$(CompPath) ../../builder/build.pas"/>
       </ExecuteBefore>
       <ExecuteAfter>
-        <Command Value="../../builder/build.exe 4 ToroWebSockets ../../builder/boot.o ToroWebSockets.img"/>
+        <Command Value="../../builder/build.exe 4 WebSocketsServer ../../builder/boot.o WebSocketsServer.img"/>
       </ExecuteAfter>
     </Other>
   </CompilerOptions>

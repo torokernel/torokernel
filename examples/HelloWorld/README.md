@@ -20,6 +20,12 @@ If you want to enable some debug symbols in the unit **Process** and check what 
 
 You will see how toro begins to initialize the unit by calling the scheduler.
 
+To create the guest by using virsh run the following command:
+
+`virsh create HelloWorld.xml`
+
+Note that you need to first edit **HelloWorld.xml** to correct the path of the **HelloWorld.img**.
+
 ## Windows Users
 
 Windows' users can just use Lazarus to open **HelloWorld.lpi** and launch the compilation and execution of the application directly from the IDE by doing first **Compile** and then **Run**.

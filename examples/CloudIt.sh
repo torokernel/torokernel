@@ -30,7 +30,7 @@ qemufile="qemu.args";
 # check parameters
 if [ "$#" -lt 1 ]; then
    echo "Usage: CloudIt.sh ApplicationName [CompilerOptions] [QemuOptions]"
-   echo "Example: CloudIt.sh ToroHello \"-dEnableDebug -dDebugProcess\" "vnc :0"
+   echo "Example: CloudIt.sh ToroHello \"-dEnableDebug -dDebugProcess\" \"vnc :0\""
    exit 1
 fi
 

@@ -1,6 +1,6 @@
 # Web Sockets Server Example
 
-This example shows the use of WebSockets  in Toro. It is made of two microservices. One microservice runs on port 80 and provides the main eweb page, e.g., index.html. The second microservice runs on port 880 and provides the web socket interface. To try this example, you need to first create a bridge and tells Qemu to use it. To do this, edit **/etc/qemu-ifup** and modify the line switch by **switch=toro-bridge**. Go to **examples** directory and run:
+This example shows the use of WebSockets  in Toro. It is made of two microservices. One microservice runs on port 80 and provides the main web page, e.g., index.html. The second microservice runs on port 880 and provides the web socket interface. To try this example, you need to first create a bridge and tells Qemu to use it. To do this, edit **/etc/qemu-ifup** and modify the line switch by **switch=toro-bridge**. Go to **examples** directory and run:
 
 `virsh net-create toro-kvm-network.xml`
 

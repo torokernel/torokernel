@@ -25,16 +25,18 @@ deploy:
   api_key:
     secure: $GH_TOKEN
   file: 
-    - ./examples/ToroHello.img
-    - ./examples/ToroHello.img.sha256
-    - ./examples/ToroException.img
-    - ./examples/ToroException.img.sha256
-    - ./examples/TorowithFileSystem.img
-    - ./examples/TorowithFileSystem.img.sha256
-    - ./examples/ToroPing.img
-    - ./examples/ToroPing.img.sha256
-    - ./examples/ToroFiles.img
-    - ./examples/ToroFiles.img.sha256
+    - ./examples/HelloWorld/HelloWorld.img
+    - ./examples/HelloWorld/HelloWorld.img.sha256
+    - ./examples/ExceptionHandling/ExceptionHandling.img
+    - ./examples/ExceptionHandling/ExceptionHandling.img.sha256
+    - ./examples/StaticWebServer/StaticWebServer.img
+    - ./examples/StaticWebServer/StaticWebServer.img.sha256
+    - ./examples/StaticWebServer/ToroFiles.img
+    - ./examples/StaticWebServer/ToroFiles.img.sha256
+    - ./examples/WebSocketServer/WebSocketsServer.img
+    - ./examples/WebSocketServer/WebSocketsServer.img.sha256
+    - ./examples/WebSocketServer/WebSocketsFiles.img
+    - ./examples/WebSocketServer/WebSocketsFiles.img.sha256
   on:
      branch: master
   skip_cleanup: true
@@ -50,12 +52,9 @@ install:
 
 script:
   - ./ci/travis.compile.py
-  - sha256sum ./examples/ToroHello.img > ./examples/ToroHello.img.sha256
-  - sha256sum ./examples/ToroException.img > ./examples/ToroException.img.sha256
-  - sha256sum ./examples/TorowithFileSystem.img > ./examples/TorowithFileSystem.img.sha256
-  - sha256sum ./examples/ToroFiles.img > ./examples/ToroFiles.img.sha256
-  - sha256sum ./examples/ToroPing.img > ./examples/ToroPing.img.sha256
-  
+  - sha256sum ./examples/WebSocketServer/WebSocketsFiles.img > ./examples/WebSocketServer/WebSocketsFiles.img.sha256
+  - sha256sum ./examples/StaticWebServer/ToroFiles.img > ./examples/StaticWebServer/ToroFiles.img.sha256
+ 
 notifications:
   email:
     on_success: false

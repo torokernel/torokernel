@@ -26,12 +26,12 @@ interface
 
 {$I ..\Toro.inc}
 
-{$IFDEF DEBUG}
+{$IFDEF EnableDebug}
         //{$DEFINE DebugVirtio}
 {$ENDIF}
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   FileSystem,
   Pci,
   Arch, Console, Network, Process, Memory;

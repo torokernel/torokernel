@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ToroKernel - Mood of the day</title>
+<style>
+* { font-family: Verdana, Tahoma, Arial; font-size: 1em; }
+body { height: 100%; }
+h1 { font-size: 2em; }
+.Counter { margin: 8px; font-size: 4em; text-align: center; transition: font-size 0.5s ease-in-out; animation-name: none; }
+.Counter.Animate { animation: adjustText 0.5s alternate; }
+.Smiley { cursor: pointer; }
+@keyframes adjustText {
+  from {
+	font-size: 7em;
+	color: blue;
+  }
+
+  to {
+	font-size: 4em;
+	color: black;
+  }
+}
+</style>
+<script type="text/javascript">
+var WebSockets_URL = 'ws://192.100.200.100:880/Smiley';
+
+var timerWS = 0;
+var ws = null;
+
+function SetCounter(Counter, Value) {
+  var obj = document.getElementById(Counter);
+  if (obj.innerText == Value)
+    return;
+  obj.innerText = Value;
+  obj.classList.remove('Animate');
+  obj.offsetHeight;
+  obj.classList.add('Animate');
+}
+
+function Vote(Number) {
+  if ( ws )
+    ws.send(Number);
+}
+
+function connectWebSocket() {
+  if ("WebSocket" in window == false) 
+    return;
+  if (ws != null)
+	console.log('ws.readyState: ' + ws.readyState);
+  if ((ws != null) && (ws.readyState != 3))
+    return;
+  ws = new WebSocket(WebSockets_URL);
+  if (ConnectionStatus = document.getElementById('ConnectionStatus')) 
+    ConnectionStatus.innerText = 'Connecting...';
+
+  window.onbeforeunload = function() {
+    console.log('Closing previous WebSocket during window.onbeforeunload');
+    ws.onclose = function () {}; 
+    ws.close();
+    ws = null;
+  };
+
+  ws.onerror = function() {
+    console.log('Error');
+    if (ConnectionStatus = document.getElementById('ConnectionStatus')) 
+      ConnectionStatus.innerText = 'Disconnected';
+  };
+
+  ws.onopen = function() {
+    if (window.timerWS != 0) { 
+     window.clearInterval(window.timerWS);
+     window.timerWS = 0;
+    }      
+    console.log('Connected to: ' + WebSockets_URL);
+    if (ConnectionStatus = document.getElementById('ConnectionStatus')) 
+	  ConnectionStatus.innerText = 'Connected';
+	Vote(0); // forces to refresh
+  };
+
+  ws.onclose = function(CloseEvent) {
+    console.log('Connection closed!'); 
+    console.log(CloseEvent.code+' '+CloseEvent.reason); 
+    if (ConnectionStatus = document.getElementById('ConnectionStatus')) 
+      ConnectionStatus.innerText = 'Disconnected';
+    if (window.timerWS == 0) {
+      console.log('setInterval(connectWebSocket, 5000);'); 
+      window.timerWS = setInterval(connectWebSocket, 5000);
+    }
+  };
+
+  function ClearPoll() {
+	SetCounter('Counter1', '0');
+	SetCounter('Counter2', '0');
+	SetCounter('Counter3', '0');
+  }
+
+  function Update(msg) {
+	SetCounter('Counter1', msg.Counter1);
+	SetCounter('Counter2', msg.Counter2);
+	SetCounter('Counter3', msg.Counter3);
+  }
+
+  ws.onmessage = function (e) {
+      if (e.data) 
+        console.log(e.data);
+      var msg = JSON.parse(e.data);
+      var Action = msg.Action;
+      switch(Action) {
+		case "Update":
+		   Update(msg);
+		   break;
+		case "Clear":
+		   ClearPoll();
+           break;            
+        default:
+           break;
+      }
+  };
+}
+</script>
+</head>
+<body onload="connectWebSocket();">
+<h1>What is your mood today with ToroKernel ?</h1>
+
+<div style="display: flex">
+<div style="flex: 1 1 auto; margin: 10px; max-width: 10em;">
+<svg class="Smiley" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 512.001 512.001" style="enable-background:new 0 0 512.001 512.001;" xml:space="preserve" onclick="Vote('1');">
+<circle style="fill:#F95428;" cx="256.004" cy="256.004" r="246.855"/>
+<g>
+	<path style="fill:#E54728;" d="M126.306,385.694c-88.801-88.802-95.798-228.426-20.998-325.241
+		c-8.286,6.401-16.258,13.399-23.858,20.999c-96.401,96.401-96.401,252.698,0,349.099s252.698,96.401,349.099,0
+		c7.599-7.599,14.597-15.573,20.999-23.858C354.733,481.492,215.108,474.495,126.306,385.694z"/>
+	<path style="fill:#E54728;" d="M220.789,326.378c-2.659,0-5.296-1.153-7.104-3.377c-3.188-3.92-2.596-9.684,1.325-12.872
+		c11.647-9.473,26.436-14.69,41.644-14.69c14.5,0,28.75,4.799,40.126,13.512c4.011,3.073,4.772,8.816,1.701,12.828
+		c-3.073,4.012-8.815,4.772-12.828,1.701c-8.2-6.281-18.499-9.74-28.999-9.74c-11.014,0-21.703,3.76-30.097,10.587
+		C224.86,325.705,222.818,326.378,220.789,326.378z"/>
+</g>
+<path d="M256.001,0C114.841,0,0,114.841,0,256.001s114.841,256.001,256.001,256.001S512.001,397.16,512.001,256.001
+	S397.16,0,256.001,0z M256.001,493.701c-131.069,0-237.702-106.631-237.702-237.7S124.932,18.299,256.001,18.299
+	s237.702,106.632,237.702,237.702S387.068,493.701,256.001,493.701z"/>
+<path d="M180.577,229.78c0-3.914-0.676-7.672-1.903-11.172c3.656,0.376,7.477,0.589,11.481,0.589
+	c10.598,0,22.412-1.442,35.442-4.985c4.875-1.326,7.753-6.353,6.428-11.231c-1.327-4.877-6.362-7.751-11.231-6.428
+	c-64.932,17.664-93.048-23.646-94.229-25.438c-2.746-4.219-8.386-5.43-12.621-2.702c-4.249,2.735-5.475,8.397-2.74,12.646
+	c0.305,0.476,6.439,9.849,19.049,19.163c-10.357,5.796-17.378,16.869-17.378,29.558c0,18.666,15.186,33.852,33.852,33.852
+	S180.577,248.446,180.577,229.78z"/>
+<path d="M260.322,257.016c-45.315,0-85.656,28.193-100.385,70.154c-1.673,4.768,0.836,9.989,5.603,11.664
+	c4.772,1.675,9.99-0.834,11.665-5.603c12.159-34.641,45.562-57.915,83.118-57.915c37.548,0,70.947,23.274,83.106,57.915
+	c1.322,3.766,4.857,6.123,8.634,6.122c1.005,0,2.028-0.167,3.03-0.518c4.768-1.674,7.276-6.895,5.603-11.664
+	C345.965,285.208,305.628,257.016,260.322,257.016z"/>
+<path d="M398.086,168.459c-4.219-2.749-9.879-1.551-12.647,2.655c-1.164,1.768-29.28,43.107-94.229,25.441
+	c-4.871-1.325-9.903,1.551-11.231,6.428c-1.326,4.876,1.552,9.903,6.428,11.231c13.033,3.544,24.843,4.985,35.442,4.985
+	c4.003,0,7.823-0.213,11.48-0.589c-1.227,3.5-1.903,7.257-1.903,11.172c0,18.666,15.186,33.852,33.852,33.852
+	s33.852-15.186,33.852-33.852c0-12.689-7.021-23.762-17.378-29.558c12.611-9.314,18.744-18.687,19.049-19.163
+	C403.524,176.825,402.304,171.206,398.086,168.459z"/>
+<g>
+	<circle style="fill:#FFFFFF;" cx="155.969" cy="225.835" r="9.15"/>
+	<circle style="fill:#FFFFFF;" cx="374.338" cy="225.835" r="9.15"/>
+</g>
+</svg>
+<div class="Counter" id="Counter1">?</div>
+</div>
+<div style="flex: 1 1 auto; margin: 10px; max-width: 10em;">
+<svg class="Smiley" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 512.001 512.001" style="enable-background:new 0 0 512.001 512.001;" xml:space="preserve" onclick="Vote('2')">
+<circle style="fill:#F7B239;" cx="256.004" cy="256.004" r="246.855"/>
+<g>
+	<path style="fill:#E09B2D;" d="M126.306,385.694c-88.801-88.802-95.798-228.426-20.998-325.241
+		c-8.286,6.401-16.258,13.399-23.858,20.999c-96.401,96.401-96.401,252.698,0,349.099s252.698,96.401,349.099,0
+		c7.599-7.599,14.597-15.573,20.999-23.858C354.733,481.492,215.108,474.495,126.306,385.694z"/>
+	<path style="fill:#E09B2D;" d="M297.481,349.115h-85.403c-5.054,0-9.15-4.097-9.15-9.15s4.095-9.15,9.15-9.15h85.403
+		c5.054,0,9.15,4.097,9.15,9.15S302.534,349.115,297.481,349.115z"/>
+</g>
+<path d="M256.001,0C114.841,0,0,114.841,0,256.001s114.841,256.001,256.001,256.001S512.001,397.16,512.001,256.001
+	S397.16,0,256.001,0z M256.001,493.701c-131.069,0-237.702-106.631-237.702-237.7S124.932,18.299,256.001,18.299
+	s237.702,106.632,237.702,237.702S387.068,493.701,256.001,493.701z"/>
+<path d="M371.284,296.658H138.275c-5.054,0-9.15,4.097-9.15,9.15s4.095,9.15,9.15,9.15h233.008c5.054,0,9.15-4.097,9.15-9.15
+	C380.433,300.754,376.337,296.658,371.284,296.658z"/>
+<path d="M180.577,226.834c0-18.666-15.186-33.852-33.852-33.852s-33.852,15.186-33.852,33.852s15.186,33.852,33.852,33.852
+	S180.577,245.501,180.577,226.834z"/>
+<path d="M365.275,192.982c-18.666,0-33.852,15.186-33.852,33.852s15.186,33.852,33.852,33.852s33.852-15.186,33.852-33.852
+	S383.942,192.982,365.275,192.982z"/>
+<g>
+	<circle style="fill:#FFFFFF;" cx="155.969" cy="219.735" r="9.15"/>
+	<circle style="fill:#FFFFFF;" cx="374.338" cy="219.735" r="9.15"/>
+</g>
+</svg>
+<div class="Counter" id="Counter2">?</div>
+</div>
+<div style="flex: 1 1 auto; margin: 10px; max-width: 10em;">
+<svg class="Smiley" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" onclick="Vote('3')">
+<circle style="fill:#F7B239;" cx="256.004" cy="256.004" r="246.855"/>
+<path style="fill:#E09B2D;" d="M126.308,385.694c-88.802-88.802-95.799-228.426-20.999-325.242
+	C97.023,66.853,89.051,73.85,81.45,81.45c-96.401,96.401-96.401,252.698,0,349.099s252.698,96.401,349.099,0
+	c7.599-7.599,14.597-15.573,20.999-23.858C354.733,481.492,215.108,474.494,126.308,385.694z"/>
+<path style="fill:#FFFFFF;" d="M127.911,273.724h248.868c0,13.968-2.306,27.4-6.551,39.941H134.462
+	C130.216,301.124,127.911,287.692,127.911,273.724z"/>
+<path style="fill:#A81004;" d="M134.462,313.665h235.765c-8.369,24.716-24.289,45.931-45.016,60.924
+	c-8.71-14.676-24.716-24.509-43.027-24.509c-11.187,0-21.508,3.672-29.84,9.882c-8.332-6.209-18.665-9.882-29.852-9.882
+	c-18.299,0-34.317,9.833-43.015,24.509C158.751,359.595,142.831,338.381,134.462,313.665z"/>
+<path style="fill:#F95428;" d="M282.184,350.08c18.311,0,34.317,9.833,43.027,24.509c-20.483,14.834-45.662,23.569-72.867,23.569
+	s-52.384-8.735-72.867-23.569c8.698-14.676,24.716-24.509,43.015-24.509c11.187,0,21.52,3.672,29.852,9.882
+	C260.677,353.752,270.997,350.08,282.184,350.08z"/>
+<path d="M256.001,0C114.841,0,0,114.841,0,255.999C0,397.159,114.841,512,256.001,512C397.159,512,512,397.159,512,255.999
+	C512,114.841,397.159,0,256.001,0z M256.001,493.701c-131.069,0-237.702-106.632-237.702-237.702
+	c0-131.068,106.632-237.7,237.702-237.7c131.068,0,237.7,106.632,237.7,237.7C493.701,387.068,387.068,493.701,256.001,493.701z"/>
+<path d="M146.725,238.682c18.666,0,33.852-15.186,33.852-33.852s-15.186-33.852-33.852-33.852s-33.852,15.186-33.852,33.852
+	S128.058,238.682,146.725,238.682z"/>
+<path d="M365.277,170.979c-18.666,0-33.852,15.186-33.852,33.852s15.186,33.852,33.852,33.852s33.852-15.186,33.852-33.852
+	S383.942,170.979,365.277,170.979z"/>
+<path d="M376.778,264.574H127.911c-5.053,0-9.15,4.097-9.15,9.15c0,14.662,2.367,29.087,7.034,42.876
+	c8.934,26.382,25.643,48.999,48.316,65.4c22.86,16.557,49.914,25.309,78.233,25.309c28.32,0,55.373-8.752,78.23-25.305
+	c22.677-16.405,39.387-39.021,48.319-65.402l0,0c4.667-13.788,7.034-28.214,7.034-42.875
+	C385.928,268.671,381.831,264.574,376.778,264.574z M367.27,282.873c-0.576,7.338-1.854,14.575-3.809,21.642H141.226
+	c-1.954-7.067-3.233-14.303-3.809-21.642H367.27z M192.566,372.312c7.649-8.21,18.499-13.083,29.925-13.083
+	c8.87,0,17.302,2.79,24.385,8.069c3.244,2.417,7.691,2.418,10.934,0c7.082-5.279,15.51-8.069,24.372-8.069
+	c11.421,0,22.274,4.871,29.932,13.085c-17.972,10.947-38.454,16.694-59.772,16.694C231.024,389.008,210.542,383.261,192.566,372.312
+	z M327.021,361.551c-11.137-12.9-27.534-20.621-44.838-20.621c-10.623,0-20.819,2.772-29.84,8.066
+	c-9.021-5.296-19.221-8.066-29.852-8.066c-17.312,0-33.709,7.723-44.83,20.616c-12.623-10.71-22.68-23.855-29.665-38.732H356.69
+	C349.705,337.694,339.647,350.84,327.021,361.551z"/>
+<g>
+	<circle style="fill:#FFFFFF;" cx="150.48" cy="200.216" r="9.15"/>
+	<circle style="fill:#FFFFFF;" cx="368.849" cy="200.216" r="9.15"/>
+</g>
+</svg>
+<div class="Counter" id="Counter3">?</div>
+</div>
+</div>
+
+<div style="position: absolute; bottom: 0px; margin: 8px;">WebSocket status: <span id="ConnectionStatus">Disconnected</span></div>
+
+</body>
+</html>
+

@@ -27,7 +27,7 @@ Unit Pci;
 interface
 
 uses
- {$IFDEF DEBUG} Debug, {$ENDIF}
+ {$IFDEF EnableDebug} Debug, {$ENDIF}
   Arch, Process, Console, Memory;
 
 type

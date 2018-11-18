@@ -29,7 +29,7 @@ interface
 //{$DEFINE DebugFatFS}
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   Console, Arch, FileSystem, Process, Memory;
 
 var

@@ -36,7 +36,7 @@ procedure KernelStart;
 implementation
 
 uses
-  {$IFDEF DEBUG} Debug, {$ENDIF}
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
   
 procedure KernelStart;
@@ -44,7 +44,7 @@ begin
   WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
-  {$IFDEF DEBUG} DebugInit; {$ENDIF}
+  {$IFDEF EnableDebug} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;
   FileSystemInit;

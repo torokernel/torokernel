@@ -1027,77 +1027,31 @@ begin
         if TCPHeader.Flags and TCP_ACK = TCP_ACK then
         begin
           DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
-          Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
           Socket.AckFlag := True;
-          if DataSize <> 0 then
+          if TCPHeader.Flags and TCP_ACKEND = TCP_ACKEND then
           begin
-            Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
-            Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
-            Move(Source^, Dest^, DataSize);
-            Socket.BufferLength := Socket.BufferLength + DataSize;
-            if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
-            begin
-              Socket.DispatcherEvent := DISP_RECEIVE;
-              {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket TCP_ACK: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
-            end;
+            Inc(Socket.LastAckNumber);
             TCPSendPacket(TCP_ACK, Socket);
-          end;
-          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACK: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-        // TODO: to implement zero window condition check
-        //
-        // Are we checking zero window condition ?
-        //if Socket.WinFlag then
-        //begin
-          // The window was refreshed
-          //if SwapWord(TCPHeader.Window_Size) <> 0 then
-          //  Socket.WinFlag := False;
-          //Socket.WinFlag := SwapWord(TCPHeader.Window_Size) = 0; // KW 20091204 Reduced previous line of code as suggested by PAL
-          // {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: ignored ASK for Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-        //end else
-        //begin
-         // Sender Dispatcher is waiting for confirmation
-        // Socket.AckFlag := True;
-         // We have got to block the sender
-         //if SwapWord(TCPHeader.Window_Size) = 0 then
-         // Socket.WinFlag := True;
-        //end;
-        end else if TCPHeader.Flags and TCP_ACKPSH = TCP_ACKPSH then
-        begin
-          if SwapDWORD(TCPHeader.AckNumber) = Socket.LastSequenceNumber then
-          begin
-            DataSize:= SwapWord(IPHeader.PacketLength)-SizeOf(TIPHeader)-SizeOf(TTCPHeader);
-            Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
-            Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
-            Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
-            Move(Source^, Dest^, DataSize);
-            {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACKPSH: Moving from %h to %h count: %d\n', [PtrUInt(Source),PtrUInt(Dest),DataSize]); {$ENDIF}
-            Socket.BufferLength := Socket.BufferLength + DataSize;
-            if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
-            begin
-              Socket.DispatcherEvent := DISP_RECEIVE;
-              {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket TCP_ACKPSH: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
-            end;
-            TCPSendPacket(TCP_ACK, Socket);
-            if TCPHeader.Flags and TCP_FIN = TCP_FIN then
-            begin
-              Socket.State := SCK_LOCALCLOSING;
-              Socket.RemoteClose := True;
-            end;
-            {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACKPSH: Socket %h sending ACK\n', [PtrUInt(Socket)]); {$ENDIF}
+            Socket.State:= SCK_LOCALCLOSING;
+            Socket.RemoteClose := True;
           end else
           begin
-            TCPSendPacket(TCP_ACK, Socket);
-            {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACKPSH: Socket %h sending ACK for invalid seq\n', [PtrUInt(Socket)]); {$ENDIF}
+            if DataSize <> 0 then
+            begin
+              Socket.LastAckNumber := SwapDWORD(TCPHeader.SequenceNumber)+DataSize;
+              Source := Pointer(PtrUInt(Packet.Data)+SizeOf(TEthHeader)+SizeOf(TIPHeader)+SizeOf(TTCPHeader));
+              Dest := Pointer(PtrUInt(Socket.Buffer)+Socket.BufferLength);
+              Move(Source^, Dest^, DataSize);
+              Socket.BufferLength := Socket.BufferLength + DataSize;
+              if (Socket.DispatcherEvent <> DISP_CLOSING) and (Socket.DispatcherEvent <> DISP_ZOMBIE) and (Socket.DispatcherEvent <> DISP_ACCEPT) then
+              begin
+                Socket.DispatcherEvent := DISP_RECEIVE;
+                {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket TCP_ACK: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
+              end;
+              TCPSendPacket(TCP_ACK, Socket);
+            end;
           end;
-        end else if TCPHeader.Flags and TCP_ACKEND = TCP_ACKEND then
-        begin
-          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACKEND: Socket %h received ACKFIN, Distpacher: %d\n', [PtrUInt(Socket), Socket.DispatcherEvent]); {$ENDIF}
-          Inc(Socket.LastAckNumber);
-          TCPSendPacket(TCP_ACK, Socket);
-          Socket.State:= SCK_LOCALCLOSING;
-          Socket.RemoteClose := True;
-          Socket.AckFlag := True;
-          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACKEND: Socket %h sending ACK to confirm ACKFIN\n', [PtrUInt(Socket)]); {$ENDIF}
+          {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACK: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
         end else
         begin
           {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h TCP Header flag unknown: %d\n', [PtrUInt(Socket), TCPHeader.Flags]); {$ENDIF}

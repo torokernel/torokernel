@@ -399,6 +399,7 @@ main64:
  mov rax , pagedir
  mov cr3 , rax
  jumpkernel:
+ xor rbx, rbx
  xor rax , rax
  mov eax , dword [(add_main)+boot32]
  jmp rax

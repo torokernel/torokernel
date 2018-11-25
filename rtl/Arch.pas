@@ -164,6 +164,7 @@ var
   Cores: array[0..MAX_CPU-1] of TCore;
   LargestMonitorLine: longint;
   SmallestMonitorLine: longint;
+  KernelParam: Pchar = Nil;
 
 implementation
 
@@ -1445,9 +1446,15 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
+  tmp: ^DWORD;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
+  if mbpointer <> Nil then
+  begin
+    tmp := mbpointer + 16;
+    KernelParam := Pointer(tmp^);  
+  end;
   RelocateIrqs;
   MemoryCounterInit;
   CacheManagerInit;

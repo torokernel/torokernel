@@ -70,6 +70,7 @@ start:
   mov   ecx, 8*5
   rep   movsb  
   lgdt [gdtr]
+  lidt [idtr]
   ; load descriptor  
   mov eax , kernel_data_sel
   mov ds , eax

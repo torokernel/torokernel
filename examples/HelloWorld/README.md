@@ -34,7 +34,11 @@ This generates HelloWorld.bin which is a valid multiboot kernel. The size of thi
 
 `kvm -m 512 -smp 2 -vnc :0 -kernel HelloWorld.bin -monitor stdio` 
 
-By doing this, your kernel boots in only 150ms, well done! 
+By doing this, your kernel boots in only 150ms, well done!
+
+If you want to speed up the booting time, you can use **QBoot**. To do this, just call **kvm** with the following parameters:
+
+`kvm -bios ../../builder/bios.bin  -m 512 -smp 2 -vnc :0 -kernel HelloWorld.bin -monitor stdio`
 
 ## Windows Users
 

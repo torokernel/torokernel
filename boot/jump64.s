@@ -4,12 +4,15 @@ extern _start
 pagedir         equ  100000h
 
 align 8
+
 bits 64
+
+trampoline_add equ 2000h
+
 start64:
  xor rax, rax
  mov rax, rbx
  push rax
- ; pass ebx
  ; We need to page more memory
  call paging
  ; Initialize CMOS shutdown code to 0ah
@@ -17,17 +20,22 @@ start64:
  out 070h, al
  mov al, 0ah
  out 071h, al
- ;
- ; TODO: add SMP support
  ; When the signal INIT is sent, the execution starts in 2000h address 
- ; mov rsi , 2000h
- ; mov [rsi] , byte 0eah
- ; xor rax , rax
- ; mov eax , trampoline_init+boot32
- ; mov [rsi+1] , eax
+ ; Move trampoline code
+ mov rsi , trampoline_init
+ mov rdi , 2000h
+movetrampoline:
+ xor rax , rax
+ mov al , [rsi]
+ mov [rdi] , byte al
+ inc rsi
+ inc rdi
+ cmp rsi , trampoline_end
+ jne movetrampoline
  ; New page directory to handle 512GB
  mov rax , pagedir
  mov cr3 , rax
+ ; Pointer to multiboot structures in rbx
  pop rbx
  jumpkernel:
    jmp _start
@@ -71,3 +79,41 @@ cleanpage:
    cmp rsi , pagedir +4096*514
    jne PDE
   ret
+
+bits 16
+trampoline_init:
+  lgdt [trampoline_gdt - trampoline_init + trampoline_add]
+  lidt [trampoline_idt - trampoline_init + trampoline_add]
+  ; enable protected mode
+  mov ebx, cr0
+  or  ebx, 1
+  mov cr0, ebx
+  db 66h,0EAh
+  dd trampoline_longmode - trampoline_init + trampoline_add
+  dw 8h
+trampoline_gdt:
+  dw 8 * 5 - 1
+  dd 3000h
+trampoline_idt:
+  dw 13ebh
+  dd 3020h
+trampoline_longmode:
+  mov esp , 1000h
+  ; enable long mode
+  mov eax , cr4
+  bts eax , 5
+  mov cr4 , eax
+  mov eax , 90000h
+  mov cr3 , eax
+  mov ecx, 0c0000080h
+  rdmsr
+  bts eax,8
+  wrmsr
+  mov eax,cr0
+  bts eax,31
+  mov cr0,eax
+  db 066h
+  db 0eah
+  dd _start
+  dw 18h
+trampoline_end:

@@ -1,7 +1,30 @@
+;
+; jump64.s
+;
+; This contains the trampoline code to 64 bits
+;
+; Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>          
+; All Rights Reserved
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+;
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 global start64
 extern _start
 
 pagedir         equ  100000h
+IDT             equ  3020h	
+kernel_code64   equ 18h
 
 align 8
 
@@ -20,10 +43,10 @@ start64:
  out 070h, al
  mov al, 0ah
  out 071h, al
- ; When the signal INIT is sent, the execution starts in 2000h address 
+ ; When the signal INIT is sent, the execution starts in trampoline_add address 
  ; Move trampoline code
  mov rsi , trampoline_init
- mov rdi , 2000h
+ mov rdi , trampoline_add
 movetrampoline:
  xor rax , rax
  mov al , [rsi]
@@ -96,7 +119,7 @@ trampoline_gdt:
   dd 3000h
 trampoline_idt:
   dw 13ebh
-  dd 3020h
+  dd IDT
 trampoline_longmode:
   mov esp , 1000h
   ; enable long mode
@@ -115,5 +138,5 @@ trampoline_longmode:
   db 066h
   db 0eah
   dd _start
-  dw 18h
+  dw kernel_code64
 trampoline_end:

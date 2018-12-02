@@ -389,7 +389,7 @@ begin
   bh.size := Size;
   bh.Dirty := False;
   bh.Block := Block;
-  if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(bh.size div FileBlock.BlockSize), Size div FileBlock.BlockSize, bh.data) = 0 then
+  if FileBlock.BlockDriver.ReadBlock(FileBlock, Block *(bh.size div FileBlock.BlockSize), Size div FileBlock.BlockSize, bh.data) = 0 then
   begin
     ToroFreeMem(bh.data);
     ToroFreeMem(bh);

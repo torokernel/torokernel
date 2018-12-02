@@ -424,12 +424,9 @@ end;
 
 procedure ATAHandler(Controller: LongInt);
 begin
-  if GetApicID <> 0 then
-   eoi_apic
-  else
-    eoi;
   ATAControllers[Controller].Driver.WaitOn.State := tsReady;
-  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATA0 Irq Captured, Thread Wake Up: #%h\n', [PtrUInt(ATAControllers[Controller].Driver.WaitOn)]); {$ENDIF}
+  {$IFDEF DebugIdeDisk} WriteDebug('IdeDisk: ATA0 Irq Captured, Thread Wake Up: #%h, Ctr: %d\n', [PtrUInt(ATAControllers[Controller].Driver.WaitOn), Controller]); {$ENDIF}
+  eoi;
 end;
 
 procedure ATA0IrqDelivery; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -504,14 +501,7 @@ asm
   mov rbp , r15
   sub r15 , 32
   mov  rsp , r15
-  // set interruption
-  sti
-  {$IFDEF Win64}
-  xor rcx , rcx
-  {$ELSE WIN64}
   xor edi , edi
-  {$ENDIF WIN64}
-  // call handler
   Call ATAHandler
   mov rsp , rbp
   // restore the registers
@@ -558,14 +548,7 @@ asm
   mov rbp , r15
   sub r15 , 32
   mov  rsp , r15
-  // set interruption
-  sti
-  {$IFDEF Win64}
-  mov rcx , 1
-  {$ELSE WIN64}
   mov edi , 1
-  {$ENDIF WIN64}
-  // call handler
   Call ATAHandler
   mov rsp , rbp
   // restore the registers
@@ -602,15 +585,14 @@ begin
   ATASendCommand(Ctr,ATA_READ);
   {$IFDEF DebugIdeDisk} WriteDebug('ATAReadBlock: prepared and commands sent, Block: %d, Count: %d, Buffer: %h\n', [Block, Count, PtrUInt(Buffer)]); {$ENDIF}
   repeat
-    SysThreadSwitch; // wait for the irq
+    SysThreadSwitch;
     if not ATADataReady(Ctr) or ATAError(Ctr) then
-      Break; // error in operation
-    DisableInt;
+      Break;
+    Inc(ReadCount);
+    if ReadCount <> Count then
+      Ctr.Driver.WaitOn.state := tsSuspended;
     ATAIn(Buffer, Ctr.IOPort);
     Buffer := Pointer(PtrUInt(Buffer) + 512);
-    Inc(ReadCount);
-    Ctr.Driver.WaitOn.state := tsSuspended;
-    RestoreInt;
   until ReadCount = Count;
   Result := ReadCount;
   FreeDevice(FileDesc.BlockDriver);

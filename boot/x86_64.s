@@ -5,7 +5,7 @@
 ; the page directory can handle 512 gb of memory at this time.
 ; It boots for HDD and USB-HDD devices using  Int 13h extension.
 ; 
-; Copyright (c) 2003-2011 Matias Vara <matiasvara@yahoo.com>          
+; Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>          
 ; All Rights Reserved
 ;
 ; This program is free software: you can redistribute it and/or modify
@@ -399,6 +399,7 @@ main64:
  mov rax , pagedir
  mov cr3 , rax
  jumpkernel:
+ xor rbx, rbx
  xor rax , rax
  mov eax , dword [(add_main)+boot32]
  jmp rax

@@ -164,6 +164,7 @@ var
   Cores: array[0..MAX_CPU-1] of TCore;
   LargestMonitorLine: longint;
   SmallestMonitorLine: longint;
+  KernelParam: Pchar = Nil;
 
 implementation
 
@@ -271,6 +272,7 @@ type
 
 var
   idt_gates: PInterruptGateArray; // Pointer to IDT
+  mbpointer: Pointer;
 
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
@@ -778,6 +780,15 @@ type
   end;
   PInt15h_info = ^Int15h_info;
 
+  Pmbentry = ^Tmbentry;
+
+  Tmbentry = packed record
+    Size: dword;
+    Addr: qword;
+    Len: qword;
+    Tp: dword;
+  end;
+
 const
   INT15H_TABLE = $30000;
 
@@ -787,36 +798,69 @@ var
 function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
+  DescMB: Pmbentry;
+  mbp: ^DWORD;
 begin
   if ID > CounterID then
     Result := 0
   else
     Result := SizeOf(TMemoryRegion);
-  Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
-  Buffer.Base := Desc.Base;
-  Buffer.Length := Desc.Length;
-  Buffer.Flag := Desc.tipe;
+  if mbpointer = nil then
+  begin
+    Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
+    Buffer.Base := Desc.Base;
+    Buffer.Length := Desc.Length;
+    Buffer.Flag := Desc.tipe;
+  end
+  else begin
+    mbp := Pointer(mbpointer + 48);
+    DescMB := Pointer(PtrUInt(mbp^));
+    Inc(DescMB, ID-1);
+    Buffer.Base := DescMB.Addr;
+    Buffer.Length := DescMB.Len;
+    Buffer.Flag := DescMB.Tp;
+  end;
 end;
 
+// Count available memory after $100000
 procedure MemoryCounterInit;
 var
-  Magic: ^DWORD;
+  Magic, maplen, mapaddr: ^DWORD;
   Desc: PInt15h_info;
+  DescMB: Pmbentry;
+  Count: DWORD;
 begin
-  CounterID :=0;
+  CounterID := 0;
   AvailableMemory := 0;
-  Magic := Pointer(INT15H_TABLE);
-  Desc := Pointer(INT15H_TABLE);
-  while Magic^ <> $1234 do
+  if mbpointer = nil then
   begin
-    if (Desc.tipe = 1) and (Desc.Base >= $100000) then
-      AvailableMemory := AvailableMemory + Desc.Length;
-    Inc(Magic);
-    Inc(Desc);
+    Magic := Pointer(INT15H_TABLE);
+    Desc := Pointer(INT15H_TABLE);
+    while Magic^ <> $1234 do
+    begin
+      if (Desc.tipe = 1) and (Desc.Base >= $100000) then
+        AvailableMemory := AvailableMemory + Desc.Length;
+      Inc(Magic);
+      Inc(Desc);
+    end;
+    AvailableMemory := AvailableMemory;
+    CounterID := (QWord(Magic)-INT15H_TABLE);
+    CounterID := CounterID div SizeOf(Int15h_info);
+  end else
+  begin
+    maplen := mbpointer + 44;
+    mapaddr := mbpointer + 48;
+    DescMB := Pointer(PtrUInt(mapaddr^));
+    Count := maplen^;
+    while count <> 0 do
+    begin
+      if (DescMB.tp = 1) and (DescMB.addr >= $100000) then
+        AvailableMemory := AvailableMemory + DescMB.Len;
+      Inc(DescMB);
+      Inc(CounterID);
+      Dec(Count, sizeof(Tmbentry));
+    end;
   end;
-  AvailableMemory := AvailableMemory;
-  CounterID := (QWord(Magic)-INT15H_TABLE);
-  CounterID := counterId div SizeOf(Int15h_info);
 end;
 
 procedure Bcd_To_Bin(var val: LongInt); inline;
@@ -1018,6 +1062,7 @@ asm
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
+  mov mbpointer, rbx
   call KernelStart
 end;
 {$ENDIF}
@@ -1401,9 +1446,15 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
+  tmp: ^DWORD;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
+  if mbpointer <> Nil then
+  begin
+    tmp := mbpointer + 16;
+    KernelParam := Pointer(tmp^);  
+  end;
   RelocateIrqs;
   MemoryCounterInit;
   CacheManagerInit;

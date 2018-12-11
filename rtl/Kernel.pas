@@ -41,6 +41,9 @@ uses
   
 procedure KernelStart;
 begin
+  {$IFDEF ProfileBootTime}
+    ShutdownInQemu;
+  {$ENDIF}
   WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);

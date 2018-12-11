@@ -26,6 +26,20 @@ To create the guest by using virsh run the following command:
 
 Note that you need to first edit **HelloWorld.xml** to correct the path of the **HelloWorld.img**.
 
+To reduce the size of the generated image, you can compile Toro as a multiboot kernel. This way you can launch a VM on Qemu by just using the **-kernel** option. To do so, first run:
+
+`../../builder/BuildMultibootKernel.sh HelloWorld`
+
+This generates HelloWorld.bin which is a valid multiboot kernel. The size of this binary is only around 130kb. Now you can just launch Qemu by doing: 
+
+`kvm -m 512 -smp 2 -vnc :0 -kernel HelloWorld.bin -monitor stdio` 
+
+By doing this, your kernel boots in only 150ms, well done!
+
+If you want to speed up the booting time, you can use **QBoot**. To do this, just call **kvm** with the following parameters:
+
+`kvm -bios ../../builder/bios.bin  -m 512 -smp 2 -vnc :0 -kernel HelloWorld.bin -monitor stdio`
+
 ## Windows Users
 
 Windows' users can just use Lazarus to open **HelloWorld.lpi** and launch the compilation and execution of the application directly from the IDE by doing first **Compile** and then **Run**.

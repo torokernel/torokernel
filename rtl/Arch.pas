@@ -128,6 +128,7 @@ procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 procedure ShutdownInQemu;
+procedure Reboot;
 procedure DelayMicro(microseg: LongInt);
 procedure PciWriteWord (const bus, device, func, regnum, value: Word);
 function read_portw(port: Word): Word;
@@ -718,6 +719,18 @@ end;
 procedure ShutdownInQemu;
 begin
   write_portb(0, $f4);
+end;
+
+// reboot using keyboard
+procedure Reboot;
+var
+  good: Byte;
+begin
+  good := 2;
+  while good and 2 = 1 do
+    good := read_portb($64);
+  write_portb($FE, $64);
+  hlt;
 end;
 
 function read_rdtsc: Int64;

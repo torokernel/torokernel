@@ -42,7 +42,7 @@ uses
 procedure KernelStart;
 begin
   {$IFDEF ProfileBootTime}
-    ShutdownInQemu;
+    Reboot;
   {$ENDIF}
   WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;

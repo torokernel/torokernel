@@ -29,7 +29,7 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 16 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
@@ -41,8 +41,8 @@ uses
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
   Ide in '..\..\rtl\drivers\IdeDisk.pas',
-  Ext2 in '..\..\rtl\drivers\Ext2.pas',
-  // Fat in '..\..\rtl\drivers\Fat.pas',
+  // Ext2 in '..\..\rtl\drivers\Ext2.pas',
+  Fat in '..\..\rtl\drivers\Fat.pas',
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas',
   //E1000 in '..\..\rtl\drivers\E1000.pas';
@@ -123,8 +123,8 @@ begin
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
-  SysMount('ext2','ATA0',5);
-  //SysMount('fat','ATA0',6);
+  //SysMount('ext2','ATA0',5);
+  SysMount('fat','ATA0',6);
 
   if SysStatFile('/web/index.html', @idx) = 0 then
   begin

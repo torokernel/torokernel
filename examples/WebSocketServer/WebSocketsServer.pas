@@ -21,11 +21,11 @@
 program WebSocketsServer;
 
 {$mode delphi}
-{. $DEFINE FAT}
-{$DEFINE EXT2}
+{$DEFINE FAT}
+{. $DEFINE EXT2}
 {. $DEFINE DebugWebServer}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=WebSocketsServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=WebSocketsFiles.img -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=WebSocketsServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:WebSocketsFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses

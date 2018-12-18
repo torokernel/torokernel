@@ -61,8 +61,6 @@ if [ -f $appbin ]; then
    echo "qemu.args=$qemuparams"
    echo "Press Ctrl-a x to exit emulator"
    kvm -kernel $appbin $qemuparams $3
-   GuestPID=$!
-   echo "Guest PID=$GuestPID"
 else
    echo "$appbin does not exist, exiting"
    exit 1

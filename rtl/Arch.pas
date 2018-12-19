@@ -194,6 +194,7 @@ const
 
   // Address of Page Directory
   PDADD = $100000;
+  Kernel_Param = $200000;
   IDTADDRESS = $3020;
 
   Kernel_Code_Sel = $18;
@@ -1460,13 +1461,23 @@ procedure ArchInit;
 var
   I: LongInt;
   tmp: ^DWORD;
+  p: PChar;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   if mbpointer <> Nil then
   begin
     tmp := mbpointer + 16;
-    KernelParam := Pointer(tmp^);  
+    p := Pointer(tmp^);
+    KernelParam := Pointer(Kernel_Param);
+    while p^ <> #0 do
+    begin
+      KernelParam^ := p^;
+      Inc(KernelParam);
+      Inc(p);
+    end;
+    KernelParam^ := #0; 
+    KernelParam := Pointer(Kernel_Param); 
   end;
   RelocateIrqs;
   MemoryCounterInit;

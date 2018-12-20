@@ -48,7 +48,7 @@ const
   // Network address
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   HTTP_PORT = 80;
   HTTPSERVER_TIMEOUT = 20000;
@@ -244,7 +244,17 @@ begin
   //WriteConsoleF('TestWebSocket Done\n', []);
 end;
 
+var
+  LocalIp: array[0..3] of Byte;
 begin
+  If GetKernelParam(1)^ = #0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+  end else
+  begin
+    IPStrtoArray(GetKernelParam(1), LocalIp);
+    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  end;
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   DedicateBlockDriver('ATA0', 0);
   {$IFDEF EXT2} SysMount('ext2', 'ATA0', 5); {$ENDIF}

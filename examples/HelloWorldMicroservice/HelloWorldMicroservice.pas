@@ -43,7 +43,7 @@ const
   // TCP-Stack configuration values
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   // port wher the service listens
   SERVICE_PORT = 8080;
@@ -79,6 +79,7 @@ var
    ServiceServer: PSocket;
    ServiceHandler: TNetworkHandler;
    MyMicroFunction : TMicroserviceFunction;
+   LocalIp: array[0..3] of Byte;
 
 // Service Initialization
 procedure ServiceInit;
@@ -223,8 +224,14 @@ begin
 end;
 
 begin
-  // dedicate the virtio network card to local cpu
-  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  If GetKernelParam(1)^ = #0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+  end else
+  begin
+    IPStrtoArray(GetKernelParam(1), LocalIp);
+    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  end;
 
   // register service callback
   ServiceHandler.DoInit    := @ServiceInit;

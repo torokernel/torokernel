@@ -51,7 +51,7 @@ uses
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
@@ -66,6 +66,7 @@ var
   BuffLeninChar: array[0..10] of char;
   indexSize: Longint;
   HttpContentLen : Longint;
+  LocalIp: array[0..3] of Byte;
 
 procedure HttpInit;
 begin
@@ -117,8 +118,14 @@ begin
 end;
 
 begin
-  //DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
-  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  If GetKernelParam(1)^ = #0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+  end else
+  begin
+    IPStrtoArray(GetKernelParam(1), LocalIp);
+    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  end;
 
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);

@@ -20,6 +20,10 @@ If you want to redirect the screen through vnc execute:
 
 You can connect the vnc client to **localhost:5900**
 
+If you want to change the default IP (192.100.200.100) to 192.100.200.40, run:
+
+`../CloudIt.sh StaticWebServer "" "-vnc :0 -append 192.100.200.40"`
+
 If you want to enable some debug symbols in the unit **Process** and check what Toro is doing just run:
 
 `../CloudIt.sh StaticWebServer "-dEnableDebug -dDebugProcess"`

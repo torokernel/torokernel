@@ -142,6 +142,7 @@ procedure hlt; assembler;
 procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
+function GetKernelParam(I: LongInt): Pchar;
 
 const
   MP_START_ADD = $e0000;
@@ -1455,6 +1456,22 @@ end;
 procedure WriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
 asm
   sfence
+end;
+
+function GetKernelParam(I: LongInt): Pchar;
+var
+  tmp: Pchar;
+begin
+  tmp := KernelParam;
+  while (tmp^ <> #0) and (I > 0) do
+  begin
+    If tmp^ = ' ' then
+    begin
+      Dec(I);
+    end;
+    Inc(tmp);
+  end;
+  Result := tmp;
 end;
 
 procedure ArchInit;

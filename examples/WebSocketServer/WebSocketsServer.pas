@@ -21,11 +21,11 @@
 program WebSocketsServer;
 
 {$mode delphi}
-{. $DEFINE FAT}
-{$DEFINE EXT2}
+{$DEFINE FAT}
+{. $DEFINE EXT2}
 {. $DEFINE DebugWebServer}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=WebSocketsServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=WebSocketsFiles.img -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=WebSocketsServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:WebSocketsFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
@@ -48,7 +48,7 @@ const
   // Network address
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   HTTP_PORT = 80;
   HTTPSERVER_TIMEOUT = 20000;
@@ -244,7 +244,17 @@ begin
   //WriteConsoleF('TestWebSocket Done\n', []);
 end;
 
+var
+  LocalIp: array[0..3] of Byte;
 begin
+  If GetKernelParam(1)^ = #0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+  end else
+  begin
+    IPStrtoArray(GetKernelParam(1), LocalIp);
+    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  end;
   DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   DedicateBlockDriver('ATA0', 0);
   {$IFDEF EXT2} SysMount('ext2', 'ATA0', 5); {$ENDIF}

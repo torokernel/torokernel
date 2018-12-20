@@ -1,10 +1,10 @@
 # Hello World Microservice Example
 
-This is a example of a microservice in Toro that shows the use of the network stack. This is a very simple microservice that just answers "Hello World" on port 8080. To try this example, you need to firs create a bridge and tells qemu to use it. To do this, edit **/etc/qemu-ifup** and modify the line switch by **switch=toro-bridge**. Then, go to **examples** directory and run:
+This is a example of a microservice in Toro that sends "Hello World" on port 8080. To run this example, you need to firs create a bridge and tells qemu to use it. To do this, edit **/etc/qemu-ifup** and modify the line switch by **switch=toro-bridge**. Then, go to **examples** directory and run:
 
 `virsh net-create toro-kvm-network.xml`
 
-Second, you can use Lazarus to open **HelloWorldMicroservice.lpi** or you can just use **CloudIt** form the command line to test it. The main code is in **HelloWorldMicroservice.pas**. To compile and try the application on QEMU, go to the **HelloWorldMicroservice** directory and run:
+Second to compile and run the application on QEMU, go to the **HelloWorldMicroservice** directory and run:
 
 `../CloudIt.sh HelloWorldMicroservice "" "-display gtk"` 
 
@@ -18,18 +18,22 @@ If you want to redirect the screen through VNC just run:
 
 You can connect then connect the client to **localhost:5900**
 
+If you want to change the default IP (192.100.200.100) to 192.100.200.40, run:
+
+`../CloudIt.sh HelloWorldMicroservice "" "-vnc :0 -append 192.100.200.40"`
+
 If you want to enable some debug symbols in the unit **Process** and check what Toro is doing just run:
 
 `../CloudIt.sh HelloWorldMicroservice "-dEnableDebug -dDebugProcess"`
 
 You will see how toro begins to initialize the unit by calling the scheduler.
 
-To create the guest by using virsh run the following command:
+If you want to forward ports between host and guest, execute:
 
-`virsh create HelloWorldMicroservice.xml`
+`../Forward.sh 192.100.200.100 8080 80`
 
-Note that you need to first edit **HelloWorldMicroservice.xml** to correct the path of the **HelloWorldMicroservice.img**.
+By doing this, you create a non-persistent rule that forwards connections to Host:80 to 192.100.200.100:8080. In this example, the IP corresponds with the guest IP. 
 
 ## Windows Users
 
-Windows' users can just use Lazarus to open **HelloWorldMicroservice.lpi** and launch the compilation and execution of the application directly from the IDE by doing first **Compile** and then **Run**.
+Windows' users should use Lazarus to open **HelloWorldMicroservice.lpi** and launch the compilation and execution of the application directly from the IDE by doing first **Compile** and then **Run**.

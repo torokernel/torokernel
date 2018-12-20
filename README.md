@@ -14,26 +14,22 @@ Toro is a kernel that allows the user to dedicate a whole kernel to run a single
 * Network Stack
 * Network drivers:
   - Virtio-net, E1000, NE2000
-* Disk Drivers:
-  - ATA Disks
-* FileSystems:
+* Disk drivers:
+  - ATA disks
+* FileSystem drivers:
   - Ext2, Fat
 * Fast boot up
 * Tiny image
 
 ## Examples
 
-The repository of Toro includes examples that show basic functionalities of the kernel. These examples are in the **examples** directory. Each example contains the instruction to compile it and run it on QEMU-KVM. We recommend to start with the **HelloWorld** example. Before go to the example, you need to follow the next instructions. First, install Lazarus and QEMU-KVM:
+The repository of Toro includes examples that show basic functionalities of the kernel. These examples are in the **examples** directory. Each example contains the instruction to compile it and run it on QEMU-KVM. We recommend to start with the **HelloWorld** example. Before go to the example, you need to install Lazarus and QEMU-KVM:
 
 `apt-get install lazarus`
 
 `sudo apt-get install qemu-kvm libvirt-bin ubuntu-vm-builder bridge-utils virtinst`
 
-Then, compile the builder by going to `torokernel/builder/` and executing:
-
-`fpc build.pas`
-
-If you want to just try Toro, you can follow a simple tutorial [here](https://github.com/mesarpe/torokernel-docker-qemu-webservices) that aims at running a static web server inside a docker image. 
+To try Toro, you can follow a simple tutorial [here](https://github.com/mesarpe/torokernel-docker-qemu-webservices) that aims at running a static web server inside a docker image. 
 
 ## Contributing
 

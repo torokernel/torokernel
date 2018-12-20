@@ -1,1 +1,1 @@
--smp 1 -m 256 -nographic -drive format=raw,file=WebSocketsFiles.img -net nic,model=virtio -net tap,ifname=tap0
+-smp 1 -m 256 -nographic -hdb fat:rw:WebSocketsFiles -net nic,model=virtio -net tap,ifname=tap0

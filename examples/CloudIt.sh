@@ -25,6 +25,7 @@ app="$1";
 appsrc="$app.pas";
 applpi="$app.lpi";
 appimg="$app.img";
+appbin="$app.bin";
 qemufile="qemu.args";
 
 # check parameters
@@ -50,25 +51,17 @@ rm -f $appimg
 rm -f $app "$app.o"
 
 if [ -f $appsrc ]; then
-   fpc -TLinux $2 -O2 $appsrc -o$app -Fu../../rtl/ -Fu../../rtl/drivers -MObjfpc
-   if [ -f ../../builder/build ]; then
-      ../../builder/build 4 $app ../../builder/boot.o $appimg
-   else
-      echo "Compile builder first!"
-      exit 1
-   fi
+   ../../builder/BuildMultibootKernel.sh $app
 else
    echo "$appsrc does not exist, exiting"
    exit 1
 fi
 
-if [ -f $appimg ]; then
+if [ -f $appbin ]; then
    echo "qemu.args=$qemuparams"
    echo "Press Ctrl-a x to exit emulator"
-   kvm -drive format=raw,file=$appimg $qemuparams $3
-   GuestPID=$!
-   echo "Guest PID=$GuestPID"
+   kvm -kernel $appbin $qemuparams $3
 else
-   echo "$appimg does not exist, exiting"
+   echo "$appbin does not exist, exiting"
    exit 1
 fi

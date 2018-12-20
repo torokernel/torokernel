@@ -12,7 +12,7 @@ WebSocketsServer.o
 ../../rtl/Filesystem.o
 ../../rtl/drivers/Pci.o
 ../../rtl/drivers/IdeDisk.o
-../../rtl/drivers/Ext2.o
+../../rtl/drivers/Fat.o
 ../../rtl/drivers/Console.o
 ../../rtl/drivers/VirtIONet.o
 ../../rtl/Network.o

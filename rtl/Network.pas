@@ -255,6 +255,7 @@ function GetLocalMAC: THardwareAddress;
 function GetMacAddress(IP: TIPAddress): PMachine;
 procedure _IPAddress(const Ip: array of Byte; var Result: TIPAddress);
 procedure _IPAddresstoArray(const Ip: TIPAddress; out Result: array of Byte);
+procedure IPStrtoArray(Ip: Pchar; out Result: array of Byte);
 function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: Longint; seq, id: word): Longint;
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
@@ -397,6 +398,30 @@ begin
   Result[1] := (Ip and $ff00) shr 8;
   Result[2] := Ip and $ff0000 shr 16;
   Result[3] := Ip and $ff000000 shr 24;
+end;
+
+// Ip can be null char ending or space char ending
+procedure IPStrtoArray(Ip: Pchar; out Result: array of Byte);
+var
+  Count, Value: byte;
+begin
+  Count := 0;
+  Value := 0;
+  while (Ip^ <> #0) and (Ip^ <> ' ') do
+  begin
+    if Ip^ = '.' then
+    begin
+      Result[Count] := Value;
+      Value := 0;
+      Inc(Count);
+    end else
+    begin
+      Value := Value * 10;
+      Value := Value + (Byte(Ip^) - Byte('0'));
+    end;
+    Inc(Ip);
+  end;
+  Result[Count] := Value;
 end;
 
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);

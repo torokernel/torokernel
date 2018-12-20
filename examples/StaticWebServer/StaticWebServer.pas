@@ -29,7 +29,7 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive format=raw,file=ToroFiles.img -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 16 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
@@ -41,8 +41,8 @@ uses
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
   Ide in '..\..\rtl\drivers\IdeDisk.pas',
-  Ext2 in '..\..\rtl\drivers\Ext2.pas',
-  // Fat in '..\..\rtl\drivers\Fat.pas',
+  // Ext2 in '..\..\rtl\drivers\Ext2.pas',
+  Fat in '..\..\rtl\drivers\Fat.pas',
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas',
   //E1000 in '..\..\rtl\drivers\E1000.pas';
@@ -51,7 +51,7 @@ uses
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  LocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
+  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
@@ -66,6 +66,7 @@ var
   BuffLeninChar: array[0..10] of char;
   indexSize: Longint;
   HttpContentLen : Longint;
+  LocalIp: array[0..3] of Byte;
 
 procedure HttpInit;
 begin
@@ -117,14 +118,20 @@ begin
 end;
 
 begin
-  //DedicateNetwork('e1000', LocalIP, Gateway, MaskIP, nil);
-  DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  If GetKernelParam(1)^ = #0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+  end else
+  begin
+    IPStrtoArray(GetKernelParam(1), LocalIp);
+    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+  end;
 
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 
-  SysMount('ext2','ATA0',5);
-  //SysMount('fat','ATA0',6);
+  //SysMount('ext2','ATA0',5);
+  SysMount('fat','ATA0',6);
 
   if SysStatFile('/web/index.html', @idx) = 0 then
   begin

@@ -142,6 +142,7 @@ procedure hlt; assembler;
 procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
+function GetKernelParam(I: LongInt): Pchar;
 
 const
   MP_START_ADD = $e0000;
@@ -194,6 +195,7 @@ const
 
   // Address of Page Directory
   PDADD = $100000;
+  Kernel_Param = $200000;
   IDTADDRESS = $3020;
 
   Kernel_Code_Sel = $18;
@@ -1456,17 +1458,43 @@ asm
   sfence
 end;
 
+function GetKernelParam(I: LongInt): Pchar;
+var
+  tmp: Pchar;
+begin
+  tmp := KernelParam;
+  while (tmp^ <> #0) and (I > 0) do
+  begin
+    If tmp^ = ' ' then
+    begin
+      Dec(I);
+    end;
+    Inc(tmp);
+  end;
+  Result := tmp;
+end;
+
 procedure ArchInit;
 var
   I: LongInt;
   tmp: ^DWORD;
+  p: PChar;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   if mbpointer <> Nil then
   begin
     tmp := mbpointer + 16;
-    KernelParam := Pointer(tmp^);  
+    p := Pointer(tmp^);
+    KernelParam := Pointer(Kernel_Param);
+    while p^ <> #0 do
+    begin
+      KernelParam^ := p^;
+      Inc(KernelParam);
+      Inc(p);
+    end;
+    KernelParam^ := #0; 
+    KernelParam := Pointer(Kernel_Param); 
   end;
   RelocateIrqs;
   MemoryCounterInit;

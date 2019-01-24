@@ -27,6 +27,7 @@ applpi="$app.lpi";
 appimg="$app.img";
 appbin="$app.bin";
 qemufile="qemu.args";
+compileropt="$2";
 
 # check parameters
 if [ "$#" -lt 1 ]; then
@@ -51,7 +52,7 @@ rm -f $appimg
 rm -f $app "$app.o"
 
 if [ -f $appsrc ]; then
-   ../../builder/BuildMultibootKernel.sh $app
+   ../../builder/BuildMultibootKernel.sh $app "$compileropt"
 else
    echo "$appsrc does not exist, exiting"
    exit 1

@@ -48,3 +48,5 @@ GPLv3
 
 [2] Matias Vara, Cesar Bernardini. Toro, a Dedicated Kernel for Microservices. Open Source Summit Europe 2018.
 
+[3] Matias Vara. Speeding Up the Booting Time of a Toro Appliance. FOSDEM 2019.
+

@@ -1,1 +1,1 @@
--smp 1 -m 16 -nographic -hdb fat:rw:StaticWebServerFiles -net nic,model=virtio -net tap,ifname=tap0
+-smp 1 -m 256 -nographic -hdb fat:rw:StaticWebServerFiles -net nic,model=virtio -net tap,ifname=tap0

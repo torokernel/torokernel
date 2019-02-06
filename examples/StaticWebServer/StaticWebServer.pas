@@ -29,12 +29,12 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 16 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
   Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..rtl\Process.pas',
+  Process in '..\..\rtl\Process.pas',
   Memory in '..\..\rtl\Memory.pas',
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
@@ -57,62 +57,24 @@ const
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
 
 var
-  HttpServer: PSocket;
+  HttpServer, HttpClient: PSocket;
   Buffer: char;
   Buf, HttpContent, tmp2: ^Char;
   tmp: THandle;
-  HttpHandler: TNetworkHandler;
   idx: TInode;
   BuffLeninChar: array[0..10] of char;
   indexSize: Longint;
   HttpContentLen : Longint;
   LocalIp: array[0..3] of Byte;
+  tid: TThreadID;
 
-procedure HttpInit;
+function ProcessesSocket(Socket: Pointer): PtrInt;
 begin
-  HttpServer := SysSocket(SOCKET_STREAM);
-  HttpServer.Sourceport := 80;
-  SysSocketListen(HttpServer, 50);
-end;
-
-function HttpAccept(Socket: PSocket): LongInt;
-var
-  tmpPing: array[0..3] of byte;
-begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   SysSocketSelect(Socket, 20000);
-  Result := 0;
-end;
-
-function HttpReceive(Socket: PSocket): LongInt;
-var
-  tmpPing: array[0..3] of byte;
-begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
   while SysSocketRecv(Socket, @Buffer, 1, 0) <> 0 do
   begin
   end;
   SysSocketSend(Socket, HttpContent, HttpContentLen, 0);
-  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  SysSocketClose(Socket);
-  Result := 0;
-end;
-
-function HttpClose(Socket: PSocket): LongInt;
-var
-  tmpPing: array[0..3] of byte;
-begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  SysSocketClose(Socket);
-  Result := 0;
-end;
-
-function HttpTimeOut(Socket: PSocket): LongInt;
-begin
-  WriteConsoleF ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
   SysSocketClose(Socket);
   Result := 0;
 end;
@@ -161,14 +123,16 @@ begin
   HttpContent := tmp2;
   ToroFreeMem(Buf);
 
-  HttpHandler.DoInit    := @HttpInit;
-  HttpHandler.DoAccept  := @HttpAccept;
-  HttpHandler.DoTimeOut := @HttpTimeOut;
-  HttpHandler.DoReceive := @HttpReceive;
-  HttpHandler.DoClose   := @HttpClose;
+  HttpServer := SysSocket(SOCKET_STREAM);
+  HttpServer.Sourceport := 80;
+  HttpServer.Blocking := True;
+  SysSocketListen(HttpServer, 50);
+  WriteConsoleF('\t /VWebServer/n: listening ...\n',[]);
 
-  SysRegisterNetworkService(@HttpHandler);
-  WriteConsoleF('\t /VToroWebServer/n: listening ...\n',[]);
+  while true do
+  begin
+    HttpClient := SysSocketAccept(HttpServer);
+    tid := BeginThread(nil, 4096, ProcessesSocket, HttpClient, 0, tid);
+  end;
 
-  SysSuspendThread(0);
 end.

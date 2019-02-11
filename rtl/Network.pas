@@ -1316,10 +1316,10 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch;
+      SysThreadSwitch(True);
       Continue;
     end;
-    //SysThreadActive;
+    SysThreadActive;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1619,7 +1619,7 @@ begin
     if Service.ClientSocket = nil then
       SysThreadSwitch(True)
     else
-      SysThreadSwitch;
+      SysThreadSwitch(False);
   end;
   Result := 0;
 end;
@@ -1826,6 +1826,7 @@ begin
   While true do
   begin
     NextSocket := Service.ClientSocket;
+    SysThreadActive;
     while NextSocket <> nil do
     begin
       tmp := NextSocket;
@@ -1839,7 +1840,7 @@ begin
         Exit;
       end;
     end;
-    SysThreadSwitch;
+    SysThreadSwitch(True);
   end;
 end;
 
@@ -1911,6 +1912,7 @@ begin
   Result := True;
   while true do
   begin
+    SysThreadActive;
     {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
     if Socket.State = SCK_LOCALCLOSING then
     begin
@@ -1932,7 +1934,7 @@ begin
       begin
         Exit;
       end;
-      SysThreadSwitch;
+      SysThreadSwitch(True);
     end else
     begin
       Exit;

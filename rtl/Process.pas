@@ -1120,7 +1120,7 @@ end;
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;
-  CurrentThreadContext, LastThread, Th, PosibleCandidate: PThread;
+  CurrentThread, LastThread, Th, tmp: PThread;
   NextTurnHalt: Boolean;
   rbp_reg: pointer;
 begin
@@ -1145,33 +1145,33 @@ begin
     end;
     Emigrating(CurrentCPU);
     Inmigrating(CurrentCPU);
-    CurrentThreadContext := CurrentCPU.CurrentThread;
-    PosibleCandidate := Candidate;
-    if PosibleCandidate <> nil then
-      LastThread := PosibleCandidate
+    CurrentThread := CurrentCPU.CurrentThread;
+    tmp := Candidate;
+    if Candidate <> nil then
+      LastThread := Candidate
     else
     begin
       LastThread := CurrentCPU.CurrentThread;
-      PosibleCandidate := LastThread.Next;
+      Candidate := LastThread.Next;
     end;
     repeat
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(PosibleCandidate), PosibleCandidate.State]); {$ENDIF}
-      if PosibleCandidate.State = tsReady then
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
+      if Candidate.State = tsReady then
         Break
-      else if (PosibleCandidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
+      else if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
         Break
-      else if (PosibleCandidate.State = tsIOPending) and not PosibleCandidate.IOScheduler.DeviceState^ then
+      else if (Candidate.State = tsIOPending) and not Candidate.IOScheduler.DeviceState^ then
       begin
-        PosibleCandidate.State := tsReady;
+        Candidate.State := tsReady;
         Break;
       end else
-        PosibleCandidate := PosibleCandidate.Next;
-    until PosibleCandidate = LastThread;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [PosibleCandidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
-    if (PosibleCandidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
+        Candidate := Candidate.Next;
+    until Candidate = LastThread;
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
+    if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
     else
     begin
-      if (PosibleCandidate.State <> tsReady) then
+      if (Candidate.State <> tsReady) then
       begin
         if (CurrentCPU.PollingThreadCount = CurrentCPU.PollingThreadTotal) and (CurrentCPU.PollingThreadCount <> 0) then
         begin
@@ -1205,14 +1205,14 @@ begin
       end;
     end;
     NextTurnHalt := False;
-    CurrentCPU.CurrentThread := PosibleCandidate;
+    CurrentCPU.CurrentThread := Candidate;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(PosibleCandidate), PosibleCandidate.State, PtrUInt(PosibleCandidate.ret_thread_sp)]); {$ENDIF}
-    if PosibleCandidate = CurrentThreadContext then
+    if Candidate = CurrentThread then
       Exit;
     GetRBP;
-    If Candidate = nil then
-      CurrentThreadContext.ret_thread_sp := rbp_reg;
-    rbp_reg := PosibleCandidate.ret_thread_sp;
+    If tmp = nil then
+      CurrentThread.ret_thread_sp := rbp_reg;
+    rbp_reg := Candidate.ret_thread_sp;
     StoreRBP;
     Break;
   end;

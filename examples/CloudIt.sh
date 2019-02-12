@@ -46,7 +46,6 @@ fi
 
 # remove all compiled files
 rm -f ../../rtl/*.o ../../rtl/*.ppu
-rm -f $appimg
 
 # remove the application
 rm -f $app "$app.o"

@@ -82,20 +82,20 @@ begin
   buffer := rq.BufferEnd;
   // Calculate len of the request
   if i <> 0 then
-    Len :=  i - 4
+    Len :=  i - 3
   else
     Len := 0;
   while (SysSocketRecv(Socket, @buf,1,0) <> 0)do
   begin
-    if ((i>4) and (buf = #32)) or (Len = Max_Path_Len) then
+    if ((i>3) and (buf = #32)) or (Len = Max_Path_Len) then
     begin
       buffer^ := #0;
       Result := True;
       Exit;
     end;
-    if (i>4) then
+    if (i>3) then
     begin
-      Len := i - 4;
+      Len := i - 3;
       buffer^ := buf;
       buffer +=1;
       rq.BufferEnd += 1;
@@ -222,8 +222,8 @@ begin
     rq := ToroGetMem(sizeof(TRequest));
     rq.BufferStart := ToroGetMem(Max_Path_Len);
     rq.BufferEnd := rq.BufferStart;
-    rq.counter:= 0;
-    HttpClient.UserDefined:= rq;
+    rq.counter := 0;
+    HttpClient.UserDefined := rq;
     tid := BeginThread(nil, 4096, ProcessesSocket, HttpClient, 0, tid);
   end;
 

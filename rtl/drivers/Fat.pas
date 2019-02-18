@@ -351,7 +351,7 @@ begin
     Result := ret;
 end;
 
-function FatLookUpInode(Ino: PInode; const Name: AnsiString): PInode;
+function FatLookUpInode(Ino: PInode; Name: PXChar): PInode;
 var
   j, blk: LongInt;
   ch: Byte;
@@ -369,15 +369,15 @@ begin
     Exit;
   end;
   pfat := Ino.SuperBlock.SbInfo;
-  for j := 1 to Length(Name) do
+  for j := 0 to (Length(Name) - 1) do
   begin
    if (Name[j] >= 'a') or (Name[j] <= 'z') then
    begin
      ch := Byte(Name[j]) xor $20;
-     NameFat[j-1] := Char(ch);
+     NameFat[j] := Char(ch);
    end else
    begin
-     NameFat[j-1] := Name[j];
+     NameFat[j] := Name[j];
    end;
   end;
   NameFat[Length(Name)] := #0;

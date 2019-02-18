@@ -521,6 +521,7 @@ begin
     Result := Ino;
     RemoveInode(Storage.FilesystemMounted.InodeCache.FreeInodesCache,Ino);
     AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer,Ino);
+    Ino.Count := 1;
     {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
@@ -550,6 +551,7 @@ end;
 
 procedure PutInode(Inode: PInode);
 begin
+  {$IFDEF DebugFS} WriteDebug('PutInode: Inode %d, Count: %d\n', [Inode.ino, Inode.Count]); {$ENDIF}
   Dec(Inode.Count);
   if Inode.Count > 0 then
     Exit;

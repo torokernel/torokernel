@@ -126,7 +126,7 @@ begin
   Result := False;
   sb_fat := sb.SbInfo;
   pfat := ToroGetMem(sb_fat^.pbpb^.bpb_fatsz16 * sb_fat^.pbpb^.bpb_bytspersec);
-  Panic ( pfat = nil, 'FatLoadTable: out of memory');
+  Panic ( pfat = nil, 'FatLoadTable: out of memory', []);
   tmpfat := pfat;
   for j := 1 to (1 + sb_fat^.pbpb^.bpb_fatsz16 - 1) do
   begin
@@ -157,7 +157,7 @@ begin
   if (pfatboot.BS_FilSysType[1] = 'F') and (pfatboot.BS_FilSysType[5] = '6') then
   begin
     pfat := ToroGetMem(sizeof(super_fat));
-    Panic(pfat = nil, 'FatReadSuper: out of memory');
+    Panic(pfat = nil, 'FatReadSuper: out of memory', []);
     pfat.InodesQueue:= nil;
     pfat.InodesQueueTail:= nil;
     pfat.pbpb := pfatboot;

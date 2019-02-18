@@ -116,7 +116,7 @@ function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch(const Idle: Boolean = False);
 procedure ThreadExit(Schedule: Boolean);
-procedure Panic(const cond: Boolean; const Format: AnsiString);
+procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 procedure SysThreadActive;
 
 var
@@ -1238,7 +1238,7 @@ var
 begin
   CpuID := GetApicID;
   CPU[CpuID].CurrentThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
-  Panic(CPU[CpuID].CurrentThread.TLS = nil, 'SysAllocateThreadVars: Out of memory');
+  Panic(CPU[CpuID].CurrentThread.TLS = nil, 'SysAllocateThreadVars: Out of memory', []);
   {$IFDEF DebugProcess} WriteDebug('SysAllocateThreadVars - TLS: %h Size: %d\n', [PtrUInt(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE]); {$ENDIF}
 end;
 
@@ -1392,7 +1392,7 @@ begin
 end;
 
 // Halt core if a Panic condition is reached
-procedure Panic(const cond: Boolean; const Format: AnsiString);
+procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 var
  rbp_reg: QWord;
  addr: pointer;
@@ -1401,8 +1401,8 @@ begin
     Exit;
   DisableInt;
   WriteConsoleF('/RPanic/n:\n',[]);
-  WriteConsoleF(Format,[]);
-  {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
+  WriteConsoleF(Format, Args);
+  {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, Args); {$ENDIF}
   {$IFDEF DebugCrash}
   WriteConsoleF('Backtrace:\n',[]);
   // FIXME: Print the whole stack
@@ -1417,7 +1417,7 @@ end;
 
 procedure ProcessInit;
 begin
-  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
+  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n', []);
   {$IFDEF DebugProcess}
     if LocalCpuSpeed = MAX_CPU_SPEED_MHZ then
       WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ\n',[]);

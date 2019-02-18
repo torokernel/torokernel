@@ -369,7 +369,7 @@ begin
     begin
       Machine := DedicateNetworks[CPUID].TranslationTable;
       PrevMachine := Machine;
-      Panic (Machine = nil, 'AddTranslateIp: Run out of memory');
+      Panic (Machine = nil, 'AddTranslateIp: Run out of memory', []);
       while Machine.Next <> nil do
       begin
         PrevMachine := Machine;

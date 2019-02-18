@@ -481,7 +481,7 @@ begin
   if BlockList.Count = BlockList.Capacity-1 then
   begin
     if not BlockListExpand(BlockList) then
-      Panic(True, 'BlockListAdd: No enough memory for expanding a list\n');
+      Panic(True, 'BlockListAdd: No enough memory for expanding a list\n', []);
   end;
   {$IFDEF DebugMemory}WriteDebug('BlockListAdd: Chunk: %h, List: %h, Count: %d\n', [PtrUInt(P), PtrUInt(BlockList), BlockList.Count]); {$ENDIF}
 end;
@@ -763,7 +763,7 @@ begin
     GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
     WriteDebug('ToroGetMem: Header SXSize %d - List SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
-  Panic(IsFree(Result)=0,'ToroGetMem: the memory block list has been corrupted\n');
+  Panic(IsFree(Result)=0,'ToroGetMem: the memory block list has been corrupted\n', []);
   ResetFreeFlag(Result);
   {$IFDEF HEAP_STATS}
     Inc(MemoryAllocator.CurrentAllocatedSize, DirectorySX[SX]);
@@ -789,7 +789,7 @@ begin
   GetHeader(Result , bCPU, bSX, bIsFree, bIsPrivateHeap, bSize);
   WriteDebug('ToroGetMem: Header SXSize %d - Lista SXSize %d \n', [DirectorySX[bSX],DirectorySX[SX]]);
   {$ENDIF}
-  Panic(IsFree(Result)=0, 'ToroGetMem: the memory block list has been corrupted\n');
+  Panic(IsFree(Result)=0, 'ToroGetMem: the memory block list has been corrupted\n', []);
   ResetFreeFlag(Result);
   Dec(BlockList.Count);
   {$IFDEF HEAP_STATS}
@@ -821,8 +821,9 @@ var
 begin
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
+  Panic(Size = 0, 'ToroFreeMem: Size of pointer %h cannot be zero, memory has been corrupted\n', [PtrUInt(P)]);
   {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: GetHeader Size %d, p: %h\n', [DirectorySX[SX], PtrUInt(P)]); {$ENDIF}
-  Panic(IsFree = FLAG_FREE, 'ToroFreeMem: memory block list corrupted\n');
+  Panic(IsFree = FLAG_FREE, 'ToroFreeMem: memory block list corrupted\n', []);
   if IsPrivateHeap = FLAG_PRIVATE_HEAP then
   begin
     SetFreeFlag(P); // not necessary, just in case we want to check that a block is not freed twice
@@ -1060,8 +1061,8 @@ begin
       Break;
     Inc(ID);
   end;
-  Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n');
-  Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n');
+  Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n', []);
+  Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n', []);
   AssignableMemory := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
   MemoryPerCpu := AssignableMemory div CPU_COUNT;
   WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);

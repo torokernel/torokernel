@@ -248,7 +248,7 @@ function AllocInodeFat(sb: psb_fat; entry: pdirectory_entry; bh: PBufferHead): p
 var
   tmp : pfat_inode_info;
 begin
-  tmp := ToroGetMem(sizeof(pfat_inode_info));
+  tmp := ToroGetMem(sizeof(fat_inode_info));
   if tmp = nil then
   begin
    Result := nil;

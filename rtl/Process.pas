@@ -1206,7 +1206,7 @@ begin
     end;
     NextTurnHalt := False;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(PosibleCandidate), PosibleCandidate.State, PtrUInt(PosibleCandidate.ret_thread_sp)]); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate), Candidate.State, PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     GetRBP;

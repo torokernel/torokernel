@@ -161,9 +161,9 @@ const
   Ext2Date : TNow = ( Sec : 0 ; Min : 0 ; Hour : 0 ; Day : 1 ; Month : 1; Year : 1970 );
 
 function AddFreeBlocktoInode (Inode: PInode; I: Longint): Boolean;forward;
-function AddFiletoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;forward;
+function AddFiletoInodeDir(Ino: PInode; Name: PXChar; Inode: Longint): Boolean;forward;
 function InitializeInodeDir(Ino: PInode; Inode: Longint): Boolean;forward;
-function AddDirtoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;forward;
+function AddDirtoInodeDir(Ino: PInode; Name: PXChar; Inode: Longint): Boolean;forward;
 var
  Ext2Driver: TFilesystemDriver;
 
@@ -408,7 +408,7 @@ begin
   {$IFDEF DebugExt2FS} WriteDebug('Ext2InitInode: initializing Inode: %d, Inode.atime: %d\n', [Inode.ino, raw_Inode^.atime]); {$ENDIF}
 end;
 
-function Ext2CreateInode(Inode: PInode; const Name: AnsiString): PInode;
+function Ext2CreateInode(Inode: PInode; Name: PXChar): PInode;
 var
   SbInfo: P_Ext2_sb_info;
   bh_gdp, bh: PBufferHead;
@@ -488,7 +488,7 @@ do_inode:
   {$IFDEF DebugFS} WriteDebug('Ext2CreateInode: error when doing AddFileToInodeDire\n', []); {$ENDIF}
 end;
 
-function Ext2CreateInodeDir(Inode: PInode; const Name: AnsiString): PInode;
+function Ext2CreateInodeDir(Inode: PInode; Name: PXChar): PInode;
 var
   SbInfo: P_Ext2_sb_info;
   bh_gdp, bh: PBufferHead;
@@ -640,7 +640,7 @@ begin
   {$IFDEF DebugExt2FS} WriteDebug('Ext2ReadInode: Inode %d, Read Ok\n',[Inode.ino]); {$ENDIF}
 end;
 
-function AddFiletoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;
+function AddFiletoInodeDir(Ino: PInode; Name: Pchar; Inode: Longint): Boolean;
 var
   BufferHead : PBufferHead;
   Entry: P_Ext2_Dir_Entry;
@@ -694,8 +694,8 @@ begin
   {$IFDEF DebugFS} WriteDebug('AddFiletoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
   Entry := Pointer(PtrUInt(Entry)+ Entry.rec_len);
   Entry.inode := Inode;
-  for J := 0 to Length(Name) do
-    Entry.name[J] := name[J + 1];
+  for J := 0 to (Length(Name)-1) do
+    Entry.name[J] := Name[J];
   Entry.name_len := Length(Name);
   Entry.file_type := Ext2_FT_Reg;
   Entry.rec_len := PreviousRecordLength;
@@ -706,7 +706,7 @@ begin
   Result := True;
 end;
 
-function AddDirtoInodeDir(Ino: PInode; const Name: AnsiString; Inode: Longint): Boolean;
+function AddDirtoInodeDir(Ino: PInode; Name: PXChar; Inode: Longint): Boolean;
 var
   Entry: P_Ext2_Dir_Entry;
   InoInfo: ^ext2_inode_info;
@@ -760,8 +760,8 @@ begin
   {$IFDEF DebugFS} WriteDebug('AddDirtoInodeDir: entry.rec_len: %d, test: %d\n', [entry.rec_len, sizeof(Ext2_Dir_Entry) - sizeof(Ext2_Dir_Entry.name) + entry.name_len - 1]); {$ENDIF}
   Entry := Pointer(PtrUInt(Entry)+ Entry.rec_len);
   Entry.inode := Inode;
-  for J := 0 to Length(Name) do
-    Entry.name[J] := name[J + 1];
+  for J := 0 to (Length(Name)-1) do
+    Entry.name[J] := Name[J];
   Entry.name_len := Length(Name);
   Entry.file_type := Ext2_FT_Dir;
   Entry.rec_len:= PreviousRecordLength;
@@ -814,7 +814,7 @@ begin
   Result := True;
 end;
 
-function Ext2LookUpInode(Ino: PInode; const Name: AnsiString): PInode;
+function Ext2LookUpInode(Ino: PInode; Name: PXChar): PInode;
 var
   I, J: Longint;
   InoInfo: ^ext2_inode_info;
@@ -845,7 +845,7 @@ begin
         if entry.name_len = Length(name) then
         begin
           for J := 0 to entry.name_len - 1 do
-            if entry.name[J] <> name[J+1] then
+            if entry.name[J] <> Name[J] then
               goto _next;
           Result := GetInode(entry.inode); // this is the inode !
           {$IFDEF DebugFS} WriteDebug('Ext2LookUpInode: Inode found\n', []); {$ENDIF}

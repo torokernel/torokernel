@@ -467,7 +467,7 @@ begin
     Exit;
   end;
   if Queue = Inode then
-    Inode := Inode.Next;
+    Queue := Inode.Next;
   Inode.Prev.Next := Inode.Next;
   Inode.Next.Prev := Inode.Prev;
   Inode.Next:= nil;
@@ -485,7 +485,7 @@ begin
   begin
     Inc(Ino.Count);
     Result := Ino;
-    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache from InodeCache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   Ino := FindInode(Storage.FilesystemMounted.InodeCache.FreeInodesCache, Inode);
@@ -495,7 +495,7 @@ begin
     AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer, Ino);
     Result := Ino;
     Ino.Count := 1;
-    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d in Inode-Cache from FreeInodesCache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   if Storage.FilesystemMounted.InodeCache.InodesInCache=0 then
@@ -522,7 +522,7 @@ begin
     RemoveInode(Storage.FilesystemMounted.InodeCache.FreeInodesCache,Ino);
     AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer,Ino);
     Ino.Count := 1;
-    {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
+    {$IFDEF DebugFS} WriteDebug('GetInode: running out of space, Inode: %d In Inode-Cache from FreeInodesCache\n', [Ino.ino]); {$ENDIF}
     Exit;
   end;
   Ino := ToroGetMem(SizeOf(TInode));
@@ -533,9 +533,9 @@ begin
   end;
   Ino.ino := Inode;
   Ino.Dirty := False;
-  Ino.Count := 1;
   Ino.SuperBlock := Storage.FileSystemMounted;
   Storage.FileSystemMounted.FileSystemDriver.ReadInode(Ino);
+  Ino.Count := 1;
   if Ino.Dirty then
   begin
     ToroFreeMem(Ino);
@@ -546,7 +546,7 @@ begin
   AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer, Ino);
   Dec(Storage.FilesystemMounted.InodeCache.InodesInCache);
   Result:= Ino;
-  {$IFDEF DebugFS} WriteDebug('GetInode: Inode: %d In Inode-Cache\n', [Ino.ino]); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('GetInode: allocating new Inode: %d in Inode-Cache\n', [Ino.ino]); {$ENDIF}
 end;
 
 procedure PutInode(Inode: PInode);
@@ -639,6 +639,7 @@ var
   ino: PInode;
 begin
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  {$IFDEF DebugFS} WriteDebug('NameI: Path: %p, Inode Base: %d, Count: %d\n', [PtrUInt(Path), Base.Ino, Base.Count]); {$ENDIF}
   Inc(Base.Count);
   Inc(Path);
   count := 0;
@@ -653,6 +654,7 @@ begin
         ino := Base.SuperBlock.FileSystemDriver.LookUpInode(Base, Name)
       else
       begin
+        {$IFDEF DebugFS} WriteDebug('NameI: Base is not a directory, Path: %p, Inode Base: %d\n', [PtrUInt(Path), Base.Ino]); {$ENDIF}
         PutInode(Base);
         Exit;
       end;

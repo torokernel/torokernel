@@ -183,7 +183,16 @@ begin
       Exit;
     end
     else
-      SysSocketSelect(Socket, SERVICE_TIMEOUT);
+    begin
+      if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
+      begin
+        SysSocketClose(Socket);
+        rq := Socket.UserDefined;
+        ToroFreeMem(rq.BufferStart);
+        ToroFreeMem(rq);
+        Exit;
+      end;
+    end;
   end;
   Result := 0;
 end;

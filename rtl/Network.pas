@@ -1910,6 +1910,7 @@ end;
 function SysSocketSelect(Socket: PSocket; TimeOut: LongInt): Boolean;
 begin
   Result := True;
+  SetSocketTimeOut(Socket, TimeOut);
   while true do
   begin
     SysThreadActive;
@@ -1917,6 +1918,7 @@ begin
     if Socket.State = SCK_LOCALCLOSING then
     begin
       Socket.DispatcherEvent := DISP_CLOSE;
+      Result := False;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
       Exit;
     end;
@@ -1926,12 +1928,12 @@ begin
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
       Exit;
     end;
-    SetSocketTimeOut(Socket, TimeOut);
     {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h set timeout\n', [PtrUInt(Socket)]); {$ENDIF}
     if Socket.Blocking then
     begin
       if Socket.TimeOut < read_rdtsc then
       begin
+        Result := False;
         Exit;
       end;
       SysThreadSwitch(True);

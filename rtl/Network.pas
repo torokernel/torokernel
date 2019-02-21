@@ -610,6 +610,7 @@ begin
   ClientSocket.BufferSenderTail := nil;
   ClientSocket.RemoteClose := False;
   ClientSocket.AckFlag := True;
+  ClientSocket.Blocking := Socket.Blocking;
   AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
   ToroFreeMem(Packet);
   Inc(Socket.ConnectionsQueueCount);

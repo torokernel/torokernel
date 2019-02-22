@@ -97,10 +97,10 @@ begin
     begin
       Len := i - 3;
       buffer^ := buf;
-      buffer +=1;
-      rq.BufferEnd += 1;
+      Inc(buffer);
+      Inc(rq.BufferEnd);
     end;
-    i+=1;
+    Inc(i);
   end;
   rq.counter := i;
 end;

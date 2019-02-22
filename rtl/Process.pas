@@ -991,7 +991,7 @@ end;
 
 procedure ThreadExit(Schedule: Boolean);
 var
-  CurrentThread, NextThread: PThread;
+  CurrentThread, NextThread, tmp: PThread;
 begin
   CurrentThread := GetCurrentThread ;
   XHeapRelease(CurrentThread.PrivateHeap);
@@ -1007,6 +1007,24 @@ begin
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem(CurrentThread.StackAddress);
+  if CurrentThread.IsPollThread then
+  begin
+    Dec(CurrentThread.CPU.PollingThreadTotal);
+    if CurrentThread.CPU.PollingThreads = CurrentThread then
+    begin
+      CurrentThread.CPU.PollingThreads := CurrentThread.NextPollingThread
+    end else
+    begin
+      tmp := CurrentThread.CPU.PollingThreads;
+      While tmp.NextPollingThread <> CurrentThread do
+      begin
+        tmp := tmp.NextPollingThread;
+      end;
+      tmp.NextPollingThread := CurrentThread.NextPollingThread;
+    end;
+    if CurrentThread.CPU.PollingThreadsTail = CurrentThread then
+      CurrentThread.CPU.PollingThreadsTail := CurrentThread.NextPollingThread;
+  end;
   ToroFreeMem(CurrentThread);
   {$IFDEF DebugProcess} WriteDebug('ThreadExit: ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
   if Schedule then

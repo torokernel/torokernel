@@ -181,30 +181,30 @@ begin
   Result := Super;
 end;
 
-function UnicodeToUnix (longname: pvfatdirectory_entry; Dest: Pchar): LongInt;
+function UnicodeToUnix (longname: pvfatdirectory_entry; Dest: Pchar; start: LongInt): LongInt;
 var
   count: dword ;
 begin
-  Result := 0;
-  for count := 0 to 4 do
+  Result := start;
+  for count := 1 downto 0 do
   begin
-    if longname^.name1[(count*2)+1] = #0 then
-      Exit;
-    Dest[Result] := longname^.name1[(count*2)+1] ;
+    if (longname^.name3[(count*2)+1] = #0) or (longname^.name3[(count*2)+1] = #$ff) then
+      continue;
+    Dest[Result] :=  longname^.name3[(count*2)+1];
     Inc(Result);
   end;
-  for count := 0 to 5 do
+  for count := 5 downto 0 do
   begin
-   if longname^.name2[(count*2)+1] = #0 then
-     Exit;
-   Dest[Result] := longname^.name2[(count*2)+1] ;
-   Inc(Result);
+    if (longname^.name2[(count*2)+1] = #0) or (longname^.name2[(count*2)+1] = #$ff) then
+      continue;
+    Dest[Result] := longname^.name2[(count*2)+1] ;
+    Inc(Result);
   end;
-  for count := 0 to 1 do
+  for count := 4 downto 0 do
   begin
-    if longname^.name3[(count*2)+1] = #0 then
-      Exit;
-    Dest[Result] :=  longname^.name3[(count*2)+1] ;
+    if (longname^.name1[(count*2)+1] = #0) or (longname^.name1[(count*2)+1] = #$ff) then
+      continue;
+    Dest[Result] := longname^.name1[(count*2)+1] ;
     Inc(Result);
   end;
 end;
@@ -263,6 +263,31 @@ begin
   Result := tmp;
 end;
 
+
+function StrCmpforFat(buff, name: pchar; len: Longint): Boolean;
+var
+ tmp: pchar;
+ j: Longint;
+begin
+  Result := True;
+  if StrLen(buff) <> StrLen(name) then
+  begin
+    Result:= False;
+    Exit;
+  end;
+  tmp := buff + len -1;
+  for j:= 0 to len-1 do
+  begin
+    if name^ <> tmp^ then
+    begin
+      Result := False;
+      Exit;
+    end;
+    Inc(name);
+    Dec(tmp);
+  end;
+end;
+
 function FindDir(bh: PBufferHead; name: pchar; out res: pdirectory_entry): Boolean;
 var 
   buff: array[0..254] of char;
@@ -288,10 +313,10 @@ begin
       start := 0;
       while (pdirlong.res <> $41) and (pdirlong.res <> 1) do
       begin
-        start := UnicodeToUnix (pdirlong, @buff[start]);
+        start := UnicodeToUnix (pdirlong, buff, start);
         Inc(pdirlong);
       end;
-      start := UnicodeToUnix (pdirlong, @buff[start]);
+      start := UnicodeToUnix (pdirlong, buff, start);
       buff[start] := #0;
       for j:= 0 to (StrLen(@buff)-1) do
       begin
@@ -309,7 +334,7 @@ begin
         Result := false;
         Exit;
       end;
-      if (StrLen(@buff) <> 0) and (StrCmp(@buff, name, StrLen(name))) then
+      if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
       begin
         res := Pointer(pdirlong);
         Result := True;
@@ -362,7 +387,7 @@ begin
         pdirlong := Pointer(pdir);
         while (pdirlong.res <> $41) and (pdirlong.res <> 1) and (PtrUInt(pdirlong) < PtrUInt(Pointer(bh.data + bh.size))-1) do
         begin
-          start := UnicodeToUnix (pdirlong, @buff[start]);
+          start := UnicodeToUnix (pdirlong, buff, start);
           Inc(pdirlong);
         end;
         if PtrUInt(pdirlong) > PtrUInt(Pointer(bh.data + bh.size))-1 then
@@ -370,7 +395,7 @@ begin
           pdir := Pointer(pdirlong);
           continue;
         end;
-        start := UnicodeToUnix (pdirlong, @buff[start]);
+        start := UnicodeToUnix (pdirlong, buff, start);
         buff[start] := #0;
         for j:= 0 to (StrLen(@buff)-1) do
         begin
@@ -387,7 +412,7 @@ begin
           pdir := Pointer(pdirlong);
           continue;
         end;
-        if (StrLen(@buff) <> 0) and (StrCmp(@buff, name, StrLen(name))) then
+        if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
         begin
           res := Pointer(pdirlong);
           Result := True;
@@ -400,7 +425,7 @@ begin
       begin
         if start <> 0 then
         begin
-          if (StrLen(@buff) <> 0) and (StrCmp(@buff, name, StrLen(name))) then
+          if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
           begin
             res := pdir;
             Result := True;

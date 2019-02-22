@@ -209,6 +209,7 @@ type
     WinCounter: LongInt;
     RemoteClose: Boolean;
     UserDefined: Pointer;
+    Blocking: Boolean;
     Next: PSocket;
   end;
 
@@ -241,6 +242,7 @@ function SysSocketBind(Socket: PSocket; IPLocal, IPRemote: TIPAddress; LocalPort
 procedure SysSocketClose(Socket: PSocket);
 function SysSocketConnect(Socket: PSocket): Boolean;
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
+function SysSocketAccept(Socket: PSocket): PSocket;
 function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
 function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32) : LongInt;
 function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
@@ -367,7 +369,7 @@ begin
     begin
       Machine := DedicateNetworks[CPUID].TranslationTable;
       PrevMachine := Machine;
-      Panic (Machine = nil, 'AddTranslateIp: Run out of memory');
+      Panic (Machine = nil, 'AddTranslateIp: Run out of memory', []);
       while Machine.Next <> nil do
       begin
         PrevMachine := Machine;
@@ -608,6 +610,7 @@ begin
   ClientSocket.BufferSenderTail := nil;
   ClientSocket.RemoteClose := False;
   ClientSocket.AckFlag := True;
+  ClientSocket.Blocking := Socket.Blocking;
   AddTranslateIp(IpHeader.SourceIp, EthHeader.Source);
   ToroFreeMem(Packet);
   Inc(Socket.ConnectionsQueueCount);
@@ -953,6 +956,8 @@ begin
   end else ToroFreeMem(Packet);
 end;
 
+procedure DispatcherFlushPacket(Socket: PSocket); forward;
+
 procedure ProcessTCPSocket(Socket: PSocket; Packet: PPacket);
 var
   TCPHeader: PTCPHeader;
@@ -1074,6 +1079,18 @@ begin
                 {$IFDEF DebugNetwork}WriteDebug('ProcessTCPSocket TCP_ACK: Socket %h in DISP_RECEIVE\n', [PtrUInt(Socket)]);{$ENDIF}
               end;
               TCPSendPacket(TCP_ACK, Socket);
+            end;
+            // a sent has been ACK, send next packet
+            if (TCPHeader.Flags = TCP_ACK) and Socket.Blocking then
+            begin
+              DispatcherFlushPacket(Socket);
+              // all has been sent and user has closed the connection
+              if (Socket.BufferSender = nil) and (Socket.DispatcherEvent = DISP_CLOSING) then
+              begin
+                Socket.State := SCK_PEER_DISCONNECTED;
+                SetSocketTimeOut(Socket, WAIT_ACK);
+                TCPSendPacket(TCP_ACK or TCP_FIN, Socket);
+              end;
             end;
           end;
           {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket TCP_ACK: received ACK on Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
@@ -1603,7 +1620,7 @@ begin
     if Service.ClientSocket = nil then
       SysThreadSwitch(True)
     else
-      SysThreadSwitch;
+      SysThreadSwitch(False);
   end;
   Result := 0;
 end;
@@ -1651,7 +1668,8 @@ begin
   Socket.BufferSender := nil;
   Socket.RemoteClose := False;
   FillChar(Socket.DestIP, 0, SizeOf(TIPAddress));
-  Socket.DestPort := 0 ;
+  Socket.DestPort := 0;
+  Socket.Blocking := False;
   Result := Socket;
   {$IFDEF DebugSocket} WriteDebug('SysSocket: New Socket Type %d, Buffer Sender: %d\n', [SocketType, PtrUInt(Socket.BufferSender)]); {$ENDIF}
 end;
@@ -1772,6 +1790,14 @@ begin
   Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
   if Service <> nil then
    Exit;
+  if Socket.Blocking then
+  begin
+    Service := ToroGetMem(SizeOf(TNetworkService));
+    if Service = nil then
+      Exit;
+    GetCurrentThread.NetworkService := Service;
+    Service.ClientSocket := nil;
+  end;
   Service:= GetCurrentThread.NetworkService;
   Service.ServerSocket := Socket;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
@@ -1783,6 +1809,40 @@ begin
   Socket.DestPort:=0;
   Result := True;
   {$IFDEF DebugSocket} WriteDebug('SysSocketListen: Socket listening at Local Port: %d, Buffer Sender: %h, QueueLen: %d\n', [Socket.SourcePort,PtrUInt(Socket.BufferSender),QueueLen]); {$ENDIF}
+end;
+
+function SysSocketAccept(Socket: PSocket): PSocket;
+var
+  NextSocket, tmp: PSocket;
+  CPUID: LongInt;
+  Service: PNetworkService;
+begin
+  if not Socket.Blocking then
+  begin
+    Result := nil;
+    Exit;
+  end;
+  CPUID := GetApicid;
+  Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
+  While true do
+  begin
+    NextSocket := Service.ClientSocket;
+    SysThreadActive;
+    while NextSocket <> nil do
+    begin
+      tmp := NextSocket;
+      NextSocket := tmp.Next;
+      if tmp.DispatcherEvent = DISP_ACCEPT then
+      begin
+        Dec(Service.ServerSocket.ConnectionsQueueCount);
+        tmp.Blocking := True;
+        tmp.DispatcherEvent := DISP_ZOMBIE;
+        Result := tmp;
+        Exit;
+      end;
+    end;
+    SysThreadSwitch(True);
+  end;
 end;
 
 function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
@@ -1851,21 +1911,52 @@ end;
 function SysSocketSelect(Socket: PSocket; TimeOut: LongInt): Boolean;
 begin
   Result := True;
-  {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
-  if Socket.State = SCK_LOCALCLOSING then
+  if not Socket.Blocking then
   begin
-    Socket.DispatcherEvent := DISP_CLOSE;
-    {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
-    Exit;
-  end;
-  if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
+    {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
+    if Socket.State = SCK_LOCALCLOSING then
+    begin
+      Socket.DispatcherEvent := DISP_CLOSE;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
+      Exit;
+    end;
+    if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
+    begin
+      Socket.DispatcherEvent := DISP_RECEIVE;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
+      Exit;
+    end;
+    SetSocketTimeOut(Socket, TimeOut);
+    {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h set timeout\n', [PtrUInt(Socket)]); {$ENDIF}
+  end else
   begin
-    Socket.DispatcherEvent := DISP_RECEIVE;
-    {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
-    Exit;
+    SetSocketTimeOut(Socket, TimeOut);
+    while true do
+    begin
+      SysThreadActive;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
+      if Socket.State = SCK_LOCALCLOSING then
+      begin
+        Socket.DispatcherEvent := DISP_CLOSE;
+        Result := False;
+        {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
+        Exit;
+      end;
+      if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
+      begin
+        Socket.DispatcherEvent := DISP_RECEIVE;
+        {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
+        Exit;
+      end;
+      {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h set timeout\n', [PtrUInt(Socket)]); {$ENDIF}
+      if Socket.TimeOut < read_rdtsc then
+      begin
+        Result := False;
+        Exit;
+      end;
+      SysThreadSwitch(True);
+    end;
   end;
-  SetSocketTimeOut(Socket, TimeOut);
-  {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h set timeout\n', [PtrUInt(Socket)]); {$ENDIF}
 end;
 
 // Send data to Remote Host using a Client Socket
@@ -1942,6 +2033,12 @@ begin
     Dec(AddrLen, FragLen);
     Inc(P, FragLen);
   end;
+
+  if Socket.Blocking then
+  begin
+    DispatcherFlushPacket(Socket);
+  end;
+
 //{$IFDEF DebugSocket} WriteDebug('SysSocketSend: END\n',[]);{$ENDIF}
 end;
 

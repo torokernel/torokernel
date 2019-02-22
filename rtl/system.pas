@@ -5817,8 +5817,8 @@ end;
 
       function TObject.ToString: {$ifdef FPC_HAS_FEATURE_ANSISTRINGS}ansistring{$else FPC_HAS_FEATURE_ANSISTRINGS}shortstring{$endif FPC_HAS_FEATURE_ANSISTRINGS};
         begin
-		while true do;
-          //result:=ClassName;
+	  while true do;
+          result:='';
         end;
 
 {****************************************************************************

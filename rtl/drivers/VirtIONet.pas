@@ -486,7 +486,7 @@ begin
 
           // buff must be 4k aligned
           buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096);
-          Panic (buff=nil, 'VirtIONet: no memory for VirtIO buffer\n');
+          Panic (buff=nil, 'VirtIONet: no memory for VirtIO buffer\n', []);
           FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096, 0);
           buff := buff + (4096 - PtrUInt(buff) mod 4096);
           buffPage := PtrUInt(buff) div 4096;
@@ -518,7 +518,7 @@ begin
         end;
 
         rx.Buffer := ToroGetMem(rx.queue_size * FRAME_SIZE + 4096);
-        Panic (rx.Buffer=nil, 'VirtIONet: no memory for Rx buffer\n');
+        Panic (rx.Buffer=nil, 'VirtIONet: no memory for Rx buffer\n', []);
         rx.Buffer := Pointer(PtrUint(rx.Buffer) + (4096 - PtrUInt(rx.Buffer) mod 4096));
         rx.chunk_size := FRAME_SIZE;
         rx.available.index := 0;
@@ -544,7 +544,7 @@ begin
 
         // setup send buffers
         tx.buffer := ToroGetMem(FRAME_SIZE * tx.queue_size + 4096);
-        Panic (tx.buffer=nil, 'VirtIONet: no memory for Tx buffer\n');
+        Panic (tx.buffer=nil, 'VirtIONet: no memory for Tx buffer\n', []);
         tx.buffer := Pointer(PtrUInt(tx.buffer) + (4096 - PtrUInt(tx.buffer) mod 4096));
         tx.chunk_size:= FRAME_SIZE;
         tx.available.index:= 0;

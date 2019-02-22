@@ -1,12 +1,7 @@
 //
 // StaticWebServer.pas
 //
-// This is a simple example that shows how toro can be used to read files from ext2 filesystem.
-// In this example, we first read a file named index.html and then we wait for connections on port
-// 80. When a connection arrives, we send the content of the file and we close the conection. The example
-// also logs into a file name /web/logs to show writting operations to ext2.
-//
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -29,12 +24,12 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 16 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
   Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..rtl\Process.pas',
+  Process in '..\..\rtl\Process.pas',
   Memory in '..\..\rtl\Memory.pas',
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
@@ -55,65 +50,156 @@ const
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+  HeaderNotFound = 'HTTP/1.0 404'#13#10;
+  SERVICE_TIMEOUT = 20000;
+  Max_Path_Len = 200;
 
-var
-  HttpServer: PSocket;
-  Buffer: char;
-  Buf, HttpContent, tmp2: ^Char;
-  tmp: THandle;
-  HttpHandler: TNetworkHandler;
-  idx: TInode;
-  BuffLeninChar: array[0..10] of char;
-  indexSize: Longint;
-  HttpContentLen : Longint;
-  LocalIp: array[0..3] of Byte;
-
-procedure HttpInit;
-begin
-  HttpServer := SysSocket(SOCKET_STREAM);
-  HttpServer.Sourceport := 80;
-  SysSocketListen(HttpServer, 50);
-end;
-
-function HttpAccept(Socket: PSocket): LongInt;
-var
-  tmpPing: array[0..3] of byte;
-begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF('\t /VToroWebServer/n: connected %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  SysSocketSelect(Socket, 20000);
-  Result := 0;
-end;
-
-function HttpReceive(Socket: PSocket): LongInt;
-var
-  tmpPing: array[0..3] of byte;
-begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF ('\t /VToroWebServer/n: reading %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  while SysSocketRecv(Socket, @Buffer, 1, 0) <> 0 do
-  begin
+type
+  PRequest = ^TRequest;
+  TRequest = record
+    BufferStart: pchar;
+    BufferEnd: pchar;
+    counter: Longint;
   end;
-  SysSocketSend(Socket, HttpContent, HttpContentLen, 0);
-  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  SysSocketClose(Socket);
-  Result := 0;
-end;
 
-function HttpClose(Socket: PSocket): LongInt;
 var
-  tmpPing: array[0..3] of byte;
+  HttpServer, HttpClient: PSocket;
+  tmp: THandle;
+  LocalIp: array[0..3] of Byte;
+  tid: TThreadID;
+  rq: PRequest;
+
+function GetRequest(Socket: PSocket): Boolean;
+var
+   i, Len: longint;
+   buf: char;
+   rq: PRequest;
+   buffer: Pchar;
 begin
-  _IPAddresstoArray (Socket.DestIp, tmpPing);
-  WriteConsoleF ('\t /VToroWebServer/n: closing %d.%d.%d.%d:%d\n',[tmpPing[0],tmpPing[1],tmpPing[2],tmpPing[3], Socket.DestPort]);
-  SysSocketClose(Socket);
+  Result := False;
+  rq := Socket.UserDefined;
+  i := rq.counter;
+  buffer := rq.BufferEnd;
+  // Calculate len of the request
+  if i <> 0 then
+    Len :=  i - 3
+  else
+    Len := 0;
+  while (SysSocketRecv(Socket, @buf,1,0) <> 0)do
+  begin
+    if ((i>3) and (buf = #32)) or (Len = Max_Path_Len) then
+    begin
+      buffer^ := #0;
+      Result := True;
+      Exit;
+    end;
+    if (i>3) then
+    begin
+      Len := i - 3;
+      buffer^ := buf;
+      Inc(buffer);
+      Inc(rq.BufferEnd);
+    end;
+    Inc(i);
+  end;
+  rq.counter := i;
+end;
+
+procedure SendStream(Socket: Psocket; Stream: Pchar);
+begin
+  SysSocketSend(Socket, Stream, Length(Stream), 0);
+end;
+
+procedure ProcessRequest (Socket: PSocket; Answer: pchar);
+var
+  dst, tmp: ^char;
+  anssizechar: array[0..10] of char;
+  AnsSize: LongInt;
+begin
+  if Answer = nil then
+  begin
+    SendStream(Socket, HeaderNotFound);
+  end
+  else begin
+    AnsSize := Strlen(Answer);
+    InttoStr(AnsSize,@anssizechar[0]);
+    dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
+    tmp := dst;
+    StrConcat(HeaderOk, @anssizechar[0], dst);
+    dst := dst + StrLen(@anssizechar[0]) + StrLen(HeaderOk);
+    StrConcat(dst, ContentOK, dst);
+    dst := dst + StrLen(ContentOK) ;
+    StrConcat(dst, Answer, dst);
+    SendStream(Socket,tmp);
+    ToroFreeMem(tmp);
+  end;
+end;
+
+function GetFileContent(entry: pchar): pchar;
+var
+  idx: TInode;
+  indexSize: LongInt;
+  Buf: Pchar;
+begin
+  Result := nil;
+  if SysStatFile(entry, @idx) = 0 then
+  begin
+    WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
+    Exit;
+  end else
+    Buf := ToroGetMem(idx.Size + 1);
+  tmp := SysOpenFile(entry);
+  if (tmp <> 0) then
+  begin
+    indexSize := SysReadFile(tmp, idx.Size, Buf);
+    pchar(Buf+idx.Size)^ := #0;
+    SysCloseFile(tmp);
+    WriteConsoleF('\t /VWebServer/n: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
+    Result := Buf;
+  end else
+  begin
+    WriteConsoleF ('index.html not found\n',[]);
+  end;
+end;
+
+function ServiceReceive(Socket: PSocket): LongInt;
+var
+  rq: PRequest;
+  entry, content: PChar;
+begin
+  while true do
+  begin
+    if GetRequest(Socket) then
+    begin
+      rq := Socket.UserDefined;
+      entry := rq.BufferStart;
+      content := GetFileContent(rq.BufferStart);
+      ProcessRequest(Socket, content);
+      SysSocketClose(Socket);
+      if content <> nil then
+        ToroFreeMem(content);
+      ToroFreeMem(rq.BufferStart);
+      ToroFreeMem(rq);
+      Exit;
+    end
+    else
+    begin
+      if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
+      begin
+        SysSocketClose(Socket);
+        rq := Socket.UserDefined;
+        ToroFreeMem(rq.BufferStart);
+        ToroFreeMem(rq);
+        Exit;
+      end;
+    end;
+  end;
   Result := 0;
 end;
 
-function HttpTimeOut(Socket: PSocket): LongInt;
+function ProcessesSocket(Socket: Pointer): PtrInt;
 begin
-  WriteConsoleF ('\t /VToroWebServer/n: closing %h for timeout\n',[PtrUInt(Socket)]);
-  SysSocketClose(Socket);
+  ServiceReceive (Socket);
   Result := 0;
 end;
 
@@ -133,42 +219,21 @@ begin
   //SysMount('ext2','ATA0',5);
   SysMount('fat','ATA0',6);
 
-  if SysStatFile('/web/index.html', @idx) = 0 then
+  HttpServer := SysSocket(SOCKET_STREAM);
+  HttpServer.Sourceport := 80;
+  HttpServer.Blocking := True;
+  SysSocketListen(HttpServer, 50);
+  WriteConsoleF('\t /VWebServer/n: listening ...\n',[]);
+
+  while true do
   begin
-    WriteConsoleF ('index.html not found\n',[]);
-  end else
-  Buf := ToroGetMem(idx.Size);
+    HttpClient := SysSocketAccept(HttpServer);
+    rq := ToroGetMem(sizeof(TRequest));
+    rq.BufferStart := ToroGetMem(Max_Path_Len);
+    rq.BufferEnd := rq.BufferStart;
+    rq.counter := 0;
+    HttpClient.UserDefined := rq;
+    tid := BeginThread(nil, 4096, ProcessesSocket, HttpClient, 0, tid);
+  end;
 
-  tmp := SysOpenFile('/web/index.html');
-
-  if (tmp <> 0) then
-  begin
-    indexSize := SysReadFile(tmp, idx.Size, Buf);
-    SysCloseFile(tmp);
-    WriteConsoleF('\t /VToroWebServer/n: index.html loaded, size: %d bytes\n', [idx.Size]);
-  end else
-      WriteConsoleF ('index.html not found\n',[]);
-
-  InttoStr(indexSize, @BuffLeninChar[0]);
-  HttpContentLen := StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Buf);
-  HttpContent := ToroGetMem(HttpContentLen);
-  tmp2 := HttpContent;
-  StrConcat(HeaderOk, @BuffLeninChar[0], HttpContent);
-  HttpContent := HttpContent + StrLen(@BuffLeninChar[0]) + StrLen(HeaderOk);
-  StrConcat(HttpContent, ContentOK, HttpContent);
-  HttpContent := HttpContent + StrLen(ContentOK) ;
-  StrConcat(HttpContent, Buf, HttpContent);
-  HttpContent := tmp2;
-  ToroFreeMem(Buf);
-
-  HttpHandler.DoInit    := @HttpInit;
-  HttpHandler.DoAccept  := @HttpAccept;
-  HttpHandler.DoTimeOut := @HttpTimeOut;
-  HttpHandler.DoReceive := @HttpReceive;
-  HttpHandler.DoClose   := @HttpClose;
-
-  SysRegisterNetworkService(@HttpHandler);
-  WriteConsoleF('\t /VToroWebServer/n: listening ...\n',[]);
-
-  SysSuspendThread(0);
 end.

@@ -84,6 +84,7 @@ var
 // Service Initialization
 procedure ServiceInit;
 begin
+ // the socket does not block by default
  ServiceServer := SysSocket(SOCKET_STREAM);
  ServiceServer.Sourceport := SERVICE_PORT;
  SysSocketListen(ServiceServer, SERVICE_QUEUELEN);

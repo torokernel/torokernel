@@ -116,7 +116,7 @@ function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch(const Idle: Boolean = False);
 procedure ThreadExit(Schedule: Boolean);
-procedure Panic(const cond: Boolean; const Format: AnsiString);
+procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 procedure SysThreadActive;
 
 var
@@ -973,7 +973,7 @@ begin
     NewThreadMsg.Next := nil;
     AddThreadMsg(@NewThreadMsg);
     Current.State := tsSuspended;
-    SysThreadSwitch;
+    SysThreadSwitch(False);
     Result := NewThreadMsg.RemoteResult;
   end;
 end;
@@ -991,7 +991,7 @@ end;
 
 procedure ThreadExit(Schedule: Boolean);
 var
-  CurrentThread, NextThread: PThread;
+  CurrentThread, NextThread, tmp: PThread;
 begin
   CurrentThread := GetCurrentThread ;
   XHeapRelease(CurrentThread.PrivateHeap);
@@ -1007,6 +1007,24 @@ begin
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem(CurrentThread.StackAddress);
+  if CurrentThread.IsPollThread then
+  begin
+    Dec(CurrentThread.CPU.PollingThreadTotal);
+    if CurrentThread.CPU.PollingThreads = CurrentThread then
+    begin
+      CurrentThread.CPU.PollingThreads := CurrentThread.NextPollingThread
+    end else
+    begin
+      tmp := CurrentThread.CPU.PollingThreads;
+      While tmp.NextPollingThread <> CurrentThread do
+      begin
+        tmp := tmp.NextPollingThread;
+      end;
+      tmp.NextPollingThread := CurrentThread.NextPollingThread;
+    end;
+    if CurrentThread.CPU.PollingThreadsTail = CurrentThread then
+      CurrentThread.CPU.PollingThreadsTail := CurrentThread.NextPollingThread;
+  end;
   ToroFreeMem(CurrentThread);
   {$IFDEF DebugProcess} WriteDebug('ThreadExit: ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
   if Schedule then
@@ -1045,7 +1063,7 @@ begin
   if (Thread = nil) or (CurrentThread.ThreadID = ThreadID) then
   begin
     CurrentThread.state := tsSuspended;
-    SysThreadSwitch;
+    SysThreadSwitch(False);
     {$IFDEF DebugProcess} WriteDebug('SuspendThread: Current Threads was Suspended\n',[]); {$ENDIF}
   end else
     Thread.State := tsSuspended;
@@ -1116,10 +1134,11 @@ begin
   end;
 end;
 
+// if Candidate <> nil, the scheduler assumes that CurrentThread can't be used
 procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;
-  CurrentThread, Th: PThread;
+  CurrentThread, LastThread, Th, tmp: PThread;
   NextTurnHalt: Boolean;
   rbp_reg: pointer;
 begin
@@ -1145,8 +1164,14 @@ begin
     Emigrating(CurrentCPU);
     Inmigrating(CurrentCPU);
     CurrentThread := CurrentCPU.CurrentThread;
-    if Candidate = nil then
-      Candidate := CurrentThread.Next;
+    tmp := Candidate;
+    if Candidate <> nil then
+      LastThread := Candidate
+    else
+    begin
+      LastThread := CurrentCPU.CurrentThread;
+      Candidate := LastThread.Next;
+    end;
     repeat
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
       if Candidate.State = tsReady then
@@ -1159,7 +1184,7 @@ begin
         Break;
       end else
         Candidate := Candidate.Next;
-    until Candidate = CurrentThread;
+    until Candidate = LastThread;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
     if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
     else
@@ -1199,11 +1224,12 @@ begin
     end;
     NextTurnHalt := False;
     CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate),Candidate.State,PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate), Candidate.State, PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
       Exit;
     GetRBP;
-    CurrentThread.ret_thread_sp := rbp_reg;
+    If tmp = nil then
+      CurrentThread.ret_thread_sp := rbp_reg;
     rbp_reg := Candidate.ret_thread_sp;
     StoreRBP;
     Break;
@@ -1230,7 +1256,7 @@ var
 begin
   CpuID := GetApicID;
   CPU[CpuID].CurrentThread.TLS := ToroGetMem(THREADVAR_BLOCKSIZE) ;
-  Panic(CPU[CpuID].CurrentThread.TLS = nil, 'SysAllocateThreadVars: Out of memory');
+  Panic(CPU[CpuID].CurrentThread.TLS = nil, 'SysAllocateThreadVars: Out of memory', []);
   {$IFDEF DebugProcess} WriteDebug('SysAllocateThreadVars - TLS: %h Size: %d\n', [PtrUInt(CPU[CpuID].CurrentThread.TLS), THREADVAR_BLOCKSIZE]); {$ENDIF}
 end;
 
@@ -1384,7 +1410,7 @@ begin
 end;
 
 // Halt core if a Panic condition is reached
-procedure Panic(const cond: Boolean; const Format: AnsiString);
+procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 var
  rbp_reg: QWord;
  addr: pointer;
@@ -1393,8 +1419,8 @@ begin
     Exit;
   DisableInt;
   WriteConsoleF('/RPanic/n:\n',[]);
-  WriteConsoleF(Format,[]);
-  {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, []); {$ENDIF}
+  WriteConsoleF(Format, Args);
+  {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, Args); {$ENDIF}
   {$IFDEF DebugCrash}
   WriteConsoleF('Backtrace:\n',[]);
   // FIXME: Print the whole stack
@@ -1409,7 +1435,7 @@ end;
 
 procedure ProcessInit;
 begin
-  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n');
+  Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n', []);
   {$IFDEF DebugProcess}
     if LocalCpuSpeed = MAX_CPU_SPEED_MHZ then
       WriteDebug('ProcessInit: warning LocalCpuSpeed=MAX_CPU_SPEED_MHZ\n',[]);

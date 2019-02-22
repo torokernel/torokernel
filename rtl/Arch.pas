@@ -1485,7 +1485,7 @@ begin
   if mbpointer <> Nil then
   begin
     tmp := mbpointer + 16;
-    p := Pointer(tmp^);
+    p := PChar(PtrUInt(tmp^));
     KernelParam := Pointer(Kernel_Param);
     while p^ <> #0 do
     begin

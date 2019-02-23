@@ -424,10 +424,8 @@ var
   buff: PChar;
   buffPage: DWORD;
   Net: PNetworkInterface;
-  rx: PVirtQueue;
-  tx: PVirtQueue;
+  rx, tx: PVirtQueue;
   bi: TBufferInfo;
-  tmp2: Pointer;
 begin
   PciCard := PCIDevices;
   DisableInt;

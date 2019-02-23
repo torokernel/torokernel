@@ -24,7 +24,7 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles,if=none,id=drive-virtio-disk0 -device virtio-blk-pci,drive=drive-virtio-disk0,addr=06 -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
@@ -35,7 +35,8 @@ uses
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
-  Ide in '..\..\rtl\drivers\IdeDisk.pas',
+  // Ide in '..\..\rtl\drivers\IdeDisk.pas',
+  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
   // Ext2 in '..\..\rtl\drivers\Ext2.pas',
   Fat in '..\..\rtl\drivers\Fat.pas',
   Console in '..\..\rtl\drivers\Console.pas',
@@ -213,6 +214,7 @@ begin
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
 
+  while true do;
   // Dedicate the ide disk to local cpu
   DedicateBlockDriver('ATA0',0);
 

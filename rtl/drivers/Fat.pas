@@ -288,72 +288,119 @@ begin
   end;
 end;
 
-function FindDir(bh: PBufferHead; name: pchar; out res: pdirectory_entry): Boolean;
+function GetNextCluster (pfat: psb_fat; Cluster: DWORD): Word ;
+var
+  lsb, msb: byte;
+  ret: word;
+  offset: dword;
+begin
+  offset := Cluster * sizeof(Word);
+  lsb := PByte(Pointer(pfat.pfat) + offset)^;
+  msb := PByte(Pointer(pfat.pfat) + offset + 1)^;
+  ret := (msb shl 8) or lsb;
+  if ret >= $FFF8 then
+    Result := LAST_SECTOR_FAT
+  else
+    Result := ret;
+end;
+
+function FindDirinDir(FatInode: pfat_inode_info; Ino: PInode; name: pchar; out res: pdirectory_entry): Boolean;
 var 
   buff: array[0..254] of char;
-  start, j: Dword;
+  start, j, i: Dword;
   pdir: pdirectory_entry;
   pdirlong: pvfatdirectory_entry;
   ch: Byte;
+  pfat:psb_fat;
+  NextCluster, Sector: LongInt;
+  bh: PBufferHead;
 begin
   Result := False;
   res := nil;
-  pdir := Pointer(bh.data);
-  while PtrUInt(pdir) < PtrUInt(Pointer(bh.data + bh.size))  do
+  pfat := Ino.SuperBlock.SbInfo;
+  nextCluster := FatInode.dir_entry.FATEntry;
+  start := 0;
+  while nextCluster <> LAST_SECTOR_FAT do
   begin
-    if (pdir.name[1] = #0) or (pdir.name[1] = #$E5)  then
+    Sector := (nextCluster - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec);
+    for i:= 0 to pfat.pbpb.BPB_SecPerClus-1 do
     begin
-      Inc(pdir);
-      continue;
-    end;
-    // long entries
-    if pdir.attr = $0F then
-    begin
-      pdirlong := Pointer(pdir);
-      start := 0;
-      while (pdirlong.res <> $41) and (pdirlong.res <> 1) do
+      bh := GetBlock(Ino.SuperBlock.BlockDevice, Sector + i, Ino.SuperBlock.BlockSize);
+      pdir := Pointer(bh.data);
+      while PtrUInt(pdir) < PtrUInt(Pointer(bh.data + bh.size))  do
       begin
-        start := UnicodeToUnix (pdirlong, buff, start);
-        Inc(pdirlong);
-      end;
-      start := UnicodeToUnix (pdirlong, buff, start);
-      buff[start] := #0;
-      for j:= 0 to (StrLen(@buff)-1) do
-      begin
-        if (buff[j] >= 'a') or (buff[j] <= 'z') then
+        if (pdir.name[1] = #0) or (pdir.name[1] = #$E5)  then
         begin
-          ch := Byte(buff[j]) xor $20;
-          buff[j] := Char(ch);
+          Inc(pdir);
+          continue;
         end;
+        // long entries
+        if pdir.attr = $0F then
+        begin
+          pdirlong := Pointer(pdir);
+          while (pdirlong.res <> $41) and (pdirlong.res <> 1) and (PtrUInt(pdirlong) < PtrUInt(Pointer(bh.data + bh.size))-1) do
+          begin
+            start := UnicodeToUnix (pdirlong, buff, start);
+            Inc(pdirlong);
+          end;
+          if PtrUInt(pdirlong) > PtrUInt(Pointer(bh.data + bh.size))-1 then
+          begin
+            pdir := Pointer(pdirlong);
+            continue;
+          end;
+          start := UnicodeToUnix (pdirlong, buff, start);
+          buff[start] := #0;
+          for j:= 0 to (StrLen(@buff)-1) do
+          begin
+            if (buff[j] >= 'a') or (buff[j] <= 'z') then
+            begin
+              ch := Byte(buff[j]) xor $20;
+              buff[j] := Char(ch);
+            end;
+          end;
+          Inc(pdirlong);
+          if PtrUInt(pdirlong) > PtrUInt(Pointer(bh.data + bh.size))-1 then
+          begin
+            pdir := Pointer(pdirlong);
+            continue;
+          end;
+          if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
+          begin
+            res := Pointer(pdirlong);
+            Result := True;
+            Exit;
+          end;
+          pdir := Pointer(pdirlong);
+          start := 0;
+        // short entries
+        end else
+        begin
+          if start <> 0 then
+          begin
+            if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
+            begin
+              res := pdir;
+              Result := True;
+              Exit;
+            end;
+            start := 0
+          end else
+          begin
+            UnixName (@pdir.name, @buff);
+            if (StrLen(@buff) <> 0) and StrCmp(@buff, name, StrLen(name)) then
+            begin
+              res := pdir;
+              Result := true;
+              Exit;
+            end;
+          end;
+        end;
+        Inc(pdir);
       end;
-      Inc(pdirlong);
-      // not sure how to handle this
-      if PtrUInt(pdirlong) > PtrUInt(Pointer(bh.data + bh.size))-1 then
-      begin
-        res := nil;
-        Result := false;
-        Exit;
-      end;
-      if (StrLen(@buff) <> 0) and (StrCmpforFat(@buff, name, StrLen(name))) then
-      begin
-        res := Pointer(pdirlong);
-        Result := True;
-        Exit;
-      end;
-      pdir := Pointer(pdirlong);
-    // short entries
-    end else
-    begin
-      UnixName (@pdir.name, @buff);
-      if (StrLen(@buff) <> 0) and StrCmp(@buff, name, StrLen(name)) then
-      begin
-        res := pdir;
-        Result := true;
-        Exit;
-      end;
+      PutBlock(Ino.SuperBlock.BlockDevice, bh);
     end;
-    Inc(pdir);
-  end;
+    nextCluster := GetNextCluster(pfat, nextCluster);
+    end;
 end;
 
 function FindDirinRoot(Ino: PInode; name: pchar; out res: pdirectory_entry): Boolean;
@@ -448,32 +495,14 @@ begin
   end;
 end;
 
-function GetNextCluster (pfat: psb_fat; Cluster: DWORD): Word ;
-var
-  lsb, msb: byte;
-  ret: word;
-  offset: dword;
-begin
-  offset := Cluster * sizeof(Word);
-  lsb := PByte(Pointer(pfat.pfat) + offset)^;
-  msb := PByte(Pointer(pfat.pfat) + offset + 1)^;
-  ret := (msb shl 8) or lsb;
-  if ret >= $FFF8 then
-    Result := LAST_SECTOR_FAT
-  else
-    Result := ret;
-end;
-
 function FatLookUpInode(Ino: PInode; Name: PXChar): PInode;
 var
   j: LongInt;
   ch: Byte;
   NameFat: Pchar;
-  bh: PBufferHead;
   pdir:  pdirectory_entry;
   pfat: psb_fat;
   FatInode: pfat_inode_info;
-  nextCluster, nextSector: LongInt;
 begin
   Result := nil;
   NameFat := ToroGetMem(Length(Name)+1);
@@ -500,8 +529,6 @@ begin
     begin
       AllocInodeFat(pfat, pdir);
       Result := GetInode(pdir.FATEntry);
-      ToroFreeMem(NameFat);
-      Exit;
     end;
     ToroFreeMem(NameFat);
     Exit;
@@ -512,22 +539,13 @@ begin
     begin
       if FatInode.ino = Ino.ino then
       begin
-        nextCluster :=  FatInode.dir_entry.FATEntry;
-        nextSector :=  (nextCluster - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec);
-        while nextSector <> LAST_SECTOR_FAT do
+        if FindDirinDir(FatInode, Ino, NameFat, pdir) then
         begin
-          bh := GetBlock(Ino.SuperBlock.BlockDevice, nextSector, Ino.SuperBlock.BlockSize);
-          if FindDir(bh, NameFat, pdir) then
-          begin
-            AllocInodeFat(pfat, pdir);
-            Result := GetInode(pdir.FATEntry);
-            PutBlock(Ino.SuperBlock.BlockDevice, bh);
-            ToroFreeMem(NameFat);
-            Exit;
-          end;
-          PutBlock(Ino.SuperBlock.BlockDevice, bh);
-          nextSector := GetNextCluster(pfat, nextSector);
+          AllocInodeFat(pfat, pdir);
+          Result := GetInode(pdir.FATEntry);
         end;
+        ToroFreeMem(NameFat);
+        Exit;
       end;
       FatInode := FatInode.NextInode;
     end;

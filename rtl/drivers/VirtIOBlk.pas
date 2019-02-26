@@ -27,7 +27,7 @@ interface
 {$I ..\Toro.inc}
 
 {$IFDEF EnableDebug}
-        //{$DEFINE DebugVirtio}
+       //{$DEFINE DebugVirtioBlk}
 {$ENDIF}
 
 uses
@@ -45,6 +45,7 @@ implementation
 
 type
   PVirtIOBlockDevice= ^TVirtIOBlockDevice;
+  PBlockDisk = ^TBlockDisk;
 
   PByte = ^TByte;
   TByte = array[0..0] of byte;
@@ -98,14 +99,12 @@ type
   end;
 
   TVirtIOBlockDevice = record
-    FileDesc: TFileBlock;
     IRQ: LongInt;
     Regs: Pointer;
     BlockCount: QWord;
-    VirtQueues: TVirtQueue;
+    VirtQueue: TVirtQueue;
     Driver: TBlockDriver;
-    // TODO: numero maximo de particiones
-    Minors: array[0..4-1] of TBlockDisk;
+    Minors: array[0..3] of TBlockDisk;
   end;
 
   PBufferInfo = ^TBufferInfo;
@@ -116,13 +115,23 @@ type
     copy: Boolean;
   end;
 
-  TNetHeader = record
-    flags: byte;
-    gso_type: byte;
-    header_length: word;
-    gso_size: word;
-    checksum_start: word;
-    checksum_offset: word;
+  PBlockRequestHeader = ^BlockRequestHeader;
+  BlockRequestHeader = record
+    tp: DWord;
+    reserved: DWord;
+    Sector: QWord;
+  end;
+
+  PPartitionEntry = ^TPartitionEntry;
+  TPartitionEntry = record
+    boot: Byte;
+    BeginHead: Byte;
+    BeginSectCyl: word;
+    pType: Byte;
+    EndHead: Byte;
+    EndSecCyl: word;
+    FirstSector: dword;
+    Size: dword;
   end;
 
 
@@ -130,30 +139,91 @@ const
   VIRTIO_ACKNOWLEDGE = 1;
   VIRTIO_DRIVER = 2;
   VIRTIO_CTRL_VQ = 17;
-  VIRTIO_GUEST_TSO4 = 7;
-  VIRTIO_GUEST_TSO6 = 8;
-  VIRTIO_GUEST_UFO = 10;
-  VIRTIO_EVENT_IDX = 29;
   VIRTIO_RING_F_INDIRECT_DESC = 28;
   VIRTIO_MRG_RXBUF = 15;
   VIRTIO_CSUM = 0;
-  VIRTIO_MAC = 5;
   VIRTIO_FEATURES_OK = 8;
   VIRTIO_DRIVER_OK = 4;
   VIRTIO_BLK_F_RO = 5;
   VIRTIO_BLK_F_BLK_SIZE = 6;
   VIRTIO_BLK_F_TOPOLOGY =10;
 
-  FRAME_SIZE = 1526;
   VIRTIO_DESC_FLAG_WRITE_ONLY = 2;
   VIRTIO_DESC_FLAG_NEXT = 1;
   VIRTIO_NET_HDR_F_NEEDS_CSUM = 1;
-  TX_QUEUE = 1;
-  RX_QUEUE = 0;
+
+  VIRTIO_BLK_T_IN = 0;
 
 var
   BlkVirtIO: TVirtIOBlockDevice;
 
+procedure VirtIOSendBuffer(Blk: PVirtIOBlockDevice; bi:PBufferInfo; count: QWord); forward;
+procedure VirtIOProcessBlkQueue(BlkVirtIO: PVirtIOBlockDevice); forward;
+
+procedure VirtIOBlkDetectPartition(Blk: PVirtIOBlockDevice);
+var
+  Buff: array[0..511] of Byte;
+  Entry: PPartitionEntry;
+  bi: array[0..2] of TBufferInfo;
+  h: BlockRequestHeader;
+  status, r: Byte;
+  i: LongInt;
+begin
+  h.tp := VIRTIO_BLK_T_IN;
+  h.reserved := 0;
+  h.sector := 0;
+
+  bi[0].buffer := @h;
+  bi[0].size := sizeof(BlockRequestHeader);
+  bi[0].flags := 0;
+  bi[0].copy := true;
+
+  bi[1].buffer := @Buff[0];
+  bi[1].size := 512;
+  bi[1].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  bi[1].copy := false;
+
+  bi[2].buffer := @status;
+  bi[2].size := 1;
+  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  bi[2].copy := true;
+
+  ReadWriteBarrier;
+
+  VirtIOSendBuffer(Blk, @bi[0], 3);
+
+  while true do
+  begin
+    r := read_portb(PtrUInt(Blk.Regs) + $13);
+    if (r and 1 = 1) then
+    begin
+      eoi;
+      VirtIOProcessBlkQueue (Blk);
+      if (Buff[511] = $AA) and (Buff[510] = $55) then
+      begin
+        Entry := @Buff[446];
+        for i := 0 to 3 do
+        begin
+          if entry.pType <> 0 then
+          begin
+            Blk.Minors[i].startSector := entry.FirstSector;
+            Blk.Minors[i].Size := Entry.Size;
+            Blk.Minors[i].FsType := Entry.pType;
+            Blk.Minors[i].FileDesc.BlockDriver := @Blk.Driver;
+            Blk.Minors[i].FileDesc.BlockSize := 512;
+            Blk.Minors[i].FileDesc.Minor := i;
+            Blk.Minors[i].FileDesc.Next := nil;
+            WriteConsoleF('VirtIOBlk: Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[i, Entry.Size div 2048, Entry.pType]);
+          end
+          else
+            Blk.Minors[i].FsType := 0;
+          Inc(Entry);
+        end;
+      end;
+      Break;
+    end;
+  end;
+end;
 
 procedure VirtIOSendBuffer(Blk: PVirtIOBlockDevice; bi:PBufferInfo; count: QWord);
 var
@@ -164,25 +234,21 @@ var
   i: LongInt;
   tmp: PQueueBuffer;
 begin
-  vq := @Blk.VirtQueues;
-
+  vq := @Blk.VirtQueue;
   index := vq.available.index mod vq.queue_size;
   buffer_index := vq.next_buffer;
   vq.available.rings[index] := buffer_index;
   buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
-
   for i := 0 to (count-1) do
   begin
     next_buffer_index:= (buffer_index +1) mod vq.queue_size;
     b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
-
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     tmp.flags := b.flags;
     tmp.next := next_buffer_index;
     tmp.length := b.size;
     if (i <> (count-1)) then
         tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
-
     // FIXME: use copy=false to use zero-copy approach
     if b.copy then
     begin
@@ -192,20 +258,34 @@ begin
        Inc(buf, b.size);
     end else
        tmp.address:= PtrUInt(b.buffer);
-
     buffer_index := next_buffer_index;
-    {$IFDEF DebugVirtio}WriteDebug('VirtIOSendBuffer: queue: %d, vq.available.index: %d, vq.used.index: %d, vq.used.len: %d id: %d\n',[queue_index, vq.available.index, vq.used.index, vq.used.rings[(vq.used.index-1) mod vq.queue_size].length, vq.used.rings[(vq.used.index-1) mod vq.queue_size].index]);{$ENDIF}
   end;
-
   ReadWriteBarrier;
   vq.next_buffer := buffer_index;
-  vq.available.index:= vq.available.index + 1;
-
-  // notification are not needed
+  Inc(vq.available.index);
+  // notifications are not needed
   if (vq.used.flags and 1 <> 1) then
       write_portw(0, PtrUInt(Blk.Regs) + $10);
+end;
 
-  {$IFDEF DebugVirtio}WriteDebug('VirtIOSendBuffer: queue: %d, vq.available.index: %d, vq.used.index: %d\n',[queue_index, vq.available.index, vq.used.index]);{$ENDIF}
+procedure VirtIOProcessBlkQueue(BlkVirtIO: PVirtIOBlockDevice);
+var
+  vq: PVirtQueue;
+begin
+  vq := @BlkVirtIO.VirtQueue;
+  ReadWriteBarrier;
+  if vq.last_used_index = vq.used.index then
+    Exit;
+  if BlkVirtIO.Driver.WaitOn <> nil then
+    BlkVirtIO.Driver.WaitOn.State := tsReady;
+  // index := vq.last_used_index;
+  // while (index <> vq.used.index) do
+  // begin
+  //   inc(index);
+  // end;
+  // ReadWriteBarrier;
+  vq.last_used_index := vq.used.index;
+  ReadWriteBarrier;
 end;
 
 procedure VirtIOBlkHandler;
@@ -215,10 +295,9 @@ begin
   r := read_portb(PtrUInt(BlkVirtIO.Regs) + $13);
   if (r and 1 = 1) then
   begin
-     // Process queue
-     //VirtIOProcessRx (@NicVirtIO);
+     // for the moment only one thread can use the disk at time
+     VirtIOProcessBlkQueue (@BlkVirtIO);
   end;
-  {$IFDEF DebugVirtio}WriteDebug('VirtIOHandler: used.flags:%d, ava.flags:%d, r:%d\n',[NicVirtIO.VirtQueues[1].used.flags, NicVirtIO.VirtQueues[1].available.flags, r]);{$ENDIF}
   eoi;
 end;
 
@@ -267,14 +346,59 @@ asm
   db $cf
 end;
 
-procedure virtIODedicateBlock(Driver:PBlockDriver;CPUID: LongInt);
+procedure virtIODedicateBlock(Driver:PBlockDriver; CPUID: LongInt);
 var
-  I: LongInt;
+  i: LongInt;
 begin
+  // ignore the major
+  for i := 0 to 3 do
+  begin
+    if BlkVirtIO.Minors[i].fsType <> 0 then
+    begin
+      DedicateBlockFile(@BlkVirtIO.Minors[i].FileDesc, CPUID);
+    end;
+  end;
+  IrqOn(BlkVirtIO.Irq);
+  {$IFDEF DebugVirtioBlk}WriteDebug('virtIODedicateBlock: Dedicating virtioblk device on CPU %d\n',[CPUID]);{$ENDIF}
 end;
 
 function virtIOReadBlock(FileDesc: PFileBlock; Block, Count: LongInt; Buffer: Pointer): LongInt;
+var
+  bi: array[0..2] of TBufferInfo;
+  h: BlockRequestHeader;
+  status: Byte;
 begin
+  Result := 0;
+  GetDevice(FileDesc.BlockDriver);
+  Block := Block + BlkVirtIO.Minors[FileDesc.Minor].StartSector;
+  {$IFDEF DebugVirtioBlk}WriteDebug('virtIOReadBlock: Reading block: %d count: %d\n',[Block, Count]);{$ENDIF}
+  While Count <> 0 do
+  begin
+    BlkVirtIO.Driver.WaitOn.state := tsSuspended;
+    h.tp := VIRTIO_BLK_T_IN;
+    h.reserved := 0;
+    h.sector := Block;
+    bi[0].buffer := @h;
+    bi[0].size := sizeof(BlockRequestHeader);
+    bi[0].flags := 0;
+    bi[0].copy := true;
+    bi[1].buffer := buffer;
+    bi[1].size := 512;
+    bi[1].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi[1].copy := false;
+    bi[2].buffer := @status;
+    bi[2].size := 1;
+    bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi[2].copy := true;
+    ReadWriteBarrier;
+    VirtIOSendBuffer(@BlkVirtIO, @bi[0], 3);
+    SysThreadSwitch;
+    ReadWriteBarrier;
+    Dec(Count);
+    Inc(Result);
+    Inc(Block);
+  end;
+  FreeDevice(FileDesc.BlockDriver);
 end;
 
 procedure FindVirtIOBlkonPci;
@@ -291,18 +415,16 @@ var
   buffPage: DWORD;
   bi: TBufferInfo;
   queue: PVirtQueue;
-  j: LongInt;
 begin
   PciCard := PCIDevices;
   DisableInt;
   while PciCard <> nil do
   begin
-    // not sure why it works with $01
     if (PciCard.mainclass = $01) and (PciCard.subclass = $00) then
     begin
       if (PciCard.vendor = $1AF4) and (PciCard.device >= $1000) and (PciCard.device <= $103f) then
       begin
-        BlkVirtIO.IRQ := PciCard.irq;
+        BlkVirtIO.Irq := PciCard.Irq;
         BlkVirtIO.Regs:= Pointer(PtrUInt(PCIcard.io[0]));
         PciSetMaster(PciCard);
 
@@ -337,79 +459,60 @@ begin
           WriteConsoleF('VirtIOBlk: driver accepted features\n',[]);
 
         // initialize virtqueue
-        FillByte(BlkVirtIO.VirtQueues, sizeof(TVirtQueue),0);
+        FillByte(BlkVirtIO.VirtQueue, sizeof(TVirtQueue), 0);
         write_portw(0,  PtrUInt(BlkVirtIO.Regs) + $0E);
         QueueSize := read_portw(PtrUInt(BlkVirtIO.Regs) + $0C);
 
-        BlkVirtIO.VirtQueues.queue_size:= QueueSize;
+        BlkVirtIO.VirtQueue.queue_size:= QueueSize;
         sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
         sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));
         sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
 
         // buff must be 4k aligned
-        buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096);
-        Panic (buff=nil, 'VirtIOBlk: no memory for VirtIO buffers\n');
-        FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096, 0);
+        buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2);
+
+        Panic (buff=nil, 'VirtIOBlk: no memory for VirtIO buffers\n', []);
+        FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2, 0);
         buff := buff + (4096 - PtrUInt(buff) mod 4096);
         buffPage := PtrUInt(buff) div 4096;
 
         // 16 bytes aligned
-        BlkVirtIO.VirtQueues.buffers := PQueueBuffer(buff);
+        BlkVirtIO.VirtQueue.buffers := PQueueBuffer(buff);
 
         // 2 bytes aligned
-        BlkVirtIO.VirtQueues.available := @buff[sizeOfBuffers];
+        BlkVirtIO.VirtQueue.available := @buff[sizeOfBuffers];
 
         // 4 bytes aligned
-        BlkVirtIO.VirtQueues.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not($0FFF))]) ;
-        BlkVirtIO.VirtQueues.next_buffer:= 0;
-        BlkVirtIO.VirtQueues.lock := 0;
+        BlkVirtIO.VirtQueue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not $FFF)]);
+
+        BlkVirtIO.VirtQueue.next_buffer:= 0;
+        BlkVirtIO.VirtQueue.lock := 0;
         write_portd(@buffPage, PtrUInt(BlkVirtIO.Regs) + $08);
-        BlkVirtIO.VirtQueues.available.flags := 0;
-        {$IFDEF DebugVirtio}WriteDebug('VirtIOBlk: queue: %d, size: %d\n',[j, QueueSize]);{$ENDIF}
 
         write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK, PtrUInt(BlkVirtIO.Regs) + $12);
 
-        // setup queue
-        queue := @BlkVirtIO.VirtQueues;
-        queue.Buffer := ToroGetMem(queue.queue_size * FRAME_SIZE + 4096);
-        Panic (queue.Buffer=nil, 'VirtIOBlk: no memory for Queue buffer\n');
+        queue := @BlkVirtIO.VirtQueue;
+        queue.Buffer := ToroGetMem(queue.queue_size * (sizeof(BlockRequestHeader)+1) + 4096);
+        Panic (queue.Buffer=nil, 'VirtIOBlk: no memory for Queue buffer\n', []);
         queue.Buffer := Pointer(PtrUint(queue.Buffer) + (4096 - PtrUInt(queue.Buffer) mod 4096));
-        queue.chunk_size := FRAME_SIZE;
-        queue.available.index := 0;
-        queue.used.index := 0;
-
-        ReadWriteBarrier;
 
         write_portw(0, PtrUInt(BlkVirtIO.Regs) + $10);
 
-        // enable interruptions
-        queue.used.flags :=0;
-
-        // add all buffers to the queue
-        bi.size:= FRAME_SIZE;
-        bi.buffer:= nil;
-        bi.flags:= VIRTIO_DESC_FLAG_WRITE_ONLY;
-        bi.copy:= True;
-
-        for j := 0 to queue.queue_size - 1 do
-        begin
-          VirtIOSendBuffer(@BlkVirtIO, @bi, 1);
-        end;
-
-        CaptureInt(32+BlkVirtIO.IRQ, @VirtIOBlkIrqHandler);
-        // TODO: cada dispositivo soporta hasta 4 particiones primarias
-        // la particion numero 0 es todo el disco
-        // la 1, 2 ,3 y 4 son las sucesivas particiones
-        // TODO: inicializar cada particion
         BlkVirtIO.Driver.name := 'virtioblk';
         BlkVirtIO.Driver.Busy := false;
         BlkVirtIO.Driver.WaitOn := nil;
         BlkVirtIO.Driver.major := 0;
         BlkVirtIO.Driver.ReadBlock := @virtIOReadBlock;
         BlkVirtIO.Driver.Dedicate := @virtIODedicateBlock;
+        BlkVirtIO.Driver.CPUID := -1;
         RegisterBlockDriver(@BlkVirtIO.Driver);
-        // TODO: Add support for more devices
-        Exit;
+
+        CaptureInt(32+BlkVirtIO.irq, @VirtIOBlkIrqHandler);
+
+        // enable interruption
+        BlkVirtIO.VirtQueue.used.flags := 0;
+        VirtIOBlkDetectPartition (@BlkVirtIO);
+        WriteConsoleF('VirtIOBlk: driver registered\n',[]);
       end;
     end;
     PciCard := PciCard.Next;

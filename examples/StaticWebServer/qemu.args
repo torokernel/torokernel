@@ -1,1 +1,1 @@
--smp 1 -m 256 -nographic -hdb fat:rw:StaticWebServerFiles -net nic,model=virtio -net tap,ifname=tap0
+-smp 1 -m 256 -nographic -net nic,model=virtio -net tap,ifname=tap0 -drive file=fat:rw:StaticWebServerFiles,if=none,id=drive-virtio-disk0 -device virtio-blk-pci,drive=drive-virtio-disk0,addr=06

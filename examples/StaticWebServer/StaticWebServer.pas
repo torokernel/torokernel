@@ -214,12 +214,10 @@ begin
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
 
-  while true do;
-  // Dedicate the ide disk to local cpu
-  DedicateBlockDriver('ATA0',0);
+  DedicateBlockDriver('virtioblk', 0);
 
   //SysMount('ext2','ATA0',5);
-  SysMount('fat','ATA0',6);
+  SysMount('fat', 'virtioblk', 0);
 
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;

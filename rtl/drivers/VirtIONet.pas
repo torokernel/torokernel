@@ -483,9 +483,9 @@ begin
           sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
 
           // buff must be 4k aligned
-          buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096);
+          buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096*2);
           Panic (buff=nil, 'VirtIONet: no memory for VirtIO buffer\n', []);
-          FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096, 0);
+          FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096*2, 0);
           buff := buff + (4096 - PtrUInt(buff) mod 4096);
           buffPage := PtrUInt(buff) div 4096;
 

@@ -65,7 +65,6 @@ type
 
 var
   HttpServer, HttpClient: PSocket;
-  tmp: THandle;
   LocalIp: array[0..3] of Byte;
   tid: TThreadID;
   rq: PRequest;
@@ -141,6 +140,7 @@ var
   idx: TInode;
   indexSize: LongInt;
   Buf: Pchar;
+  tmp: THandle;
 begin
   Result := nil;
   if SysStatFile(entry, @idx) = 0 then

@@ -40,7 +40,7 @@ const
   USER_START_PORT = 10000;
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1;
   WAIT_ICMP = 50;
-  ServiceStack = 10*1024;
+  ServiceStack = 40*1024;
 
 type
   PNetworkInterface = ^TNetworkInterface;
@@ -1346,7 +1346,7 @@ procedure NetworkServicesInit;
 var
   ThreadID: TThreadID;
 begin
-  if PtrUInt(BeginThread(nil, 10*1024, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
+  if PtrUInt(BeginThread(nil, ServiceStack, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
     WriteConsoleF('Networks Packets Service .... Thread: %d\n',[ThreadID])
   else
     WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
@@ -1399,7 +1399,7 @@ begin
       DedicateNetworks[CPUID].NetworkInterface := Net;
       if @Handler <> nil then
       begin
-        if PtrUInt(BeginThread(nil, 10*1024, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
+        if PtrUInt(BeginThread(nil, ServiceStack, @Handler, nil, DWORD(-1), ThreadID)) <> 0 then
           WriteConsoleF('Network Packets Service .... Thread %d\n',[ThreadID])
         else
         begin

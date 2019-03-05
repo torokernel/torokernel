@@ -24,7 +24,7 @@ program StaticWebServer;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles -serial file:torodebug.txt}
+{%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles,if=none,id=drive-virtio-disk0 -device virtio-blk-pci,drive=drive-virtio-disk0,addr=06 -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
 uses
@@ -35,7 +35,8 @@ uses
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
-  Ide in '..\..\rtl\drivers\IdeDisk.pas',
+  // Ide in '..\..\rtl\drivers\IdeDisk.pas',
+  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
   // Ext2 in '..\..\rtl\drivers\Ext2.pas',
   Fat in '..\..\rtl\drivers\Fat.pas',
   Console in '..\..\rtl\drivers\Console.pas',
@@ -64,7 +65,6 @@ type
 
 var
   HttpServer, HttpClient: PSocket;
-  tmp: THandle;
   LocalIp: array[0..3] of Byte;
   tid: TThreadID;
   rq: PRequest;
@@ -140,6 +140,7 @@ var
   idx: TInode;
   indexSize: LongInt;
   Buf: Pchar;
+  tmp: THandle;
 begin
   Result := nil;
   if SysStatFile(entry, @idx) = 0 then
@@ -213,11 +214,10 @@ begin
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
 
-  // Dedicate the ide disk to local cpu
-  DedicateBlockDriver('ATA0',0);
+  DedicateBlockDriver('virtioblk', 0);
 
   //SysMount('ext2','ATA0',5);
-  SysMount('fat','ATA0',6);
+  SysMount('fat', 'virtioblk', 0);
 
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
@@ -233,7 +233,7 @@ begin
     rq.BufferEnd := rq.BufferStart;
     rq.counter := 0;
     HttpClient.UserDefined := rq;
-    tid := BeginThread(nil, 4096, ProcessesSocket, HttpClient, 0, tid);
+    tid := BeginThread(nil, 4096*2, ProcessesSocket, HttpClient, 0, tid);
   end;
 
 end.

@@ -233,7 +233,7 @@ begin
     rq.BufferEnd := rq.BufferStart;
     rq.counter := 0;
     HttpClient.UserDefined := rq;
-    tid := BeginThread(nil, 4096, ProcessesSocket, HttpClient, 0, tid);
+    tid := BeginThread(nil, 4096*2, ProcessesSocket, HttpClient, 0, tid);
   end;
 
 end.

@@ -38,7 +38,10 @@ implementation
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
   Arch, Console, Process, Memory, FileSystem, Network;
-  
+
+const
+  MainThreadStackSize = 64*1024;
+
 procedure KernelStart;
 begin
   {$IFDEF ProfileBootTime}
@@ -55,9 +58,9 @@ begin
   NetworkInit;
   ConsoleInit;
   // we will never return from this procedure call
-  {$IFDEF FPC} CreateInitThread(@InitSystem, 32*1024); {$ENDIF}
+  {$IFDEF FPC} CreateInitThread(@InitSystem, MainThreadStackSize); {$ENDIF}
   {$IFDEF DCC}
-//    CreateInitThread(@InitSystem, 32*1024);
+//    CreateInitThread(@InitSystem, MainThreadStackSize);
   {$ENDIF}
 end;
 

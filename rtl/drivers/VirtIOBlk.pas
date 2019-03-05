@@ -273,7 +273,6 @@ var
   vq: PVirtQueue;
 begin
   vq := @BlkVirtIO.VirtQueue;
-  ReadWriteBarrier;
   if vq.last_used_index = vq.used.index then
     Exit;
   if BlkVirtIO.Driver.WaitOn <> nil then
@@ -374,6 +373,7 @@ begin
   {$IFDEF DebugVirtioBlk}WriteDebug('virtIOReadBlock: Reading block: %d count: %d\n',[Block, Count]);{$ENDIF}
   While Count <> 0 do
   begin
+    DisableInt;
     BlkVirtIO.Driver.WaitOn.state := tsSuspended;
     h.tp := VIRTIO_BLK_T_IN;
     h.reserved := 0;
@@ -390,10 +390,9 @@ begin
     bi[2].size := 1;
     bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi[2].copy := true;
-    ReadWriteBarrier;
     VirtIOSendBuffer(@BlkVirtIO, @bi[0], 3);
+    RestoreInt;
     SysThreadSwitch;
-    ReadWriteBarrier;
     Dec(Count);
     Inc(Result);
     Inc(Block);
@@ -495,6 +494,7 @@ begin
         queue.Buffer := ToroGetMem(queue.queue_size * (sizeof(BlockRequestHeader)+1) + 4096);
         Panic (queue.Buffer=nil, 'VirtIOBlk: no memory for Queue buffer\n', []);
         queue.Buffer := Pointer(PtrUint(queue.Buffer) + (4096 - PtrUInt(queue.Buffer) mod 4096));
+        queue.chunk_size := sizeof(BlockRequestHeader) + 1;
 
         write_portw(0, PtrUInt(BlkVirtIO.Regs) + $10);
 

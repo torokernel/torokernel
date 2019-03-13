@@ -2,7 +2,7 @@
 // TestMemory.pas
 //
 // This unit contains unittests for the Memory unit.
-// 
+//
 // Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
@@ -41,62 +41,50 @@ uses
   Console in '..\..\rtl\drivers\Console.pas';
 
 var
-  test: LongInt;
+  test, i: LongInt;
 
-function TestGetMem(out test: Longint): Boolean;
-var
-  i: LongInt;
 begin
-  Result := False;
   test := 0;
-  i := 0;
-  // zero allocation returns the smallest chunk
-  If ToroGetMem(0) = nil then
-    Exit;
+  If ToroFreeMem(nil) = 1 then
+    WriteDebug('TestFreeMem-%d: PASSED\n', [test])
+  else
+    WriteDebug('TestFreeMem-%d: FAILED\n', [test]);
+
   Inc(test);
-  // Size > MAX_BLOCKSIZE shall return nil
-  If ToroGetMem(2*1024*1024*1024) <> nil then
-    Exit;
+
+  If ToroFreeMem(ToroGetMem(64)) <> 1 then
+    WriteDebug('TestFreeMem-%d: PASSED\n', [test])
+  else
+    WriteDebug('TestFreeMem-%d: FAILED\n', [test]);
+
   Inc(test);
-  // get all 64 bytes available chunks
+
+  if ToroGetMem(0) <> nil then
+    WriteDebug('TestGetMem-%d: PASSED\n', [test])
+  else
+    WriteDebug('TestGetMem-%d: FAILED\n', [test]);
+
+  Inc(test);
+
+  if ToroGetMem(2*1024*1024*1024) = nil then
+    WriteDebug('TestGetMem-%d: PASSED\n', [test])
+  else
+    WriteDebug('TestGetMem-%d: FAILED\n', [test]);
+
+  Inc(test);
+
   while true do
   begin
     if ToroGetMem(64) = nil then
       Break;
     i += 1;
   end;
+
   // number of allocations of 64 bytes for 256Mb per core
   if i <> 1765080 Then
-    Exit;
-  Result := True; 
-end;
-
-function TestFreeMem(out test: LongInt): Boolean;
-begin
-  Result := False;
-  test := 0;
-  If ToroFreeMem(nil) = 0 then
-    Exit;
-  Inc(test); 
-  // This trigger an unexpected behavior
-  // ToroFreeMem(Pointer($fffff));
-  // Inc(test);
-  If ToroFreeMem(ToroGetMem(64)) = 1 then
-    Exit;
-  Result := True;
-end;
-
-begin
-  // TODO: Neither exceptions nor panics are captured
-  if TestFreeMem(test) then
-    WriteDebug('TestFreeMem: PASSED\n', [])
+    WriteDebug('TestGetMem-%d: FAILED\n', [test])
   else
-    WriteDebug('TestFreeMem: FAILED\n', []);
-
-  if TestGetMem(test) then
-    WriteDebug('TestGetMem: PASSED\n', [])
-  else
-    WriteDebug('TestGetMem: FAILED, %d\n', [test]);
+    WriteDebug('TestGetMem-%d: PASSED\n', [test]);
 
   ShutdownInQemu;
 end.

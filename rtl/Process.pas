@@ -1406,7 +1406,11 @@ procedure SystemExit; [public, alias : 'SYSTEMEXIT'];
 begin
   {$IFDEF DebugProcess} WriteDebug('System_Exit due to ExitCode: %d\n', [ExitCode]); {$ENDIF}
   WriteConsoleF('\nSystem_Exit due to ExitCode: %d\n', [ExitCode]);
-  hlt;
+  {$IFDEF ShutdownWhenFinished}
+    ShutdownInQemu;
+  {$ELSE}
+    hlt;
+  {$ENDIF}
 end;
 
 // Halt core if a Panic condition is reached

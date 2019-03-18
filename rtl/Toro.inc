@@ -12,6 +12,7 @@
 //{$DEFINE CPUX86_64}
 //{$DEFINE EnableDebug}
 {$DEFINE EnablePing}
+//{$DEFINE ShutdownWhenFinished}
 //{$DEFINE ProfileBootTime}
 //{$DEFINE ToroHeadLess}
 //{$DEFINE DebugCrash}

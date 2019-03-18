@@ -40,7 +40,7 @@ uses
   VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas';
 
 const
-  longname: Pchar = 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttestte                     sttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttestt                     esttesttesttesttesttesttesttesttesttesttesttesttest';
+  longname: Pchar = 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest';
   noendname: array[0..4] of char = 'aaaaa';
   content: Pchar = 'abcdefeedfegghkkgiugjfhuiifjijefij';
 
@@ -187,27 +187,38 @@ begin
     WriteDebug('TestRead-%d: PASSED\n', [test]);
 
   SysCloseFile(tmp);
-
   Inc(test);
 
-  tmp := SysCreateFile('/test');
-  SysWriteFile(tmp, content, StrLen(content));
-  SysCloseFile(tmp);
+  tmp := 0;
 
-  tmp := SysOpenFile('/test');
-  i := 0;
-
-  while SysReadFile(tmp, @buf, 1) <> 0 do
-  begin
-   if buf <> content[i] then
-     Break;
-   Inc(i);
+  try
+    tmp := SysCreateFile('/test');
+    WriteDebug('TestRead-%d: PASSED\n', [test]);
+  except
+    WriteDebug('TestRead-%d: FAILED\n', [test]);
   end;
 
-  if i <> StrLen(content) then
-    WriteDebug('TestWrite-%d: FAILED\n', [test])
-  else
-    WriteDebug('TestWrite-%d: PASSED\n', [test]);
+  if tmp <> 0 then
+  begin
+    Inc(test);
+    SysWriteFile(tmp, StrLen(content), content);
+    SysCloseFile(tmp);
+
+    tmp := SysOpenFile('/test');
+    i := 0;
+
+    while SysReadFile(tmp, 1, @buf) <> 0 do
+    begin
+      if buf <> content[i] then
+        Break;
+      Inc(i);
+    end;
+
+    if i <> StrLen(content) then
+      WriteDebug('TestWrite-%d: FAILED\n', [test])
+    else
+      WriteDebug('TestWrite-%d: PASSED\n', [test]);
+  end;
 
   ShutdownInQemu;
 end.

@@ -193,9 +193,9 @@ begin
 
   try
     tmp := SysCreateFile('/test');
-    WriteDebug('TestRead-%d: PASSED\n', [test]);
+    WriteDebug('TestCreate-%d: PASSED\n', [test]);
   except
-    WriteDebug('TestRead-%d: FAILED\n', [test]);
+    WriteDebug('TestCreate-%d: FAILED\n', [test]);
   end;
 
   if tmp <> 0 then

@@ -213,7 +213,6 @@ begin
     IPStrtoArray(GetKernelParam(1), LocalIp);
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
-
   DedicateBlockDriver('virtioblk', 0);
 
   //SysMount('ext2','ATA0',5);

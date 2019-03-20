@@ -819,6 +819,12 @@ var
   Size: PtrUInt;
   SX: Byte;
 begin
+  Result := 1;
+  if P = nil then
+  begin
+    {$IFDEF DebugMemory} WriteDebug('ToroFreeMem: freeing nil pointer\n', []); {$ENDIF}
+    Exit;
+  end;
   DisableInt;
   GetHeader(P, CPU, SX, IsFree, IsPrivateHeap, Size); // return block to original CPU MMU
   Panic(Size = 0, 'ToroFreeMem: Size of pointer %h cannot be zero, memory has been corrupted\n', [PtrUInt(P)]);

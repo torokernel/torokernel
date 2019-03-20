@@ -48,6 +48,11 @@ install:
 
 script:
   - ./ci/travis.compile.py
+  - ./tests/process/TestProcess.sh
+  - ./tests/memory/TestMemory.sh
+  - ./tests/benchmarks/ProfileBootTime.sh
+  - ./tests/benchmarks/ProfileKernelInitTime.sh
+  - ./tests/filesystem/TestFilesystem.sh
  
 notifications:
   email:

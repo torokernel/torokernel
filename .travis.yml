@@ -42,6 +42,7 @@ before_install:
   - Xvfb $DISPLAY &
   - chmod +x ./ci/travis.install.py
   - chmod +x ./ci/travis.compile.py
+  - chmod +x ./ci/travis.test.py
 
 install:
   - ./ci/travis.install.py
@@ -49,16 +50,7 @@ install:
 
 script:
   - ./ci/travis.compile.py
-  - cd ./tests/process/
-  - ./TestProcess.sh
-  - cd ../memory
-  - ./TestMemory.sh
-  - cd ../benchmarks
-  - ./ProfileBootTime.sh
-  - ./ProfileKernelInitTime.sh
-  - cd ../filesystem/
-  - ./TestFilesystem.sh
-  - cd ../..
+  - ./ci/travis.test.py
  
 notifications:
   email:

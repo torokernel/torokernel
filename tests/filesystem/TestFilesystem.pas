@@ -219,6 +219,4 @@ begin
     else
       WriteDebug('TestWrite-%d: PASSED\n', [test]);
   end;
-
-  ShutdownInQemu;
 end.

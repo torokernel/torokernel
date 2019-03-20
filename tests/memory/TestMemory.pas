@@ -73,11 +73,13 @@ begin
 
   Inc(test);
 
+  i := 0;
+
   while true do
   begin
     if ToroGetMem(64) = nil then
       Break;
-    i += 1;
+    Inc(i);
   end;
 
   // number of allocations of 64 bytes for 256Mb per core
@@ -85,6 +87,4 @@ begin
     WriteDebug('TestGetMem-%d: FAILED\n', [test])
   else
     WriteDebug('TestGetMem-%d: PASSED\n', [test]);
-
-  ShutdownInQemu;
 end.

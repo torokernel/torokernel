@@ -42,7 +42,4 @@ uses
 
 begin
 
-{$IFDEF ProfileKernelInit}
-  ShutdownInQemu;
-{$ENDIF}
 end.

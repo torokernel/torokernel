@@ -169,7 +169,7 @@ begin
     WriteDebug('TestBeginThread-%d: PASSED\n', [test]);
 
   ret := 2;
-  inc (test);
+  Inc (test);
   tmp := BeginThread(nil, 4096, Thread, Pointer($12345), 1, tmp);
 
   while ret = 2 do
@@ -215,6 +215,4 @@ begin
     WriteDebug('TestThreadSwitch-%d: FAILED\n', [test]);
 
   TestExceptions;
-
-  ShutdownInQemu;
 end.

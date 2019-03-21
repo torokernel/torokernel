@@ -153,7 +153,7 @@ end;
 
 procedure TestBeginThread;
 var
-  i, test: LongInt;
+  test: LongInt;
   tmp: TThreadID;
 begin
   test := 0;

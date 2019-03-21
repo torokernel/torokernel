@@ -41,7 +41,8 @@ uses
   Console in '..\..\rtl\drivers\Console.pas';
 
 var
-  test, i: LongInt;
+  test: LongInt;
+  r: ^Char;
 
 begin
   test := 0;
@@ -73,18 +74,19 @@ begin
 
   Inc(test);
 
-  i := 0;
-
   while true do
   begin
-    if ToroGetMem(64) = nil then
+    r := ToroGetMem(64);
+    if r = nil then
       Break;
-    Inc(i);
+    try
+      r^ := 'a';
+    except
+      WriteDebug('TestGetMem-%d: FAILED\n', [test]);
+      break;
+    end;
   end;
 
-  // number of allocations of 64 bytes for 256Mb per core
-  if i <> 1765080 Then
-    WriteDebug('TestGetMem-%d: FAILED\n', [test])
-  else
-    WriteDebug('TestGetMem-%d: PASSED\n', [test]);
+  if r = nil then
+     WriteDebug('TestGetMem-%d: PASSED\n', [test]);
 end.

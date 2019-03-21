@@ -54,7 +54,6 @@ var
 begin
   DedicateBlockDriver('virtioblk', 0);
   SysMount('fat', 'virtioblk', 0);
-
   test := 0;
   if SysOpenFile('/1kfile') = 0 then
     WriteDebug('TestOpen-%d: FAILED\n', [test])
@@ -163,7 +162,7 @@ begin
       Break;
   end;
 
-  if i <> (1024*1024-1) then
+  if i <> 1024*1024 then
     WriteDebug('TestRead-%d: FAILED\n', [test])
   else
     WriteDebug('TestRead-%d: PASSED\n', [test]);

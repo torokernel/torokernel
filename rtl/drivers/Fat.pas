@@ -598,7 +598,7 @@ function FatReadFile(FileDesc: PFileRegular; Count: LongInt; Buffer: Pointer): l
 var
   bh: PBufferHead;
   Cnt: DWORD;
-  initblk, initoff: DWORD;
+  initblk, initoff, startblk: DWORD;
   j: LongInt;
   nextCluster, Sector: DWORD;
   pfat: psb_fat;
@@ -612,7 +612,8 @@ begin
   pfat := FileDesc.Inode.SuperBlock.SbInfo;
   tmp := FileDesc.Inode.InoInfo;
   initblk := FileDesc.FilePos div (FileDesc.Inode.SuperBlock.BlockSize * pfat.pbpb.BPB_SecPerClus);
-  initoff := FileDesc.FilePos mod (FileDesc.Inode.SuperBlock.BlockSize * pfat.pbpb.BPB_SecPerClus);
+  initoff := FileDesc.FilePos mod FileDesc.Inode.SuperBlock.BlockSize;
+  startblk := (FileDesc.FilePos mod (FileDesc.Inode.SuperBlock.BlockSize * pfat.pbpb.BPB_SecPerClus)) div FileDesc.Inode.SuperBlock.BlockSize;
   nextCluster := tmp.dir_entry.FATEntry;
   If initblk = 0 then
    Sector := (nextCluster - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec)
@@ -632,10 +633,10 @@ begin
   cnt := Count ;
   repeat
     // read a whole cluster
-    for j:= 0 to pfat.pbpb.BPB_SecPerClus-1 do
+    for j:= startblk to pfat.pbpb.BPB_SecPerClus-1 do
     begin
       bh := GetBlock(FileDesc.Inode.SuperBlock.BlockDevice, Sector + j, FileDesc.Inode.SuperBlock.BlockSize);
-      {$IFDEF DebugFat} WriteDebug('FatReadFile: nextSector: %d, ClusterSize: %d, Count: %d\n',[Sector, FileDesc.Inode.SuperBlock.BlockSize*pfat.pbpb.BPB_SecPerClus, cnt]);{$ENDIF}
+      {$IFDEF DebugFat} WriteDebug('FatReadFile: nextSector: %d, ClusterSize: %d, Count: %d, startblk: %d, initoff: %d\n',[Sector, FileDesc.Inode.SuperBlock.BlockSize*pfat.pbpb.BPB_SecPerClus, cnt, startblk, initoff]); {$ENDIF}
       if bh = nil then
       begin
         Result := Count - cnt;
@@ -645,14 +646,16 @@ begin
       begin
         Move (PByte(bh.data+initoff)^, Pbyte(Buffer)^, FileDesc.Inode.SuperBlock.BlockSize);
         Inc(FileDesc.FilePos, FileDesc.Inode.SuperBlock.BlockSize);
-        initoff := 0 ;
+        initoff := 0;
+        startblk := 0;
         Dec(cnt, FileDesc.Inode.SuperBlock.BlockSize);
         Inc(Buffer, FileDesc.Inode.SuperBlock.BlockSize);
         PutBlock(FileDesc.Inode.SuperBlock.BlockDevice, bh);
       end else
       begin
         Move(PByte(bh.data+initoff)^, Pbyte(Buffer)^, cnt);
-        initoff := 0 ;
+        initoff := 0;
+        startblk := 0;
         Inc(FileDesc.FilePos, cnt);
         cnt := 0 ;
         PutBlock(FileDesc.Inode.SuperBlock.BlockDevice, bh);
@@ -665,7 +668,7 @@ begin
     Sector := (nextCluster - 2) * pfat.pbpb.BPB_SecPerClus + ((pfat.pbpb.BPB_FATSz16 *2) + pfat.pbpb.BPB_RsvdSecCnt + (pfat.pbpb.BPB_RootEntCnt * 32) div pfat.pbpb.BPB_BytsPerSec);
   until cnt = 0;
   Result := Count - cnt;
-  {$IFDEF DebugFat} WriteDebug('FatReadFile: Result: %d\n',[Result]);{$ENDIF}
+  {$IFDEF DebugFat} WriteDebug('FatReadFile: Result: %d\n',[Result]); {$ENDIF}
 end;
 
 initialization

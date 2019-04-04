@@ -153,6 +153,7 @@ const
   VIRTIO_NET_HDR_F_NEEDS_CSUM = 1;
 
   VIRTIO_BLK_T_IN = 0;
+  VIRTIO_BLK_T_OUT = 1;
 
 var
   BlkVirtIO: TVirtIOBlockDevice;
@@ -400,6 +401,45 @@ begin
   FreeDevice(FileDesc.BlockDriver);
 end;
 
+function virtIOWriteBlock(FileDesc: PFileBlock; Block, Count: LongInt; Buffer: Pointer): LongInt;
+var
+  bi: array[0..2] of TBufferInfo;
+  h: BlockRequestHeader;
+  status: Byte;
+begin
+  Result := 0;
+  GetDevice(FileDesc.BlockDriver);
+  Block := Block + BlkVirtIO.Minors[FileDesc.Minor].StartSector;
+  {$IFDEF DebugVirtioBlk}WriteDebug('virtIOWriteBlock: Writing block: %d count: %d\n',[Block, Count]);{$ENDIF}
+  While Count <> 0 do
+  begin
+    DisableInt;
+    BlkVirtIO.Driver.WaitOn.state := tsSuspended;
+    h.tp := VIRTIO_BLK_T_OUT;
+    h.reserved := 0;
+    h.sector := Block;
+    bi[0].buffer := @h;
+    bi[0].size := sizeof(BlockRequestHeader);
+    bi[0].flags := 0;
+    bi[0].copy := true;
+    bi[1].buffer := buffer;
+    bi[1].size := 512;
+    bi[1].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi[1].copy := false;
+    bi[2].buffer := @status;
+    bi[2].size := 1;
+    bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi[2].copy := true;
+    VirtIOSendBuffer(@BlkVirtIO, @bi[0], 3);
+    RestoreInt;
+    SysThreadSwitch;
+    Dec(Count);
+    Inc(Result);
+    Inc(Block);
+  end;
+  FreeDevice(FileDesc.BlockDriver);
+end;
+
 procedure FindVirtIOBlkonPci;
 var
   PciCard: PBusDevInfo;
@@ -503,6 +543,7 @@ begin
         BlkVirtIO.Driver.WaitOn := nil;
         BlkVirtIO.Driver.major := 0;
         BlkVirtIO.Driver.ReadBlock := @virtIOReadBlock;
+        BlkVirtIO.Driver.WriteBlock := @virtIOWriteBlock;
         BlkVirtIO.Driver.Dedicate := @virtIODedicateBlock;
         BlkVirtIO.Driver.CPUID := -1;
         RegisterBlockDriver(@BlkVirtIO.Driver);

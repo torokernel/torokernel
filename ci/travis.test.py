@@ -32,9 +32,9 @@ def main():
   os.system ('./TestProcess.sh')
   os.chdir(cwd + '/tests/memory')
   os.system ('./TestMemory.sh')
-  os.chdir(cwd + '/tests/benchmarks')
-  os.system ('./ProfileBootTime.sh')
-  os.system ('./ProfileKernelInitTime.sh')
+  # os.chdir(cwd + '/tests/benchmarks')
+  # os.system ('./ProfileBootTime.sh')
+  # os.system ('./ProfileKernelInitTime.sh')
   os.chdir (cwd)
   return 0
     

@@ -190,12 +190,12 @@ begin
 
   tmp := 0;
 
-  try
-    tmp := SysCreateFile('/test');
-    WriteDebug('TestCreate-%d: PASSED\n', [test]);
-  except
-    WriteDebug('TestCreate-%d: FAILED\n', [test]);
-  end;
+  // try
+  //  tmp := SysCreateFile('/test');
+  //  WriteDebug('TestCreate-%d: PASSED\n', [test]);
+  // except
+  //  WriteDebug('TestCreate-%d: FAILED\n', [test]);
+  // end;
 
   if tmp <> 0 then
   begin

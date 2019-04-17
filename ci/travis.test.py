@@ -26,17 +26,21 @@ import subprocess
 
 def main():
   cwd = os.getcwd()
+  ret = 1
   os.chdir (cwd + '/tests/filesystem')
-  os.system ('./TestFilesystem.sh')
+  if os.system ('./TestFilesystem.sh'):
+    ret = 0
   os.chdir(cwd + '/tests/process')
-  os.system ('./TestProcess.sh')
+  if os.system ('./TestProcess.sh'):
+    ret = 0
   os.chdir(cwd + '/tests/memory')
-  os.system ('./TestMemory.sh')
+  if os.system ('./TestMemory.sh'):
+    ret = 0
   # os.chdir(cwd + '/tests/benchmarks')
   # os.system ('./ProfileBootTime.sh')
   # os.system ('./ProfileKernelInitTime.sh')
   os.chdir (cwd)
-  return 0
+  return ret
     
 if __name__ == '__main__':
     sys.exit(int(not main()))

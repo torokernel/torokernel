@@ -1406,6 +1406,9 @@ procedure SystemExit; [public, alias : 'SYSTEMEXIT'];
 begin
   {$IFDEF DebugProcess} WriteDebug('System_Exit due to ExitCode: %d\n', [ExitCode]); {$ENDIF}
   WriteConsoleF('\nSystem_Exit due to ExitCode: %d\n', [ExitCode]);
+  {$IFDEF EnableDebug}
+    DumpDebugRing;
+  {$ENDIF}
   {$IFDEF ShutdownWhenFinished}
     ShutdownInQemu;
   {$ELSE}
@@ -1426,13 +1429,14 @@ begin
   WriteConsoleF(Format, Args);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, Args); {$ENDIF}
   {$IFDEF DebugCrash}
-  WriteConsoleF('Backtrace:\n',[]);
-  // FIXME: Print the whole stack
-  GetRBP;
-  get_caller_stackinfo(pointer(rbp_reg), addr);
-  PrintBackTraceStr(addr);
-  get_caller_stackinfo(pointer(rbp_reg), addr);
-  PrintBackTraceStr(addr);
+    WriteConsoleF('Backtrace:\n',[]);
+    // FIXME: Print the whole stack
+    GetRBP;
+    get_caller_stackinfo(pointer(rbp_reg), addr);
+    PrintBackTraceStr(addr);
+    get_caller_stackinfo(pointer(rbp_reg), addr);
+    PrintBackTraceStr(addr);
+    DumpDebugRing;
   {$ENDIF}
   while true do;
 end;

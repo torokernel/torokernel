@@ -41,8 +41,13 @@ uses
 
 const
   MainThreadStackSize = 64*1024;
+  DebugRingSize = 1*1024*1024;
 
 procedure KernelStart;
+{$IFDEF EnableDebug}
+var
+  tmp: PChar;
+{$ENDIF}
 begin
   {$IFDEF ProfileBootTime}
     ShutdownInQemu;
@@ -54,6 +59,11 @@ begin
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;
+  {$IFDEF EnableDebug}
+    tmp := ToroGetMem(DebugRingSize);
+    Panic(tmp=nil,'No memory for ring buffer for debug\n', []);
+    SetDebugRing (tmp,DebugRingSize);
+  {$ENDIF}
   FileSystemInit;
   NetworkInit;
   ConsoleInit;

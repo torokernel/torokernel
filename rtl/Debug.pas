@@ -1,9 +1,9 @@
 //
 // Debug.pas
 //
-// This units contains functions and procedures to Debug the kernel.
+// This unit contains procedures to debug the kernel.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -31,7 +31,6 @@ uses
 
 procedure DebugInit;
 procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
-procedure SetBreakPoint(Id: Qword);
 
 implementation
 
@@ -64,22 +63,10 @@ begin
   WaitForCompletion;
 end;
 
-
 function ReadChar: XChar;
 begin
   while (read_portb(BASE_COM_PORT+5) and 1 ) = 0 do;
   Result := XChar(read_portb(BASE_COM_PORT));
-end;
-
-
-procedure SetBreakPoint(Id: Qword);
-var
-  tmp: Char;
-begin
-  WriteDebug('Debug: Breakpoint %d reached, press any key to continue\n',[Id]);
-  DisableInt;
-  tmp := ReadChar;
-  RestoreInt;
 end;
 
 // Print in decimal form

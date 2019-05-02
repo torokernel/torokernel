@@ -86,18 +86,19 @@ var
   p: PChar;
 begin
   p := DebugRingBufferBegin;
-  while p <= ringPos do
+  while p < ringPos do
   begin
     SendChartoConsole(p^);
     Inc(p);
   end;
+  ringPos := DebugRingBufferBegin;
 end;
 
 procedure SetDebugRing(Base: PChar; NewSize: LongInt);
 var
   tmp: LongInt;
 begin
-  tmp := LongInt(ringPos - DebugRingBufferBegin - 1);
+  tmp := LongInt(ringPos - DebugRingBufferBegin);
   Move(DebugRingBufferBegin^, Base^, tmp);
   DebugRingBufferBegin := Base;
   DebugRingBufferEnd := Base + NewSize - 1;

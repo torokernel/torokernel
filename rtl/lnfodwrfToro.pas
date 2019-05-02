@@ -31,7 +31,9 @@ type
   CodePointer = Pointer;
 {$ENDIF}
 
-uses Console, Debug;
+uses
+  {$IFDEF EnableDebug} Debug, {$ENDIF}
+  Console;
 
 function GetLineInfo(addr:ptruint;var func,source: shortstring;var line:longint) : boolean;
 procedure PrintBackTraceStr(addr: Pointer);
@@ -794,11 +796,11 @@ begin
   if Success then
   begin
     WriteConsoleF('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@Source[1]), Line]);
-    WriteDebug('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@Source[1]),Line]);
+    {$IFDEF EnableDebug}WriteDebug('[%h] %p:%d\n',[ptruint(addr), PtrUInt(@Source[1]),Line]);{$ENDIF}
   end else
   begin
     WriteConsoleF('[%h] in ??:??\n',[PtrUInt(addr)]);
-    WriteDebug('[%h] in ??:??\n',[PtrUInt(addr)]);
+    {$IFDEF EnableDebug}WriteDebug('[%h] in ??:??\n',[PtrUInt(addr)]);{$ENDIF}
   end;
   BackTraceStrFunc := Store;
 end;

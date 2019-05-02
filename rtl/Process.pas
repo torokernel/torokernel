@@ -262,6 +262,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EDivException.Create ('Division by Zero');
 end;
@@ -316,6 +317,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EOverflowException.Create ('OverFlow');
 end;
@@ -370,6 +372,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EBoundException.Create ('Bound');
 end;
@@ -424,6 +427,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EIllegalInsException.Create ('Illegal Instruction');
 end;
@@ -478,6 +482,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EDevnotAvaException.Create ('Device not available');
 end;
@@ -532,6 +537,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EDFException.Create ('Double Fault');
 end;
@@ -586,6 +592,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise ESTACKFAULTException.Create ('Stack Fault');
 end;
@@ -644,6 +651,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EGENERALPException.Create ('General Protection');
 end;
@@ -694,17 +702,19 @@ begin
     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
     WriteDebug('Backtrace:\n',[]);
+    DumpDebugRing;
  {$ENDIF}
- WriteConsoleF('Backtrace:\n',[]);
- get_caller_stackinfo(pointer(rbp_reg), addr);
- PrintBackTraceStr(pointer(rip_reg));
- while rbp_reg <> 0 do
- begin
+  WriteConsoleF('Backtrace:\n',[]);
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(pointer(rip_reg));
+  while rbp_reg <> 0 do
+  begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
- end;
- EnableInt;
- raise EPageFaultPException.Create ('Page Fault');
+  end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
+  EnableInt;
+  raise EPageFaultPException.Create ('Page Fault');
 end;
 
 type
@@ -757,6 +767,7 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
   EnableInt;
   raise EFPUException.Create ('FPU');
 end;

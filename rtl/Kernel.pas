@@ -41,7 +41,6 @@ uses
 
 const
   MainThreadStackSize = 64*1024;
-  DebugRingSize = 1*1024*1024;
 
 procedure KernelStart;
 {$IFDEF EnableDebug}
@@ -63,6 +62,7 @@ begin
     tmp := ToroGetMem(DebugRingSize);
     Panic(tmp=nil,'No memory for ring buffer for debug\n', []);
     SetDebugRing (tmp,DebugRingSize);
+    WriteDebug('Debug ring buffer size: %d\n',[DebugRingSize]);
   {$ENDIF}
   FileSystemInit;
   NetworkInit;

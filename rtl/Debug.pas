@@ -1,9 +1,9 @@
 //
 // Debug.pas
 //
-// This units contains functions and procedures to Debug the kernel.
+// This unit contains procedures to debug the kernel.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -31,7 +31,8 @@ uses
 
 procedure DebugInit;
 procedure WriteDebug (const Format: AnsiString; const Args: array of PtrUInt);
-procedure SetBreakPoint(Id: Qword);
+procedure DumpDebugRing;
+procedure SetDebugRing(Base: PChar; NewSize: LongInt);
 
 implementation
 
@@ -58,28 +59,56 @@ begin
   until (lsr and $20) = $20;
 end;
 
-procedure SendChar(C: XChar);
+procedure SendChartoConsole(C: XChar);
 begin
   write_portb(Byte(C), BASE_COM_PORT);
   WaitForCompletion;
 end;
 
+const
+  RingBufferInitialSize = 1024;
+
+var
+  InitialDebugRing: array[0..RingBufferInitialSize-1] of Char;
+  DebugRingBufferBegin, DebugRingBufferEnd: PChar;
+  ringPos: PChar;
+
+procedure SendChar(C: XChar);
+begin
+  ringPos^ := C;
+  Inc(ringPos);
+  if ringPos > DebugRingBufferEnd then
+    ringPos := DebugRingBufferBegin;
+end;
+
+procedure DumpDebugRing;
+var
+  p: PChar;
+begin
+  p := DebugRingBufferBegin;
+  while p < ringPos do
+  begin
+    SendChartoConsole(p^);
+    Inc(p);
+  end;
+  ringPos := DebugRingBufferBegin;
+end;
+
+procedure SetDebugRing(Base: PChar; NewSize: LongInt);
+var
+  tmp: LongInt;
+begin
+  tmp := LongInt(ringPos - DebugRingBufferBegin);
+  Move(DebugRingBufferBegin^, Base^, tmp);
+  DebugRingBufferBegin := Base;
+  DebugRingBufferEnd := Base + NewSize - 1;
+  ringPos := DebugRingBufferBegin + tmp;
+end;
 
 function ReadChar: XChar;
 begin
   while (read_portb(BASE_COM_PORT+5) and 1 ) = 0 do;
   Result := XChar(read_portb(BASE_COM_PORT));
-end;
-
-
-procedure SetBreakPoint(Id: Qword);
-var
-  tmp: Char;
-begin
-  WriteDebug('Debug: Breakpoint %d reached, press any key to continue\n',[Id]);
-  DisableInt;
-  tmp := ReadChar;
-  RestoreInt;
 end;
 
 // Print in decimal form
@@ -295,11 +324,14 @@ end;
 
 procedure DebugInit;
 begin
+  DebugRingBufferBegin := @InitialDebugRing;
+  DebugRingBufferEnd := @InitialDebugRing[RingBufferInitialSize-1];
+  ringPos := DebugRingBufferBegin;
   write_portb ($83, BASE_COM_PORT+3);
   write_portb (0, BASE_COM_PORT+1);
   write_portb (1, BASE_COM_PORT);
   write_portb (3, BASE_COM_PORT+3);
-  WriteConsoleF ('Toro on /Vdebug mode/n using /VCOM1/n\n',[]);
+  WriteConsoleF ('Toro on /Vdebug mode/n\n',[]);
   WriteDebug('Initialization of debugging console.\n',[]);
   {$IFDEF DebugCrash}
      WriteDebug('Crash dumping is Enabled\n',[]);

@@ -327,10 +327,12 @@ begin
   DebugRingBufferBegin := @InitialDebugRing;
   DebugRingBufferEnd := @InitialDebugRing[RingBufferInitialSize-1];
   ringPos := DebugRingBufferBegin;
-  write_portb ($83, BASE_COM_PORT+3);
-  write_portb (0, BASE_COM_PORT+1);
-  write_portb (1, BASE_COM_PORT);
-  write_portb (3, BASE_COM_PORT+3);
+  {$IFNDEF UseConsoleasSerial}
+    write_portb ($83, BASE_COM_PORT+3);
+    write_portb (0, BASE_COM_PORT+1);
+    write_portb (1, BASE_COM_PORT);
+    write_portb (3, BASE_COM_PORT+3);
+  {$ENDIF}
   WriteConsoleF ('Toro on /Vdebug mode/n\n',[]);
   WriteDebug('Initialization of debugging console.\n',[]);
   {$IFDEF DebugCrash}

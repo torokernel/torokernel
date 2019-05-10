@@ -52,6 +52,7 @@ begin
     ShutdownInQemu;
     Reboot;
   {$ENDIF}
+  ConsoleInit;
   WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
@@ -66,7 +67,6 @@ begin
   {$ENDIF}
   FileSystemInit;
   NetworkInit;
-  ConsoleInit;
   // we will never return from this procedure call
   {$IFDEF FPC} CreateInitThread(@InitSystem, MainThreadStackSize); {$ENDIF}
   {$IFDEF DCC}

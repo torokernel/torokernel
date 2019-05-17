@@ -12,8 +12,9 @@ StaticWebServer.o
 ../../rtl/drivers/Pci.o
 ../../rtl/drivers/VirtIOBlk.o
 ../../rtl/drivers/Fat.o
-../../rtl/drivers/Console.o
+../../rtl/drivers/VirtIOFS.o
 ../../rtl/drivers/VirtIONet.o
+../../rtl/drivers/Console.o
 ../../rtl/Network.o
 ../../rtl/SysUtils.o
 ../../rtl/lnfodwrfToro.o

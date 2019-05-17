@@ -36,9 +36,13 @@ uses
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
   // Ide in '..\..\rtl\drivers\IdeDisk.pas',
-  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-  // Ext2 in '..\..\rtl\drivers\Ext2.pas',
-  Fat in '..\..\rtl\drivers\Fat.pas',
+  {$IFDEF UseVirtIOFS}
+    VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
+  {$ELSE}
+    VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
+    // Ext2 in '..\..\rtl\drivers\Ext2.pas',
+    Fat in '..\..\rtl\drivers\Fat.pas',
+  {$ENDIF}
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas',
   //E1000 in '..\..\rtl\drivers\E1000.pas';
@@ -213,11 +217,17 @@ begin
     IPStrtoArray(GetKernelParam(1), LocalIp);
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
-  DedicateBlockDriver('virtioblk', 0);
+
+  DedicateBlockDriver('myfstoro', 0);
 
   //SysMount('ext2','ATA0',5);
-  SysMount('fat', 'virtioblk', 0);
-
+  {$IFDEF UseVirtIOFS}
+    DedicateBlockDriver('myfstoro', 0);
+    SysMount('virtiofs', 'myfstoro', 0);
+  {$ELSE}
+    DedicateBlockDriver('virtioblk', 0);
+    SysMount('fat', 'virtioblk', 0);
+  {$ENDIF}
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;

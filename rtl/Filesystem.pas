@@ -40,6 +40,8 @@ const
   SeekCur = 1;
   SeekEof = 2;
 
+  MAX_DEV_NAME = 30;
+
 type
   PBlockDriver = ^TBlockDriver;
   PStorage = ^TStorage;
@@ -53,7 +55,7 @@ type
   TBlockDriver = record
     Busy: Boolean; // protection for access from Local CPU.
     WaitOn: PThread; // Thread using the Driver.
-    Name: AnsiString; // Driver identificators is used by the Kernel
+    Name: array[0..MAX_DEV_NAME-1] of Char;
     Major: LongInt;
     Dedicate: procedure (Controller:PBlockDriver;CPUID: LongInt);
     WriteBlock: function (FileDesc: PFileBlock; Block, Count: LongInt; Buffer: Pointer): LongInt;
@@ -126,7 +128,7 @@ type
   end;
 
   TFileSystemDriver = record
-    Name: AnsiString; // e.g., ext2, fat, etc
+    Name: array[0..MAX_DEV_NAME-1] of Char; // e.g., ext2, fat, etc
     OpenFile: function (FileDesc: PFileRegular): LongInt;
     CloseFile: function (FileDesc: PFileRegular): LongInt;
     ReadFile: function (FileDesc: PFileRegular;count: LongInt;Buffer: Pointer): LongInt;
@@ -152,25 +154,21 @@ procedure GetDevice(Dev:PBlockDriver);
 procedure FreeDevice(Dev:PBlockDriver);
 procedure RegisterBlockDriver(Driver:PBlockDriver);
 procedure RegisterFilesystem (Driver: PFileSystemDriver);
-procedure DedicateBlockDriver(const Name: AnsiString; CPUID: LongInt);
+procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 procedure DedicateBlockFile(FBlock: PFileBlock;CPUID: LongInt);
 procedure SysCloseFile(FileHandle: THandle);
-procedure SysMount(const FileSystemName, BlockName: AnsiString; const Minor: LongInt);
+procedure SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt);
 function SysOpenFile(Path: PXChar): THandle;
-function SysCreateDir(Path: PAnsiChar): Longint;
+function SysCreateDir(Path: PXChar): Longint;
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
 function SysReadFile(FileHandle: THandle; Count: LongInt;Buffer:Pointer): LongInt;
 function SysWriteFile(FileHandle: THandle; Count: LongInt; Buffer:Pointer): LongInt;
-function SysWriteBlock(FileHandle: THandle; Block, Count: LongInt; Buffer: Pointer): LongInt;
-function SysReadBlock(FileHandle: THandle;Block,Count: LongInt; Buffer: Pointer): LongInt;
-function SysOpenBlock (const Name: AnsiString; Minor: LongInt): THandle;
 function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
 procedure PutBlock(FileBlock: PFileBlock; Bh: PBufferHead);
 function GetInode(Inode: LongInt): PInode;
 procedure PutInode(Inode: PInode);
-procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
-function SysCreateFile(Path:  PAnsiChar): THandle;
+function SysCreateFile(Path:  PXChar): THandle;
 
 var
   FileSystemDrivers: PFileSystemDriver;
@@ -226,35 +224,14 @@ begin
   {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d\n', [CPUID, FBlock.Minor]); {$ENDIF}
 end;
 
-function SysOpenBlock(const Name: AnsiString; Minor: LongInt): THandle;
-var
-  Storage: PStorage;
-  FileBlock: PFileBlock;
-begin
-  Storage := @Storages[GetApicID];
-  FileBlock := Storage.BlockFiles;
-  while (FileBlock <> nil) do
-  begin
-    if (FileBlock.BlockDriver.Name = Name) and (FileBlock.Minor=Minor) then
-    begin
-      Result := Thandle(FileBlock);
-      {$IFDEF DebugFS} WriteDebug('SysOpenBlock: Handle %q\n',[Int64(result)]); {$ENDIF}
-      Exit;
-    end;
-    FileBlock:=FileBlock.Next;
-  end;
-  Result := 0;
-  {$IFDEF DebugFS} WriteDebug('SysOpenBlock: Fail , Minor: %d\n', [Minor]); {$ENDIF}
-end;
-
-procedure DedicateBlockDriver(const Name: AnsiString; CPUID: LongInt);
+procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 var
   Dev: PBlockDriver;
 begin
   Dev := BlockDevices;
   while Dev <> nil do
   begin
-    if (Dev.Name = Name) and (Dev.CPUID = -1) then
+    if StrCmp(@Dev.Name, Name, StrLen(Name)) and (Dev.CPUID = -1) then
     begin
       Dev.Dedicate(Dev, CPUID);
       Dev.CPUID := CPUID;
@@ -264,24 +241,6 @@ begin
     Dev := Dev.Next;
   end;
   {$IFDEF DebugFS} WriteDebug('DedicateBlockDriver: Driver does not exist\n',[]); {$ENDIF}
-end;
-
-function SysWriteBlock(FileHandle: THandle; Block, Count: LongInt; Buffer: Pointer): LongInt;
-var
-  FileBlock: PFileBlock;
-begin
-  FileBlock := PFileBlock(FileHandle);
-  Result := FileBlock.BlockDriver.WriteBlock(FileBlock,Block,Count,Buffer);
-  {$IFDEF DebugFS} WriteDebug('SysWriteBlock: Handle %q, Result: %d', [Int64(FileHandle), Result]); {$ENDIF}
-end;
-
-function SysReadBlock(FileHandle: THandle; Block, Count: LongInt; Buffer: Pointer): LongInt;
-var
-  FileBlock: PFileBlock;
-begin
-  FileBlock := PFileBlock(FileHandle);
-  Result := FileBlock.BlockDriver.ReadBlock(FileBlock,Block,Count,Buffer);
-  {$IFDEF DebugFS} WriteDebug('SysReadBlock: Handle %q, Result: %d', [Int64(FileHandle), Result]); {$ENDIF}
 end;
 
 function FindBlock(Buffer: PBufferHead; Block, Size: LongInt): PBufferHead;
@@ -419,12 +378,6 @@ begin
     AddBuffer(FileBlock.BufferCache.FreeBlocksCache, bh);
   end;
   {$IFDEF DebugFS} WriteDebug('PutBlock: Block: %d\n', [Bh.Block]); {$ENDIF}
-end;
-
-procedure WriteBlock(FileBlock: PFileBlock; Bh: PBufferHead);
-begin
-  FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block *(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data);
-  Bh.Dirty:= False;
 end;
 
 function FindInode(Buffer: PInode;Inode: LongInt): PInode;
@@ -572,18 +525,18 @@ begin
   {$IFDEF DebugFS} WriteDebug('RegisterFilesystem: New Driver\n', []); {$ENDIF}
 end;
 
-function FindFileSystemDriver(Storage: PStorage; const FileSystemName, BlockName: AnsiString; const Minor: LongInt; var FileBlock: PFileBlock): PFileSystemDriver;
+function FindFileSystemDriver(Storage: PStorage; const FileSystemName, BlockName: PXChar; const Minor: LongInt; var FileBlock: PFileBlock): PFileSystemDriver;
 begin
   Result := nil;
   FileBlock := Storage.BlockFiles;
   while FileBlock <> nil do
   begin
-    if (FileBlock.BlockDriver.Name = BlockName) and (FileBlock.Minor = Minor) then
+    if StrCmp(@FileBlock.BlockDriver.Name, BlockName, Strlen(BlockName)) and (FileBlock.Minor = Minor) then
     begin
       Result := FileSystemDrivers;
       while Result <> nil do
       begin
-        if Result.Name = FileSystemName then
+        if StrCmp(@Result.Name, FileSystemName, Strlen(FileSystemName)) then
           Exit;
         Result := Result.Next;
       end;
@@ -592,7 +545,7 @@ begin
   end;
 end;
 
-procedure SysMount(const FileSystemName, BlockName: AnsiString; const Minor: LongInt);
+procedure SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt);
 var
   FileBlock: PFileBlock;
   FileSystem: PFileSystemDriver;

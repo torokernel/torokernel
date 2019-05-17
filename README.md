@@ -15,9 +15,9 @@ Toro is a kernel that allows the user to dedicate a whole kernel to run a single
 * Network drivers:
   - Virtio-net, E1000, NE2000
 * Disk drivers:
-  - ATA disks
+  - Virtio-blk, ATA
 * FileSystem drivers:
-  - Ext2, Fat
+  - Ext2, Fat, VirtioFS
 * Fast boot up
 * Tiny image
 

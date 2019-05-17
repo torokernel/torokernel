@@ -14,7 +14,7 @@
 //{$DEFINE EnableDebug}
 {$DEFINE EnablePing}
 {$DEFINE DebugRingSize:=1*1024*1024}
-{$DEFINE UseSerialasConsole}
+//{$DEFINE UseSerialasConsole}
 //{$DEFINE ShutdownWhenFinished}
 //{$DEFINE ProfileBootTime}
 //{$DEFINE ToroHeadLess}

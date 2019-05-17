@@ -829,8 +829,7 @@ end;
 procedure FindVirtIOFSonPci;
 var
   PciDev: PBusDevInfo;
-  tmp, off, multi: DWORD;
-  buff: PChar;
+  off, multi: DWORD;
   cap_vndr, cap: Byte;
   cfg, Bar, next: Byte;
 begin

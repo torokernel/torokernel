@@ -86,7 +86,7 @@ var
   {$IFDEF UseSerialasConsole}
    PutC: procedure (C: Char) = PutCtoSerial;
   {$ELSE}
-   PutC: procedure (C: Char) = PutCtoScreen;
+   PutC: procedure (const C: Char) = PutCtoScreen;
   {$ENDIF}
 
 procedure SetCursor(X, Y: Byte);

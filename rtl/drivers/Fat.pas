@@ -678,5 +678,7 @@ initialization
   FatDriver.ReadInode := @FatReadInode;
   FatDriver.LookUpInode := @FatLookUpInode;
   FatDriver.ReadFile := @FatReadFile;
+  FatDriver.OpenFile := nil;
+  FatDriver.CloseFile := nil;
   RegisterFilesystem(@FatDriver);
 end.

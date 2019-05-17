@@ -88,6 +88,7 @@ type
 
   TFileRegular = record
     FilePos: LongInt;
+    Opaque: QWord;
     Inode: PInode;
   end;
 
@@ -126,6 +127,8 @@ type
 
   TFileSystemDriver = record
     Name: AnsiString; // e.g., ext2, fat, etc
+    OpenFile: function (FileDesc: PFileRegular): LongInt;
+    CloseFile: function (FileDesc: PFileRegular): LongInt;
     ReadFile: function (FileDesc: PFileRegular;count: LongInt;Buffer: Pointer): LongInt;
     WriteFile: function (FileDesc: PFileRegular;count: LongInt;Buffer: Pointer): LongInt;
     ReadInode: procedure (Ino: PInode);
@@ -845,6 +848,9 @@ begin
   end;
   FileRegular.FilePos := 0;
   FileRegular.Inode := Ino;
+  // TODO: to check OpenFile
+  If Pointer(@FileRegular.Inode.SuperBlock.FileSystemDriver.OpenFile) <> nil then
+    FileRegular.Inode.SuperBlock.FileSystemDriver.OpenFile(FileRegular);
   Result := THandle(FileRegular);
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: File Openned\n', []); {$ENDIF}
 end;
@@ -914,6 +920,8 @@ begin
   FileRegular := PFileRegular(FileHandle);
   {$IFDEF DebugFS} WriteDebug('SysCloseFile: Closing file %d\n', [PtrUInt(FileHandle)]); {$ENDIF}
   PutInode(FileRegular.inode);
+  if @FileRegular.Inode.SuperBlock.FileSystemDriver.CloseFile <> nil then
+    FileRegular.Inode.SuperBlock.FileSystemDriver.CloseFile(FileRegular);
   ToroFreeMem(FileRegular);
 end;
 

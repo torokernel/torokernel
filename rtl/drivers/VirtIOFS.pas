@@ -110,7 +110,6 @@ type
     buffer: ^Byte;
     size: QWord;
     flags: Byte;
-    copy: Boolean;
   end;
 
   TVirtIOFsConfig = packed record
@@ -392,7 +391,6 @@ end;
 procedure VirtIOSendBuffer(vq: PVirtQueue; bi:PBufferInfo; count: QWord; QueueIdx: WORD);
 var
   index, buffer_index, next_buffer_index: word;
-  buf: ^Byte;
   b: PBufferInfo;
   i: LongInt;
   tmp: PQueueBuffer;
@@ -400,28 +398,17 @@ begin
   index := vq.available.index mod vq.queue_size;
   buffer_index := vq.next_buffer;
   vq.available.rings[index] := buffer_index;
-  buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
   for i := 0 to (count-1) do
   begin
     next_buffer_index:= (buffer_index +1) mod vq.queue_size;
     b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
-    // el buffer no lo necesito de una cola
-    // lo puede proveer el usuario
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     tmp.flags := b.flags;
     tmp.next := next_buffer_index;
     tmp.length := b.size;
     if (i <> (count-1)) then
         tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
-    // FIXME: use copy=false to use zero-copy approach
-    if b.copy then
-    begin
-       tmp.address:= PtrUInt (buf); // check this
-       if (bi.buffer <> nil) then
-           Move(b.buffer^, buf^, b.size);
-       Inc(buf, b.size);
-    end else
-       tmp.address:= PtrUInt(b.buffer);
+    tmp.address:= PtrUInt(b.buffer);
     buffer_index := next_buffer_index;
   end;
   ReadWriteBarrier;
@@ -462,17 +449,14 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := @releasein;
   bi[1].size := sizeof(releasein);
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, 0);
   SysThreadSwitch;
@@ -506,22 +490,18 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := @openin;
   bi[1].size := sizeof(openin);
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   bi[3].buffer := @openout;
   bi[3].size := sizeof(openout);
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
   SysThreadSwitch;
@@ -559,22 +539,18 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := @readin;
   bi[1].size := sizeof(readin);
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   bi[3].buffer := Pointer(buffer);
   bi[3].size := Count;
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
   SysThreadSwitch;
@@ -606,22 +582,18 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := Pointer(Name);
   bi[1].size := Len;
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   bi[3].buffer := @lookupout;
   bi[3].size := sizeof(lookupout);
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
   SysThreadSwitch;
@@ -652,22 +624,18 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := @getattrin;
   bi[1].size := sizeof(getattrin);
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   bi[3].buffer := @getattrout;
   bi[3].size := sizeof(getattrout);
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
   SysThreadSwitch;
@@ -710,22 +678,18 @@ begin
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
   bi[0].flags := 0;
-  bi[0].copy := false;
 
   bi[1].buffer := @initinhd;
   bi[1].size := sizeof(initinhd);
   bi[1].flags := 0;
-  bi[1].copy := false;
 
   bi[2].buffer := @outhd;
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[2].copy := false;
 
   bi[3].buffer := @initouthd;
   bi[3].size := sizeof(initouthd);
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
   SysThreadSwitch;

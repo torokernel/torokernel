@@ -447,15 +447,15 @@ var
   inhd: FuseInHeader;
   releasein: FuseReleaseIn;
   bi: array[0..2] of TBufferInfo;
+  th: PThread;
 begin
   Result := 0;
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
 
   inhd.opcode := FUSE_RELEASE;
   inhd.len := sizeof(inhd) + sizeof(releasein);
-  inhd.unique := TORO_UNIQUE;
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
   inhd.nodeid := FileDesc.INode.ino;
   releasein.fh := FileDesc.Opaque;
 
@@ -474,13 +474,8 @@ begin
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
   bi[2].copy := false;
 
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
-
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, 0);
-  RestoreInt;
   SysThreadSwitch;
-
-  FreeDevice(@FsVirtio.BlkDriver);
 
   if outhd.error <> 0 then
     Exit;
@@ -495,16 +490,16 @@ var
   openin: FuseOpenIn;
   openout: FuseOpenOut;
   bi: array[0..3] of TBufferInfo;
+  th: PThread;
 begin
   Result := 0;
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
 
   inhd.opcode := FUSE_OPEN;
   inhd.len := sizeof(inhd) + sizeof(openin);
   inhd.nodeid := FileDesc.Inode.ino;
-  inhd.unique := TORO_UNIQUE;
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
   // TODO: to check flags here for the moment is RO
   openin.flags := 0;
 
@@ -528,13 +523,8 @@ begin
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
   bi[3].copy := false;
 
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
-
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
-  RestoreInt;
   SysThreadSwitch;
-
-  FreeDevice(@FsVirtio.BlkDriver);
 
   if outhd.error <> 0 then
     Exit;
@@ -549,18 +539,18 @@ var
   readin: FuseReadIn;
   inhd: FuseInHeader;
   outhd: FuseOutHeader;
+  th: PThread;
 begin
   Result := 0;
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
   begin
     Count := FileDesc.Inode.Size - FileDesc.FilePos;
   end;
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
   inhd.opcode := FUSE_READ;
   inhd.len := sizeof(inhd) + sizeof(readin);
-  inhd.unique := TORO_UNIQUE;
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
   inhd.nodeid := FileDesc.Inode.ino;
   readin.fh := FileDesc.Opaque;
   readin.size := Count;
@@ -586,12 +576,8 @@ begin
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
   bi[3].copy := false;
 
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
-  RestoreInt;
   SysThreadSwitch;
-
-  FreeDevice(@FsVirtio.BlkDriver);
 
   if outhd.error <> 0 then
    Exit;
@@ -605,15 +591,15 @@ var
   bi: array[0..3] of TBufferInfo;
   inhd: FuseInHeader;
   outhd: FuseOutHeader;
+  th: PThread;
 begin
   Result := nil;
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
 
   Len := strlen(name) + 1;
   inhd.opcode := FUSE_LOOKUP;
-  inhd.unique := TORO_UNIQUE;
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
   inhd.len := sizeof(inhd) + Len ;
   inhd.nodeid := Ino.ino;
 
@@ -638,10 +624,7 @@ begin
   bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  RestoreInt;
   SysThreadSwitch;
-
-  FreeDevice(@FsVirtio.BlkDriver);
 
   if outhd.error <> 0 then
     Exit;
@@ -656,15 +639,15 @@ var
   outhd: FuseOutHeader;
   getattrin: FuseGetAttrIn;
   getattrout: FuseGetAttrOut;
+  th: PThread;
 begin
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
 
   inhd.opcode := FUSE_GETATTR;
   inhd.len := sizeof(inhd) + sizeof(getattrin);
   inhd.nodeid := Ino.ino;
-  inhd.unique := TORO_UNIQUE;
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
 
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
@@ -687,9 +670,7 @@ begin
   bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  RestoreInt;
   SysThreadSwitch;
-  FreeDevice(@FsVirtio.BlkDriver);
 
   If outhd.error <> 0 then
     Exit;
@@ -710,15 +691,15 @@ var
   outhd: FuseOutHeader;
   initinhd: FuseInitIn;
   initouthd: FuseInitOut;
+  th: PThread;
 begin
   Result := nil;
-  GetDevice(@FsVirtio.BlkDriver);
-  DisableInt;
-  // TODO: Add support for several instances of FsVirtio
-  FsVirtio.BlkDriver.WaitOn.state := tsSuspended;
+
   inhd.opcode := FUSE_INIT;
-  inhd.unique := TORO_UNIQUE;
   inhd.len := sizeof(inhd) + sizeof(initinhd);
+  th := GetCurrentThread;
+  th.state := tsSuspended;
+  inhd.unique := PtrUInt(th);
   initinhd.major := FUSE_MAJOR_VERSION;
   initinhd.minor := FUSE_MINOR_VERSION;
 
@@ -747,10 +728,7 @@ begin
   bi[3].copy := false;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  RestoreInt;
   SysThreadSwitch;
-
-  FreeDevice(@FsVirtio.BlkDriver);
 
   if outhd.error <> 0 then
    Exit;
@@ -762,11 +740,25 @@ begin
 end;
 
 procedure VirtIOProcessQueue(vq: PVirtQueue);
+var
+  index, norm_index, buffer_index: Word;
+  tmp: PQueueBuffer;
+  FuseIn: ^FuseInHeader;
+  th: PThread;
 begin
-  if FsVirtio.BlkDriver.WaitOn <> nil then
-    FsVirtio.BlkDriver.WaitOn.State := tsReady;
   if vq.last_used_index = vq.used.index then
     Exit;
+
+  // wake up the thread in unique
+  // which is always the first buffer
+  index := vq.last_used_index;
+  norm_index := index mod vq.queue_size;
+  buffer_index := vq.used.rings[norm_index].index;
+  tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+  FuseIn := Pointer(tmp.address);
+  th := Pointer(fusein.unique);
+  th.state := tsReady;
+
   vq.last_used_index := vq.used.index;
   ReadWriteBarrier;
 end;

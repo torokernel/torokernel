@@ -721,6 +721,7 @@ begin
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
   FuseIn := Pointer(tmp.address);
   th := Pointer(fusein.unique);
+  Panic(th.state = tsReady, 'VirtioFS: Waking up a thread in ready state\n', []);
   th.state := tsReady;
 
   vq.last_used_index := vq.used.index;

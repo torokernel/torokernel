@@ -50,44 +50,44 @@ type
   PVirtIOPciCommonCfg = ^TVirtIOPciCommonCfg;
 
   VirtIOUsedItem = record
-    index: Dword;
-    length: Dword;
+    Index: Dword;
+    Length: Dword;
   end;
 
   PVirtIOUsed = ^TVirtIOUsed;
   TVirtIOUsed = record
-    flags: word;
-    index: word;
-    rings: array[0..0] of VirtIOUsedItem;
+    Flags: word;
+    Index: word;
+    Rings: array[0..0] of VirtIOUsedItem;
   end;
 
   PVirtIOAvailable = ^TVirtIOAvailable;
   TVirtIOAvailable = record
-    flags: Word;
-    index: Word;
-    rings: Array[0..0] of Word;
+    Flags: Word;
+    Index: Word;
+    Rings: Array[0..0] of Word;
   end;
 
   PQueueBuffer = ^TQueueBuffer;
   TQueueBuffer = record
-    address: QWord;
-    length: DWord;
-    flags: Word;
-    next: Word;
+    Address: QWord;
+    Length: DWord;
+    Flags: Word;
+    Next: Word;
   end;
 
   PVirtQueue = ^TVirtQueue;
   TVirtQueue = record
-    queue_size: word;
-    buffers: PQueueBuffer;
-    available: PVirtIOAvailable;
-    used: PVirtIOUsed;
-    last_used_index: word;
-    last_available_index: word;
-    buffer: PByte;
-    chunk_size: dword;
-    next_buffer: word;
-    lock: QWord;
+    QueueSize: word;
+    Buffers: PQueueBuffer;
+    Available: PVirtIOAvailable;
+    Used: PVirtIOUsed;
+    LastUsedIndex: word;
+    LastAvailableIndex: word;
+    Buffer: PByte;
+    ChunkSize: dword;
+    NextBuffer: word;
+    Lock: QWord;
   end;
 
   TVirtIOFSDevice = record
@@ -107,9 +107,9 @@ type
 
   PBufferInfo = ^TBufferInfo;
   TBufferInfo = record
-    buffer: ^Byte;
-    size: QWord;
-    flags: Byte;
+    Buffer: ^Byte;
+    Size: QWord;
+    Flags: Byte;
   end;
 
   TVirtIOFsConfig = packed record
@@ -118,141 +118,141 @@ type
   end;
 
   TVirtIOPciCommonCfg = packed record
-    device_feature_select: DWORD;
-    device_feature: DWORD;
-    driver_feature_select: DWORD;
-    driver_feature: DWORD;
-    msix_config: WORD;
-    num_queues: WORD;
-    device_status: Byte;
-    config_generation: Byte;
-    queue_select: WORD;
-    queue_size: WORD;
-    queue_msix_vector: WORD;
-    queue_enable: WORD;
-    queue_notify_off: WORD;
-    queue_desc: QWORD;
-    queue_avail: QWORD;
-    queue_used: QWORD;
+    DeviceFeature_select: DWORD;
+    DeviceFeature: DWORD;
+    DriverFeature_select: DWORD;
+    DriverFeature: DWORD;
+    MsixConfig: WORD;
+    NumQueues: WORD;
+    DeviceStatus: Byte;
+    ConfigGeneration: Byte;
+    QueueSelect: WORD;
+    QueueSize: WORD;
+    QueueMsixVector: WORD;
+    QueueEnable: WORD;
+    QueueNotifyOff: WORD;
+    QueueDesc: QWORD;
+    QueueAvail: QWORD;
+    QueueUsed: QWORD;
   end;
 
   TVirtIOPciCap = packed record
-    cap_vndr: Byte;
-    cap_next: Byte;
-    cap_len: Byte;
-    cfg_type: Byte;
-    bar: Byte;
-    padding: array [0..2] of Byte;
-    offset: DWORD;
-    length: DWORD;
+    CapVndr: Byte;
+    CapNext: Byte;
+    CapLen: Byte;
+    CfgType: Byte;
+    Bar: Byte;
+    Padding: array [0..2] of Byte;
+    Offset: DWORD;
+    Length: DWORD;
   end;
 
   FuseInHeader = packed record
-    len: DWORD;
-    opcode: DWORD;
-    unique: QWord;
-    nodeid: QWord;
-    uid: DWORD;
-    gid: DWORD;
-    pid: DWORD;
-    padding: DWORD;
+    Len: DWORD;
+    Opcode: DWORD;
+    Unique: QWord;
+    Nodeid: QWord;
+    Uid: DWORD;
+    Gid: DWORD;
+    Pid: DWORD;
+    Padding: DWORD;
   end;
 
   FuseOutHeader = packed record
-    len: DWORD;
-    error: DWORD;
-    unique: QWord;
+    Len: DWORD;
+    Error: DWORD;
+    Unique: QWord;
   end;
 
   FuseInitIn = packed record
-    major: DWORD;
-    minor: DWORD;
-    max_readahead: DWORD;
-    flags: DWORD;
+    Major: DWORD;
+    Minor: DWORD;
+    MaxReadahead: DWORD;
+    Flags: DWORD;
   end;
 
   FuseInitOut = packed record
-    major: DWORD;
-    minor: DWORD;
-    max_readahead: DWORD;
-    flags: DWORD;
-    max_background: WORD;
-    congestion_threshold: WORD;
-    max_write: DWORD;
-    time_gran: DWORD;
-    max_pages: WORD;
-    padding: WORD;
-    unused: array[0..7] of DWORD;
+    Major: DWORD;
+    Minor: DWORD;
+    MaxReadahead: DWORD;
+    Flags: DWORD;
+    MaxBackground: WORD;
+    CongestionThreshold: WORD;
+    MaxWrite: DWORD;
+    TimeGran: DWORD;
+    MaxPages: WORD;
+    Padding: WORD;
+    Unused: array[0..7] of DWORD;
   end;
 
   FuseGetAttrIn = packed record
-    getattr_flags: DWORD;
-    dummy: DWORD;
-    fh: QWORD;
+    GetattrFlags: DWORD;
+    Dummy: DWORD;
+    Fh: QWORD;
   end;
 
   FuseAttr = packed record
-    ino: QWORD;
-    size: QWORD;
-    blocks: QWORD;
-    atime: QWORD;
-    mtime: QWORD;
-    ctime: QWORD;
-    atimensec: DWORD;
-    mtimensec: DWORD;
-    ctimensec: DWORD;
-    mode: DWORD;
-    nlink: DWORD;
-    uid: DWORD;
-    gid: DWORD;
-    rdev: DWORD;
-    blksize: DWORD;
-    padding: DWORD;
+    Ino: QWORD;
+    Size: QWORD;
+    Blocks: QWORD;
+    Atime: QWORD;
+    Mtime: QWORD;
+    Ctime: QWORD;
+    Atimensec: DWORD;
+    Mtimensec: DWORD;
+    Ctimensec: DWORD;
+    Mode: DWORD;
+    Nlink: DWORD;
+    Uid: DWORD;
+    Gid: DWORD;
+    Rdev: DWORD;
+    Blksize: DWORD;
+    Padding: DWORD;
   end;
 
   FuseGetAttrOut = packed record
-    attr_valid: QWORD;
-    attr_valid_nsec: DWORD;
-    dummy: DWORD;
-    attr: FuseAttr;
+    AttrValid: QWORD;
+    AttrValid_nsec: DWORD;
+    Dummy: DWORD;
+    Attr: FuseAttr;
   end;
 
   FuseEntryOut = packed record
-    nodeid: QWORD;
-    generation: QWORD;
-    entry_valid: QWORD;
-    attr_valid: QWORD;
-    entry_valid_nsec: DWORD;
-    attr_valid_nsec: DWORD;
-    attr: FuseAttr;
+    Nodeid: QWORD;
+    Generation: QWORD;
+    EntryValid: QWORD;
+    AttrValid: QWORD;
+    EntryValid_nsec: DWORD;
+    AttrValid_nsec: DWORD;
+    Attr: FuseAttr;
   end;
 
   FuseOpenIn = packed record
-    flags: DWORD;
-    unused: DWORD;
+    Flags: DWORD;
+    Unused: DWORD;
   end;
 
   FuseOpenOut = packed record
-    fh: QWORD;
-    open_flags: DWORD;
-    padding: DWORD;
+    Fh: QWORD;
+    OpenFlags: DWORD;
+    Padding: DWORD;
   end;
 
   FuseReadIn = packed record
-    fh: QWORD;
-    offset: QWORD;
-    size: DWORD;
-    read_flags: DWORD;
-    lock_owner: QWORD;
-    flags: DWORD;
-    padding: DWORD;
+    Fh: QWORD;
+    Offset: QWORD;
+    Size: DWORD;
+    ReadFlags: DWORD;
+    LockOwner: QWORD;
+    Flags: DWORD;
+    Padding: DWORD;
   end;
 
   FuseReleaseIn = packed record
-    fh: QWORD;
-    flags: DWORD;
-    release_flags: DWORD;
-    lock_owner: QWORD;
+    Fh: QWORD;
+    Flags: DWORD;
+    ReleaseFlags: DWORD;
+    LockOwner: QWORD;
   end;
 
 const
@@ -324,7 +324,7 @@ var
 
 function VirtIOGetDeviceFeatures(Dev: PVirtIOPciCommonCfg): DWORD;
 begin
-  Result := Dev.device_feature;
+  Result := Dev.DeviceFeature;
 end;
 
 // Reset device and negotiate features
@@ -333,15 +333,15 @@ var
   devfeat: DWORD;
 begin
   Result := False;
-  Dev.device_status := 0;
-  Dev.device_status := VIRTIO_ACKNOWLEDGE;
-  Dev.device_status := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER;
-  devfeat := Dev.device_feature;
+  Dev.DeviceStatus := 0;
+  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE;
+  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER;
+  devfeat := Dev.DeviceFeature;
   devfeat := devfeat and Features;
   // TODO: To check if this is the right field
-  Dev.device_feature_select := devfeat;
-  Dev.device_status := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK;
-  if ((Dev.device_status and VIRTIO_FEATURES_OK) = 0) then
+  Dev.DeviceFeature_select := devfeat;
+  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK;
+  if ((Dev.DeviceStatus and VIRTIO_FEATURES_OK) = 0) then
     Exit;
   Result := True;
 end;
@@ -355,11 +355,11 @@ var
 begin
   Result := False;
   FillByte(Queue^, sizeof(TVirtQueue), 0);
-  Dev.queue_select := QueueId;
-  Queue.queue_size := Dev.queue_size;
-  sizeOfBuffers := (sizeof(TQueueBuffer) * Queue.queue_size);
-  sizeofQueueAvailable := (2*sizeof(WORD)+2) + (Queue.queue_size*sizeof(WORD));
-  sizeofQueueUsed := (2*sizeof(WORD)+2)+(Queue.queue_size*sizeof(VirtIOUsedItem));
+  Dev.QueueSelect := QueueId;
+  Queue.QueueSize := Dev.QueueSize;
+  sizeOfBuffers := (sizeof(TQueueBuffer) * Queue.QueueSize);
+  sizeofQueueAvailable := (2*sizeof(WORD)+2) + (Queue.QueueSize*sizeof(WORD));
+  sizeofQueueUsed := (2*sizeof(WORD)+2)+(Queue.QueueSize*sizeof(VirtIOUsedItem));
   // buff must be 4k aligned
   buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2);
   FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2, 0);
@@ -370,49 +370,49 @@ begin
   Queue.available := @buff[sizeOfBuffers];
   // 4 bytes aligned
   Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not $FFF)]);
-  Queue.next_buffer:= 0;
+  Queue.NextBuffer:= 0;
   Queue.lock := 0;
-  Dev.queue_desc := QWORD(Queue.buffers);
-  Dev.queue_avail := QWORD(Queue.available);
-  Dev.queue_used := QWORD(Queue.used);
-  Dev.queue_enable := 1;
-  Dev.device_status := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK;
-  if ((Dev.device_status and DEVICE_NEEDS_RESET) = DEVICE_NEEDS_RESET) then
+  Dev.QueueDesc := QWORD(Queue.buffers);
+  Dev.QueueAvail := QWORD(Queue.available);
+  Dev.QueueUsed := QWORD(Queue.used);
+  Dev.QueueEnable := 1;
+  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK;
+  if ((Dev.DeviceStatus and DEVICE_NEEDS_RESET) = DEVICE_NEEDS_RESET) then
     Exit;
   if HeaderLen <> 0 then
   begin
-    Queue.Buffer := ToroGetMem(queue.queue_size * (HeaderLen) + 4096);
+    Queue.Buffer := ToroGetMem(queue.QueueSize * (HeaderLen) + 4096);
     Queue.Buffer := Pointer(PtrUint(queue.Buffer) + (4096 - PtrUInt(queue.Buffer) mod 4096));
-    Queue.chunk_size := HeaderLen;
+    Queue.ChunkSize := HeaderLen;
   end;
   Result := True;
 end;
 
 procedure VirtIOSendBuffer(vq: PVirtQueue; bi:PBufferInfo; count: QWord; QueueIdx: WORD);
 var
-  index, buffer_index, next_buffer_index: word;
+  index, buffer_index, NextBuffer_index: word;
   b: PBufferInfo;
   i: LongInt;
   tmp: PQueueBuffer;
 begin
-  index := vq.available.index mod vq.queue_size;
-  buffer_index := vq.next_buffer;
+  index := vq.available.index mod vq.QueueSize;
+  buffer_index := vq.NextBuffer;
   vq.available.rings[index] := buffer_index;
   for i := 0 to (count-1) do
   begin
-    next_buffer_index:= (buffer_index +1) mod vq.queue_size;
+    NextBuffer_index:= (buffer_index +1) mod vq.QueueSize;
     b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     tmp.flags := b.flags;
-    tmp.next := next_buffer_index;
+    tmp.next := NextBuffer_index;
     tmp.length := b.size;
     if (i <> (count-1)) then
         tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
     tmp.address:= PtrUInt(b.buffer);
-    buffer_index := next_buffer_index;
+    buffer_index := NextBuffer_index;
   end;
   ReadWriteBarrier;
-  vq.next_buffer := buffer_index;
+  vq.NextBuffer := buffer_index;
   Inc(vq.available.index);
   if (vq.used.flags and 1 <> 1) then
     FsVirtio.QueueNotify^ := QueueIdx;
@@ -690,7 +690,7 @@ begin
 
   // TODO: to check this flags
   initinhd.flags := 0;
-  initinhd.max_readahead := TORO_MAX_READAHEAD_SIZE;
+  initinhd.MaxReadahead := TORO_MAX_READAHEAD_SIZE;
 
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
@@ -731,12 +731,12 @@ var
   FuseIn: ^FuseInHeader;
   p: ^Boolean;
 begin
-  if vq.last_used_index = vq.used.index then
+  if vq.LastUsedIndex = vq.used.index then
     Exit;
-  index := vq.last_used_index;
+  index := vq.LastUsedIndex;
   while index <> vq.used.index do
   begin
-    norm_index := index mod vq.queue_size;
+    norm_index := index mod vq.QueueSize;
     buffer_index := vq.used.rings[norm_index].index;
     tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     FuseIn := Pointer(tmp.address);
@@ -746,7 +746,7 @@ begin
     inc(index);
   end;
 
-  vq.last_used_index := index;
+  vq.LastUsedIndex := index;
   ReadWriteBarrier;
 end;
 
@@ -877,7 +877,7 @@ begin
 
         if VirtIOInitQueue(FsVirtio.CommonConfig, 0, @FsVirtio.RqQueue, 0) then
         begin
-          WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.queue_size, FsVirtio.IRQ]);
+          WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.QueueSize, FsVirtio.IRQ]);
         end else
         begin
           WriteConsoleF('VirtIOFS: Queue 0, failed\n', []);
@@ -885,7 +885,7 @@ begin
         end;
 
         // Set up notification queue
-        FsVirtio.QueueNotify := Pointer(PtrUInt(FsVirtio.QueueNotify) + FsVirtio.CommonConfig.queue_notify_off * FsVirtio.NotifyOffMultiplier);
+        FsVirtio.QueueNotify := Pointer(PtrUInt(FsVirtio.QueueNotify) + FsVirtio.CommonConfig.QueueNotifyOff * FsVirtio.NotifyOffMultiplier);
         // enable the irq
         CaptureInt(32+FsVirtio.IRQ, @VirtIOFSIrqHandler);
         IrqOn(FsVirtio.IRQ);

@@ -1170,5 +1170,7 @@ initialization
   Ext2Driver.LookUpInode := @Ext2LookUpInode;
   Ext2Driver.ReadFile := @Ext2ReadFile;
   Ext2Driver.WriteFile := @Ext2WriteFile;
+  Ext2Driver.OpenFile := nil;
+  Ext2Driver.CloseFile := nil;
   RegisterFilesystem(@Ext2Driver);
 end.

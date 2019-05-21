@@ -46,7 +46,7 @@ else
 fi
 
 # remove all compiled files
-rm -f ../../rtl/*.o ../../rtl/*.ppu
+rm -f ../../rtl/*.o ../../rtl/*.ppu ../../rtl/drivers/*.o ../../rtl/drivers/*.ppu
 
 # remove the application
 rm -f $app "$app.o"

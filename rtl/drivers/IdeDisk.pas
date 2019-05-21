@@ -59,7 +59,7 @@ const
   BLKSIZE = 512;
 
   // nameing interface
-  ATANAMES : array[0..3] of AnsiString = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
+  ATANAMES : array[0..3] of PChar = ('ATA0', 'ATA1', 'ATA2', 'ATA3');
 
   // ATA Ports
   ATA_DATA = 0;
@@ -329,7 +329,7 @@ begin
           Ctr.Minors[Minor+I].FileDesc.BlockSize:= BLKSIZE;
           Ctr.Minors[Minor+I].FileDesc.Next:=nil;
           WriteConsoleF('IdeDisk: /V', []);
-          WriteConsoleF(ATANames[Ctr.Driver.Major], []);
+          WriteConsoleF('%p',[PtrUInt(ATANames[Ctr.Driver.Major])]);
           WriteConsoleF('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n',[Minor+I,Entry.Size div 2048,Entry.pType]);
           {$IFDEF DebugIdeDisk} WriteDebug('ATADetectPartition: Controller: %d, Disk: %d --> Ok\n', [Ctr.Driver.Major, Minor+I]); {$ENDIF}
         end;
@@ -372,7 +372,7 @@ begin
         ATAControllers[ControllerNo].Minors[DriveNo*5].FileDesc.Next:= nil;
         {$IFDEF DebugIdeDisk} WriteDebug('ATADetectController - Controller: %d, Disk: %d --> Ok\n', [ControllerNo, DriveNo*5]); {$ENDIF}
         WriteConsoleF('IdeDisk: /V', []);
-        WriteConsoleF(ATANames[ATAControllers[ControllerNo].Driver.Major], []);
+        WriteConsoleF('%p',[PtrUInt(ATANames[ATAControllers[ControllerNo].Driver.Major])]);
         WriteConsoleF('/n, Minor: /V%d/n, Size: /V%d/n Mb, Type: /V%d/n\n', [DriveNo*5, ATA_Buffer.LBA_Capacity div 2048, NOT_FILESYSTEM]);
         ATADetectPartition(@ATAControllers[ControllerNo], DriveNo*5);
       end

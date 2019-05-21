@@ -61,6 +61,7 @@ const
 
 const
   VIDEO_OFFSET = $B8000;
+  BASE_COM_PORT = $3f8;
 
 type
   TConsole = record
@@ -72,6 +73,8 @@ var
   LockConsole: UInt64 = 3;
 
 procedure PrintString(const S: AnsiString); forward;
+procedure PutCtoScreen(const Car: XChar); forward;
+procedure PutCtoSerial(C: XChar); forward;
 
 var
   PConsole: ^TConsole;
@@ -80,6 +83,11 @@ var
   BufferCount: LongInt = 1 ;
   ThreadInKey: PThread = nil;
   LastChar: LongInt = 1;
+  {$IFDEF UseSerialasConsole}
+   PutC: procedure (C: Char) = PutCtoSerial;
+  {$ELSE}
+   PutC: procedure (const C: Char) = PutCtoScreen;
+  {$ENDIF}
 
 procedure SetCursor(X, Y: Byte);
 begin
@@ -91,12 +99,17 @@ end;
 
 procedure FlushUp;
 begin
-  X := 0 ;
-  Move(PXChar(VIDEO_OFFSET+160)^, PXChar(VIDEO_OFFSET)^, 24*80*2);
-  FillWord(PXChar(VIDEO_OFFSET+160*24)^, 80, $0720);
+  {$IFDEF UseSerialasConsole}
+    PutCtoSerial(XChar(13));
+    PutCtoSerial(XChar(10));
+  {$ELSE}
+   X := 0 ;
+   Move(PXChar(VIDEO_OFFSET+160)^, PXChar(VIDEO_OFFSET)^, 24*80*2);
+   FillWord(PXChar(VIDEO_OFFSET+160*24)^, 80, $0720);
+  {$ENDIF}
 end;
 
-procedure PutC(const Car: XChar);
+procedure PutCtoScreen(const Car: XChar);
 begin
   Y := 24;
   if X > 79 then
@@ -106,6 +119,21 @@ begin
   PConsole.car := Car;
   X := X+1;
   SetCursor(X, Y);
+end;
+
+procedure WaitForCompletion;
+var
+  lsr: Byte;
+begin
+  repeat
+    lsr := read_portb(BASE_COM_PORT+5);
+  until (lsr and $20) = $20;
+end;
+
+procedure PutCtoSerial(C: XChar);
+begin
+  write_portb(Byte(C), BASE_COM_PORT);
+  WaitForCompletion;
 end;
 
 {$IFDEF DCC}
@@ -496,9 +524,15 @@ end;
 
 procedure ConsoleInit;
 begin
+  {$IFDEF UseSerialasConsole}
+    write_portb ($83, BASE_COM_PORT+3);
+    write_portb (0, BASE_COM_PORT+1);
+    write_portb (1, BASE_COM_PORT);
+    write_portb (3, BASE_COM_PORT+3);
+  {$ENDIF}
   {$IFDEF ToroHeadLess}
   {$ELSE}
-    CaptureInt(33,@IrqKeyb);
+    //CaptureInt(33,@IrqKeyb);
   {$ENDIF}
 end;
 

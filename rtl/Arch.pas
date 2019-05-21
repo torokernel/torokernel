@@ -122,6 +122,7 @@ procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
 function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
+function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
@@ -971,6 +972,15 @@ begin
   write_portd(@Send, PCI_CONF_PORT_INDEX);
   read_portd(@Send, PCI_CONF_PORT_DATA);
   Result := Send;
+end;
+
+function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
+var
+  tmp, off: DWORD;
+begin
+  tmp := PciReadDword(bus, device, func, offset shr 2);
+  off := offset mod 4;
+  Result := (tmp shr (off shl 3)) and $ff;
 end;
 
 function PciReadWord(const bus, device, func, regnum: UInt32): Word;

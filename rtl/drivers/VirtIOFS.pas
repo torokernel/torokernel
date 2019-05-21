@@ -434,15 +434,14 @@ var
   inhd: FuseInHeader;
   releasein: FuseReleaseIn;
   bi: array[0..2] of TBufferInfo;
-  th: PThread;
+  Done: Boolean;
 begin
   Result := 0;
 
   inhd.opcode := FUSE_RELEASE;
   inhd.len := sizeof(inhd) + sizeof(releasein);
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
   inhd.nodeid := FileDesc.INode.ino;
   releasein.fh := FileDesc.Opaque;
 
@@ -458,8 +457,12 @@ begin
   bi[2].size := sizeof(outhd);
   bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, 0);
-  SysThreadSwitch;
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, REQUEST_QUEUE);
+  while Done = false do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -474,16 +477,15 @@ var
   openin: FuseOpenIn;
   openout: FuseOpenOut;
   bi: array[0..3] of TBufferInfo;
-  th: PThread;
+  Done: Boolean;
 begin
   Result := 0;
 
   inhd.opcode := FUSE_OPEN;
   inhd.len := sizeof(inhd) + sizeof(openin);
   inhd.nodeid := FileDesc.Inode.ino;
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
   // TODO: to check flags here for the moment is RO
   openin.flags := 0;
 
@@ -503,8 +505,13 @@ begin
   bi[3].size := sizeof(openout);
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
-  SysThreadSwitch;
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+
+  while Done = False do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -519,7 +526,7 @@ var
   readin: FuseReadIn;
   inhd: FuseInHeader;
   outhd: FuseOutHeader;
-  th: PThread;
+  Done: Boolean;
 begin
   Result := 0;
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
@@ -528,9 +535,8 @@ begin
   end;
   inhd.opcode := FUSE_READ;
   inhd.len := sizeof(inhd) + sizeof(readin);
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
   inhd.nodeid := FileDesc.Inode.ino;
   readin.fh := FileDesc.Opaque;
   readin.size := Count;
@@ -552,8 +558,13 @@ begin
   bi[3].size := Count;
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, 0);
-  SysThreadSwitch;
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+
+  while Done = false do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   if outhd.error <> 0 then
    Exit;
@@ -567,15 +578,14 @@ var
   bi: array[0..3] of TBufferInfo;
   inhd: FuseInHeader;
   outhd: FuseOutHeader;
-  th: PThread;
+  Done : Boolean;
 begin
   Result := nil;
 
   Len := strlen(name) + 1;
   inhd.opcode := FUSE_LOOKUP;
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
   inhd.len := sizeof(inhd) + Len ;
   inhd.nodeid := Ino.ino;
 
@@ -596,7 +606,12 @@ begin
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  SysThreadSwitch;
+
+  while Done = False do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -611,15 +626,13 @@ var
   outhd: FuseOutHeader;
   getattrin: FuseGetAttrIn;
   getattrout: FuseGetAttrOut;
-  th: PThread;
+  Done: Boolean;
 begin
-
   inhd.opcode := FUSE_GETATTR;
   inhd.len := sizeof(inhd) + sizeof(getattrin);
   inhd.nodeid := Ino.ino;
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
 
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
@@ -638,7 +651,12 @@ begin
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  SysThreadSwitch;
+
+  while Done = False do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   If outhd.error <> 0 then
     Exit;
@@ -659,15 +677,14 @@ var
   outhd: FuseOutHeader;
   initinhd: FuseInitIn;
   initouthd: FuseInitOut;
-  th: PThread;
+  Done: Boolean;
 begin
   Result := nil;
 
   inhd.opcode := FUSE_INIT;
   inhd.len := sizeof(inhd) + sizeof(initinhd);
-  th := GetCurrentThread;
-  th.state := tsSuspended;
-  inhd.unique := PtrUInt(th);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
   initinhd.major := FUSE_MAJOR_VERSION;
   initinhd.minor := FUSE_MINOR_VERSION;
 
@@ -692,7 +709,11 @@ begin
   bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  SysThreadSwitch;
+  while Done = false do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
 
   if outhd.error <> 0 then
    Exit;
@@ -708,23 +729,24 @@ var
   index, norm_index, buffer_index: Word;
   tmp: PQueueBuffer;
   FuseIn: ^FuseInHeader;
-  th: PThread;
+  p: ^Boolean;
 begin
   if vq.last_used_index = vq.used.index then
     Exit;
-
-  // wake up the thread in unique
-  // which is always the first buffer
   index := vq.last_used_index;
-  norm_index := index mod vq.queue_size;
-  buffer_index := vq.used.rings[norm_index].index;
-  tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-  FuseIn := Pointer(tmp.address);
-  th := Pointer(fusein.unique);
-  Panic(th.state = tsReady, 'VirtioFS: Waking up a thread in ready state\n', []);
-  th.state := tsReady;
+  while index <> vq.used.index do
+  begin
+    norm_index := index mod vq.queue_size;
+    buffer_index := vq.used.rings[norm_index].index;
+    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+    FuseIn := Pointer(tmp.address);
+    p := Pointer(fusein.unique);
+    Panic(p^ = True, 'VirtioFS: Waking up a thread in ready state\n', []);
+    p^ := True;
+    inc(index);
+  end;
 
-  vq.last_used_index := vq.used.index;
+  vq.last_used_index := index;
   ReadWriteBarrier;
 end;
 

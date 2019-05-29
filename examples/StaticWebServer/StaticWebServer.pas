@@ -53,7 +53,8 @@ const
   Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
   DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
 
-  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: Text/Html'#13#10 + 'Content-length:';
+  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
+  ContentLen = #13#10'Content-length: ';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 20000;
@@ -109,44 +110,64 @@ begin
   rq.counter := i;
 end;
 
-procedure SendStream(Socket: Psocket; Stream: Pchar);
+procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
 begin
-  SysSocketSend(Socket, Stream, Length(Stream), 0);
+  If Len = 0 then
+    SysSocketSend(Socket, Stream, Length(Stream), 0)
+  else
+    SysSocketSend(Socket, Stream, Len, 0);
 end;
 
-procedure ProcessRequest (Socket: PSocket; Answer: pchar);
+procedure ProcessRequest (Socket: PSocket; Answer: pchar; Len: LongInt; Header: Pchar);
 var
   dst, tmp: ^char;
   anssizechar: array[0..10] of char;
   AnsSize: LongInt;
+  TotalLen: Longint;
 begin
   if Answer = nil then
   begin
-    SendStream(Socket, HeaderNotFound);
+    SendStream(Socket, HeaderNotFound, 0);
   end
   else begin
-    AnsSize := Strlen(Answer);
+    If Len = 0 then
+      AnsSize := Strlen(Answer)
+    else
+      AnsSize := Len;
     InttoStr(AnsSize,@anssizechar[0]);
-    dst := ToroGetMem(StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(ContentOK) + StrLen(Answer));
+    TotalLen := StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(Header) + Strlen(ContentLen) + StrLen(ContentOK) + AnsSize;
+    dst := ToroGetMem(TotalLen);
     tmp := dst;
-    StrConcat(HeaderOk, @anssizechar[0], dst);
-    dst := dst + StrLen(@anssizechar[0]) + StrLen(HeaderOk);
+    StrConcat(HeaderOk, Header, dst);
+    dst := dst + StrLen(HeaderOk) + StrLen(Header);
+    StrConcat(dst, ContentLen, dst);
+    dst := dst + StrLen(ContentLen);
+    StrConcat(dst, @anssizechar[0], dst);
+    dst := dst + StrLen(@anssizechar[0]);
     StrConcat(dst, ContentOK, dst);
     dst := dst + StrLen(ContentOK) ;
-    StrConcat(dst, Answer, dst);
-    SendStream(Socket,tmp);
+    if Len = 0 then
+    begin
+      StrConcat(dst, Answer, dst);
+      SendStream(Socket,tmp, 0);
+    end
+    else begin
+      Move(Answer^, dst^, AnsSize);
+      SendStream(Socket,tmp, TotalLen);
+    end;
     ToroFreeMem(tmp);
   end;
 end;
 
-function GetFileContent(entry: pchar): pchar;
+function GetFileContent(entry: pchar; var Content: pchar): LongInt;
 var
   idx: TInode;
   indexSize: LongInt;
   Buf: Pchar;
   tmp: THandle;
 begin
-  Result := nil;
+  Content := nil;
+  Result := 0;
   if SysStatFile(entry, @idx) = 0 then
   begin
     WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
@@ -160,7 +181,8 @@ begin
     pchar(Buf+idx.Size)^ := #0;
     SysCloseFile(tmp);
     WriteConsoleF('\t /VWebServer/n: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
-    Result := Buf;
+    Result := idx.Size;
+    Content := Buf;
   end else
   begin
     WriteConsoleF ('index.html not found\n',[]);
@@ -171,6 +193,7 @@ function ServiceReceive(Socket: PSocket): LongInt;
 var
   rq: PRequest;
   entry, content: PChar;
+  len: LongInt;
 begin
   while true do
   begin
@@ -178,8 +201,19 @@ begin
     begin
       rq := Socket.UserDefined;
       entry := rq.BufferStart;
-      content := GetFileContent(rq.BufferStart);
-      ProcessRequest(Socket, content);
+      len := GetFileContent(rq.BufferStart, content);
+      if StrCmp(Pchar(entry + StrLen(entry) - 4), 'html', 4) then
+        ProcessRequest(Socket, content, 0, 'Text/html')
+      else if StrCmp(PChar(entry + StrLen(entry) - 4), 'json', 4) then
+        ProcessRequest(Socket, content, 0, 'Text/json')
+      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'css', 3) then
+        ProcessRequest(Socket, content, 0, 'Text/css')
+      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'js', 2) then
+        ProcessRequest(Socket, content, 0, 'Text/javascript')
+      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'md', 2) then
+        ProcessRequest(Socket, content, 0, 'Text/markdown')
+      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
+        ProcessRequest(Socket, content, len, 'Image/png');
       SysSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
@@ -244,5 +278,4 @@ begin
     HttpClient.UserDefined := rq;
     tid := BeginThread(nil, 4096*2, ProcessesSocket, HttpClient, 0, tid);
   end;
-
 end.

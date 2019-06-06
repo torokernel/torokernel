@@ -40,8 +40,8 @@ implementation
 
 {$MACRO ON}
 {$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
+{$DEFINE DisableInt := asm pushfq;cli;end;}
+{$DEFINE RestoreInt := asm popfq;end;}
 
 type
   PVirtIONetwork= ^TVirtIONetwork;

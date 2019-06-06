@@ -42,6 +42,10 @@ const
 
   MAX_DEV_NAME = 30;
 
+  O_RDONLY = 0;
+  O_WRONLY = 1;
+  O_RDWR = 2;
+
 type
   PBlockDriver = ^TBlockDriver;
   PStorage = ^TStorage;
@@ -129,7 +133,7 @@ type
 
   TFileSystemDriver = record
     Name: array[0..MAX_DEV_NAME-1] of Char; // e.g., ext2, fat, etc
-    OpenFile: function (FileDesc: PFileRegular): LongInt;
+    OpenFile: function (FileDesc: PFileRegular; Flags: Longint): LongInt;
     CloseFile: function (FileDesc: PFileRegular): LongInt;
     ReadFile: function (FileDesc: PFileRegular;count: LongInt;Buffer: Pointer): LongInt;
     WriteFile: function (FileDesc: PFileRegular;count: LongInt;Buffer: Pointer): LongInt;
@@ -158,7 +162,7 @@ procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 procedure DedicateBlockFile(FBlock: PFileBlock;CPUID: LongInt);
 procedure SysCloseFile(FileHandle: THandle);
 procedure SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt);
-function SysOpenFile(Path: PXChar): THandle;
+function SysOpenFile(Path: PXChar; Flags: Longint): THandle;
 function SysCreateDir(Path: PXChar): Longint;
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
@@ -777,12 +781,12 @@ begin
   begin
     PutInode(ino);
     PutInode(Base);
-    Result:= SysOpenFile(SPath);
+    Result:= SysOpenFile(SPath, O_WRONLY);
     {$IFDEF DebugFS} WriteDebug('SysCreateFile: new file created in %p, THandle: %d\n', [PtrUInt(SPath), PtrUInt(Result)]); {$ENDIF}
   end;
 end;
 
-function SysOpenFile(Path: PXChar): THandle;
+function SysOpenFile(Path: PXChar; Flags: Longint): THandle;
 var
   FileRegular: PFileRegular;
   Ino: PInode;
@@ -803,7 +807,7 @@ begin
   FileRegular.Inode := Ino;
   // TODO: to check OpenFile
   If Pointer(@FileRegular.Inode.SuperBlock.FileSystemDriver.OpenFile) <> nil then
-    FileRegular.Inode.SuperBlock.FileSystemDriver.OpenFile(FileRegular);
+    FileRegular.Inode.SuperBlock.FileSystemDriver.OpenFile(FileRegular, Flags);
   Result := THandle(FileRegular);
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: File Openned\n', []); {$ENDIF}
 end;

@@ -174,7 +174,7 @@ begin
     Exit;
   end else
     Buf := ToroGetMem(idx.Size + 1);
-  tmp := SysOpenFile(entry);
+  tmp := SysOpenFile(entry, O_RDONLY);
   if (tmp <> 0) then
   begin
     indexSize := SysReadFile(tmp, idx.Size, Buf);

@@ -470,7 +470,7 @@ begin
   Result := 1;
 end;
 
-function VirtioFSOpenFile(FileDesc: PFileRegular): LongInt;
+function VirtioFSOpenFile(FileDesc: PFileRegular; Flags: Longint): LongInt;
 var
   outhd: FuseOutHeader;
   inhd: FuseInHeader;
@@ -487,7 +487,7 @@ begin
   Done := False;
   inhd.unique := PtrUInt(@Done);
   // TODO: to check flags here for the moment is RO
-  openin.flags := 0;
+  openin.flags := Flags;
 
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);

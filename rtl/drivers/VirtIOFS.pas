@@ -686,6 +686,8 @@ begin
   if FileDesc.FilePos + Count > FileDesc.Inode.Size then
   begin
     Count := FileDesc.Inode.Size - FileDesc.FilePos;
+    If Count = 0 then
+      Exit;
   end;
   inhd.opcode := FUSE_READ;
   inhd.len := sizeof(inhd) + sizeof(readin);
@@ -724,6 +726,9 @@ begin
 
   if outhd.error <> 0 then
    Exit;
+
+  Inc(FileDesc.FilePos, Count);
+
   Result := Count;
 end;
 

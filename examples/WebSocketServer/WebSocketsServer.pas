@@ -221,7 +221,7 @@ begin
     Exit;
   end;
   XBufferCreate(Buffer, nil, INode.Size);
-  FileHandle := SysOpenFile(FileName);
+  FileHandle := SysOpenFile(FileName, O_RDONLY);
   if FileHandle = 0 then
   begin
     WriteConsoleF('SysOpenFile %p not found\n', [PtrUInt(FileName)]);

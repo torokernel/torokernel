@@ -252,8 +252,6 @@ begin
     DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
   end;
 
-  DedicateBlockDriver('myfstoro', 0);
-
   //SysMount('ext2','ATA0',5);
   {$IFDEF UseVirtIOFS}
     DedicateBlockDriver('myfstoro', 0);

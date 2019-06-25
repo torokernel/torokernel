@@ -36,8 +36,12 @@ uses
   Pci in '..\..\rtl\Pci.pas',
   Network in '..\..\rtl\Network.pas',
   Console in '..\..\rtl\drivers\Console.pas',
-  Fat in '..\..\rtl\drivers\Fat.pas',
-  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas';
+  {$IFDEF UseVirtIOFS}
+    VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas';
+  {$ELSE}
+    VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
+    Fat in '..\..\rtl\drivers\Fat.pas';
+  {$ENDIF}
 
 const
   longname: Pchar = 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest';
@@ -52,24 +56,29 @@ var
   tmp: THandle;
 
 begin
-  DedicateBlockDriver('virtioblk', 0);
-  SysMount('fat', 'virtioblk', 0);
+  {$IFDEF UseVirtIOFS}
+    DedicateBlockDriver('myfstoro', 0);
+    SysMount('virtiofs', 'myfstoro', 0);
+  {$ELSE}
+    DedicateBlockDriver('virtioblk', 0);
+    SysMount('fat', 'virtioblk', 0);
+  {$ENDIF}
   test := 0;
-  if SysOpenFile('/1kfile') = 0 then
+  if SysOpenFile('/1kfile', O_RDONLY) = 0 then
     WriteDebug('TestOpen-%d: FAILED\n', [test])
   else
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
 
   Inc(test);
 
-  if SysOpenFile('/dir/1kfile') = 0 then
+  if SysOpenFile('/dir/1kfile', O_RDONLY) = 0 then
     WriteDebug('TestOpen-%d: FAILED\n', [test])
   else
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
 
   Inc(test);
 
-  if SysOpenFile('/dir') = 0 then
+  if SysOpenFile('/dir', O_RDONLY) = 0 then
     WriteDebug('TestOpen-%d: FAILED\n', [test])
   else
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
@@ -77,7 +86,7 @@ begin
   Inc(test);
 
   try
-    SysOpenFile(longname);
+    SysOpenFile(longname, O_RDONLY);
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
   except
     WriteDebug('TestOpen-%d: FAILED\n', [test]);
@@ -86,7 +95,7 @@ begin
   Inc(test);
 
   try
-    SysOpenFile('/filenametooooolong');
+    SysOpenFile('/filenametooooolong', O_RDONLY);
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
   except
     WriteDebug('TestOpen-%d: FAILED\n', [test]);
@@ -95,7 +104,7 @@ begin
   Inc(test);
 
   try
-    SysOpenFile('/dir/filenametooooolong');
+    SysOpenFile('/dir/filenametooooolong', O_RDONLY);
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
   except
     WriteDebug('TestOpen-%d: FAILED\n', [test]);
@@ -104,7 +113,7 @@ begin
   Inc(test);
 
   try
-    SysOpenFile(@noendname);
+    SysOpenFile(@noendname, O_RDONLY);
     WriteDebug('TestOpen-%d: PASSED\n', [test]);
   except
     WriteDebug('TestOpen-%d: FAILED\n', [test]);
@@ -152,7 +161,7 @@ begin
     WriteDebug('TestStat-%d: PASSED\n', [test]);
 
   Inc(test);
-  tmp := SysOpenFile('/1Mfilezero');
+  tmp := SysOpenFile('/1Mfilezero', O_RDONLY);
   i := 0;
 
   while SysReadFile (tmp, 1, @buf) <> 0 do
@@ -170,7 +179,7 @@ begin
   SysCloseFile(tmp);
 
   Inc(test);
-  tmp := SysOpenFile('/1Mfilezero');
+  tmp := SysOpenFile('/1Mfilezero', O_RDONLY);
 
   buf2 := ToroGetMem(1024*1024);
   SysReadFile (tmp, 1024*1024, buf2);
@@ -190,12 +199,14 @@ begin
 
   tmp := 0;
 
-  // try
-  //  tmp := SysCreateFile('/test');
-  //  WriteDebug('TestCreate-%d: PASSED\n', [test]);
-  // except
-  //  WriteDebug('TestCreate-%d: FAILED\n', [test]);
-  // end;
+  {$IFDEF UseVirtIOFS}
+    try
+      tmp := SysCreateFile('/test');
+      WriteDebug('TestCreate-%d: PASSED\n', [test]);
+    except
+      WriteDebug('TestCreate-%d: FAILED\n', [test]);
+    end;
+  {$ENDIF}
 
   if tmp <> 0 then
   begin
@@ -203,7 +214,7 @@ begin
     SysWriteFile(tmp, StrLen(content), content);
     SysCloseFile(tmp);
 
-    tmp := SysOpenFile('/test');
+    tmp := SysOpenFile('/test', O_RDONLY);
     i := 0;
 
     while SysReadFile(tmp, 1, @buf) <> 0 do

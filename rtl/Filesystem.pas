@@ -781,7 +781,7 @@ begin
   begin
     PutInode(ino);
     PutInode(Base);
-    Result:= SysOpenFile(SPath, O_WRONLY);
+    Result:= SysOpenFile(SPath, O_RDWR);
     {$IFDEF DebugFS} WriteDebug('SysCreateFile: new file created in %p, THandle: %d\n', [PtrUInt(SPath), PtrUInt(Result)]); {$ENDIF}
   end;
 end;

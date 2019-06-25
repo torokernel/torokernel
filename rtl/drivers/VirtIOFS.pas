@@ -255,6 +255,28 @@ type
     LockOwner: QWORD;
   end;
 
+  FuseMknodIn = packed record
+    Mode: DWORD;
+    Rdev: DWORD;
+    Umask: DWORD;
+    Padding: DWORD;
+  end;
+
+  FuseWriteIn = packed record
+    fh: QWORD;
+    offset: QWORD;
+    size: DWORD;
+    write_flags: DWORD;
+    lock_owner: QWORD;
+    flags: DWORD;
+    padding: DWORD;
+  end;
+
+  FuseWriteOut = packed record
+    size: DWORD;
+    padding: DWORD;
+  end;
+
 const
   VIRTIO_ACKNOWLEDGE = 1;
   VIRTIO_DRIVER = 2;
@@ -285,6 +307,8 @@ const
   FUSE_READ = 15;
   FUSE_GETATTR = 3;
   FUSE_RELEASE = 18;
+  FUSE_MKNOD = 8;
+  FUSE_WRITE = 16;
 
   REQUEST_QUEUE = 0;
 
@@ -319,8 +343,12 @@ const
   TORO_MAX_READAHEAD_SIZE = 1048576;
   TORO_UNIQUE = $2721987;
 
+  ROOT_UID = 0;
+
 var
   FSVirtIO: TVirtIOFSDevice;
+
+function VirtioFSLookUpInode(Ino: PInode; Name: PXChar): PInode; forward;
 
 function VirtIOGetDeviceFeatures(Dev: PVirtIOPciCommonCfg): DWORD;
 begin
@@ -443,6 +471,7 @@ begin
   Done := False;
   inhd.unique := PtrUInt(@Done);
   inhd.nodeid := FileDesc.INode.ino;
+  inhd.uid := ROOT_UID;
   releasein.fh := FileDesc.Opaque;
 
   bi[0].buffer := @inhd;
@@ -486,7 +515,8 @@ begin
   inhd.nodeid := FileDesc.Inode.ino;
   Done := False;
   inhd.unique := PtrUInt(@Done);
-  // TODO: to check flags here for the moment is RO
+  inhd.uid := ROOT_UID;
+
   openin.flags := Flags;
 
   bi[0].buffer := @inhd;
@@ -520,6 +550,130 @@ begin
   Result := 1;
 end;
 
+// TODO: These values should be parameters
+const
+  Irusr = &400;
+  Iwusr = &200;
+  Irgrp = &40;
+  Iroth = &4;
+  S_Ifreg = $8000;
+
+function VirtIOFSCreateInode(Ino: PInode; Name: PXChar): PInode;
+var
+  Len: LongInt;
+  mknodIn: FuseMknodIn;
+  bi: array[0..3] of TBufferInfo;
+  inhd: FuseInHeader;
+  outhd: FuseOutHeader;
+  Done : Boolean;
+begin
+  Result := nil;
+
+  Len := strlen(name) + 1;
+  inhd.opcode := FUSE_MKNOD;
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
+  inhd.len := sizeof(inhd) + sizeof(mknodIn) + Len ;
+  inhd.nodeid := Ino.ino;
+  inhd.uid := ROOT_UID;
+  outhd.error := 0;
+
+  // TODO: Mode must be a parameter
+  mknodIn.mode := S_Ifreg or Irusr or Iwusr or Irgrp or Iroth;
+  mknodIn.rdev := 0;
+  mknodIn.umask := 0;
+
+  bi[0].buffer := @inhd;
+  bi[0].size := sizeof(inhd);
+  bi[0].flags := 0;
+
+  bi[1].buffer := @mknodIn;
+  bi[1].size := sizeof(mknodIn);
+  bi[1].flags := 0;
+
+  bi[2].buffer := Pointer(Name);
+  bi[2].size := Len;
+  bi[2].flags := 0;
+
+  bi[3].buffer := @outhd;
+  bi[3].size := sizeof(outhd);
+  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+
+  while Done = False do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
+
+  if outhd.error <> 0 then
+    Exit;
+
+  Result := VirtioFSLookUpInode(Ino, Name);
+end;
+
+function VirtIOFSWriteFile(FileDesc: PFileRegular; Count: Longint; Buffer: Pointer): longint;
+var
+  bi: array[0..4] of TBufferInfo;
+  writein: FuseWriteIn;
+  writeout: FuseWriteOut;
+  inhd: FuseInHeader;
+  outhd: FuseOutHeader;
+  Done: Boolean;
+begin
+  Result := 0;
+  inhd.opcode := FUSE_WRITE;
+  inhd.len := sizeof(inhd) + sizeof(writein) + sizeof(Pointer);
+  Done := False;
+  inhd.unique := PtrUInt(@Done);
+  inhd.nodeid := FileDesc.Inode.ino;
+  inhd.uid := ROOT_UID;
+
+  writein.fh := FileDesc.Opaque;
+  writein.size := Count;
+  writein.offset := FileDesc.FilePos;
+
+  bi[0].buffer := @inhd;
+  bi[0].size := sizeof(inhd);
+  bi[0].flags := 0;
+
+  bi[1].buffer := @writein;
+  bi[1].size := sizeof(writein);
+  bi[1].flags := 0;
+
+  bi[2].buffer := Pointer(buffer);
+  bi[2].size := Count;
+  bi[2].flags := 0;
+
+  bi[3].buffer := @outhd;
+  bi[3].size := sizeof(outhd);
+  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+
+  bi[4].buffer := @writeout;
+  bi[4].size := sizeof(writeout);
+  bi[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 5, REQUEST_QUEUE);
+
+  while Done = false do
+  begin
+    SysThreadSwitch;
+    ReadWriteBarrier;
+  end;
+
+  if outhd.error <> 0 then
+   Exit;
+
+  Inc(FileDesc.FilePos, Count);
+
+  // update inode size
+  if FileDesc.FilePos > FileDesc.Inode.Size then
+    FileDesc.Inode.Size := FileDesc.FilePos;
+
+  Result := Count;
+end;
+
 function VirtioFSReadFile(FileDesc: PFileRegular; Count: Longint; Buffer: Pointer): longint;
 var
   bi: array[0..3] of TBufferInfo;
@@ -538,6 +692,8 @@ begin
   Done := False;
   inhd.unique := PtrUInt(@Done);
   inhd.nodeid := FileDesc.Inode.ino;
+  inhd.uid := ROOT_UID;
+
   readin.fh := FileDesc.Opaque;
   readin.size := Count;
   readin.offset := FileDesc.FilePos;
@@ -588,6 +744,7 @@ begin
   inhd.unique := PtrUInt(@Done);
   inhd.len := sizeof(inhd) + Len ;
   inhd.nodeid := Ino.ino;
+  inhd.uid := ROOT_UID;
 
   bi[0].buffer := @inhd;
   bi[0].size := sizeof(inhd);
@@ -631,6 +788,7 @@ begin
   inhd.opcode := FUSE_GETATTR;
   inhd.len := sizeof(inhd) + sizeof(getattrin);
   inhd.nodeid := Ino.ino;
+  inhd.uid := ROOT_UID;
   Done := False;
   inhd.unique := PtrUInt(@Done);
 
@@ -683,6 +841,8 @@ begin
 
   inhd.opcode := FUSE_INIT;
   inhd.len := sizeof(inhd) + sizeof(initinhd);
+  inhd.uid := ROOT_UID;
+
   Done := False;
   inhd.unique := PtrUInt(@Done);
   initinhd.major := FUSE_MAJOR_VERSION;
@@ -892,11 +1052,13 @@ begin
         PciSetMaster(PciDev);
         FsVirtio.RqQueue.used.flags := 0;
         FsVirtio.Driver.name := 'virtiofs';
-        FsVirtio.Driver.ReadSuper := @VirtioFSReadSuper;
-        FsVirtio.Driver.ReadInode := @VirtioFSReadInode;
-        FsVirtio.Driver.WriteInode := @VirtioFSWriteInode;
-        FsVirtio.Driver.LookUpInode := @VirtioFSLookUpInode;
-        FsVirtio.Driver.ReadFile := @VirtioFSReadFile;
+        FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
+        FsVirtio.Driver.ReadInode := VirtioFSReadInode;
+        FsVirtio.Driver.WriteInode := VirtioFSWriteInode;
+        FsVirtio.Driver.CreateInode := VirtIOFSCreateInode;
+        FsVirtio.Driver.LookUpInode := VirtioFSLookUpInode;
+        FsVirtio.Driver.ReadFile := VirtioFSReadFile;
+        FsVirtio.Driver.WriteFile := VirtIOFSWriteFile;
         FsVirtio.Driver.OpenFile := VirtioFSOpenFile;
         FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
         RegisterFilesystem(@FsVirtio.Driver);
@@ -904,7 +1066,7 @@ begin
         FsVirtio.BlkDriver.Busy := false;
         FsVirtio.BlkDriver.WaitOn := nil;
         FsVirtio.BlkDriver.major := 0;
-        FsVirtIO.BlkDriver.Dedicate := @virtIOFSDedicate;
+        FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
         FsVirtIO.BlkDriver.CPUID := -1;
         FsVirtIO.FileDesc.Minor := 0;
         FsVirtIO.FileDesc.Next := nil;

@@ -38,15 +38,15 @@ uses
   // Ide in '..\..\rtl\drivers\IdeDisk.pas',
   {$IFDEF UseVirtIOFS}
     VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
+    VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
   {$ELSE}
     VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
     // Ext2 in '..\..\rtl\drivers\Ext2.pas',
     Fat in '..\..\rtl\drivers\Fat.pas',
+    VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
   {$ENDIF}
   Console in '..\..\rtl\drivers\Console.pas',
-  Network in '..\..\rtl\Network.pas',
-  //E1000 in '..\..\rtl\drivers\E1000.pas';
-  VirtIONet in '..\..\rtl\drivers\VirtIONet.pas';
+  Network in '..\..\rtl\Network.pas';
 
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
@@ -243,20 +243,19 @@ begin
 end;
 
 begin
-  If GetKernelParam(1)^ = #0 then
-  begin
-    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
-  end else
-  begin
-    IPStrtoArray(GetKernelParam(1), LocalIp);
-    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
-  end;
-
-  //SysMount('ext2','ATA0',5);
   {$IFDEF UseVirtIOFS}
+    DedicateNetworkSocket('virtiovsocket');
     DedicateBlockDriver('myfstoro', 0);
     SysMount('virtiofs', 'myfstoro', 0);
   {$ELSE}
+    If GetKernelParam(1)^ = #0 then
+    begin
+      DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+    end else
+    begin
+      IPStrtoArray(GetKernelParam(1), LocalIp);
+      DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+    end;
     DedicateBlockDriver('virtioblk', 0);
     SysMount('fat', 'virtioblk', 0);
   {$ENDIF}

@@ -11,7 +11,7 @@ StaticWebServer.o
 ../../rtl/Filesystem.o
 ../../rtl/drivers/Pci.o
 ../../rtl/drivers/VirtIOFS.o
-../../rtl/drivers/VirtIONet.o
+../../rtl/drivers/VirtIOVSocket.o
 ../../rtl/drivers/Console.o
 ../../rtl/Network.o
 ../../rtl/SysUtils.o

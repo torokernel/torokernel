@@ -262,6 +262,7 @@ function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: Longint; seq, id: 
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetworkSocket(const Name: AnsiString);
 
 implementation
 
@@ -1305,8 +1306,78 @@ begin
   RestoreInt;
 end;
 
-// This thread function processes the arriving of new packets
-function ProcessNetworksPackets(Param: Pointer): PtrInt;
+type
+  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;  
+  TVirtIOVSockHdr = packed record
+    src_cid: QWORD;
+    dst_cid: QWORD;
+    src_port: DWORD;
+    dst_port: DWORD;
+    len: DWORD;
+    tp: WORD;
+    op: WORD;
+    flags: DWORD;
+    buf_alloc: DWORD;
+    fwd_cnt: DWORD;
+  end;
+
+  VirtIOVSocketPacket = packed record
+    hdr: TVirtIOVSockHdr;
+    data: array[0..0] of Byte;
+  end;
+
+const
+  VIRTIO_VSOCK_OP_REQUEST = 1;
+  VIRTIO_VSOCK_OP_RW = 5;
+  VIRTIO_VSOCK_OP_RESPONSE = 2;
+
+function ProcessSocketPacket(Param: Pointer): PtrUInt;
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+  LocalPort: DWORD;
+  Service: PNetworkService;
+begin
+  {$IFDEF FPC} Result := 0; {$ENDIF}
+  while True do
+  begin
+    Packet := SysNetworkRead;
+    if Packet = nil then
+    begin
+      SysThreadSwitch(True);
+      Continue;
+    end;
+    SysThreadActive;
+    VPacket := Packet.Data; 
+    WriteConsoleF('new packet: %d\n',[VPacket.hdr.op]);
+    case VPacket.hdr.op of
+    VIRTIO_VSOCK_OP_REQUEST:
+      begin
+        LocalPort := VPacket.hdr.dst_port;
+        Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+        // TODO: complete this
+        if (Service = nil) or (Service.ServerSocket = nil) then
+        begin
+         Continue;
+        end;
+        // Crear Socket y responder con un op response
+        VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RESPONSE;
+        VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+        VPacket.hdr.src_cid := 3;
+        VPacket.hdr.dst_port := VPacket.hdr.src_port;
+        VPacket.hdr.src_port := LocalPort;
+        WriteConsoleF('Sending response\n',[]);
+        SysNetworkSend(Packet); 
+      end;
+    VIRTIO_VSOCK_OP_RW:
+      begin
+      end;
+    end;
+    ToroFreeMem(Packet); 
+  end;
+end;
+
+function ProcessNetworkPacket(Param: Pointer): PtrInt;
 var
   Packet: PPacket;
   EthPacket: PEthHeader;
@@ -1342,17 +1413,7 @@ begin
   end;
 end;
 
-procedure NetworkServicesInit;
-var
-  ThreadID: TThreadID;
-begin
-  if PtrUInt(BeginThread(nil, ServiceStack, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    WriteConsoleF('Networks Packets Service .... Thread: %d\n',[ThreadID])
-  else
-    WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
-end;
-
-function LocalNetworkInit: Boolean;
+function LocalNetworkInit(PacketHandler: Pointer): Boolean;
 var
   I, CPUID: LongInt;
 begin
@@ -1376,9 +1437,38 @@ begin
     DedicateNetworks[CPUID].SocketStream[I]:=nil;
     DedicateNetworks[CPUID].SocketDatagram[I]:=nil;
   end;
-  NetworkServicesInit;
+  if PtrUInt(BeginThread(nil, ServiceStack, PacketHandler, nil, DWORD(-1), ThreadID)) <> 0 then
+    WriteConsoleF('Networks Packets Service .... Thread: %h\n',[ThreadID])
+  else
+    WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
   DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   Result := True;
+end;
+
+procedure DedicateNetworkSocket(const Name: AnsiString);
+var
+  Net: PNetworkInterface;
+  CPUID: Longint;
+begin
+  Net := NetworkInterfaces;
+  CPUID:= GetApicid;
+  while Net <> nil do
+  begin
+    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    begin
+      Net.CPUID := CPUID;
+      DedicateNetworks[CPUID].NetworkInterface := Net;
+      if not LocalNetworkInit(@ProcessSocketPacket) then
+      begin
+        DedicateNetworks[CPUID].NetworkInterface := nil;
+        Exit;
+      end;
+      WriteConsoleF('DedicateNetworkSocket: success on core #%d\n', [CPUID]);
+      Exit;
+    end;
+    Net := Net.Next;
+  end;
+  {$IFDEF DebugNetwork} WriteDebug('DedicateNetworkSocket: fail, driver not found\n', []); {$ENDIF}
 end;
 
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
@@ -1408,7 +1498,7 @@ begin
         end;
       end else
       begin
-        if not LocalNetworkInit then
+        if not LocalNetworkInit(@ProcessNetworkPacket) then
         begin
           DedicateNetworks[CPUID].NetworkInterface := nil;
           Exit;

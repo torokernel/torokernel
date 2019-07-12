@@ -984,6 +984,7 @@ begin
             Socket.State := SCK_TRANSMITTING;
             Socket.BufferLength := 0;
             // TODO: this should be allocated before the connection is stablished
+            // TODO: we are allocation this two times
             Socket.Buffer := ToroGetMem(MAX_WINDOW);
             Socket.BufferReader := Socket.Buffer;
             {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for confirmation\n', [PtrUInt(Socket)]); {$ENDIF}
@@ -1337,6 +1338,8 @@ var
   VPacket: PVirtIOVSocketPacket;
   LocalPort: DWORD;
   Service: PNetworkService;
+  ServerSocket, ClientSocket: PSocket;
+  Source, Dest: PByte;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
   while True do
@@ -1348,30 +1351,88 @@ begin
       Continue;
     end;
     SysThreadActive;
-    VPacket := Packet.Data; 
-    WriteConsoleF('new packet: %d\n',[VPacket.hdr.op]);
+    VPacket := Packet.Data;
     case VPacket.hdr.op of
-    VIRTIO_VSOCK_OP_REQUEST:
-      begin
-        LocalPort := VPacket.hdr.dst_port;
-        Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-        // TODO: complete this
-        if (Service = nil) or (Service.ServerSocket = nil) then
+      VIRTIO_VSOCK_OP_REQUEST:
         begin
-         Continue;
+          // TODO: before accept the connection we need to check the connectionQueue
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ServerSocket = nil) then
+          begin
+           // TODO: send op invalid
+           Continue;
+          end;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          ServerSocket := Service.ServerSocket;
+          ClientSocket := ToroGetMem(SizeOf(TSocket));
+          Buffer:= ToroGetMem(MAX_WINDOW);
+          if Buffer = nil or ClientSocket = nil then
+          begin
+            // TODO: Send op invalid
+            Continue;
+          end;
+          ClientSocket.State := SCK_TRANSMITTING;
+          ClientSocket.BufferLength := 0;
+          ClientSocket.Buffer := Buffer;
+          ClientSocket.BufferReader := ClientSocket.Buffer;
+          ClientSocket.Next := Service.ClientSocket;
+          Service.ClientSocket := ClientSocket;
+          ClientSocket.SocketType := SOCKET_STREAM;
+          ClientSocket.DispatcherEvent := DISP_ACCEPT;
+          ClientSocket.Mode := MODE_CLIENT;
+          ClientSocket.SourcePort := LocalPort;
+          ClientSocket.DestPort := VPacket.hdr.src_port;
+          ClientSocket.DestIp := VPacket.hdr.dst_cid;
+
+          ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
+          ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+
+          ClientSocket.BufferSender := nil;
+          ClientSocket.BufferSenderTail := nil;
+          ClientSocket.RemoteClose := False;
+          ClientSocket.Blocking := Socket.Blocking;
+
+          VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RESPONSE;
+          VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+
+          VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+          VPacket.hdr.dst_port := VPacket.hdr.src_port;
+          VPacket.hdr.src_port := LocalPort;
+
+          VPacket.hdr.buf_alloc := MAX_WINDOW;
+          VPacket.hdr.fwd_cnt := 0;
+
+          WriteConsoleF('OP_REQUEST_RECEIVED, buff_alloc: %d, fwd_cnt: %d\n',[ClientSocket.RemoteWinLen, ClientSocket.RemoteWinCount]);
+          SysNetworkSend(Packet);
         end;
-        // Crear Socket y responder con un op response
-        VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RESPONSE;
-        VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-        VPacket.hdr.src_cid := 3;
-        VPacket.hdr.dst_port := VPacket.hdr.src_port;
-        VPacket.hdr.src_port := LocalPort;
-        WriteConsoleF('Sending response\n',[]);
-        SysNetworkSend(Packet); 
-      end;
-    VIRTIO_VSOCK_OP_RW:
-      begin
-      end;
+      VIRTIO_VSOCK_OP_RW:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ClientSocket = nil) then
+          begin
+           // TODO: send op invalid
+           Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          while ClientSocket <> nil do
+          begin
+            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            begin
+              Source := Pointer(PtrUInt(@VPacket.data));
+              Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
+              Move(Source^, Dest^, VPacket.hdr.len);
+              ClientSocket.BufferLength := ClientSocket.BufferLength + VPacket.hdr.len;
+              Break;
+            end;
+            ClientSocket := ClientSocket.Next;
+          end;
+          if ClientSocket = nil then
+          begin
+            //TODO: send op invalid
+          end;
+        end;
     end;
     ToroFreeMem(Packet); 
   end;
@@ -1925,6 +1986,7 @@ begin
       if tmp.DispatcherEvent = DISP_ACCEPT then
       begin
         Dec(Service.ServerSocket.ConnectionsQueueCount);
+        // TODO: This may be not needed because client socket are created based on the father socket
         tmp.Blocking := True;
         tmp.DispatcherEvent := DISP_ZOMBIE;
         Result := tmp;

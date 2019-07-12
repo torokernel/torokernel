@@ -476,6 +476,7 @@ begin
       Net.start:= @virtIOVSocketStart;
       Net.send:= @virtIOVSocketSend;
       Net.TimeStamp := 0;
+      Net.Minor := VirtIOVSocketDev.GuestID;
       RegisterNetworkInterface(Net);
       WriteConsoleF('VirtIOVSocket: driver registered\n',[]);
     end;

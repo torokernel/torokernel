@@ -72,26 +72,26 @@ type
     GuestId: QWORD;
     Driverinterface: TNetworkInterface;
   end;
-  
+
   TVirtIOVSockEvent = record
-    ID: DWORD; 
+    ID: DWORD;
   end;
 
-  TVirtIOVSockHdr = record 
-    src_cid: QWORD; 
-    dst_cid: QWORD; 
-    src_port: DWORD; 
-    dst_port: DWORD; 
-    len: DWORD; 
-    tp: WORD; 
-    op: WORD; 
-    flags: DWORD; 
-    buf_alloc: DWORD; 
-    fwd_cnt: DWORD; 
+  TVirtIOVSockHdr = packed record
+    src_cid: QWORD;
+    dst_cid: QWORD;
+    src_port: DWORD;
+    dst_port: DWORD;
+    len: DWORD;
+    tp: WORD;
+    op: WORD;
+    flags: DWORD;
+    buf_alloc: DWORD;
+    fwd_cnt: DWORD;
   end;
 
-  VirtIOVSockPacket = record 
-    hdr: TVirtIOVSockHdr; 
+  VirtIOVSockPacket = packed record
+    hdr: TVirtIOVSockHdr;
     data: array[0..0] of Byte;
   end;
 
@@ -182,13 +182,13 @@ var
   sizeofQueueUsed: DWORD;
   buff: PChar;
   buffPage: DWORD;
-  bi: TBufferInfo; 
+  bi: TBufferInfo;
 begin
   Result := False;
   FillByte(Queue^, sizeof(TVirtQueue), 0);
   write_portw(QueueId, Base + $0E);
   QueueSize := read_portw(Base + $0C);
-  if QueueSize = 0 then 
+  if QueueSize = 0 then
     Exit;
   Queue.queue_size := QueueSize;
   sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
@@ -213,7 +213,7 @@ begin
   Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable + $0FFF) and not($0FFF))]);
   Queue.next_buffer := 0;
   Queue.lock := 0;
-  
+
   write_portd(@buffPage, Base + $08);
   Queue.available.flags := 0;
 
@@ -228,8 +228,8 @@ begin
     Queue.used.index := 0;
     ReadWriteBarrier;
     write_portw(QueueId, Base + $10);
-    Queue.used.flags := 0; 
-    
+    Queue.used.flags := 0;
+
     bi.size := HeaderLen;
     bi.buffer := nil;
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
@@ -249,7 +249,6 @@ var
 begin
   if (vq.last_used_index = vq.used.index) then
     Exit;
-
   index := vq.last_used_index;
 
   while (index <> vq.used.index) do
@@ -308,7 +307,7 @@ begin
         Data^[I] := P^[I];
       EnqueueIncomingPacket(Packet);
     end;
-    
+
     Inc(rx.last_used_index);
 
     // return the buffer
@@ -424,29 +423,29 @@ begin
       VirtIOVSocketDev.Regs:= PtrUInt(PciDev.io[0]);
       PciSetMaster(PciDev);
       WriteConsoleF('VirtIOVSocket: /Vfound/n, irq: /V%d/n, ioport: /V%h/n\n',[VirtIOVSocketDev.IRQ, PtrUInt(VirtIOVSocketDev.Regs)]);
-      
+
       // reset device
       write_portb(0, VirtIOVSocketDev.Regs + $12);
 
       // tell driver that we found it
       write_portb(VIRTIO_ACKNOWLEDGE, VirtIOVSocketDev.Regs + $12);
       write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER, VirtIOVSocketDev.Regs + $12);
-      
+
       VirtIOVSocketDev.GuestID := 0;
-      
+
       for j := 0 to sizeof(VirtIOVSocketDev.GuestID)-1 do
       begin
         VirtIOVSocketDev.GuestID := VirtIOVSocketDev.GuestID or (read_portb(VirtIOVSocketDev.Regs + $14 + j) shr (j * sizeof(Byte)));
       end;
 
-      WriteConsoleF('VirtIOVSocket: Guest ID: /V%d/n\n', [VirtIOVSocketDev.GuestID]); 
-      
+      WriteConsoleF('VirtIOVSocket: Guest ID: /V%d/n\n', [VirtIOVSocketDev.GuestID]);
+
       // RX and EVENT queue must fulled with buffers
       if VirtIOInitQueueLegacy(VirtIOVSocketDev.Regs, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
         WriteConsoleF('VirtIOVSocket: RX_QUEUE was initiated\n', [])
       else
         WriteConsoleF('VirtIOVSocket: RX_QUEUE was not initiated\n', []);
-      
+
       if VirtIOInitQueueLegacy(VirtIOVSocketDev.Regs, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
         WriteConsoleF('VirtIOVSocket: EVENT_QUEUE was initiated\n', [])
       else
@@ -456,9 +455,9 @@ begin
         WriteConsoleF('VirtIOVSocket: TX_QUEUE was initiated\n', [])
       else
         WriteConsoleF('VirtIOVSocket: TX_QUEUE was not initiated\n', []);
-      
+
       // set up buffers for transmission
-      // TODO: use the buffers from user 
+      // TODO: use the buffers from user
       tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
       tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + 4096);
       tx.buffer := Pointer(PtrUInt(tx.buffer) + (4096 - PtrUInt(tx.buffer) mod 4096));
@@ -468,7 +467,7 @@ begin
       tx.used.flags := 0;
       ReadWriteBarrier;
       write_portw(TX_QUEUE, VirtIOVSocketDev.Regs + $10);
-    
+
       write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_DRIVER_OK, VirtIOVSocketDev.Regs + $12);
       CaptureInt(32+VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);
       Net := @VirtIOVSocketDev.Driverinterface;

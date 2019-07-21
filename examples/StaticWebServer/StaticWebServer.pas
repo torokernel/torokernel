@@ -113,9 +113,9 @@ end;
 procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
 begin
   If Len = 0 then
-    SysSocketSend(Socket, Stream, Length(Stream), 0)
+    SysVSocketSend(Socket, Stream, Length(Stream), 0)
   else
-    SysSocketSend(Socket, Stream, Len, 0);
+    SysVSocketSend(Socket, Stream, Len, 0);
 end;
 
 procedure ProcessRequest (Socket: PSocket; Answer: pchar; Len: LongInt; Header: Pchar);
@@ -170,7 +170,7 @@ begin
   Result := 0;
   if SysStatFile(entry, @idx) = 0 then
   begin
-    WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
+    WriteConsoleF ('\t Http Server: %p not found\n',[PtrUInt(entry)]);
     Exit;
   end else
     Buf := ToroGetMem(idx.Size + 1);
@@ -180,12 +180,12 @@ begin
     indexSize := SysReadFile(tmp, idx.Size, Buf);
     pchar(Buf+idx.Size)^ := #0;
     SysCloseFile(tmp);
-    WriteConsoleF('\t /VWebServer/n: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
+    WriteConsoleF('\t Http Server: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
     Result := idx.Size;
     Content := Buf;
   end else
   begin
-    WriteConsoleF ('index.html not found\n',[]);
+    WriteConsoleF ('file not found\n',[]);
   end;
 end;
 
@@ -214,7 +214,7 @@ begin
         ProcessRequest(Socket, content, 0, 'Text/markdown')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
         ProcessRequest(Socket, content, len, 'Image/png');
-      SysSocketClose(Socket);
+      SysVSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
       ToroFreeMem(rq.BufferStart);
@@ -225,7 +225,7 @@ begin
     begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
-        SysSocketClose(Socket);
+        SysVSocketClose(Socket);
         rq := Socket.UserDefined;
         ToroFreeMem(rq.BufferStart);
         ToroFreeMem(rq);
@@ -263,11 +263,12 @@ begin
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
   SysSocketListen(HttpServer, 50);
-  WriteConsoleF('\t /VWebServer/n: listening ...\n',[]);
+  WriteConsoleF('\t Http Server: listening at %d ..\n',[HttpServer.Sourceport]);
 
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);
+    WriteConsoleF('\t Http Server: new connection from %d:%d\n', [HttpClient.DestIp, HttpClient.DestPort]);
     rq := ToroGetMem(sizeof(TRequest));
     rq.BufferStart := ToroGetMem(Max_Path_Len);
     rq.BufferEnd := rq.BufferStart;

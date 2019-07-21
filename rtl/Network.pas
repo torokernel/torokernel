@@ -1330,6 +1330,7 @@ type
   end;
 
 const
+  VIRTIO_VSOCK_OP_INVALID = 0;
   VIRTIO_VSOCK_OP_REQUEST = 1;
   VIRTIO_VSOCK_OP_RW = 5;
   VIRTIO_VSOCK_OP_RESPONSE = 2;
@@ -1363,15 +1364,29 @@ begin
       VIRTIO_VSOCK_OP_REQUEST:
         begin
           // TODO: before accept the connection we need to check the connectionQueue
+          LocalPort := VPacket.hdr.dst_port;
           if VPacket.hdr.tp <> VIRTIO_VSOCK_TYPE_STREAM then
           begin
-            // TODO: Send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
-          LocalPort := VPacket.hdr.dst_port;
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           if (Service = nil) or (Service.ServerSocket = nil) then
           begin
-           // TODO: send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           ServerSocket := Service.ServerSocket;
@@ -1379,7 +1394,14 @@ begin
           Buffer := ToroGetMem(MAX_WINDOW);
           if (Buffer = nil) or (ClientSocket = nil) then
           begin
-            // TODO: Send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
           ClientSocket.State := SCK_TRANSMITTING;
           ClientSocket.BufferLength := 0;
@@ -1400,7 +1422,7 @@ begin
           ClientSocket.RemoteClose := False;
           ClientSocket.Blocking := ServerSocket.Blocking;
 
-          VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RESPONSE;
+          VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
           VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
           VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
           VPacket.hdr.dst_port := VPacket.hdr.src_port;
@@ -1416,8 +1438,14 @@ begin
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           if (Service = nil) or (Service.ClientSocket = nil) then
           begin
-           // TODO: send op invalid
-           Continue;
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
           ClientSocket := Service.ClientSocket;
           while ClientSocket <> nil do
@@ -1434,7 +1462,12 @@ begin
           end;
           if ClientSocket = nil then
           begin
-            //TODO: send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
           end;
         end;
       VIRTIO_VSOCK_OP_SHUTDOWN:
@@ -1443,8 +1476,14 @@ begin
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           if (Service = nil) or (Service.ClientSocket = nil) then
           begin
-           // TODO: send op invalid
-           Continue;
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
           ClientSocket := Service.ClientSocket;
           while ClientSocket <> nil do
@@ -1467,7 +1506,12 @@ begin
           end;
           if ClientSocket = nil then
           begin
-            //TODO: send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
           end;
         end;
       VIRTIO_VSOCK_OP_RST:
@@ -1476,8 +1520,14 @@ begin
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           if (Service = nil) or (Service.ClientSocket = nil) then
           begin
-           // TODO: send op invalid
-           Continue;
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
           end;
           ClientSocket := Service.ClientSocket;
           while ClientSocket <> nil do
@@ -1494,7 +1544,12 @@ begin
           end;
           if ClientSocket = nil then
           begin
-            //TODO: send op invalid
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
           end;
         end;
     end;

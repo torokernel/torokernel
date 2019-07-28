@@ -1329,6 +1329,7 @@ type
     data: array[0..0] of Byte;
   end;
 
+  // TODO: move these constants to one place
 const
   VIRTIO_VSOCK_OP_INVALID = 0;
   VIRTIO_VSOCK_OP_REQUEST = 1;
@@ -1338,6 +1339,7 @@ const
   VIRTIO_VSOCK_OP_RST = 3;
   VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
   VIRTIO_VSOCK_TYPE_STREAM = 1;
+  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
 
 function ProcessSocketPacket(Param: Pointer): PtrUInt;
 var
@@ -1363,7 +1365,6 @@ begin
     case VPacket.hdr.op of
       VIRTIO_VSOCK_OP_REQUEST:
         begin
-          // TODO: before accept the connection we need to check the connectionQueue
           LocalPort := VPacket.hdr.dst_port;
           if VPacket.hdr.tp <> VIRTIO_VSOCK_TYPE_STREAM then
           begin
@@ -1388,8 +1389,19 @@ begin
             ToroFreeMem(Packet);
             Continue;
           end;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           ServerSocket := Service.ServerSocket;
+          if ServerSocket.ConnectionsQueueCount = ServerSocket.ConnectionsQueueLen then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end else
+             Inc(ServerSocket.ConnectionsQueueCount);
           ClientSocket := ToroGetMem(SizeOf(TSocket));
           Buffer := ToroGetMem(MAX_WINDOW);
           if (Buffer = nil) or (ClientSocket = nil) then
@@ -1427,7 +1439,6 @@ begin
           VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
           VPacket.hdr.dst_port := VPacket.hdr.src_port;
           VPacket.hdr.src_port := LocalPort;
-
           VPacket.hdr.buf_alloc := MAX_WINDOW;
           VPacket.hdr.fwd_cnt := 0;
           SysNetworkSend(Packet);
@@ -1513,6 +1524,10 @@ begin
             VPacket.hdr.src_port := LocalPort;
             SysNetworkSend(Packet);
           end;
+        end;
+      VIRTIO_VSOCK_OP_CREDIT_UPDATE:
+        begin
+          WriteConsoleF('We get a VIRTIO_VSOCK_OP_CREDIT_UPDATE\n', []);
         end;
       VIRTIO_VSOCK_OP_RST:
         begin
@@ -2351,30 +2366,40 @@ var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
   P: PChar;
+  FragLen: UInt32;
 begin
-  Packet := ToroGetMem(AddrLen + sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-  Packet.Size := AddrLen + sizeof(TVirtIOVSockHdr);
-  Packet.Ready := False;
-  Packet.Delete := False;
-  Packet.Next := nil;
-  VPacket := Pointer(Packet.Data);
-  VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-  VPacket.hdr.dst_cid := Socket.DestIp;
-  VPacket.hdr.src_port := Socket.SourcePort;
-  VPacket.hdr.dst_port := Socket.DestPort;
-  VPacket.hdr.flags := 0;
-  VPacket.hdr.op := VIRTIO_VSOCK_OP_RW;
-  VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
-  VPacket.hdr.len := AddrLen;
-  VPacket.hdr.buf_alloc := MAX_WINDOW;
-  VPacket.hdr.fwd_cnt := Socket.BufferLength;
+  while Addrlen > 0 do
+  begin
+    if Addrlen > VIRTIO_VSOCK_MAX_PKT_BUF_SIZE then
+      FragLen := VIRTIO_VSOCK_MAX_PKT_BUF_SIZE
+    else
+      FragLen := Addrlen;
+    Packet := ToroGetMem(FragLen + sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+    Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+    Packet.Size := FragLen + sizeof(TVirtIOVSockHdr);
+    Packet.Ready := False;
+    Packet.Delete := False;
+    Packet.Next := nil;
+    VPacket := Pointer(Packet.Data);
+    VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+    VPacket.hdr.dst_cid := Socket.DestIp;
+    VPacket.hdr.src_port := Socket.SourcePort;
+    VPacket.hdr.dst_port := Socket.DestPort;
+    VPacket.hdr.flags := 0;
+    VPacket.hdr.op := VIRTIO_VSOCK_OP_RW;
+    VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+    VPacket.hdr.len := FragLen;
+    VPacket.hdr.buf_alloc := MAX_WINDOW;
+    VPacket.hdr.fwd_cnt := Socket.BufferLength;
   //WriteConsoleF('VIRTIO_VSOCK_OP_RW from %d:%d to %d:%d, size: %d, %d, size packet: %d\n', [VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_cid, VPacket.hdr.dst_port, VPacket.hdr.len, VPacket.hdr.fwd_cnt, Packet.Size]);
-  P := Pointer(@VPacket.data);
-  Move(Addr^, P^, AddrLen);
-  SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
-  Result := AddrLen;
+    P := Pointer(@VPacket.data);
+    Move(Addr^, P^, FragLen);
+    SysNetworkSend(Packet);
+    ToroFreeMem(Packet);
+    Dec(AddrLen, FragLen);
+    Inc(Addr, FragLen);
+  end;
+    Result := AddrLen;
 end;
 
 end.

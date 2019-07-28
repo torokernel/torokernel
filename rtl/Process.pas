@@ -1206,7 +1206,8 @@ begin
         begin
           {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
           CurrentCPU.Idle := True;
-          hlt;
+          // TODO: this is broken, comment it until fix it
+          // hlt;
           CurrentCPU.Idle := False;
           {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
           Th := CurrentCPU.PollingThreads;

@@ -55,7 +55,7 @@ const
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
   ContentLen = #13#10'Content-length: ';
-  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 20000;
   Max_Path_Len = 200;

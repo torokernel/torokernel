@@ -1568,6 +1568,7 @@ begin
           end;
         end;
     end;
+    // TODO: Move this Free to a position in which it is evident who is executing it
     ToroFreeMem(Packet);
   end;
 end;

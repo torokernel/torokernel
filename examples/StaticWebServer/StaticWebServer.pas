@@ -214,6 +214,7 @@ begin
         ProcessRequest(Socket, content, 0, 'Text/markdown')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
         ProcessRequest(Socket, content, len, 'Image/png');
+      WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
       SysVSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
@@ -225,6 +226,7 @@ begin
     begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
+        WriteConsoleF('\t Http Server: closing for timeout from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
         SysVSocketClose(Socket);
         rq := Socket.UserDefined;
         ToroFreeMem(rq.BufferStart);

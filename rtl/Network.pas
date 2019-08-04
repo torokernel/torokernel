@@ -334,6 +334,39 @@ const
   DISP_ZOMBIE = 6;
   DISP_CLOSING = 7;
 
+
+type
+  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;
+  TVirtIOVSockHdr = packed record
+    src_cid: QWORD;
+    dst_cid: QWORD;
+    src_port: DWORD;
+    dst_port: DWORD;
+    len: DWORD;
+    tp: WORD;
+    op: WORD;
+    flags: DWORD;
+    buf_alloc: DWORD;
+    fwd_cnt: DWORD;
+  end;
+
+  VirtIOVSocketPacket = packed record
+    hdr: TVirtIOVSockHdr;
+    data: array[0..0] of Byte;
+  end;
+
+  // TODO: move these constants to one place
+const
+  VIRTIO_VSOCK_OP_INVALID = 0;
+  VIRTIO_VSOCK_OP_REQUEST = 1;
+  VIRTIO_VSOCK_OP_RW = 5;
+  VIRTIO_VSOCK_OP_RESPONSE = 2;
+  VIRTIO_VSOCK_OP_SHUTDOWN = 4;
+  VIRTIO_VSOCK_OP_RST = 3;
+  VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
+  VIRTIO_VSOCK_TYPE_STREAM = 1;
+  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
+
 var
   LastId: WORD = 0;
 
@@ -843,17 +876,20 @@ procedure ProcessARPPacket(Packet: PPacket); forward;
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
-  EthPacket : PEthHeader;
+  //EthPacket : PEthHeader;
+  VPacket: PVirtIOVSocketPacket;
 begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  EthPacket := Packet.Data;
-  if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
-  begin
-      {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-      ProcessARPPacket(Packet);
-      Exit;
-  end;
+  // TODO: To check if it is a thernet packet
+  //EthPacket := Packet.Data;
+  //if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
+  //begin
+  //    {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+  //    ProcessARPPacket(Packet);
+  //    Exit;
+  //end;
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
+  VPacket := Packet.Data;
   Packet.Next := nil;
   if PacketQueue = nil then
   begin
@@ -1309,38 +1345,6 @@ begin
   RestoreInt;
 end;
 
-type
-  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;
-  TVirtIOVSockHdr = packed record
-    src_cid: QWORD;
-    dst_cid: QWORD;
-    src_port: DWORD;
-    dst_port: DWORD;
-    len: DWORD;
-    tp: WORD;
-    op: WORD;
-    flags: DWORD;
-    buf_alloc: DWORD;
-    fwd_cnt: DWORD;
-  end;
-
-  VirtIOVSocketPacket = packed record
-    hdr: TVirtIOVSockHdr;
-    data: array[0..0] of Byte;
-  end;
-
-  // TODO: move these constants to one place
-const
-  VIRTIO_VSOCK_OP_INVALID = 0;
-  VIRTIO_VSOCK_OP_REQUEST = 1;
-  VIRTIO_VSOCK_OP_RW = 5;
-  VIRTIO_VSOCK_OP_RESPONSE = 2;
-  VIRTIO_VSOCK_OP_SHUTDOWN = 4;
-  VIRTIO_VSOCK_OP_RST = 3;
-  VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
-  VIRTIO_VSOCK_TYPE_STREAM = 1;
-  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
-
 function ProcessSocketPacket(Param: Pointer): PtrUInt;
 var
   Packet: PPacket;
@@ -1433,6 +1437,7 @@ begin
           ClientSocket.BufferSenderTail := nil;
           ClientSocket.RemoteClose := False;
           ClientSocket.Blocking := ServerSocket.Blocking;
+          ClientSocket.NeedFreePort := False;
 
           VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
           VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
@@ -1466,6 +1471,7 @@ begin
               Source := Pointer(PtrUInt(@VPacket.data));
               Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
               Move(Source^, Dest^, VPacket.hdr.len);
+              // TODO: need to check (BufferLength + hdr.len) > Buffer
               ClientSocket.BufferLength := ClientSocket.BufferLength + VPacket.hdr.len;
               // update credit
               VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;

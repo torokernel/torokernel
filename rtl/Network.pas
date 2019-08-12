@@ -3,7 +3,7 @@
 //
 // This unit implements the Stack TCP/IP and Socket management.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -41,6 +41,17 @@ const
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1;
   WAIT_ICMP = 50;
   ServiceStack = 40*1024;
+  SCK_TCPIP = 0;
+  SCK_VIRTIO = 1;
+  VIRTIO_VSOCK_OP_INVALID = 0;
+  VIRTIO_VSOCK_OP_REQUEST = 1;
+  VIRTIO_VSOCK_OP_RW = 5;
+  VIRTIO_VSOCK_OP_RESPONSE = 2;
+  VIRTIO_VSOCK_OP_SHUTDOWN = 4;
+  VIRTIO_VSOCK_OP_RST = 3;
+  VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
+  VIRTIO_VSOCK_TYPE_STREAM = 1;
+  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
 
 type
   PNetworkInterface = ^TNetworkInterface;
@@ -137,6 +148,7 @@ type
     Name: AnsiString;
     Minor: LongInt;
     MaxPacketSize: LongInt;
+    SocketType: Longint;
     HardAddress: THardwareAddress;
     IncomingPacketTail: PPacket;
     IncomingPackets: PPacket;
@@ -236,18 +248,39 @@ type
     NextBuffer: PBufferSender;
   end;
 
+  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;
+  TVirtIOVSockHdr = packed record
+    src_cid: QWORD;
+    dst_cid: QWORD;
+    src_port: DWORD;
+    dst_port: DWORD;
+    len: DWORD;
+    tp: WORD;
+    op: WORD;
+    flags: DWORD;
+    buf_alloc: DWORD;
+    fwd_cnt: DWORD;
+  end;
+
+  VirtIOVSocketPacket = packed record
+    hdr: TVirtIOVSockHdr;
+    data: array[0..0] of Byte;
+  end;
+
+  TVirtIOVSockEvent = record
+    ID: DWORD;
+  end;
+
 procedure SysRegisterNetworkService(Handler: PNetworkHandler);
 function SysSocket(SocketType: LongInt): PSocket;
 function SysSocketBind(Socket: PSocket; IPLocal, IPRemote: TIPAddress; LocalPort: LongInt): Boolean;
 procedure SysSocketClose(Socket: PSocket);
-procedure SysVSocketClose(Socket: PSocket);
 function SysSocketConnect(Socket: PSocket): Boolean;
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
 function SysSocketAccept(Socket: PSocket): PSocket;
 function SysSocketPeek(Socket: PSocket; Addr: PChar; AddrLen: UInt32): LongInt;
 function SysSocketRecv(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32) : LongInt;
 function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
-function SysVSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 function SysSocketSelect(Socket:PSocket;TimeOut: LongInt):Boolean;
 procedure NetworkInit;
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
@@ -333,39 +366,6 @@ const
   DISP_CLOSE = 5;
   DISP_ZOMBIE = 6;
   DISP_CLOSING = 7;
-
-
-type
-  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;
-  TVirtIOVSockHdr = packed record
-    src_cid: QWORD;
-    dst_cid: QWORD;
-    src_port: DWORD;
-    dst_port: DWORD;
-    len: DWORD;
-    tp: WORD;
-    op: WORD;
-    flags: DWORD;
-    buf_alloc: DWORD;
-    fwd_cnt: DWORD;
-  end;
-
-  VirtIOVSocketPacket = packed record
-    hdr: TVirtIOVSockHdr;
-    data: array[0..0] of Byte;
-  end;
-
-  // TODO: move these constants to one place
-const
-  VIRTIO_VSOCK_OP_INVALID = 0;
-  VIRTIO_VSOCK_OP_REQUEST = 1;
-  VIRTIO_VSOCK_OP_RW = 5;
-  VIRTIO_VSOCK_OP_RESPONSE = 2;
-  VIRTIO_VSOCK_OP_SHUTDOWN = 4;
-  VIRTIO_VSOCK_OP_RST = 3;
-  VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
-  VIRTIO_VSOCK_TYPE_STREAM = 1;
-  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
 
 var
   LastId: WORD = 0;
@@ -876,20 +876,20 @@ procedure ProcessARPPacket(Packet: PPacket); forward;
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;
-  //EthPacket : PEthHeader;
-  VPacket: PVirtIOVSocketPacket;
+  EthPacket : PEthHeader;
 begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  // TODO: To check if it is a thernet packet
-  //EthPacket := Packet.Data;
-  //if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
-  //begin
-  //    {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  //    ProcessARPPacket(Packet);
-  //    Exit;
-  //end;
+  if DedicateNetworks[GetApicId].NetworkInterface.SocketType = SCK_TCPIP then
+  begin
+    EthPacket := Packet.Data;
+    if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
+    begin
+      {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
+      ProcessARPPacket(Packet);
+      Exit;
+    end;
+  end;
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
-  VPacket := Packet.Data;
   Packet.Next := nil;
   if PacketQueue = nil then
   begin
@@ -1022,7 +1022,6 @@ begin
             Socket.State := SCK_TRANSMITTING;
             Socket.BufferLength := 0;
             // TODO: this should be allocated before the connection is stablished
-            // TODO: we are allocation this two times
             Socket.Buffer := ToroGetMem(MAX_WINDOW);
             Socket.BufferReader := Socket.Buffer;
             {$IFDEF DebugNetwork} WriteDebug('ProcessTCPSocket: Socket %h sending ACK for confirmation\n', [PtrUInt(Socket)]); {$ENDIF}
@@ -1472,7 +1471,7 @@ begin
               Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
               Move(Source^, Dest^, VPacket.hdr.len);
               // TODO: need to check (BufferLength + hdr.len) > Buffer
-              ClientSocket.BufferLength := ClientSocket.BufferLength + VPacket.hdr.len;
+              Inc(ClientSocket.BufferLength, VPacket.hdr.len);
               // update credit
               VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
               VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
@@ -2073,7 +2072,7 @@ begin
   Result := True;
 end;
 
-procedure SysSocketClose(Socket: PSocket);
+procedure SysTCPSocketClose(Socket: PSocket);
 begin
   DisableInt;
   {$IFDEF DebugSocket} WriteDebug('SysSocketClose: Closing Socket %h in port %d, Buffer Sender %h, Dispatcher %d\n', [PtrUInt(Socket),Socket.SourcePort, PtrUInt(Socket.BufferSender),Socket.DispatcherEvent]); {$ENDIF}
@@ -2139,6 +2138,14 @@ begin
     SysNetworkSend(Packet);
     ToroFreeMem(Packet);
   end;
+end;
+
+procedure SysSocketClose(Socket: PSocket);
+begin
+  if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_TCPIP then
+    SysTCPSocketClose(Socket)
+  else if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_VIRTIO then
+    SysVSocketClose(Socket);
 end;
 
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
@@ -2329,7 +2336,7 @@ end;
 // every packet is sent with ACKPSH bit, with the maximum size possible
 //
 // TODO: check the return values
-function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
+function SysTCPSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 var
   Buffer: PBufferSender;
   Dest: PByte;
@@ -2457,6 +2464,14 @@ begin
     Inc(Addr, FragLen);
   end;
     Result := AddrLen;
+end;
+
+function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
+begin
+  if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_TCPIP then
+    Result := SysTCPSocketSend(Socket, Addr, AddrLen, Flags)
+  else if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_VIRTIO then
+    Result := SysVSocketSend(Socket, Addr, AddrLen, Flags);
 end;
 
 end.

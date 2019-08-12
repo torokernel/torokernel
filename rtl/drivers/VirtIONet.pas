@@ -576,6 +576,7 @@ begin
         Net.stop:= @virtIOStop;
         Net.Reset:= @virtIOReset;
         Net.TimeStamp := 0;
+        Net.SocketType := SCK_TCPIP;
         RegisterNetworkInterface(Net);
         WriteConsoleF('VirtIONet: driver registered\n',[]);
       end;

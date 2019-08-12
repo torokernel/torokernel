@@ -97,28 +97,6 @@ type
     Driverinterface: TNetworkInterface;
   end;
 
-  TVirtIOVSockEvent = record
-    ID: DWORD;
-  end;
-
-  TVirtIOVSockHdr = packed record
-    src_cid: QWORD;
-    dst_cid: QWORD;
-    src_port: DWORD;
-    dst_port: DWORD;
-    len: DWORD;
-    tp: WORD;
-    op: WORD;
-    flags: DWORD;
-    buf_alloc: DWORD;
-    fwd_cnt: DWORD;
-  end;
-
-  VirtIOVSockPacket = packed record
-    hdr: TVirtIOVSockHdr;
-    data: array[0..0] of Byte;
-  end;
-
 const
   VIRTIO_ID_VSOCKET = $1012;
   VIRTIO_ACKNOWLEDGE = 1;
@@ -499,6 +477,7 @@ begin
       Net.start:= @virtIOVSocketStart;
       Net.send:= @virtIOVSocketSend;
       Net.TimeStamp := 0;
+      Net.SocketType := SCK_VIRTIO;
       Net.Minor := VirtIOVSocketDev.GuestID;
       RegisterNetworkInterface(Net);
       WriteConsoleF('VirtIOVSocket: driver registered\n',[]);

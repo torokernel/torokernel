@@ -743,6 +743,7 @@ begin
         Net.stop := @e1000Stop;
         Net.Reset := @e1000Reset;
         Net.TimeStamp := 0;
+        Net.SocketType := SOCK_TCPIP;
         RegisterNetworkInterface(Net);
         end;
       end;

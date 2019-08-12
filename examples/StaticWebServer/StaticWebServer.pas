@@ -113,9 +113,9 @@ end;
 procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
 begin
   If Len = 0 then
-    SysVSocketSend(Socket, Stream, Length(Stream), 0)
+    SysSocketSend(Socket, Stream, Length(Stream), 0)
   else
-    SysVSocketSend(Socket, Stream, Len, 0);
+    SysSocketSend(Socket, Stream, Len, 0);
 end;
 
 procedure ProcessRequest (Socket: PSocket; Answer: pchar; Len: LongInt; Header: Pchar);
@@ -215,7 +215,7 @@ begin
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
         ProcessRequest(Socket, content, len, 'Image/png');
       WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
-      SysVSocketClose(Socket);
+      SysSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
       ToroFreeMem(rq.BufferStart);
@@ -227,7 +227,7 @@ begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
         WriteConsoleF('\t Http Server: closing for timeout from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
-        SysVSocketClose(Socket);
+        SysSocketClose(Socket);
         rq := Socket.UserDefined;
         ToroFreeMem(rq.BufferStart);
         ToroFreeMem(rq);

@@ -206,6 +206,8 @@ begin
         ProcessRequest(Socket, content, 0, 'Text/html')
       else if StrCmp(PChar(entry + StrLen(entry) - 4), 'json', 4) then
         ProcessRequest(Socket, content, 0, 'Text/json')
+      else if StrCmp(Pchar(entry + StrLen(entry) - 3), 'htm', 3) then
+        ProcessRequest(Socket, content, 0, 'Text/htm')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'css', 3) then
         ProcessRequest(Socket, content, 0, 'Text/css')
       else if StrCmp(PChar(entry + StrLen(entry) - 2), 'js', 2) then
@@ -213,7 +215,9 @@ begin
       else if StrCmp(PChar(entry + StrLen(entry) - 2), 'md', 2) then
         ProcessRequest(Socket, content, 0, 'Text/markdown')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
-        ProcessRequest(Socket, content, len, 'Image/png');
+        ProcessRequest(Socket, content, len, 'Image/png')
+      else
+        WriteConsoleF('\t Http Server: file format not found\n', []);
       WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
       SysSocketClose(Socket);
       if content <> nil then

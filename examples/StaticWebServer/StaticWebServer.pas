@@ -38,15 +38,15 @@ uses
   // Ide in '..\..\rtl\drivers\IdeDisk.pas',
   {$IFDEF UseVirtIOFS}
     VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
+    VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
   {$ELSE}
     VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
     // Ext2 in '..\..\rtl\drivers\Ext2.pas',
     Fat in '..\..\rtl\drivers\Fat.pas',
+    VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
   {$ENDIF}
   Console in '..\..\rtl\drivers\Console.pas',
-  Network in '..\..\rtl\Network.pas',
-  //E1000 in '..\..\rtl\drivers\E1000.pas';
-  VirtIONet in '..\..\rtl\drivers\VirtIONet.pas';
+  Network in '..\..\rtl\Network.pas';
 
 const
   MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
@@ -55,7 +55,7 @@ const
 
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
   ContentLen = #13#10'Content-length: ';
-  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 20000;
   Max_Path_Len = 200;
@@ -170,7 +170,7 @@ begin
   Result := 0;
   if SysStatFile(entry, @idx) = 0 then
   begin
-    WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
+    WriteConsoleF ('\t Http Server: %p not found\n',[PtrUInt(entry)]);
     Exit;
   end else
     Buf := ToroGetMem(idx.Size + 1);
@@ -180,12 +180,12 @@ begin
     indexSize := SysReadFile(tmp, idx.Size, Buf);
     pchar(Buf+idx.Size)^ := #0;
     SysCloseFile(tmp);
-    WriteConsoleF('\t /VWebServer/n: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
+    WriteConsoleF('\t Http Server: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
     Result := idx.Size;
     Content := Buf;
   end else
   begin
-    WriteConsoleF ('index.html not found\n',[]);
+    WriteConsoleF ('file not found\n',[]);
   end;
 end;
 
@@ -206,6 +206,8 @@ begin
         ProcessRequest(Socket, content, 0, 'Text/html')
       else if StrCmp(PChar(entry + StrLen(entry) - 4), 'json', 4) then
         ProcessRequest(Socket, content, 0, 'Text/json')
+      else if StrCmp(Pchar(entry + StrLen(entry) - 3), 'htm', 3) then
+        ProcessRequest(Socket, content, 0, 'Text/htm')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'css', 3) then
         ProcessRequest(Socket, content, 0, 'Text/css')
       else if StrCmp(PChar(entry + StrLen(entry) - 2), 'js', 2) then
@@ -213,7 +215,10 @@ begin
       else if StrCmp(PChar(entry + StrLen(entry) - 2), 'md', 2) then
         ProcessRequest(Socket, content, 0, 'Text/markdown')
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
-        ProcessRequest(Socket, content, len, 'Image/png');
+        ProcessRequest(Socket, content, len, 'Image/png')
+      else
+        WriteConsoleF('\t Http Server: file format not found\n', []);
+      WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
       SysSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
@@ -225,6 +230,7 @@ begin
     begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
+        WriteConsoleF('\t Http Server: closing for timeout from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
         SysSocketClose(Socket);
         rq := Socket.UserDefined;
         ToroFreeMem(rq.BufferStart);
@@ -243,20 +249,19 @@ begin
 end;
 
 begin
-  If GetKernelParam(1)^ = #0 then
-  begin
-    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
-  end else
-  begin
-    IPStrtoArray(GetKernelParam(1), LocalIp);
-    DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
-  end;
-
-  //SysMount('ext2','ATA0',5);
   {$IFDEF UseVirtIOFS}
+    DedicateNetworkSocket('virtiovsocket');
     DedicateBlockDriver('myfstoro', 0);
     SysMount('virtiofs', 'myfstoro', 0);
   {$ELSE}
+    If GetKernelParam(1)^ = #0 then
+    begin
+      DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
+    end else
+    begin
+      IPStrtoArray(GetKernelParam(1), LocalIp);
+      DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
+    end;
     DedicateBlockDriver('virtioblk', 0);
     SysMount('fat', 'virtioblk', 0);
   {$ENDIF}
@@ -264,11 +269,12 @@ begin
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
   SysSocketListen(HttpServer, 50);
-  WriteConsoleF('\t /VWebServer/n: listening ...\n',[]);
+  WriteConsoleF('\t Http Server: listening at %d ..\n',[HttpServer.Sourceport]);
 
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);
+    WriteConsoleF('\t Http Server: new connection from %d:%d\n', [HttpClient.DestIp, HttpClient.DestPort]);
     rq := ToroGetMem(sizeof(TRequest));
     rq.BufferStart := ToroGetMem(Max_Path_Len);
     rq.BufferEnd := rq.BufferStart;

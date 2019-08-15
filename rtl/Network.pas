@@ -3,7 +3,7 @@
 //
 // This unit implements the Stack TCP/IP and Socket management.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -41,6 +41,17 @@ const
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1;
   WAIT_ICMP = 50;
   ServiceStack = 40*1024;
+  SCK_TCPIP = 0;
+  SCK_VIRTIO = 1;
+  VIRTIO_VSOCK_OP_INVALID = 0;
+  VIRTIO_VSOCK_OP_REQUEST = 1;
+  VIRTIO_VSOCK_OP_RW = 5;
+  VIRTIO_VSOCK_OP_RESPONSE = 2;
+  VIRTIO_VSOCK_OP_SHUTDOWN = 4;
+  VIRTIO_VSOCK_OP_RST = 3;
+  VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
+  VIRTIO_VSOCK_TYPE_STREAM = 1;
+  VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
 
 type
   PNetworkInterface = ^TNetworkInterface;
@@ -137,6 +148,7 @@ type
     Name: AnsiString;
     Minor: LongInt;
     MaxPacketSize: LongInt;
+    SocketType: Longint;
     HardAddress: THardwareAddress;
     IncomingPacketTail: PPacket;
     IncomingPackets: PPacket;
@@ -180,7 +192,7 @@ type
   TInAddr = TIPAddress;
 
   TSocket = record
-    SourcePort,DestPort: LongInt;
+    SourcePort,DestPort: UInt32;
     DestIp: TIPAddress;
     SocketType: LongInt;
     Mode: LongInt;
@@ -236,6 +248,29 @@ type
     NextBuffer: PBufferSender;
   end;
 
+  PVirtIOVSocketPacket = ^VirtIOVSocketPacket;
+  TVirtIOVSockHdr = packed record
+    src_cid: QWORD;
+    dst_cid: QWORD;
+    src_port: DWORD;
+    dst_port: DWORD;
+    len: DWORD;
+    tp: WORD;
+    op: WORD;
+    flags: DWORD;
+    buf_alloc: DWORD;
+    fwd_cnt: DWORD;
+  end;
+
+  VirtIOVSocketPacket = packed record
+    hdr: TVirtIOVSockHdr;
+    data: array[0..0] of Byte;
+  end;
+
+  TVirtIOVSockEvent = record
+    ID: DWORD;
+  end;
+
 procedure SysRegisterNetworkService(Handler: PNetworkHandler);
 function SysSocket(SocketType: LongInt): PSocket;
 function SysSocketBind(Socket: PSocket; IPLocal, IPRemote: TIPAddress; LocalPort: LongInt): Boolean;
@@ -262,6 +297,7 @@ function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: Longint; seq, id: 
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetworkSocket(const Name: AnsiString);
 
 implementation
 
@@ -843,12 +879,15 @@ var
   EthPacket : PEthHeader;
 begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  EthPacket := Packet.Data;
-  if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
+  if DedicateNetworks[GetApicId].NetworkInterface.SocketType = SCK_TCPIP then
   begin
+    EthPacket := Packet.Data;
+    if SwapWORD(EthPacket.ProtocolType) = ETH_FRAME_ARP then
+    begin
       {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new ARP packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
       ProcessARPPacket(Packet);
       Exit;
+    end;
   end;
   PacketQueue := DedicateNetworks[GetApicId].NetworkInterface.IncomingPackets;
   Packet.Next := nil;
@@ -1305,8 +1344,281 @@ begin
   RestoreInt;
 end;
 
-// This thread function processes the arriving of new packets
-function ProcessNetworksPackets(Param: Pointer): PtrInt;
+function ProcessSocketPacket(Param: Pointer): PtrUInt;
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+  LocalPort: DWORD;
+  Service: PNetworkService;
+  ServerSocket, ClientSocket: PSocket;
+  Source, Dest: PByte;
+  Buffer: Pointer;
+begin
+  {$IFDEF FPC} Result := 0; {$ENDIF}
+  while True do
+  begin
+    Packet := SysNetworkRead;
+    if Packet = nil then
+    begin
+      SysThreadSwitch(True);
+      Continue;
+    end;
+    SysThreadActive;
+    VPacket := Packet.Data;
+    case VPacket.hdr.op of
+      VIRTIO_VSOCK_OP_REQUEST:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          if VPacket.hdr.tp <> VIRTIO_VSOCK_TYPE_STREAM then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ServerSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ServerSocket := Service.ServerSocket;
+          if ServerSocket.ConnectionsQueueCount = ServerSocket.ConnectionsQueueLen then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end else
+             Inc(ServerSocket.ConnectionsQueueCount);
+          ClientSocket := ToroGetMem(SizeOf(TSocket));
+          Buffer := ToroGetMem(MAX_WINDOW);
+          if (Buffer = nil) or (ClientSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket.State := SCK_TRANSMITTING;
+          ClientSocket.BufferLength := 0;
+          ClientSocket.Buffer := Buffer;
+          ClientSocket.BufferReader := ClientSocket.Buffer;
+          ClientSocket.Next := Service.ClientSocket;
+          Service.ClientSocket := ClientSocket;
+          ClientSocket.SocketType := SOCKET_STREAM;
+          ClientSocket.DispatcherEvent := DISP_ACCEPT;
+          ClientSocket.Mode := MODE_CLIENT;
+          ClientSocket.SourcePort := LocalPort;
+          ClientSocket.DestPort := VPacket.hdr.src_port;
+          ClientSocket.DestIp := VPacket.hdr.src_cid;
+          ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
+          ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+          ClientSocket.BufferSender := nil;
+          ClientSocket.BufferSenderTail := nil;
+          ClientSocket.RemoteClose := False;
+          ClientSocket.Blocking := ServerSocket.Blocking;
+          ClientSocket.NeedFreePort := False;
+
+          VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
+          VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+          VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+          VPacket.hdr.dst_port := VPacket.hdr.src_port;
+          VPacket.hdr.src_port := LocalPort;
+          VPacket.hdr.buf_alloc := MAX_WINDOW;
+          VPacket.hdr.fwd_cnt := 0;
+          SysNetworkSend(Packet);
+        end;
+      VIRTIO_VSOCK_OP_RW:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ClientSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          while ClientSocket <> nil do
+          begin
+            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            begin
+              Source := Pointer(PtrUInt(@VPacket.data));
+              Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
+              Move(Source^, Dest^, VPacket.hdr.len);
+              // TODO: need to check (BufferLength + hdr.len) > Buffer
+              Inc(ClientSocket.BufferLength, VPacket.hdr.len);
+              // update credit
+              VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
+              VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+              VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+              VPacket.hdr.dst_port := VPacket.hdr.src_port;
+              VPacket.hdr.src_port := LocalPort;
+              VPacket.hdr.buf_alloc := MAX_WINDOW;
+              VPacket.hdr.fwd_cnt := ClientSocket.BufferLength;
+              SysNetworkSend(Packet);
+              Break;
+            end;
+            ClientSocket := ClientSocket.Next;
+          end;
+          if ClientSocket = nil then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+          end;
+        end;
+      VIRTIO_VSOCK_OP_SHUTDOWN:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ClientSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          while ClientSocket <> nil do
+          begin
+            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            begin
+              If ClientSocket.State = SCK_TRANSMITTING then
+              begin
+                ClientSocket.State := SCK_LOCALCLOSING;
+                VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RST;
+                VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+                VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+                VPacket.hdr.dst_port := VPacket.hdr.src_port;
+                VPacket.hdr.src_port := LocalPort;
+                SysNetworkSend(Packet);
+              end;
+              Break;
+            end;
+            ClientSocket := ClientSocket.Next;
+          end;
+          if ClientSocket = nil then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+          end;
+        end;
+      VIRTIO_VSOCK_OP_CREDIT_UPDATE:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ClientSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          while ClientSocket <> nil do
+          begin
+            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            begin
+              ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+              Break;
+            end;
+            ClientSocket := ClientSocket.Next;
+          end;
+          if ClientSocket = nil then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+          end;
+        end;
+      VIRTIO_VSOCK_OP_RST:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if (Service = nil) or (Service.ClientSocket = nil) then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          while ClientSocket <> nil do
+          begin
+            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            begin
+              If ClientSocket.State = SCK_PEER_DISCONNECTED then
+              begin
+                FreeSocket(ClientSocket);
+              end;
+              Break;
+            end;
+            ClientSocket := ClientSocket.Next;
+          end;
+          if ClientSocket = nil then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+          end;
+        end;
+    end;
+    // TODO: Move this Free to a position in which it is evident who is executing it
+    ToroFreeMem(Packet);
+  end;
+end;
+
+function ProcessNetworkPacket(Param: Pointer): PtrInt;
 var
   Packet: PPacket;
   EthPacket: PEthHeader;
@@ -1342,17 +1654,7 @@ begin
   end;
 end;
 
-procedure NetworkServicesInit;
-var
-  ThreadID: TThreadID;
-begin
-  if PtrUInt(BeginThread(nil, ServiceStack, @ProcessNetworksPackets, nil, DWORD(-1), ThreadID)) <> 0 then
-    WriteConsoleF('Networks Packets Service .... Thread: %d\n',[ThreadID])
-  else
-    WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
-end;
-
-function LocalNetworkInit: Boolean;
+function LocalNetworkInit(PacketHandler: Pointer): Boolean;
 var
   I, CPUID: LongInt;
 begin
@@ -1376,9 +1678,38 @@ begin
     DedicateNetworks[CPUID].SocketStream[I]:=nil;
     DedicateNetworks[CPUID].SocketDatagram[I]:=nil;
   end;
-  NetworkServicesInit;
+  if PtrUInt(BeginThread(nil, ServiceStack, PacketHandler, nil, DWORD(-1), ThreadID)) <> 0 then
+    WriteConsoleF('Networks Packets Service .... Thread: %h\n',[ThreadID])
+  else
+    WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
   DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
   Result := True;
+end;
+
+procedure DedicateNetworkSocket(const Name: AnsiString);
+var
+  Net: PNetworkInterface;
+  CPUID: Longint;
+begin
+  Net := NetworkInterfaces;
+  CPUID:= GetApicid;
+  while Net <> nil do
+  begin
+    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    begin
+      Net.CPUID := CPUID;
+      DedicateNetworks[CPUID].NetworkInterface := Net;
+      if not LocalNetworkInit(@ProcessSocketPacket) then
+      begin
+        DedicateNetworks[CPUID].NetworkInterface := nil;
+        Exit;
+      end;
+      WriteConsoleF('DedicateNetworkSocket: success on core #%d\n', [CPUID]);
+      Exit;
+    end;
+    Net := Net.Next;
+  end;
+  {$IFDEF DebugNetwork} WriteDebug('DedicateNetworkSocket: fail, driver not found\n', []); {$ENDIF}
 end;
 
 procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
@@ -1408,7 +1739,7 @@ begin
         end;
       end else
       begin
-        if not LocalNetworkInit then
+        if not LocalNetworkInit(@ProcessNetworkPacket) then
         begin
           DedicateNetworks[CPUID].NetworkInterface := nil;
           Exit;
@@ -1741,7 +2072,7 @@ begin
   Result := True;
 end;
 
-procedure SysSocketClose(Socket: PSocket);
+procedure SysTCPSocketClose(Socket: PSocket);
 begin
   DisableInt;
   {$IFDEF DebugSocket} WriteDebug('SysSocketClose: Closing Socket %h in port %d, Buffer Sender %h, Dispatcher %d\n', [PtrUInt(Socket),Socket.SourcePort, PtrUInt(Socket.BufferSender),Socket.DispatcherEvent]); {$ENDIF}
@@ -1774,6 +2105,47 @@ begin
     end;
   end;
   RestoreInt;
+end;
+
+procedure SysVSocketClose(Socket: PSocket);
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+begin
+  if Socket.State = SCK_LOCALCLOSING then
+  begin
+    FreeSocket(Socket)
+  end else
+  begin
+    Socket.State := SCK_PEER_DISCONNECTED;
+    Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+    Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+    Packet.Size := sizeof(TVirtIOVSockHdr);
+    Packet.Ready := False;
+    Packet.Delete := False;
+    Packet.Next := nil;
+    VPacket := Pointer(Packet.Data);
+    VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+    VPacket.hdr.dst_cid := Socket.DestIp;
+    VPacket.hdr.src_port := Socket.SourcePort;
+    VPacket.hdr.dst_port := Socket.DestPort;
+    VPacket.hdr.flags := 3;
+    VPacket.hdr.op := VIRTIO_VSOCK_OP_SHUTDOWN;
+    VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+    VPacket.hdr.len := 0;
+    VPacket.hdr.buf_alloc := MAX_WINDOW;
+    VPacket.hdr.fwd_cnt := Socket.BufferLength;
+    SysNetworkSend(Packet);
+    ToroFreeMem(Packet);
+  end;
+end;
+
+procedure SysSocketClose(Socket: PSocket);
+begin
+  if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_TCPIP then
+    SysTCPSocketClose(Socket)
+  else if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_VIRTIO then
+    SysVSocketClose(Socket);
 end;
 
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
@@ -1835,6 +2207,7 @@ begin
       if tmp.DispatcherEvent = DISP_ACCEPT then
       begin
         Dec(Service.ServerSocket.ConnectionsQueueCount);
+        // TODO: This may be not needed because client socket are created based on the father socket
         tmp.Blocking := True;
         tmp.DispatcherEvent := DISP_ZOMBIE;
         Result := tmp;
@@ -1963,7 +2336,7 @@ end;
 // every packet is sent with ACKPSH bit, with the maximum size possible
 //
 // TODO: check the return values
-function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
+function SysTCPSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
 var
   Buffer: PBufferSender;
   Dest: PByte;
@@ -2040,6 +2413,65 @@ begin
   end;
 
 //{$IFDEF DebugSocket} WriteDebug('SysSocketSend: END\n',[]);{$ENDIF}
+end;
+
+function SysVSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+  P: PChar;
+  FragLen: UInt32;
+begin
+  while Addrlen > 0 do
+  begin
+    if Addrlen > VIRTIO_VSOCK_MAX_PKT_BUF_SIZE then
+      FragLen := VIRTIO_VSOCK_MAX_PKT_BUF_SIZE
+    else
+      FragLen := Addrlen;
+
+    while FragLen = Socket.RemoteWinLen - Socket.RemoteWinCount do
+    begin
+      SysThreadSwitch(True);
+    end;
+    SysThreadActive;
+
+    if FragLen > Socket.RemoteWinLen - Socket.RemoteWinCount then
+      FragLen := Socket.RemoteWinLen - Socket.RemoteWinCount;
+
+    Packet := ToroGetMem(FragLen + sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+    Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+    Packet.Size := FragLen + sizeof(TVirtIOVSockHdr);
+    Packet.Ready := False;
+    Packet.Delete := False;
+    Packet.Next := nil;
+    VPacket := Pointer(Packet.Data);
+    VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+    VPacket.hdr.dst_cid := Socket.DestIp;
+    VPacket.hdr.src_port := Socket.SourcePort;
+    VPacket.hdr.dst_port := Socket.DestPort;
+    VPacket.hdr.flags := 0;
+    VPacket.hdr.op := VIRTIO_VSOCK_OP_RW;
+    VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+    VPacket.hdr.len := FragLen;
+    VPacket.hdr.buf_alloc := MAX_WINDOW;
+    VPacket.hdr.fwd_cnt := Socket.BufferLength;
+  //WriteConsoleF('VIRTIO_VSOCK_OP_RW from %d:%d to %d:%d, size: %d, %d, size packet: %d\n', [VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_cid, VPacket.hdr.dst_port, VPacket.hdr.len, VPacket.hdr.fwd_cnt, Packet.Size]);
+    P := Pointer(@VPacket.data);
+    Move(Addr^, P^, FragLen);
+    SysNetworkSend(Packet);
+    ToroFreeMem(Packet);
+    Dec(AddrLen, FragLen);
+    Inc(Addr, FragLen);
+  end;
+    Result := AddrLen;
+end;
+
+function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): LongInt;
+begin
+  if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_TCPIP then
+    Result := SysTCPSocketSend(Socket, Addr, AddrLen, Flags)
+  else if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_VIRTIO then
+    Result := SysVSocketSend(Socket, Addr, AddrLen, Flags);
 end;
 
 end.

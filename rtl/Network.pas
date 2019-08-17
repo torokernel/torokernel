@@ -943,6 +943,7 @@ begin
     else
       DedicateNetworks[CPUID].SocketDatagram[Socket.SourcePort] := nil;
     FreePort(Socket.SourcePort);
+    ToroFreeMem(Service);
   end;
   if Socket.BufferSender <> nil then
   begin
@@ -1597,6 +1598,9 @@ begin
               If ClientSocket.State = SCK_PEER_DISCONNECTED then
               begin
                 FreeSocket(ClientSocket);
+              end else if ClientSocket.State = SCK_CONNECTING then
+              begin
+                ClientSocket.State := SCK_BLOCKED;
               end;
               Break;
             end;
@@ -1611,6 +1615,26 @@ begin
             VPacket.hdr.src_port := LocalPort;
             SysNetworkSend(Packet);
           end;
+        end;
+      VIRTIO_VSOCK_OP_RESPONSE:
+        begin
+          LocalPort := VPacket.hdr.dst_port;
+          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          if Service = nil then
+          begin
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.src_port := LocalPort;
+            SysNetworkSend(Packet);
+            ToroFreeMem(Packet);
+            Continue;
+          end;
+          ClientSocket := Service.ClientSocket;
+          ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
+          ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+          ClientSocket.State := SCK_TRANSMITTING;
         end;
     end;
     // TODO: Move this Free to a position in which it is evident who is executing it
@@ -2034,7 +2058,7 @@ begin
   Result := USER_START_PORT-1;
 end;
 
-function SysSocketConnect(Socket: PSocket): Boolean;
+function SysTCPSocketConnect(Socket: PSocket): Boolean;
 var
   CPUID: LongInt;
   Service: PNetworkService;
@@ -2058,7 +2082,6 @@ begin
   Socket.mode := MODE_CLIENT;
   Socket.NeedFreePort := True;
   Socket.BufferLength := 0;
-  Socket.BufferLength:=0;
   Socket.BufferReader:= Socket.Buffer;
   Service := GetCurrentThread.NetworkService;
   DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service ;
@@ -2070,6 +2093,84 @@ begin
   TcpSendPacket(TCP_SYN, Socket);
   SetSocketTimeOut(Socket,WAIT_ACK);
   Result := True;
+end;
+
+function SysVSocketConnect(Socket: PSocket): Boolean;
+var
+  CPUID: LongInt;
+  Service: PNetworkService;
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+begin
+  Result := True;
+  CPUID:= GetApicid;
+  Socket.Buffer := ToroGetMem(MAX_WINDOW);
+  if Socket.Buffer = nil then
+  begin
+    Result := False;
+    Exit;
+  end;
+  Socket.SourcePort := GetFreePort;
+  Socket.State := SCK_CONNECTING;
+  Socket.mode := MODE_CLIENT;
+  Socket.NeedFreePort := True;
+  Socket.BufferLength :=0;
+  Socket.BufferReader := Socket.Buffer;
+  // TODO: to check if this is nill
+  Service := ToroGetMem(sizeof(TNetworkService));
+  DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
+  Service.ServerSocket := Socket;
+  Service.ClientSocket := Socket;
+  Socket.Next := nil;
+  Socket.SocketType := SOCKET_STREAM;
+  Socket.BufferSender := nil;
+  Socket.BufferSenderTail := nil;
+  Socket.RemoteClose := False;
+  // TODO: to check if it is nill
+  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+  Packet.Size := sizeof(TVirtIOVSockHdr);
+  Packet.Ready := False;
+  Packet.Delete := False;
+  Packet.Next := nil;
+  VPacket := Pointer(Packet.Data);
+  VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+  VPacket.hdr.dst_cid := Socket.DestIp;
+  VPacket.hdr.src_port := Socket.SourcePort;
+  VPacket.hdr.dst_port := Socket.DestPort;
+  VPacket.hdr.flags := 0;
+  VPacket.hdr.op := VIRTIO_VSOCK_OP_REQUEST;
+  VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+  VPacket.hdr.len := 0;
+  VPacket.hdr.buf_alloc := MAX_WINDOW;
+  VPacket.hdr.fwd_cnt := Socket.BufferLength;
+  SysNetworkSend(Packet);
+  ToroFreeMem(Packet);
+  SetSocketTimeOut(Socket, WAIT_ACK);
+  while true do
+  begin
+    SysThreadActive;
+    if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
+    begin
+      ToroFreeMem(Socket.Buffer);
+      ToroFreeMem(DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]);
+      DedicateNetworks[CPUID].SocketStream[Socket.SourcePort] := nil;
+      FreePort(Socket.SourcePort);
+      Result := False;
+      Exit;
+    end
+    else if Socket.State = SCK_TRANSMITTING then
+      Exit;
+    SysThreadSwitch(True);
+  end;
+end;
+
+function SysSocketConnect(Socket: PSocket): Boolean;
+begin
+  if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_TCPIP then
+    Result := SysTCPSocketConnect(Socket)
+  else if DedicateNetworks[GetApicid].NetworkInterface.SocketType = SCK_VIRTIO then
+    Result := SysVSocketConnect(Socket);
 end;
 
 procedure SysTCPSocketClose(Socket: PSocket);

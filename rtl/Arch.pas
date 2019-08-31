@@ -29,6 +29,7 @@ interface
 
 const
   EXC_DIVBYZERO = 0;
+  EXC_NMI = 2;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;
   EXC_ILLEGALINS = 6;
@@ -1484,6 +1485,12 @@ begin
   Result := tmp;
 end;
 
+procedure EnableNMI;
+begin
+  write_portb(read_portb($70) and $7F, $70);
+  NOP;
+end;
+
 procedure ArchInit;
 var
   I: LongInt;
@@ -1511,6 +1518,7 @@ begin
   CacheManagerInit;
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
   IrqOn(2);
+  EnableNMI;
   for I := 33 to 47 do
     CaptureInt(I, @IRQ_Ignore);
   for I := 0 to 32 do

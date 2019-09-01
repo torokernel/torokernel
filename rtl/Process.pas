@@ -312,6 +312,8 @@ begin
      WriteDebug('Backtrace:\n',[]);
   {$ENDIF}
   WriteConsoleF('Backtrace:\n',[]);
+  get_caller_stackinfo(pointer(rbp_reg), addr);
+  PrintBackTraceStr(pointer(rip_reg));
   while rbp_reg <> 0 do
   begin
     get_caller_stackinfo(pointer(rbp_reg), addr);

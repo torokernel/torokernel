@@ -26,11 +26,12 @@ program HelloWorld;
  {$mode delphi}
 {$ENDIF}
 
-{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img}
+{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img -device isa-debug-exit,iobase=0xf4,iosize=0x04}
 {%RunFlags BUILD-}
 
 // only include the needed units
 uses
+  SysUtils,
   Kernel in '..\..\rtl\Kernel.pas',
   Process in '..\..\rtl\Process.pas',
   Memory in '..\..\rtl\Memory.pas',
@@ -41,6 +42,13 @@ uses
   Console in '..\..\rtl\drivers\Console.pas';
 
 begin
-  WriteConsoleF('/RHello World, I am TORO !!!\n',[]);
-  While True do hlt;
+  WriteConsoleF('/RHello World, I am TORO !!!/n\n',[]);
+  try
+    While True do hlt;
+  except
+    on E: Exception do
+    begin
+      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
+    end;
+  end;
 end.

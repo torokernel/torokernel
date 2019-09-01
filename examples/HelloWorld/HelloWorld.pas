@@ -41,14 +41,13 @@ uses
   Pci in '..\..\rtl\drivers\Pci.pas',
   Console in '..\..\rtl\drivers\Console.pas';
 
+procedure ShutdownHelloWorld;
 begin
+  // do something
+end;
+
+begin
+  ShutdownProcedure := ShutdownHelloWorld;
   WriteConsoleF('/RHello World, I am TORO !!!/n\n',[]);
-  try
-    While True do hlt;
-  except
-    on E: Exception do
-    begin
-      WriteConsoleF('Exception Message: %s\n',[PtrUInt(@E.Message)]);
-    end;
-  end;
+  While True do hlt;
 end.

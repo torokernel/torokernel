@@ -122,6 +122,7 @@ procedure SysThreadActive;
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
   CpuMxSlots: TMxSlots;
+  ShutdownProcedure: procedure;
 
 implementation
 
@@ -319,9 +320,14 @@ begin
     get_caller_stackinfo(pointer(rbp_reg), addr);
     PrintBackTraceStr(addr);
   end;
+  if @ShutdownProcedure <> nil then
+    ShutdownProcedure;
   {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
-  EnableInt;
-  raise EDivException.Create ('NMI');
+  {$IFDEF ShutdownWhenFinished}
+    ShutdownInQemu;
+  {$ELSE}
+    hlt;
+  {$ENDIF}
 end;
 
 type
@@ -1521,6 +1527,7 @@ begin
   if HasException then
     InitializeExceptions;
   InitCores;
+  ShutdownProcedure := nil;
   {$IFDEF EnableDebug}
     WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]);
   {$ENDIF}

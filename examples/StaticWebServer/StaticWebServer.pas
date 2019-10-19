@@ -255,6 +255,7 @@ begin
     SysMount('fat', 'virtioblk', 0)
   end else
   begin
+    // parameters are [ip/vsocket],[fsdriver],[blkdriver]
     // configure networking
     // TODO: compare the full virtiosocket string
     if GetKernelParam(1)[0] = 'v' then

@@ -1354,6 +1354,8 @@ var
   ServerSocket, ClientSocket: PSocket;
   Source, Dest: PByte;
   Buffer: Pointer;
+  dst_cid: DWORD;
+  dst_port: DWORD;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
   while True do
@@ -1454,11 +1456,23 @@ begin
           Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
           if (Service = nil) or (Service.ClientSocket = nil) then
           begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            dst_cid := VPacket.hdr.src_cid;
+            dst_port := VPacket.hdr.src_port;
+            ToroFreeMem(Packet);
+            Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+            Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+            Packet.Size := sizeof(TVirtIOVSockHdr);
+            Packet.Ready := False;
+            Packet.Delete := False;
+            Packet.Next := nil;
+            VPacket := Pointer(Packet.Data);
             VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.dst_cid := dst_cid;
             VPacket.hdr.src_port := LocalPort;
+            VPacket.hdr.dst_port := dst_port;
+            VPacket.hdr.flags := 0;
+            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+            VPacket.hdr.len := 0;
             SysNetworkSend(Packet);
             ToroFreeMem(Packet);
             Continue;
@@ -1474,13 +1488,21 @@ begin
               // TODO: need to check (BufferLength + hdr.len) > Buffer
               Inc(ClientSocket.BufferLength, VPacket.hdr.len);
               // update credit
+              dst_cid := VPacket.hdr.src_cid;
+              dst_port := VPacket.hdr.src_port;
+              ToroFreeMem(Packet);
+              Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+              Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+              VPacket := Packet.Data;
+              Packet.Size := sizeof(TVirtIOVSockHdr);
               VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
-              VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+              VPacket.hdr.dst_cid := dst_cid;
               VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-              VPacket.hdr.dst_port := VPacket.hdr.src_port;
+              VPacket.hdr.dst_port := dst_port;
               VPacket.hdr.src_port := LocalPort;
               VPacket.hdr.buf_alloc := MAX_WINDOW;
               VPacket.hdr.fwd_cnt := ClientSocket.BufferLength;
+              VPacket.hdr.len := 0;
               SysNetworkSend(Packet);
               Break;
             end;
@@ -1488,10 +1510,16 @@ begin
           end;
           if ClientSocket = nil then
           begin
+            dst_cid := VPacket.hdr.src_cid;
+            dst_port := VPacket.hdr.src_port;
+            ToroFreeMem(Packet);
+            Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+            Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+            VPacket := Packet.Data;
             VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
+            VPacket.hdr.dst_cid := dst_cid;
             VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
+            VPacket.hdr.dst_port := dst_port;
             VPacket.hdr.src_port := LocalPort;
             SysNetworkSend(Packet);
           end;

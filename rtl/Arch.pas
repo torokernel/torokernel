@@ -169,6 +169,8 @@ var
   LargestMonitorLine: longint;
   SmallestMonitorLine: longint;
   KernelParam: Pchar = Nil;
+  KernelParamEnd: Pchar = Nil;
+  KernelParamCount: LongInt = 0;
 
 implementation
 
@@ -1474,13 +1476,12 @@ var
   tmp: Pchar;
 begin
   tmp := KernelParam;
-  while (tmp^ <> #0) and (I > 0) do
+  while (I > 0) do
   begin
-    If tmp^ = ' ' then
-    begin
+    if tmp^ = #0 then
       Dec(I);
-    end;
-    Inc(tmp);
+    if tmp < KernelParamEnd then
+      Inc(tmp);
   end;
   Result := tmp;
 end;
@@ -1506,12 +1507,19 @@ begin
     KernelParam := Pointer(Kernel_Param);
     while p^ <> #0 do
     begin
-      KernelParam^ := p^;
+      if (p^ = ',') or (p^ = ' ') then
+      begin
+        KernelParam^ := #0;
+        Inc(KernelParamCount)
+      end
+      else
+        KernelParam^ := p^;
       Inc(KernelParam);
       Inc(p);
     end;
-    KernelParam^ := #0; 
-    KernelParam := Pointer(Kernel_Param); 
+    KernelParam^ := #0;
+    KernelParamEnd := KernelParam;
+    KernelParam := Pointer(Kernel_Param);
   end;
   RelocateIrqs;
   MemoryCounterInit;

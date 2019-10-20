@@ -36,15 +36,11 @@ uses
   Filesystem in '..\..\rtl\Filesystem.pas',
   Pci in '..\..\rtl\drivers\Pci.pas',
   // Ide in '..\..\rtl\drivers\IdeDisk.pas',
-  {$IFDEF UseVirtIOFS}
-    VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-    VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
-  {$ELSE}
-    VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-    // Ext2 in '..\..\rtl\drivers\Ext2.pas',
-    Fat in '..\..\rtl\drivers\Fat.pas',
-    VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
-  {$ENDIF}
+  VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
+  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
+  Fat in '..\..\rtl\drivers\Fat.pas',
+  VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
+  VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas';
 
@@ -73,6 +69,8 @@ var
   LocalIp: array[0..3] of Byte;
   tid: TThreadID;
   rq: PRequest;
+  fsdriver: PChar;
+  blkdriver: PChar;
 
 function GetRequest(Socket: PSocket): Boolean;
 var
@@ -249,12 +247,20 @@ begin
 end;
 
 begin
-  {$IFDEF UseVirtIOFS}
-    DedicateNetworkSocket('virtiovsocket');
-    DedicateBlockDriver('myfstoro', 0);
-    SysMount('virtiofs', 'myfstoro', 0);
-  {$ELSE}
-    If GetKernelParam(1)^ = #0 then
+  // default parameters
+  if KernelParamCount = 0 then
+  begin
+    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil);
+    DedicateBlockDriver('virtioblk', 0);
+    SysMount('fat', 'virtioblk', 0)
+  end else
+  begin
+    // parameters are [ip/vsocket],[fsdriver],[blkdriver]
+    // configure networking
+    // TODO: compare the full virtiosocket string
+    if GetKernelParam(1)[0] = 'v' then
+      DedicateNetworkSocket('virtiovsocket')
+    else If GetKernelParam(1)^ = #0 then
     begin
       DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
     end else
@@ -262,9 +268,19 @@ begin
       IPStrtoArray(GetKernelParam(1), LocalIp);
       DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
     end;
-    DedicateBlockDriver('virtioblk', 0);
-    SysMount('fat', 'virtioblk', 0);
-  {$ENDIF}
+    // configure filesystem
+    if GetKernelParam(2)^ = #0 then
+    begin
+      DedicateBlockDriver('virtioblk', 0);
+      SysMount('fat', 'virtioblk', 0);
+    end else
+    begin
+      fsdriver := GetKernelParam(2);
+      blkdriver := GetKernelParam(3);
+      DedicateBlockDriver(blkdriver, 0);
+      SysMount(fsdriver, blkdriver, 0);
+    end;
+  end;
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;

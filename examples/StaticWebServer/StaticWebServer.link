@@ -10,9 +10,11 @@ StaticWebServer.o
 ../../rtl/Arch.o
 ../../rtl/Filesystem.o
 ../../rtl/drivers/Pci.o
+../../rtl/drivers/VirtIOFS.o
+../../rtl/drivers/VirtIOVSocket.o
 ../../rtl/drivers/VirtIOBlk.o
-../../rtl/drivers/Fat.o
 ../../rtl/drivers/VirtIONet.o
+../../rtl/drivers/Fat.o
 ../../rtl/drivers/Console.o
 ../../rtl/Network.o
 ../../rtl/SysUtils.o

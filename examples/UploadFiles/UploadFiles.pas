@@ -53,20 +53,26 @@ const
   Gateway: array[0..3] of Byte  = (192, 100, 2, 1);
   DefaultLocalIP: array[0..3] of Byte  = (192, 100, 2, 100);
 
-  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
+  //HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
+  HeaderOK = 'HTTP/1.0 200'#13#10;
   ContentLen = #13#10'Content-length: ';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   HEADER_CONTENT_LENGTH = 'Content-Length: ';
   HEADER_CONTENT_BOUNDARY = 'Content-Type: application/x-www-form-urlencoded; boundary=';
+  HEADER_CONTENT_APP_URLENCODED = 'Content-Type: application/x-www-form-urlencoded'#13#10;
   HEADER_END_LINE = #13#10;
   BODY_CONTENT_DISP = 'Content-Disposition: form-data; name="';
   BODY_QUOTE = '"';
+  EMPTY = '';
+  AMPERSAND = '&';
+  EQUAL = '=';
   BODY_DOUBLE_BREAK_LINE = #13#10#13#10;
   SERVICE_TIMEOUT = 20000;
   Max_Path_Len = 200;
 
 type
+  TContentType = (ContentTypeFormUrlEncoded, ContentTypeFormUrlEncodedWithBoundary);
   PRequest = ^TRequest;
   TRequest = record
     BufferStart: pchar;
@@ -173,6 +179,8 @@ var
    CESAR_field_name_end: integer;
    CESAR_field_value_start: integer;
    CESAR_field_value_end: integer;
+   
+   CESAR_content_type: TContentType;
 begin
   Result := False;
   CESAR_finish_header := 0;
@@ -214,8 +222,29 @@ begin
   WriteConsoleF('Length of Request: %d %d %d\n', [CESAR_contentlen_pos, CESAR_contentlen_end_pos, CESAR_contentlen]);
   
   // 3) Determine the content-boundary
-  CESAR_boundary_pos := torolib_string_find(rq.BufferStart, HEADER_CONTENT_BOUNDARY, 0, rq.counter) + Length(HEADER_CONTENT_BOUNDARY);
-  CESAR_boundary_end_pos := torolib_string_find(rq.BufferStart, HEADER_END_LINE, CESAR_boundary_pos, rq.counter);
+  CESAR_boundary_pos := torolib_string_find(rq.BufferStart, HEADER_CONTENT_BOUNDARY, 0, rq.counter);
+  
+  if (CESAR_boundary_pos = -1) then
+  begin
+  //ContentTypeFormUrlEncodedWithBoundary 
+        // 3.a) There is no content-boundary
+        CESAR_boundary_pos := torolib_string_find(rq.BufferStart, HEADER_CONTENT_APP_URLENCODED, 0, rq.counter);
+        if(CESAR_boundary_pos = -1) then // 3.a.1) There is an unsupported type of request
+        begin
+            WriteConsoleF('Unsupported content-type\n', []);
+            Result:=False;
+            Exit;
+        end;
+        
+        CESAR_content_type :=ContentTypeFormUrlEncoded;
+  end
+  else
+  begin
+      CESAR_boundary_pos := CESAR_boundary_pos + Length(HEADER_CONTENT_BOUNDARY);
+      CESAR_boundary_end_pos := torolib_string_find(rq.BufferStart, HEADER_END_LINE, CESAR_boundary_pos, rq.counter);
+      
+      CESAR_content_type := ContentTypeFormUrlEncodedWithBoundary;
+  end;
   
   WriteConsoleF('Length of Boundary: %d %d\n', [CESAR_boundary_pos, CESAR_boundary_end_pos]);
   
@@ -238,40 +267,68 @@ begin
   WriteConsoleF('Finish extracting body (%d): %p\n', [i, PtrUInt(Body.BufferStart)]);
   WriteConsoleF('Finish extracting body (%d)\n', [i]);
   
-  // 5) Search occurrences of boundary
-  WriteConsoleF('Occurrence boundary %d\n', [torolib_string_find2(body.BufferStart, rq.BufferStart, 0, 44, CESAR_boundary_pos, CESAR_boundary_end_pos)]);
-  
-  CESAR_total_fields := 0;
-  i:=0;
-  CESAR_oc_boundary := 0;
-  while((i<CESAR_contentlen) and (CESAR_oc_boundary <> -1)) do
+  CESAR_field_value_end :=0 ;
+  CESAR_field_name_start := CESAR_field_value_end;
+  if (CESAR_content_type = ContentTypeFormUrlEncoded) then
   begin
-    CESAR_oc_boundary := torolib_string_find2(body.BufferStart, rq.BufferStart, CESAR_oc_boundary + 1, CESAR_contentlen, CESAR_boundary_pos, CESAR_boundary_end_pos);
-    
-    if(CESAR_oc_boundary <> -1) then
-    begin
-        Inc(CESAR_total_fields);
-    end;
+        // We have to search for equals and ampersands
+        i:=0;
+        while(i<CESAR_contentlen) do
+        begin
+            CESAR_field_name_start := CESAR_field_value_end;
+            CESAR_field_name_end := torolib_string_find(body.BufferStart, EQUAL, CESAR_field_name_start, body.counter);
+            
+            CESAR_field_value_start := CESAR_field_name_end + 1;
+            CESAR_field_value_end := torolib_string_find(body.BufferStart, AMPERSAND, CESAR_field_value_start, body.counter);
+            if(CESAR_field_value_end = -1) then
+            begin
+                i:=CESAR_contentlen;
+                CESAR_field_value_end := CESAR_contentlen;
+            end;
+                
+            WriteConsoleF('FIeld name[%d, %d) = [%d, %d)\n', [CESAR_field_name_start, CESAR_field_name_end, CESAR_field_value_start, CESAR_field_value_end]);
+            
+            Inc(i);
+        end;
   end;
   
-  i:=0;
-  CESAR_oc_boundary := 0;
-  while(i<CESAR_total_fields - 1) do
+  if (CESAR_content_type = ContentTypeFormUrlEncodedWithBoundary) then
   begin
+      // 5) Search occurrences of boundary
+      WriteConsoleF('Occurrence boundary %d\n', [torolib_string_find2(body.BufferStart, rq.BufferStart, 0, 44, CESAR_boundary_pos, CESAR_boundary_end_pos)]);
+      
+      CESAR_total_fields := 0;
+      i:=0;
+      CESAR_oc_boundary := 0;
+      while((i<CESAR_contentlen) and (CESAR_oc_boundary <> -1)) do
+      begin
         CESAR_oc_boundary := torolib_string_find2(body.BufferStart, rq.BufferStart, CESAR_oc_boundary + 1, CESAR_contentlen, CESAR_boundary_pos, CESAR_boundary_end_pos);
         
         if(CESAR_oc_boundary <> -1) then
         begin
-            CESAR_field_name_start := torolib_string_find(body.BufferStart, BODY_CONTENT_DISP, CESAR_oc_boundary, body.counter) + Length(BODY_CONTENT_DISP);
-            CESAR_field_name_end := torolib_string_find(body.BufferStart, BODY_QUOTE, CESAR_field_name_start, body.counter);
-            
-            CESAR_field_value_start := torolib_string_find(body.BufferStart, BODY_DOUBLE_BREAK_LINE, CESAR_field_name_end, body.counter) + 4; // double break line counts as 2 chars (but in toro magic
-            CESAR_field_value_end := torolib_string_find2(body.BufferStart, rq.BufferStart, CESAR_oc_boundary + 1, CESAR_contentlen, CESAR_boundary_pos, CESAR_boundary_end_pos) - 4;
-            
-            WriteConsoleF('FIeld name[%d, %d) = [%d, %d)\n', [CESAR_field_name_start, CESAR_field_name_end, CESAR_field_value_start, CESAR_field_value_end]);
+            Inc(CESAR_total_fields);
         end;
-        
-        Inc(i);
+      end;
+      
+      i:=0;
+      CESAR_oc_boundary := 0;
+      while(i<CESAR_total_fields - 1) do
+      begin
+            CESAR_oc_boundary := torolib_string_find2(body.BufferStart, rq.BufferStart, CESAR_oc_boundary + 1, CESAR_contentlen, CESAR_boundary_pos, CESAR_boundary_end_pos);
+            
+            if(CESAR_oc_boundary <> -1) then
+            begin
+                CESAR_field_name_start := torolib_string_find(body.BufferStart, BODY_CONTENT_DISP, CESAR_oc_boundary, body.counter) + Length(BODY_CONTENT_DISP);
+                CESAR_field_name_end := torolib_string_find(body.BufferStart, BODY_QUOTE, CESAR_field_name_start, body.counter);
+                
+                CESAR_field_value_start := torolib_string_find(body.BufferStart, BODY_DOUBLE_BREAK_LINE, CESAR_field_name_end, body.counter) + 4; // double break line counts as 2 chars (but in toro magic
+                CESAR_field_value_end := torolib_string_find2(body.BufferStart, rq.BufferStart, CESAR_oc_boundary + 1, CESAR_contentlen, CESAR_boundary_pos, CESAR_boundary_end_pos) - 4;
+                
+                WriteConsoleF('FIeld name[%d, %d) = [%d, %d)\n', [CESAR_field_name_start, CESAR_field_name_end, CESAR_field_value_start, CESAR_field_value_end]);
+            end;
+            
+            Inc(i);
+      end;
   end;
 
   
@@ -279,13 +336,32 @@ begin
   
 end;
 
-procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
+procedure SendStream(Socket: Psocket; Stream: Pchar);
 begin
-  If Len = 0 then
-    SysSocketSend(Socket, Stream, Length(Stream), 0)
-  else
-    SysSocketSend(Socket, Stream, Len, 0);
+  SysSocketSend(Socket, Stream, Length(Stream), 0);
 end;
+
+procedure ProcessRequest (Socket: PSocket);
+var
+  dst, tmp: ^char;
+  anssizechar: array[0..10] of char;
+  HeaderTypeOk: PChar;
+begin
+    dst := ToroGetMem(StrLen(HeaderTypeOk) + StrLen(ContentOK));
+    tmp := dst;
+    StrConcat(HeaderOk, EMPTY, dst);
+    dst := dst + StrLen(HeaderTypeOk);
+    StrConcat(dst, ContentOK, dst);
+    SendStream(Socket,tmp);
+end;
+
+//procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
+//begin
+//  If Len = 0 then
+//    SysSocketSend(Socket, Stream, Length(Stream), 0)
+//  else
+//    SysSocketSend(Socket, Stream, Len, 0);
+//end;
 
 
 
@@ -297,16 +373,17 @@ var
 begin
   while true do
   begin
-    if GetRequest(Socket) then
-    begin
+    GetRequest(Socket);
+    //begin
       rq := Socket.UserDefined;
       //entry := rq.BufferStart;
       WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
+      ProcessRequest(Socket);
       SysSocketClose(Socket);
       //ToroFreeMem(rq.BufferStart);
       //ToroFreeMem(rq);
       Exit;
-    end;
+    //end;
     //else
     //begin
     //  if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then

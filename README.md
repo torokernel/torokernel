@@ -8,12 +8,12 @@ Toro is a kernel that allows the user to dedicate a whole kernel to run a single
 
 * Support to x86-64 architecture
 * Support up to 512GB of RAM
-* Support to KVM, Xen, HyperV, VirtualBox and Qemu-Lite
+* Support to KVM, Xen, HyperV, VirtualBox and Firecraker
 * Cooperative Scheduler
 * Virtual FileSystem
 * Network Stack
 * Network drivers:
-  - Virtio-net, E1000, NE2000
+  - Virtio-socket, Virtio-net, E1000, NE2000
 * Disk drivers:
   - Virtio-blk, ATA
 * FileSystem drivers:

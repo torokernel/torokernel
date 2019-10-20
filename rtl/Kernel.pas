@@ -41,6 +41,11 @@ uses
 
 const
   MainThreadStackSize = 64*1024;
+  {$IFDEF LINUX}
+    Kernel_Head : PChar = {$I %KERNEL_HEAD%};
+  {$ELSE}
+    Kernel_Head : PChar = '';
+  {$ENDIF}
 
 procedure KernelStart;
 {$IFDEF EnableDebug}
@@ -53,7 +58,7 @@ begin
     Reboot;
   {$ENDIF}
   ConsoleInit;
-  WriteConsoleF('/c/VLoading Toro ...\n/n',[]);
+  WriteConsoleF('/c/VLoading Toro ... HEAD:%p\n/n',[PtrUInt(Kernel_Head)]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}

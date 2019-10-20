@@ -1,4 +1,5 @@
 #!/bin/bash
+export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
 app="StaticWebServer"
 applink="StaticWebServer.link"
 appbin="StaticWebServer.bin"

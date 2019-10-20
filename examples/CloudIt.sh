@@ -29,6 +29,7 @@ appbin="$app.bin";
 qemufile="qemu.args";
 compileropt="$2";
 imageformat="$4";
+export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
 
 # check parameters
 if [ "$#" -lt 1 ]; then

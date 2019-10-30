@@ -146,8 +146,6 @@ end;
 function torolib_string_toInt(s: PChar; from_: Integer; to_: Integer): Integer;
 var
     i:Integer;
-    aux: Integer;
-    j: Integer;
     
 begin
     Result := 0;
@@ -161,7 +159,7 @@ end;
 
 function GetRequest(Socket: PSocket): Boolean;
 var
-   i, Len: longint;
+   i: longint;
    buf: char;
    rq: PRequest;
    buffer: Pchar;
@@ -172,7 +170,6 @@ var
    CESAR_contentlen:Integer;
    CESAR_boundary_pos: Integer;
    CESAR_boundary_end_pos: Integer;
-   CESAR_body: PRequest;
    CESAR_total_fields : Integer;
    CESAR_oc_boundary: Integer;
    CESAR_field_name_start: integer;
@@ -344,13 +341,11 @@ end;
 procedure ProcessRequest (Socket: PSocket);
 var
   dst, tmp: ^char;
-  anssizechar: array[0..10] of char;
-  HeaderTypeOk: PChar;
 begin
-    dst := ToroGetMem(StrLen(HeaderTypeOk) + StrLen(ContentOK));
+    dst := ToroGetMem(StrLen(HeaderOk) + StrLen(ContentOK));
     tmp := dst;
     StrConcat(HeaderOk, EMPTY, dst);
-    dst := dst + StrLen(HeaderTypeOk);
+    dst := dst + StrLen(HeaderOk);
     StrConcat(dst, ContentOK, dst);
     SendStream(Socket,tmp);
 end;
@@ -366,16 +361,14 @@ end;
 
 
 function ServiceReceive(Socket: PSocket): LongInt;
-var
-  rq: PRequest;
-  entry: PChar;
-  len: LongInt;
+//var
+//  rq: PRequest;
 begin
   while true do
   begin
     GetRequest(Socket);
     //begin
-      rq := Socket.UserDefined;
+//      rq := Socket.UserDefined;
       //entry := rq.BufferStart;
       WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
       ProcessRequest(Socket);

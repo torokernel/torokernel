@@ -56,7 +56,7 @@ const
   //HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
   HeaderOK = 'HTTP/1.0 200'#13#10;
   ContentLen = #13#10'Content-length: ';
-  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
+  ContentOK = 'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   HEADER_CONTENT_LENGTH = 'Content-Length: ';
   HEADER_CONTENT_BOUNDARY = 'Content-Type: application/x-www-form-urlencoded; boundary=';

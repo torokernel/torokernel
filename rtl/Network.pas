@@ -1403,6 +1403,7 @@ begin
       Result := Socket;
       Exit;
     end;
+    Socket := Socket.Next;
   end;
 end;
 

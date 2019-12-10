@@ -1452,7 +1452,6 @@ begin
   VPacket.hdr.dst_cid := Socket.DestIp;
   VPacket.hdr.src_port := Socket.SourcePort;
   VPacket.hdr.dst_port := Socket.DestPort;
-  // This can be a problem
   VPacket.hdr.flags := 0;
   VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
   VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
@@ -1496,6 +1495,7 @@ var
   Service: PNetworkService;
   ClientSocket: PSocket;
   Source, Dest: PByte;
+  total: DWORD;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
   while True do
@@ -1535,15 +1535,17 @@ begin
         end;
       VIRTIO_VSOCK_OP_RW:
         begin
-          // TODO: this does not verify the src_cid
           ClientSocket := VSocketGetClient(VPacket.hdr.dst_port, VPacket.hdr.src_port);
           if ClientSocket <> nil then
           begin
             Source := Pointer(PtrUInt(@VPacket.data));
             Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
-            Move(Source^, Dest^, VPacket.hdr.len);
-            // TODO: need to check (BufferLength + hdr.len) > Buffer
-            Inc(ClientSocket.BufferLength, VPacket.hdr.len);
+            if  ClientSocket.BufferLength + VPacket.hdr.len > MAX_WINDOW then
+              total := MAX_WINDOW - ClientSocket.BufferLength
+            else
+              total :=  VPacket.hdr.len;
+            Move(Source^, Dest^, total);
+            Inc(ClientSocket.BufferLength, total);
             VSocketUpdateCredit(ClientSocket);
           end else
             VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);

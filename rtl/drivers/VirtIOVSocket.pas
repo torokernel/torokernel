@@ -39,6 +39,7 @@ type
 
   PByte = ^TByte;
   TByte = array[0..0] of byte;
+  PVirtIOVSocketDevice = ^TVirtIOVSocketDevice;
 
   PBufferInfo = ^TBufferInfo;
   TBufferInfo = record
@@ -244,11 +245,13 @@ begin
   Result := True;
 end;
 
-procedure VirtIOProcessTxQueue(vq: PVirtQueue);
+procedure VirtIOProcessTxQueue(Drv: PVirtIOVSocketDevice);
 var
   index, norm_index, buffer_index: Word;
   tmp: PQueueBuffer;
+  vq: PVirtQueue;
 begin
+  vq := @Drv.VirtQueues[TX_QUEUE];
   if (vq.last_used_index = vq.used.index) then
     Exit;
   index := vq.last_used_index;
@@ -272,14 +275,16 @@ type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
 
-procedure VirtIOProcessRxQueue(rx: PVirtQueue);
+procedure VirtIOProcessRxQueue(Drv: PVirtIOVSocketDevice);
 var
   Packet: PPacket;
   index, buffer_index, Len, I: dword;
   Data, P: PByteArray;
   buf: PQueueBuffer;
   bi: TBufferInfo;
+  rx: PVirtQueue;
 begin
+  rx := @Drv.VirtQueues[RX_QUEUE];
   // empty queue?
   if (rx.last_used_index = rx.used.index) then
     Exit;
@@ -313,14 +318,12 @@ begin
     Inc(rx.last_used_index);
 
     // return the buffer
-    // TODO: to define a function that does this
     bi.size := VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
     bi.buffer := Pointer(buf.address);
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy := false;
 
-    // TODO: remove the use of VirtIOVSocketDev
-    VirtIOSendBufferLegacy(VirtIOVSocketDev.Regs, RX_QUEUE, rx, @bi, 1);
+    VirtIOSendBufferLegacy(Drv.Regs, RX_QUEUE, rx, @bi, 1);
     ReadWriteBarrier;
   end;
 end;
@@ -332,8 +335,8 @@ begin
   r := read_portb(VirtIOVSocketDev.Regs + $13);
   if (r and 1 = 1) then
   begin
-    VirtIOProcessRxQueue (@VirtIOVSocketDev.VirtQueues[RX_QUEUE]);
-    VirtIOProcessTxQueue (@VirtIOVSocketDev.VirtQueues[TX_QUEUE]);
+    VirtIOProcessRxQueue (@VirtIOVSocketDev);
+    VirtIOProcessTxQueue (@VirtIOVSocketDev);
   end;
   eoi;
 end;

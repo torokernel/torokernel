@@ -488,10 +488,7 @@ begin
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, REQUEST_QUEUE);
   while Done = false do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -538,10 +535,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
 
   while Done = False do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -602,10 +596,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
 
   while Done = False do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -657,10 +648,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 5, REQUEST_QUEUE);
 
   while Done = false do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
    Exit;
@@ -719,10 +707,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
 
   while Done = false do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
    Exit;
@@ -770,10 +755,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
 
   while Done = False do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
     Exit;
@@ -816,10 +798,7 @@ begin
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
 
   while Done = False do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   If outhd.error <> 0 then
     Exit;
@@ -875,10 +854,7 @@ begin
 
   VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
   while Done = false do
-  begin
-    SysThreadSwitch;
     ReadWriteBarrier;
-  end;
 
   if outhd.error <> 0 then
    Exit;

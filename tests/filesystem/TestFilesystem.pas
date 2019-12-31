@@ -205,9 +205,12 @@ begin
 
   try
     tmp := SysCreateFile('/test');
-    WriteDebug('TestCreate-%d: PASSED\n', [test]);
+    if tmp <> 0 then
+      WriteDebug('TestCreate-%d: PASSED\n', [test])
+    else
+      WriteDebug('TestCreate-%d: FAILED\n', [test]);
   except
-    WriteDebug('TestCreate-%d: FAILED\n', [test]);
+    WriteDebug('TestCreate-%d: NOT IMPLEMENTED\n', [test]);
   end;
 
   if tmp <> 0 then

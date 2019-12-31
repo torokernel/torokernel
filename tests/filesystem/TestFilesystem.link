@@ -12,6 +12,7 @@ TestFilesystem.o
 ../../rtl/drivers/Pci.o
 ../../rtl/drivers/Fat.o
 ../../rtl/drivers/VirtIOBlk.o
+../../rtl/drivers/VirtIOFS.o
 ../../rtl/Network.o
 ../../rtl/drivers/Console.o
 ../../rtl/SysUtils.o

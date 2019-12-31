@@ -36,12 +36,9 @@ uses
   Pci in '..\..\rtl\Pci.pas',
   Network in '..\..\rtl\Network.pas',
   Console in '..\..\rtl\drivers\Console.pas',
-  {$IFDEF UseVirtIOFS}
-    VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas';
-  {$ELSE}
-    VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-    Fat in '..\..\rtl\drivers\Fat.pas';
-  {$ENDIF}
+  VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
+  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
+  Fat in '..\..\rtl\drivers\Fat.pas';
 
 const
   longname: Pchar = 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest';
@@ -54,15 +51,22 @@ var
   buf: char;
   buf2: ^char;
   tmp: THandle;
+  fsdriver: PChar;
+  blkdriver: PChar;
 
 begin
-  {$IFDEF UseVirtIOFS}
-    DedicateBlockDriver('myfstoro', 0);
-    SysMount('virtiofs', 'myfstoro', 0);
-  {$ELSE}
+  if KernelParamCount = 0 then
+  begin
     DedicateBlockDriver('virtioblk', 0);
     SysMount('fat', 'virtioblk', 0);
-  {$ENDIF}
+  end
+  else
+  begin
+    fsdriver := GetKernelParam(1);
+    blkdriver := GetKernelParam(2);
+    DedicateBlockDriver(blkdriver, 0);
+    SysMount(fsdriver, blkdriver, 0);
+  end;
   test := 0;
   if SysOpenFile('/1kfile', O_RDONLY) = 0 then
     WriteDebug('TestOpen-%d: FAILED\n', [test])
@@ -199,14 +203,12 @@ begin
 
   tmp := 0;
 
-  {$IFDEF UseVirtIOFS}
-    try
-      tmp := SysCreateFile('/test');
-      WriteDebug('TestCreate-%d: PASSED\n', [test]);
-    except
-      WriteDebug('TestCreate-%d: FAILED\n', [test]);
-    end;
-  {$ENDIF}
+  try
+    tmp := SysCreateFile('/test');
+    WriteDebug('TestCreate-%d: PASSED\n', [test]);
+  except
+    WriteDebug('TestCreate-%d: FAILED\n', [test]);
+  end;
 
   if tmp <> 0 then
   begin

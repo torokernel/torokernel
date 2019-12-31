@@ -1,4 +1,4 @@
-# Toro Kernel [build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
+# Toro Kernel ![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
 
 ## Introduction
 

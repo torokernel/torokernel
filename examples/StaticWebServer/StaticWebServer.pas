@@ -55,6 +55,7 @@ const
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 20000;
   Max_Path_Len = 200;
+  SERVICE_BACKLOG = 100;
 
 type
   PRequest = ^TRequest;
@@ -284,7 +285,7 @@ begin
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
-  SysSocketListen(HttpServer, 50);
+  SysSocketListen(HttpServer, SERVICE_BACKLOG);
   WriteConsoleF('\t Http Server: listening at %d ..\n',[HttpServer.Sourceport]);
 
   while true do

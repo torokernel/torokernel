@@ -301,8 +301,8 @@ function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
 var
   bh: PBufferHead;
 begin
-  bh := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
   Result := nil;
+  bh := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
   if bh <> nil then
   begin
     Inc(bh.Count);
@@ -324,14 +324,10 @@ begin
   begin
     bh := FileBlock.BufferCache.FreeBlocksCache;
     if bh = nil then
-    begin
       Exit;
-    end;
     bh := bh.Prev;
     if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data) = 0 then
-    begin
       Exit;
-    end;
     bh.Count := 1;
     bh.Block := block;
     bh.Dirty := False;
@@ -342,9 +338,7 @@ begin
   end;
   bh := ToroGetMem(SizeOf(TBufferHead));
   if bh = nil then
-  begin
     Exit;
-  end;
   bh.data := ToroGetMem(Size);
   if bh.data = nil then
   begin
@@ -439,6 +433,7 @@ var
   Storage: PStorage;
   Ino: PInode;
 begin
+  Result := nil;
   Storage := @Storages[GetApicID];
   Ino := FindInode(Storage.FileSystemMounted.InodeCache.InodeBuffer,Inode);
   if Ino <> nil then
@@ -463,7 +458,6 @@ begin
     Ino := Storage.FilesystemMounted.InodeCache.FreeInodesCache;
     if Ino = nil then
     begin
-      Result := nil;
       {$IFDEF DebugFS} WriteDebug('GetInode: Inode Cache is Busy!\n', []); {$ENDIF}
       Exit;
     end;
@@ -474,7 +468,6 @@ begin
     Ino.SuperBlock.FileSystemDriver.ReadInode(Ino);
     if Ino.Dirty then
     begin
-      Result := nil;
       {$IFDEF DebugFS} WriteDebug('GetInode: Error reading Inode: %d\n', [Inode]); {$ENDIF}
       Exit;
     end;
@@ -487,10 +480,7 @@ begin
   end;
   Ino := ToroGetMem(SizeOf(TInode));
   if Ino = nil then
-  begin
-    Result := nil;
     Exit;
-  end;
   Ino.ino := Inode;
   Ino.Dirty := False;
   Ino.SuperBlock := Storage.FileSystemMounted;
@@ -499,13 +489,12 @@ begin
   if Ino.Dirty then
   begin
     ToroFreeMem(Ino);
-    Result := nil;
     {$IFDEF DebugFS} WriteDebug('GetInode: Error reading Inode: %d\n', [Inode]); {$ENDIF}
     Exit;
   end;
   AddInode(Storage.FilesystemMounted.InodeCache.InodeBuffer, Ino);
   Dec(Storage.FilesystemMounted.InodeCache.InodesInCache);
-  Result:= Ino;
+  Result := Ino;
   {$IFDEF DebugFS} WriteDebug('GetInode: allocating new Inode: %d in Inode-Cache\n', [Ino.ino]); {$ENDIF}
 end;
 
@@ -598,12 +587,12 @@ var
   Name: array[0..254] of Char;
   ino: PInode;
 begin
+  Result := nil;
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   {$IFDEF DebugFS} WriteDebug('NameI: Path: %p, Inode Base: %d, Count: %d\n', [PtrUInt(Path), Base.Ino, Base.Count]); {$ENDIF}
   Inc(Base.Count);
   Inc(Path);
   count := 0;
-  Result := nil;
   Name[0] := #0;
   while PtrUint(Path^) <> 0 do
   begin
@@ -651,11 +640,11 @@ var
   ino: PInode;
   {$IFDEF DebugFS}SPath: PChar;{$ENDIF}
 begin
+  Result := 0;
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   Inc(Base.Count);
   Inc(Path);
   Count := 0;
-  Result := 0;
   Name[0] := #0;
   {$IFDEF DebugFS}
     SPath := Path;
@@ -721,6 +710,7 @@ var
   ino: PInode;
   SPath: PChar;
 begin
+  Result := 0;
   Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
   Inc(Base.Count);
   SPath := Path;
@@ -729,7 +719,6 @@ begin
   {$ENDIF}
   Inc(Path);
   Count := 0;
-  Result := 0;
   Name[0] := #0;
   while PtrUint(Path^) <> 0 do
   begin
@@ -791,10 +780,10 @@ var
   FileRegular: PFileRegular;
   Ino: PInode;
 begin
+  Result := 0;
   FileRegular := ToroGetMem(SizeOf(TFileRegular));
   if FileRegular = nil then
     Exit;
-  Result := 0;
   {$IFDEF DebugFS} WriteDebug('SysOpenFile: opening path: %p\n', [PtrUInt(Path)]); {$ENDIF}
   Ino:= NameI(Path);
   if Ino=nil then
@@ -816,12 +805,11 @@ function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 var
   FileRegular: PFileRegular;
 begin
+  Result := 0;
   FileRegular := PFileRegular(FileHandle);
   if FileRegular.Inode.Mode = INODE_DIR then
-  begin
-    Result := 0;
-    Exit;
-  end else if Whence = SeekSet then
+    Exit
+  else if Whence = SeekSet then
     FileRegular.FilePos := Offset
   else if Whence = SeekCur then
     FileRegular.FilePos := FileRegular.FilePos+Offset
@@ -834,10 +822,11 @@ function SysReadFile(FileHandle: THandle; Count: LongInt; Buffer: Pointer): Long
 var
   FileRegular: PFileRegular;
 begin
+  Result := 0;
   FileRegular := PFileRegular(FileHandle);
   {$IFDEF DebugFS} WriteDebug('SysReadFile: File: %d, Count: %d, FilePos: %d\n', [PtrUInt(FileHandle), Count, FileRegular.FilePos]); {$ENDIF}
   if FileRegular.Inode.Mode = INODE_DIR then
-    Result := 0
+    Exit
   else
     Result := FileRegular.Inode.SuperBlock.FileSystemDriver.ReadFile(FileRegular, Count, Buffer);
   {$IFDEF DebugFS} WriteDebug('SysReadFile: %d bytes read, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}
@@ -847,12 +836,10 @@ function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
 var
   INode: PInode;
 begin
+  Result := 0;
   INode := NameI(Path);
   if INode = nil then
-  begin
-    Result := 0;
     Exit;
-  end;
   Buffer^ := INode^;
   PutInode(INode);
   Result := 1;
@@ -862,9 +849,10 @@ function SysWriteFile(FileHandle: THandle; Count: LongInt; Buffer: Pointer): Lon
 var
   FileRegular: PFileRegular;
 begin
+  Result := 0;
   FileRegular := PFileRegular(FileHandle);
   if FileRegular.Inode.Mode = INODE_DIR then
-    Result := 0
+    Exit
   else
     Result := FileRegular.Inode.SuperBlock.FileSystemDriver.WriteFile(FileRegular, Count, Buffer);
   {$IFDEF DebugFS} WriteDebug('SysWriteFile: %d bytes written, FilePos: %d\n', [Result, FileRegular.FilePos]); {$ENDIF}

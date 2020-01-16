@@ -1345,17 +1345,157 @@ begin
   RestoreInt;
 end;
 
+procedure VSocketReset(DstCID, DstPort, LocalPort: DWORD);
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+begin
+  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+  Packet.Size := sizeof(TVirtIOVSockHdr);
+  Packet.Ready := False;
+  Packet.Delete := False;
+  Packet.Next := nil;
+  VPacket := Pointer(Packet.Data);
+  VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+  VPacket.hdr.dst_cid := DstCID;
+  VPacket.hdr.src_port := LocalPort;
+  VPacket.hdr.dst_port := DstPort;
+  VPacket.hdr.flags := 0;
+  VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+  VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
+  VPacket.hdr.len := 0;
+  SysNetworkSend(Packet);
+  ToroFreeMem(Packet);
+end;
+
+function VSocketValidateIncomingConnection(tp, LocalPort: DWORD): PNetworkService;
+var
+  Service: PNetworkService;
+  ServerSocket: PSocket;
+begin
+  Result := nil;
+  if tp <> VIRTIO_VSOCK_TYPE_STREAM then
+    Exit;
+  Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+  if (Service = nil) or (Service.ServerSocket = nil) then
+    Exit;
+  ServerSocket := Service.ServerSocket;
+  if ServerSocket.ConnectionsQueueCount = ServerSocket.ConnectionsQueueLen then
+    Exit;
+  Result := Service;
+end;
+
+function VSocketGetClient(LocalPort, RemotePort: DWORD): PSocket;
+var
+  Service: PNetworkService;
+  Socket: PSocket;
+begin
+  Result := nil;
+  Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+  if (Service = nil) or (Service.ClientSocket = nil) then
+    Exit;
+  Socket := Service.ClientSocket;
+  while Socket <> nil do
+  begin
+    if Socket.DestPort = RemotePort then
+    begin
+      Result := Socket;
+      Exit;
+    end;
+    Socket := Socket.Next;
+  end;
+end;
+
+function VSocketInit(): PSocket;
+var
+  ClientSocket: PSocket;
+  Buffer: Pointer;
+begin
+  Result := nil;
+  ClientSocket := ToroGetMem(SizeOf(TSocket));
+  if ClientSocket = nil then
+    Exit;
+  Buffer := ToroGetMem(MAX_WINDOW);
+  if Buffer = nil then
+  begin
+    ToroFreeMem(ClientSocket);
+    Exit;
+  end;
+  ClientSocket.State := SCK_TRANSMITTING;
+  ClientSocket.BufferLength := 0;
+  ClientSocket.Buffer := Buffer;
+  ClientSocket.BufferReader := ClientSocket.Buffer;
+  ClientSocket.SocketType := SOCKET_STREAM;
+  ClientSocket.DispatcherEvent := DISP_ACCEPT;
+  ClientSocket.Mode := MODE_CLIENT;
+  ClientSocket.BufferSender := nil;
+  ClientSocket.BufferSenderTail := nil;
+  ClientSocket.RemoteClose := False;
+  ClientSocket.NeedFreePort := False;
+  Result := ClientSocket;
+end;
+
+procedure VSocketResponse(Socket: PSocket);
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+begin
+  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+  Packet.Size := sizeof(TVirtIOVSockHdr);
+  Packet.Ready := False;
+  Packet.Delete := False;
+  Packet.Next := nil;
+  VPacket := Pointer(Packet.Data);
+  VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+  VPacket.hdr.dst_cid := Socket.DestIp;
+  VPacket.hdr.src_port := Socket.SourcePort;
+  VPacket.hdr.dst_port := Socket.DestPort;
+  VPacket.hdr.flags := 0;
+  VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
+  VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+  VPacket.hdr.len := 0;
+  VPacket.hdr.buf_alloc := MAX_WINDOW;
+  VPacket.hdr.fwd_cnt := 0;
+  SysNetworkSend(Packet);
+  ToroFreeMem(Packet);
+end;
+
+procedure VSocketUpdateCredit(Socket: PSocket);
+var
+  Packet: PPacket;
+  VPacket: PVirtIOVSocketPacket;
+begin
+  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
+  Packet.Size := sizeof(TVirtIOVSockHdr);
+  Packet.Ready := False;
+  Packet.Delete := False;
+  Packet.Next := nil;
+  VPacket := Pointer(Packet.Data);
+  VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
+  VPacket.hdr.dst_cid := Socket.DestIP;
+  VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
+  VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
+  VPacket.hdr.src_port := Socket.SourcePort;
+  VPacket.hdr.dst_port := Socket.DestPort;
+  VPacket.hdr.buf_alloc := MAX_WINDOW;
+  VPacket.hdr.fwd_cnt := Socket.BufferLength;
+  VPacket.hdr.len := 0;
+  VPacket.hdr.flags := 0;
+  SysNetworkSend(Packet);
+  ToroFreeMem(Packet);
+end;
+
 function ProcessSocketPacket(Param: Pointer): PtrUInt;
 var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
-  LocalPort: DWORD;
   Service: PNetworkService;
-  ServerSocket, ClientSocket: PSocket;
+  ClientSocket: PSocket;
   Source, Dest: PByte;
-  Buffer: Pointer;
-  dst_cid: DWORD;
-  dst_port: DWORD;
+  total: DWORD;
 begin
   {$IFDEF FPC} Result := 0; {$ENDIF}
   while True do
@@ -1371,301 +1511,93 @@ begin
     case VPacket.hdr.op of
       VIRTIO_VSOCK_OP_REQUEST:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          if VPacket.hdr.tp <> VIRTIO_VSOCK_TYPE_STREAM then
+          Service := VSocketValidateIncomingConnection(VPacket.hdr.tp, VPacket.hdr.dst_port);
+          if Service = nil then
+            VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port)
+          else
           begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
+            ClientSocket := VSocketInit();
+            if ClientSocket <> nil then
+            begin
+              Inc(Service.ServerSocket.ConnectionsQueueCount);
+              ClientSocket.Next := Service.ClientSocket;
+              Service.ClientSocket := ClientSocket;
+              ClientSocket.SourcePort := VPacket.hdr.dst_port;
+              ClientSocket.DestPort := VPacket.hdr.src_port;
+              ClientSocket.DestIp := VPacket.hdr.src_cid;
+              ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
+              ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+              ClientSocket.Blocking := Service.ServerSocket.Blocking;
+              VSocketResponse(ClientSocket);
+            end else
+              VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
           end;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-          if (Service = nil) or (Service.ServerSocket = nil) then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ServerSocket := Service.ServerSocket;
-          if ServerSocket.ConnectionsQueueCount = ServerSocket.ConnectionsQueueLen then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end else
-             Inc(ServerSocket.ConnectionsQueueCount);
-          ClientSocket := ToroGetMem(SizeOf(TSocket));
-          Buffer := ToroGetMem(MAX_WINDOW);
-          if (Buffer = nil) or (ClientSocket = nil) then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ClientSocket.State := SCK_TRANSMITTING;
-          ClientSocket.BufferLength := 0;
-          ClientSocket.Buffer := Buffer;
-          ClientSocket.BufferReader := ClientSocket.Buffer;
-          ClientSocket.Next := Service.ClientSocket;
-          Service.ClientSocket := ClientSocket;
-          ClientSocket.SocketType := SOCKET_STREAM;
-          ClientSocket.DispatcherEvent := DISP_ACCEPT;
-          ClientSocket.Mode := MODE_CLIENT;
-          ClientSocket.SourcePort := LocalPort;
-          ClientSocket.DestPort := VPacket.hdr.src_port;
-          ClientSocket.DestIp := VPacket.hdr.src_cid;
-          ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
-          ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
-          ClientSocket.BufferSender := nil;
-          ClientSocket.BufferSenderTail := nil;
-          ClientSocket.RemoteClose := False;
-          ClientSocket.Blocking := ServerSocket.Blocking;
-          ClientSocket.NeedFreePort := False;
-
-          VPacket.hdr.op := VIRTIO_VSOCK_OP_RESPONSE;
-          VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-          VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-          VPacket.hdr.dst_port := VPacket.hdr.src_port;
-          VPacket.hdr.src_port := LocalPort;
-          VPacket.hdr.buf_alloc := MAX_WINDOW;
-          VPacket.hdr.fwd_cnt := 0;
-          SysNetworkSend(Packet);
         end;
       VIRTIO_VSOCK_OP_RW:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-          if (Service = nil) or (Service.ClientSocket = nil) then
+          ClientSocket := VSocketGetClient(VPacket.hdr.dst_port, VPacket.hdr.src_port);
+          if ClientSocket <> nil then
           begin
-            dst_cid := VPacket.hdr.src_cid;
-            dst_port := VPacket.hdr.src_port;
-            ToroFreeMem(Packet);
-            Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-            Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-            Packet.Size := sizeof(TVirtIOVSockHdr);
-            Packet.Ready := False;
-            Packet.Delete := False;
-            Packet.Next := nil;
-            VPacket := Pointer(Packet.Data);
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_cid := dst_cid;
-            VPacket.hdr.src_port := LocalPort;
-            VPacket.hdr.dst_port := dst_port;
-            VPacket.hdr.flags := 0;
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.len := 0;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ClientSocket := Service.ClientSocket;
-          while ClientSocket <> nil do
-          begin
-            if ClientSocket.DestPort = VPacket.hdr.src_port then
-            begin
-              Source := Pointer(PtrUInt(@VPacket.data));
-              Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
-              Move(Source^, Dest^, VPacket.hdr.len);
-              // TODO: need to check (BufferLength + hdr.len) > Buffer
-              Inc(ClientSocket.BufferLength, VPacket.hdr.len);
-              // update credit
-              dst_cid := VPacket.hdr.src_cid;
-              dst_port := VPacket.hdr.src_port;
-              ToroFreeMem(Packet);
-              Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-              Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-              VPacket := Packet.Data;
-              Packet.Size := sizeof(TVirtIOVSockHdr);
-              VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
-              VPacket.hdr.dst_cid := dst_cid;
-              VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-              VPacket.hdr.dst_port := dst_port;
-              VPacket.hdr.src_port := LocalPort;
-              VPacket.hdr.buf_alloc := MAX_WINDOW;
-              VPacket.hdr.fwd_cnt := ClientSocket.BufferLength;
-              VPacket.hdr.len := 0;
-              SysNetworkSend(Packet);
-              Break;
-            end;
-            ClientSocket := ClientSocket.Next;
-          end;
-          if ClientSocket = nil then
-          begin
-            dst_cid := VPacket.hdr.src_cid;
-            dst_port := VPacket.hdr.src_port;
-            ToroFreeMem(Packet);
-            Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-            Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-            VPacket := Packet.Data;
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := dst_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := dst_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-          end;
+            Source := Pointer(PtrUInt(@VPacket.data));
+            Dest := Pointer(PtrUInt(ClientSocket.Buffer)+ClientSocket.BufferLength);
+            if  ClientSocket.BufferLength + VPacket.hdr.len > MAX_WINDOW then
+              total := MAX_WINDOW - ClientSocket.BufferLength
+            else
+              total :=  VPacket.hdr.len;
+            Move(Source^, Dest^, total);
+            Inc(ClientSocket.BufferLength, total);
+            VSocketUpdateCredit(ClientSocket);
+          end else
+            VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
         end;
       VIRTIO_VSOCK_OP_SHUTDOWN:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-          if (Service = nil) or (Service.ClientSocket = nil) then
+          ClientSocket := VSocketGetClient(VPacket.hdr.dst_port, VPacket.hdr.src_port);
+          if ClientSocket <> nil then
           begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ClientSocket := Service.ClientSocket;
-          while ClientSocket <> nil do
-          begin
-            if ClientSocket.DestPort = VPacket.hdr.src_port then
+            If ClientSocket.State = SCK_TRANSMITTING then
             begin
-              If ClientSocket.State = SCK_TRANSMITTING then
-              begin
-                ClientSocket.State := SCK_LOCALCLOSING;
-                VPacket.hdr.op :=  VIRTIO_VSOCK_OP_RST;
-                VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-                VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-                VPacket.hdr.dst_port := VPacket.hdr.src_port;
-                VPacket.hdr.src_port := LocalPort;
-                SysNetworkSend(Packet);
-              end;
-              Break;
+              ClientSocket.State := SCK_LOCALCLOSING;
+              VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
             end;
-            ClientSocket := ClientSocket.Next;
-          end;
-          if ClientSocket = nil then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-          end;
+          end else
+            VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
         end;
       VIRTIO_VSOCK_OP_CREDIT_UPDATE:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-          if (Service = nil) or (Service.ClientSocket = nil) then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ClientSocket := Service.ClientSocket;
-          while ClientSocket <> nil do
-          begin
-            if ClientSocket.DestPort = VPacket.hdr.src_port then
-            begin
-              ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
-              Break;
-            end;
-            ClientSocket := ClientSocket.Next;
-          end;
-          if ClientSocket = nil then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-          end;
+          ClientSocket := VSocketGetClient(VPacket.hdr.dst_port, VPacket.hdr.src_port);
+          if ClientSocket <> nil then
+            ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt
+          else
+            VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
         end;
       VIRTIO_VSOCK_OP_RST:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
-          if (Service = nil) or (Service.ClientSocket = nil) then
+          ClientSocket := VSocketGetClient(VPacket.hdr.dst_port, VPacket.hdr.src_port);
+          if ClientSocket <> nil then
           begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
-          end;
-          ClientSocket := Service.ClientSocket;
-          while ClientSocket <> nil do
-          begin
-            if ClientSocket.DestPort = VPacket.hdr.src_port then
-            begin
-              If ClientSocket.State = SCK_PEER_DISCONNECTED then
-              begin
-                FreeSocket(ClientSocket);
-              end else if ClientSocket.State = SCK_CONNECTING then
-              begin
-                ClientSocket.State := SCK_BLOCKED;
-              end;
-              Break;
-            end;
-            ClientSocket := ClientSocket.Next;
-          end;
-          if ClientSocket = nil then
-          begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-          end;
+            If ClientSocket.State = SCK_PEER_DISCONNECTED then
+              FreeSocket(ClientSocket)
+            else if ClientSocket.State = SCK_CONNECTING then
+              ClientSocket.State := SCK_BLOCKED;
+          end else
+              VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
         end;
       VIRTIO_VSOCK_OP_RESPONSE:
         begin
-          LocalPort := VPacket.hdr.dst_port;
-          Service := DedicateNetworks[GetApicid].SocketStream[LocalPort];
+          Service := DedicateNetworks[GetApicid].SocketStream[VPacket.hdr.dst_port];
           if Service = nil then
           begin
-            VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
-            VPacket.hdr.dst_cid := VPacket.hdr.src_cid;
-            VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
-            VPacket.hdr.dst_port := VPacket.hdr.src_port;
-            VPacket.hdr.src_port := LocalPort;
-            SysNetworkSend(Packet);
-            ToroFreeMem(Packet);
-            Continue;
+            VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
+          end else
+          begin
+            ClientSocket := Service.ClientSocket;
+            ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
+            ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
+            ClientSocket.State := SCK_TRANSMITTING;
           end;
-          ClientSocket := Service.ClientSocket;
-          ClientSocket.RemoteWinLen := VPacket.hdr.buf_alloc;
-          ClientSocket.RemoteWinCount := VPacket.hdr.fwd_cnt;
-          ClientSocket.State := SCK_TRANSMITTING;
         end;
     end;
-    // TODO: Move this Free to a position in which it is evident who is executing it
     ToroFreeMem(Packet);
   end;
 end;

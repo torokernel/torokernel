@@ -51,3 +51,5 @@ GPLv3
 [3] Matias Vara. Speeding Up the Booting Time of a Toro Appliance. FOSDEM 2019.
 
 [4] Matias Vara. Developing and Deploying Microservices with Toro Unikernel. Open Source Summit Europe 2019.
+
+[5] Matias Vara. Leveraging Virtio-fs and Virtio-vsocket in Toro Unikernel. DevConfCZ 2019.

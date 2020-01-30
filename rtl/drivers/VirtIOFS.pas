@@ -147,7 +147,7 @@ type
     Length: DWORD;
   end;
 
-  FuseInHeader = packed record
+  TFuseInHeader = packed record
     Len: DWORD;
     Opcode: DWORD;
     Unique: QWord;
@@ -158,20 +158,20 @@ type
     Padding: DWORD;
   end;
 
-  FuseOutHeader = packed record
+  TFuseOutHeader = packed record
     Len: DWORD;
     Error: DWORD;
     Unique: QWord;
   end;
 
-  FuseInitIn = packed record
+  TFuseInitIn = packed record
     Major: DWORD;
     Minor: DWORD;
     MaxReadahead: DWORD;
     Flags: DWORD;
   end;
 
-  FuseInitOut = packed record
+  TFuseInitOut = packed record
     Major: DWORD;
     Minor: DWORD;
     MaxReadahead: DWORD;
@@ -185,13 +185,13 @@ type
     Unused: array[0..7] of DWORD;
   end;
 
-  FuseGetAttrIn = packed record
+  TFuseGetAttrIn = packed record
     GetattrFlags: DWORD;
     Dummy: DWORD;
     Fh: QWORD;
   end;
 
-  FuseAttr = packed record
+  TFuseAttr = packed record
     Ino: QWORD;
     Size: QWORD;
     Blocks: QWORD;
@@ -210,35 +210,35 @@ type
     Padding: DWORD;
   end;
 
-  FuseGetAttrOut = packed record
+  TFuseGetAttrOut = packed record
     AttrValid: QWORD;
     AttrValid_nsec: DWORD;
     Dummy: DWORD;
-    Attr: FuseAttr;
+    Attr: TFuseAttr;
   end;
 
-  FuseEntryOut = packed record
+  TFuseEntryOut = packed record
     Nodeid: QWORD;
     Generation: QWORD;
     EntryValid: QWORD;
     AttrValid: QWORD;
     EntryValid_nsec: DWORD;
     AttrValid_nsec: DWORD;
-    Attr: FuseAttr;
+    Attr: TFuseAttr;
   end;
 
-  FuseOpenIn = packed record
+  TFuseOpenIn = packed record
     Flags: DWORD;
     Unused: DWORD;
   end;
 
-  FuseOpenOut = packed record
+  TFuseOpenOut = packed record
     Fh: QWORD;
     OpenFlags: DWORD;
     Padding: DWORD;
   end;
 
-  FuseReadIn = packed record
+  TFuseReadIn = packed record
     Fh: QWORD;
     Offset: QWORD;
     Size: DWORD;
@@ -248,21 +248,21 @@ type
     Padding: DWORD;
   end;
 
-  FuseReleaseIn = packed record
+  TFuseReleaseIn = packed record
     Fh: QWORD;
     Flags: DWORD;
     ReleaseFlags: DWORD;
     LockOwner: QWORD;
   end;
 
-  FuseMknodIn = packed record
+  TFuseMknodIn = packed record
     Mode: DWORD;
     Rdev: DWORD;
     Umask: DWORD;
     Padding: DWORD;
   end;
 
-  FuseWriteIn = packed record
+  TFuseWriteIn = packed record
     fh: QWORD;
     offset: QWORD;
     size: DWORD;
@@ -272,7 +272,7 @@ type
     padding: DWORD;
   end;
 
-  FuseWriteOut = packed record
+  TFuseWriteOut = packed record
     size: DWORD;
     padding: DWORD;
   end;
@@ -416,12 +416,12 @@ begin
   Result := True;
 end;
 
-procedure VirtIOSendBuffer(vq: PVirtQueue; bi:PBufferInfo; count: QWord; QueueIdx: WORD);
+procedure VirtIOSendBuffer(vq: PVirtQueue; BufferInfo:PBufferInfo; count: QWord; QueueIdx: WORD);
 var
   index, buffer_index, NextBuffer_index: word;
   b: PBufferInfo;
   i: LongInt;
-  tmp: PQueueBuffer;
+  QueueBuffer: PQueueBuffer;
 begin
   index := vq.available.index mod vq.QueueSize;
   buffer_index := vq.NextBuffer;
@@ -429,14 +429,14 @@ begin
   for i := 0 to (count-1) do
   begin
     NextBuffer_index:= (buffer_index +1) mod vq.QueueSize;
-    b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
-    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    tmp.flags := b.flags;
-    tmp.next := NextBuffer_index;
-    tmp.length := b.size;
+    b := Pointer(PtrUInt(BufferInfo) + i * sizeof(TBufferInfo));
+    QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+    QueueBuffer.flags := b.flags;
+    QueueBuffer.next := NextBuffer_index;
+    QueueBuffer.length := b.size;
     if (i <> (count-1)) then
-        tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
-    tmp.address:= PtrUInt(b.buffer);
+        QueueBuffer.flags := QueueBuffer.flags or VIRTIO_DESC_FLAG_NEXT;
+    QueueBuffer.address:= PtrUInt(b.buffer);
     buffer_index := NextBuffer_index;
   end;
   ReadWriteBarrier;
@@ -458,39 +458,39 @@ end;
 
 function VirtioFSCloseFile(FileDesc: PFileRegular): LongInt;
 var
-  outhd: FuseOutHeader;
-  inhd: FuseInHeader;
-  releasein: FuseReleaseIn;
-  bi: array[0..2] of TBufferInfo;
+  OutHeader: TFuseOutHeader;
+  InHeader: TFuseInHeader;
+  ReleaseIn: TFuseReleaseIn;
+  BufferInfo: array[0..2] of TBufferInfo;
   Done: Boolean;
 begin
   Result := 0;
 
-  inhd.opcode := FUSE_RELEASE;
-  inhd.len := sizeof(inhd) + sizeof(releasein);
+  InHeader.opcode := FUSE_RELEASE;
+  InHeader.len := sizeof(InHeader) + sizeof(ReleaseIn);
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.nodeid := FileDesc.INode.ino;
-  inhd.uid := ROOT_UID;
-  releasein.fh := FileDesc.Opaque;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.nodeid := FileDesc.INode.ino;
+  InHeader.uid := ROOT_UID;
+  ReleaseIn.fh := FileDesc.Opaque;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @releasein;
-  bi[1].size := sizeof(releasein);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @ReleaseIn;
+  BufferInfo[1].size := sizeof(ReleaseIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 3, REQUEST_QUEUE);
-  while Done = false do
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 3, REQUEST_QUEUE);
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
     Exit;
 
   Result := 1;
@@ -498,46 +498,46 @@ end;
 
 function VirtioFSOpenFile(FileDesc: PFileRegular; Flags: Longint): LongInt;
 var
-  outhd: FuseOutHeader;
-  inhd: FuseInHeader;
-  openin: FuseOpenIn;
-  openout: FuseOpenOut;
-  bi: array[0..3] of TBufferInfo;
+  OutHeader: TFuseOutHeader;
+  InHeader: TFuseInHeader;
+  OpenIn: TFuseOpenIn;
+  OpenOut: TFuseOpenOut;
+  BufferInfo: array[0..3] of TBufferInfo;
   Done: Boolean;
 begin
   Result := 0;
 
-  inhd.opcode := FUSE_OPEN;
-  inhd.len := sizeof(inhd) + sizeof(openin);
-  inhd.nodeid := FileDesc.Inode.ino;
+  InHeader.opcode := FUSE_OPEN;
+  InHeader.len := sizeof(InHeader) + sizeof(OpenIn);
+  InHeader.nodeid := FileDesc.Inode.ino;
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.uid := ROOT_UID;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.uid := ROOT_UID;
 
-  openin.flags := Flags;
+  OpenIn.flags := Flags;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @openin;
-  bi[1].size := sizeof(openin);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @OpenIn;
+  BufferInfo[1].size := sizeof(OpenIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[3].buffer := @openout;
-  bi[3].size := sizeof(openout);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @OpenOut;
+  BufferInfo[3].size := sizeof(OpenOut);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
 
-  while Done = False do
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
     Exit;
 
   FileDesc.Opaque := openout.fh;
@@ -555,50 +555,50 @@ const
 function VirtIOFSCreateInode(Ino: PInode; Name: PXChar): PInode;
 var
   Len: LongInt;
-  mknodIn: FuseMknodIn;
-  bi: array[0..3] of TBufferInfo;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
+  MknodIn: TFuseMknodIn;
+  BufferInfo: array[0..3] of TBufferInfo;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
   Done : Boolean;
 begin
   Result := nil;
 
   Len := strlen(name) + 1;
-  inhd.opcode := FUSE_MKNOD;
+  InHeader.opcode := FUSE_MKNOD;
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.len := sizeof(inhd) + sizeof(mknodIn) + Len ;
-  inhd.nodeid := Ino.ino;
-  inhd.uid := ROOT_UID;
-  outhd.error := 0;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.len := sizeof(InHeader) + sizeof(MknodIn) + Len ;
+  InHeader.nodeid := Ino.ino;
+  InHeader.uid := ROOT_UID;
+  OutHeader.error := 0;
 
   // TODO: Mode must be a parameter
-  mknodIn.mode := S_Ifreg or Irusr or Iwusr or Irgrp or Iroth;
-  mknodIn.rdev := 0;
-  mknodIn.umask := 0;
+  MknodIn.mode := S_Ifreg or Irusr or Iwusr or Irgrp or Iroth;
+  MknodIn.rdev := 0;
+  MknodIn.umask := 0;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @mknodIn;
-  bi[1].size := sizeof(mknodIn);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @MknodIn;
+  BufferInfo[1].size := sizeof(MknodIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := Pointer(Name);
-  bi[2].size := Len;
-  bi[2].flags := 0;
+  BufferInfo[2].buffer := Pointer(Name);
+  BufferInfo[2].size := Len;
+  BufferInfo[2].flags := 0;
 
-  bi[3].buffer := @outhd;
-  bi[3].size := sizeof(outhd);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @OutHeader;
+  BufferInfo[3].size := sizeof(OutHeader);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
 
-  while Done = False do
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
     Exit;
 
   Result := VirtioFSLookUpInode(Ino, Name);
@@ -606,51 +606,51 @@ end;
 
 function VirtIOFSWriteFile(FileDesc: PFileRegular; Count: Longint; Buffer: Pointer): longint;
 var
-  bi: array[0..4] of TBufferInfo;
-  writein: FuseWriteIn;
-  writeout: FuseWriteOut;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
+  BufferInfo: array[0..4] of TBufferInfo;
+  WriteIn: TFuseWriteIn;
+  WriteOut: TFuseWriteOut;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
   Done: Boolean;
 begin
   Result := 0;
-  inhd.opcode := FUSE_WRITE;
-  inhd.len := sizeof(inhd) + sizeof(writein) + sizeof(Pointer);
+  InHeader.opcode := FUSE_WRITE;
+  InHeader.len := sizeof(InHeader) + sizeof(WriteIn) + sizeof(Pointer);
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.nodeid := FileDesc.Inode.ino;
-  inhd.uid := ROOT_UID;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.nodeid := FileDesc.Inode.ino;
+  InHeader.uid := ROOT_UID;
 
-  writein.fh := FileDesc.Opaque;
-  writein.size := Count;
-  writein.offset := FileDesc.FilePos;
+  WriteIn.fh := FileDesc.Opaque;
+  WriteIn.size := Count;
+  WriteIn.offset := FileDesc.FilePos;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @writein;
-  bi[1].size := sizeof(writein);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @WriteIn;
+  BufferInfo[1].size := sizeof(WriteIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := Pointer(buffer);
-  bi[2].size := Count;
-  bi[2].flags := 0;
+  BufferInfo[2].buffer := Pointer(buffer);
+  BufferInfo[2].size := Count;
+  BufferInfo[2].flags := 0;
 
-  bi[3].buffer := @outhd;
-  bi[3].size := sizeof(outhd);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @OutHeader;
+  BufferInfo[3].size := sizeof(OutHeader);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[4].buffer := @writeout;
-  bi[4].size := sizeof(writeout);
-  bi[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[4].buffer := @WriteOut;
+  BufferInfo[4].size := sizeof(WriteOut);
+  BufferInfo[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 5, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 5, REQUEST_QUEUE);
 
-  while Done = false do
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
    Exit;
 
   Inc(FileDesc.FilePos, Count);
@@ -664,10 +664,10 @@ end;
 
 function VirtioFSReadFile(FileDesc: PFileRegular; Count: Longint; Buffer: Pointer): longint;
 var
-  bi: array[0..3] of TBufferInfo;
-  readin: FuseReadIn;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
+  BufferInfo: array[0..3] of TBufferInfo;
+  ReadIn: TFuseReadIn;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
   Done: Boolean;
 begin
   Result := 0;
@@ -677,39 +677,39 @@ begin
     If Count = 0 then
       Exit;
   end;
-  inhd.opcode := FUSE_READ;
-  inhd.len := sizeof(inhd) + sizeof(readin);
+  InHeader.opcode := FUSE_READ;
+  InHeader.len := sizeof(InHeader) + sizeof(ReadIn);
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.nodeid := FileDesc.Inode.ino;
-  inhd.uid := ROOT_UID;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.nodeid := FileDesc.Inode.ino;
+  InHeader.uid := ROOT_UID;
 
-  readin.fh := FileDesc.Opaque;
-  readin.size := Count;
-  readin.offset := FileDesc.FilePos;
+  ReadIn.fh := FileDesc.Opaque;
+  ReadIn.size := Count;
+  ReadIn.offset := FileDesc.FilePos;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @readin;
-  bi[1].size := sizeof(readin);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @ReadIn;
+  BufferInfo[1].size := sizeof(ReadIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[3].buffer := Pointer(buffer);
-  bi[3].size := Count;
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := Pointer(buffer);
+  BufferInfo[3].size := Count;
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
 
-  while Done = false do
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
    Exit;
 
   Inc(FileDesc.FilePos, Count);
@@ -720,93 +720,93 @@ end;
 function VirtioFSLookUpInode(Ino: PInode; Name: PXChar): PInode;
 var
   len: LongInt;
-  lookupout: FuseEntryOut;
-  bi: array[0..3] of TBufferInfo;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
+  EntryOut: TFuseEntryOut;
+  BufferInfo: array[0..3] of TBufferInfo;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
   Done : Boolean;
 begin
   Result := nil;
 
   Len := strlen(name) + 1;
-  inhd.opcode := FUSE_LOOKUP;
+  InHeader.opcode := FUSE_LOOKUP;
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  inhd.len := sizeof(inhd) + Len ;
-  inhd.nodeid := Ino.ino;
-  inhd.uid := ROOT_UID;
+  InHeader.unique := PtrUInt(@Done);
+  InHeader.len := sizeof(InHeader) + Len ;
+  InHeader.nodeid := Ino.ino;
+  InHeader.uid := ROOT_UID;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := Pointer(Name);
-  bi[1].size := Len;
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := Pointer(Name);
+  BufferInfo[1].size := Len;
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[3].buffer := @lookupout;
-  bi[3].size := sizeof(lookupout);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @EntryOut;
+  BufferInfo[3].size := sizeof(EntryOut);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
 
-  while Done = False do
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
     Exit;
 
-  Result := GetInode(lookupout.nodeid);
+  Result := GetInode(EntryOut.nodeid);
 end;
 
 procedure VirtioFSReadInode(Ino: PInode);
 var
-  bi: array[0..3] of TBufferInfo;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
-  getattrin: FuseGetAttrIn;
-  getattrout: FuseGetAttrOut;
+  BufferInfo: array[0..3] of TBufferInfo;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
+  GetAttrIn: TFuseGetAttrIn;
+  GetAttrOut: TFuseGetAttrOut;
   Done: Boolean;
 begin
-  inhd.opcode := FUSE_GETATTR;
-  inhd.len := sizeof(inhd) + sizeof(getattrin);
-  inhd.nodeid := Ino.ino;
-  inhd.uid := ROOT_UID;
+  InHeader.opcode := FUSE_GETATTR;
+  InHeader.len := sizeof(InHeader) + sizeof(GetAttrIn);
+  InHeader.nodeid := Ino.ino;
+  InHeader.uid := ROOT_UID;
   Done := False;
-  inhd.unique := PtrUInt(@Done);
+  InHeader.unique := PtrUInt(@Done);
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @getattrin;
-  bi[1].size := sizeof(getattrin);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @GetAttrIn;
+  BufferInfo[1].size := sizeof(GetAttrIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[3].buffer := @getattrout;
-  bi[3].size := sizeof(getattrout);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @GetAttrOut;
+  BufferInfo[3].size := sizeof(GetAttrOut);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
 
-  while Done = False do
+  while not Done do
     ReadWriteBarrier;
 
-  If outhd.error <> 0 then
+  If OutHeader.error <> 0 then
     Exit;
 
-  Ino.Size := getattrout.attr.size;
+  Ino.Size := GetAttrOut.attr.size;
   Ino.Dirty := False;
 
-  if getattrout.attr.mode and $4000 = $4000 then
+  if GetAttrOut.attr.mode and $4000 = $4000 then
     Ino.Mode := INODE_DIR
   else
     Ino.Mode := INODE_REG;
@@ -814,49 +814,49 @@ end;
 
 function VirtioFSReadSuper(Super: PSuperBlock): PSuperBlock;
 var
-  bi: array[0..3] of TBufferInfo;
-  inhd: FuseInHeader;
-  outhd: FuseOutHeader;
-  initinhd: FuseInitIn;
-  initouthd: FuseInitOut;
+  BufferInfo: array[0..3] of TBufferInfo;
+  InHeader: TFuseInHeader;
+  OutHeader: TFuseOutHeader;
+  InitIn: TFuseInitIn;
+  InitOut: TFuseInitOut;
   Done: Boolean;
 begin
   Result := nil;
 
-  inhd.opcode := FUSE_INIT;
-  inhd.len := sizeof(inhd) + sizeof(initinhd);
-  inhd.uid := ROOT_UID;
+  InHeader.opcode := FUSE_INIT;
+  InHeader.len := sizeof(InHeader) + sizeof(InitIn);
+  InHeader.uid := ROOT_UID;
 
   Done := False;
-  inhd.unique := PtrUInt(@Done);
-  initinhd.major := FUSE_MAJOR_VERSION;
-  initinhd.minor := FUSE_MINOR_VERSION;
+  InHeader.unique := PtrUInt(@Done);
+  InitIn.major := FUSE_MAJOR_VERSION;
+  InitIn.minor := FUSE_MINOR_VERSION;
 
   // TODO: to check this flags
-  initinhd.flags := 0;
-  initinhd.MaxReadahead := TORO_MAX_READAHEAD_SIZE;
+  InitIn.flags := 0;
+  InitIn.MaxReadahead := TORO_MAX_READAHEAD_SIZE;
 
-  bi[0].buffer := @inhd;
-  bi[0].size := sizeof(inhd);
-  bi[0].flags := 0;
+  BufferInfo[0].buffer := @InHeader;
+  BufferInfo[0].size := sizeof(InHeader);
+  BufferInfo[0].flags := 0;
 
-  bi[1].buffer := @initinhd;
-  bi[1].size := sizeof(initinhd);
-  bi[1].flags := 0;
+  BufferInfo[1].buffer := @InitIn;
+  BufferInfo[1].size := sizeof(InitIn);
+  BufferInfo[1].flags := 0;
 
-  bi[2].buffer := @outhd;
-  bi[2].size := sizeof(outhd);
-  bi[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[2].buffer := @OutHeader;
+  BufferInfo[2].size := sizeof(OutHeader);
+  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  bi[3].buffer := @initouthd;
-  bi[3].size := sizeof(initouthd);
-  bi[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  BufferInfo[3].buffer := @InitOut;
+  BufferInfo[3].size := sizeof(InitOut);
+  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @bi[0], 4, REQUEST_QUEUE);
-  while Done = false do
+  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  while not Done do
     ReadWriteBarrier;
 
-  if outhd.error <> 0 then
+  if OutHeader.error <> 0 then
    Exit;
 
   Super.InodeROOT := GetInode(FUSE_ROOT_ID);
@@ -868,8 +868,8 @@ end;
 procedure VirtIOProcessQueue(vq: PVirtQueue);
 var
   index, norm_index, buffer_index: Word;
-  tmp: PQueueBuffer;
-  FuseIn: ^FuseInHeader;
+  QueueBuffer: PQueueBuffer;
+  InHeader: ^TFuseInHeader;
   p: ^Boolean;
 begin
   if vq.LastUsedIndex = vq.used.index then
@@ -879,9 +879,9 @@ begin
   begin
     norm_index := index mod vq.QueueSize;
     buffer_index := vq.used.rings[norm_index].index;
-    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    FuseIn := Pointer(tmp.address);
-    p := Pointer(fusein.unique);
+    QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+    InHeader := Pointer(QueueBuffer.address);
+    p := Pointer(InHeader.unique);
     Panic(p^ = True, 'VirtioFS: Waking up a thread in ready state\n', []);
     p^ := True;
     inc(index);

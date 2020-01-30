@@ -169,7 +169,7 @@ function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
 function SysReadFile(FileHandle: THandle; Count: LongInt;Buffer:Pointer): LongInt;
 function SysWriteFile(FileHandle: THandle; Count: LongInt; Buffer:Pointer): LongInt;
 function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
-procedure PutBlock(FileBlock: PFileBlock; Bh: PBufferHead);
+procedure PutBlock(FileBlock: PFileBlock; BufferHead: PBufferHead);
 function GetInode(Inode: LongInt): PInode;
 procedure PutInode(Inode: PInode);
 function SysCreateFile(Path:  PXChar): THandle;
@@ -249,12 +249,12 @@ end;
 
 function FindBlock(Buffer: PBufferHead; Block, Size: LongInt): PBufferHead;
 var
-  Bhd: PBufferHead;
+  BufferHead: PBufferHead;
 begin
   Result := nil;
   if Buffer = nil then
     Exit;
-  Bhd := Buffer;
+  BufferHead := Buffer;
   repeat
     if (Buffer.Block = Block) and (Buffer.Size = Size) then
     begin
@@ -262,120 +262,120 @@ begin
       Exit;
     end;
     Buffer := Buffer.Next;
-  until Buffer = Bhd;
+  until Buffer = BufferHead;
 end;
 
-procedure AddBuffer(var Queue: PBufferHead; bh: PBufferHead);
+procedure AddBuffer(var Queue: PBufferHead; BufferHead: PBufferHead);
 begin
   if Queue = nil then
   begin
-    Queue := bh;
-    bh.Next := bh;
-    bh.Prev := bh;
+    Queue := BufferHead;
+    BufferHead.Next := BufferHead;
+    BufferHead.Prev := BufferHead;
     Exit;
   end;
-  bh.Prev := Queue.Prev;
-  bh.Next := Queue;
-  Queue.Prev.Next := bh;
-  Queue.Prev := bh;
+  BufferHead.Prev := Queue.Prev;
+  BufferHead.Next := Queue;
+  Queue.Prev.Next := BufferHead;
+  Queue.Prev := BufferHead;
 end;
 
-procedure RemoveBuffer(var Queue: PBufferHead; bh: PBufferHead);
+procedure RemoveBuffer(var Queue: PBufferHead; BufferHead: PBufferHead);
 begin
-  if (Queue = bh) and (Queue.Next = Queue) then
+  if (Queue = BufferHead) and (Queue.Next = Queue) then
   begin
     Queue := nil;
-    bh.Next := nil;
-    bh.Prev := nil;
+    BufferHead.Next := nil;
+    BufferHead.Prev := nil;
     Exit;
   end;
-  if Queue = bh then
-    Queue := bh.Next;
-  bh.Prev.Next := bh.Next;
-  bh.Next.Prev := bh.Prev;
-  bh.Next := nil;
-  bh.Prev := nil;
+  if Queue = BufferHead then
+    Queue := BufferHead.Next;
+  BufferHead.Prev.Next := BufferHead.Next;
+  BufferHead.Next.Prev := BufferHead.Prev;
+  BufferHead.Next := nil;
+  BufferHead.Prev := nil;
 end;
 
 function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
 var
-  bh: PBufferHead;
+  BufferHead: PBufferHead;
 begin
   Result := nil;
-  bh := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
-  if bh <> nil then
+  BufferHead := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
+  if BufferHead <> nil then
   begin
-    Inc(bh.Count);
-    Result := bh;
+    Inc(BufferHead.Count);
+    Result := BufferHead;
     {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In use\n', [Block, Size]); {$ENDIF}
     Exit;
   end;
-  bh := FindBlock(FileBlock.BufferCache.FreeBlocksCache, Block, Size);
-  if bh <> nil then
+  BufferHead := FindBlock(FileBlock.BufferCache.FreeBlocksCache, Block, Size);
+  if BufferHead <> nil then
   begin
-    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache, bh);
-    AddBuffer(FileBlock.BufferCache.BlockCache, bh);
-    bh.Count := 1;
-    Result := bh;
+    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache, BufferHead);
+    AddBuffer(FileBlock.BufferCache.BlockCache, BufferHead);
+    BufferHead.Count := 1;
+    Result := BufferHead;
     {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In Free Block\n', [Block, Size]); {$ENDIF}
     Exit;
   end;
   if FileBlock.BufferCache.BuffersInCache=0 then
   begin
-    bh := FileBlock.BufferCache.FreeBlocksCache;
-    if bh = nil then
+    BufferHead := FileBlock.BufferCache.FreeBlocksCache;
+    if BufferHead = nil then
       Exit;
-    bh := bh.Prev;
-    if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data) = 0 then
+    BufferHead := BufferHead.Prev;
+    if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(BufferHead.size div FileBlock.BlockSize), BufferHead.size div FileBlock.BlockSize, BufferHead.data) = 0 then
       Exit;
-    bh.Count := 1;
-    bh.Block := block;
-    bh.Dirty := False;
-    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache,bh);
-    AddBuffer(FileBlock.BufferCache.BlockCache,bh);
-    Result := bh;
+    BufferHead.Count := 1;
+    BufferHead.Block := block;
+    BufferHead.Dirty := False;
+    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache,BufferHead);
+    AddBuffer(FileBlock.BufferCache.BlockCache,BufferHead);
+    Result := BufferHead;
     Exit;
   end;
-  bh := ToroGetMem(SizeOf(TBufferHead));
-  if bh = nil then
+  BufferHead := ToroGetMem(SizeOf(TBufferHead));
+  if BufferHead = nil then
     Exit;
-  bh.data := ToroGetMem(Size);
-  if bh.data = nil then
+  BufferHead.data := ToroGetMem(Size);
+  if BufferHead.data = nil then
   begin
-    ToroFreeMem(bh);
+    ToroFreeMem(BufferHead);
     Exit;
   end;
-  bh.Count := 1;
-  bh.size := Size;
-  bh.Dirty := False;
-  bh.Block := Block;
-  if FileBlock.BlockDriver.ReadBlock(FileBlock, Block *(bh.size div FileBlock.BlockSize), Size div FileBlock.BlockSize, bh.data) = 0 then
+  BufferHead.Count := 1;
+  BufferHead.size := Size;
+  BufferHead.Dirty := False;
+  BufferHead.Block := Block;
+  if FileBlock.BlockDriver.ReadBlock(FileBlock, Block *(BufferHead.size div FileBlock.BlockSize), Size div FileBlock.BlockSize, BufferHead.data) = 0 then
   begin
-    ToroFreeMem(bh.data);
-    ToroFreeMem(bh);
+    ToroFreeMem(BufferHead.data);
+    ToroFreeMem(BufferHead);
     Exit;
   end;
-  AddBuffer(FileBlock.BufferCache.BlockCache,bh);
+  AddBuffer(FileBlock.BufferCache.BlockCache,BufferHead);
   Dec(FileBlock.BufferCache.BuffersInCache);
-  Result := bh;
+  Result := BufferHead;
   {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, New in Buffer\n', [Block, Size]); {$ENDIF}
 end;
 
-procedure PutBlock(FileBlock: PFileBlock; Bh: PBufferHead);
+procedure PutBlock(FileBlock: PFileBlock; BufferHead: PBufferHead);
 begin
-  Dec(Bh.Count);
-  if Bh.Count = 0 then
+  Dec(BufferHead.Count);
+  if BufferHead.Count = 0 then
   begin
-    if Bh.Dirty then
+    if BufferHead.Dirty then
     begin
-      FileBlock.BlockDriver.WriteBlock(FileBlock, bh.Block *(bh.size div FileBlock.BlockSize), bh.size div FileBlock.BlockSize, bh.data);
-      {$IFDEF DebugFS} WriteDebug('PutBlock: Writing Block: %d\n', [Bh.Block]); {$ENDIF}
+      FileBlock.BlockDriver.WriteBlock(FileBlock, BufferHead.Block *(BufferHead.size div FileBlock.BlockSize), BufferHead.size div FileBlock.BlockSize, BufferHead.data);
+      {$IFDEF DebugFS} WriteDebug('PutBlock: Writing Block: %d\n', [BufferHead.Block]); {$ENDIF}
     end;
-    Bh.Dirty := False;
-    RemoveBuffer(FileBlock.BufferCache.BlockCache, bh);
-    AddBuffer(FileBlock.BufferCache.FreeBlocksCache, bh);
+    BufferHead.Dirty := False;
+    RemoveBuffer(FileBlock.BufferCache.BlockCache, BufferHead);
+    AddBuffer(FileBlock.BufferCache.FreeBlocksCache, BufferHead);
   end;
-  {$IFDEF DebugFS} WriteDebug('PutBlock: Block: %d\n', [Bh.Block]); {$ENDIF}
+  {$IFDEF DebugFS} WriteDebug('PutBlock: Block: %d\n', [BufferHead.Block]); {$ENDIF}
 end;
 
 function FindInode(Buffer: PInode;Inode: LongInt): PInode;

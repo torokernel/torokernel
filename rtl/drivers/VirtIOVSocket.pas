@@ -125,6 +125,8 @@ implementation
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
 
+procedure virtIOVSocketDoSend(Net: PNetworkInterface); forward;
+
 procedure VirtIOSendBufferLegacy(Base: DWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
@@ -153,7 +155,6 @@ begin
     if (i <> (count-1)) then
         tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
 
-    // FIXME: use copy=false to use zero-copy approach
     if b.copy then
     begin
        tmp.address:= PtrUInt (buf); // check this
@@ -247,28 +248,11 @@ end;
 
 procedure VirtIOProcessTxQueue(Drv: PVirtIOVSocketDevice);
 var
-  index, norm_index, buffer_index: Word;
-  tmp: PQueueBuffer;
-  vq: PVirtQueue;
+  Packet: PPacket;
 begin
-  vq := @Drv.VirtQueues[TX_QUEUE];
-  if (vq.last_used_index = vq.used.index) then
-    Exit;
-  index := vq.last_used_index;
-
-  while (index <> vq.used.index) do
-  begin
-    norm_index := index mod vq.queue_size;
-    buffer_index := vq.used.rings[norm_index].index;
-    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    // mark buffer as free
-    tmp.length:= 0;
-    inc(index);
-  end;
-
-  ReadWriteBarrier;
-
-  vq.last_used_index:= index;
+  Packet := DequeueOutgoingPacket;
+  if Packet <> nil then
+    virtIOVSocketDoSend(@Drv.Driverinterface);
 end;
 
 type
@@ -347,22 +331,37 @@ begin
   IrqOn(VirtIOVSocketDev.IRQ);
 end;
 
-procedure virtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
+procedure virtIOVSocketDoSend(Net: PNetworkInterface);
 var
   bi: TBufferInfo;
+  Packet: PPacket;
 begin
-  DisableInt;
-
+  Packet := Net.OutgoingPackets;
   bi.buffer := Packet.Data;
   bi.size := Packet.Size;
   bi.flags := 0;
-  bi.copy := true;
-
-  Net.OutgoingPackets:= Packet;
-  // TODO: Remove the use of VirtIOVSocketDev
+  bi.copy := false;
   VirtIOSendBufferLegacy(VirtIOVSocketDev.Regs, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
-  DequeueOutgoingPacket;
-  RestoreInt;
+end;
+
+procedure virtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
+var
+  bi: TBufferInfo;
+  PacketQueue: PPacket;
+begin
+  PacketQueue := Net.OutgoingPackets;
+  if PacketQueue = nil then
+  begin
+    Net.OutgoingPackets := Packet;
+    Net.OutgoingPacketTail := Packet;
+    virtIOVSocketDoSend(Net);
+  end else
+  begin
+    DisableInt;
+    Net.OutgoingPacketTail.Next := Packet;
+    Net.OutgoingPacketTail := Packet;
+    RestoreInt;
+  end;
 end;
 
 procedure VirtIOVSocketIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -460,18 +459,6 @@ begin
         WriteConsoleF('VirtIOVSocket: TX_QUEUE was initiated\n', [])
       else
         WriteConsoleF('VirtIOVSocket: TX_QUEUE was not initiated\n', []);
-
-      // set up buffers for transmission
-      // TODO: use the buffers from user
-      tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
-      tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + 4096);
-      tx.buffer := Pointer(PtrUInt(tx.buffer) + (4096 - PtrUInt(tx.buffer) mod 4096));
-      tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
-      tx.available.index := 0;
-      tx.available.flags := 0;
-      tx.used.flags := 0;
-      ReadWriteBarrier;
-      write_portw(TX_QUEUE, VirtIOVSocketDev.Regs + $10);
 
       write_portb(VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_DRIVER_OK, VirtIOVSocketDev.Regs + $12);
       CaptureInt(32+VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);

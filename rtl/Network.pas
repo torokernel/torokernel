@@ -1354,7 +1354,7 @@ begin
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
   Packet.Ready := False;
-  Packet.Delete := False;
+  Packet.Delete := True;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
@@ -1366,7 +1366,6 @@ begin
   VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
   VPacket.hdr.len := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 function VSocketValidateIncomingConnection(tp, LocalPort: DWORD): PNetworkService;
@@ -1445,7 +1444,7 @@ begin
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
   Packet.Ready := False;
-  Packet.Delete := False;
+  Packet.Delete := True;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
@@ -1459,7 +1458,6 @@ begin
   VPacket.hdr.buf_alloc := MAX_WINDOW;
   VPacket.hdr.fwd_cnt := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 procedure VSocketUpdateCredit(Socket: PSocket);
@@ -1471,7 +1469,7 @@ begin
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
   Packet.Ready := False;
-  Packet.Delete := False;
+  Packet.Delete := True;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
@@ -1485,7 +1483,6 @@ begin
   VPacket.hdr.len := 0;
   VPacket.hdr.flags := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 function ProcessSocketPacket(Param: Pointer): PtrUInt;
@@ -2503,7 +2500,7 @@ begin
     Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
     Packet.Size := FragLen + sizeof(TVirtIOVSockHdr);
     Packet.Ready := False;
-    Packet.Delete := False;
+    Packet.Delete := True;
     Packet.Next := nil;
     VPacket := Pointer(Packet.Data);
     VPacket.hdr.src_cid := DedicateNetworks[GetApicid].NetworkInterface.Minor;
@@ -2520,7 +2517,6 @@ begin
     P := Pointer(@VPacket.data);
     Move(Addr^, P^, FragLen);
     SysNetworkSend(Packet);
-    ToroFreeMem(Packet);
     Dec(AddrLen, FragLen);
     Inc(Addr, FragLen);
   end;

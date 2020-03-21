@@ -326,12 +326,12 @@ begin
 end;
 
 // TODO: Use net to get the IRQ
-procedure virtIOVSocketStart(net: PNetworkInterface);
+procedure VirtIOVSocketStart(net: PNetworkInterface);
 begin
   IrqOn(VirtIOVSocketDev.IRQ);
 end;
 
-procedure virtIOVSocketDoSend(Net: PNetworkInterface);
+procedure VirtIOVSocketDoSend(Net: PNetworkInterface);
 var
   bi: TBufferInfo;
   Packet: PPacket;
@@ -344,7 +344,7 @@ begin
   VirtIOSendBufferLegacy(VirtIOVSocketDev.Regs, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
 end;
 
-procedure virtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
+procedure VirtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
 var
   bi: TBufferInfo;
   PacketQueue: PPacket;
@@ -354,7 +354,7 @@ begin
   begin
     Net.OutgoingPackets := Packet;
     Net.OutgoingPacketTail := Packet;
-    virtIOVSocketDoSend(Net);
+    VirtIOVSocketDoSend(Net);
   end else
   begin
     DisableInt;
@@ -464,8 +464,8 @@ begin
       CaptureInt(32+VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);
       Net := @VirtIOVSocketDev.Driverinterface;
       Net.Name:= 'virtiovsocket';
-      Net.start:= @virtIOVSocketStart;
-      Net.send:= @virtIOVSocketSend;
+      Net.start:= @VirtIOVSocketStart;
+      Net.send:= @VirtIOVSocketSend;
       Net.TimeStamp := 0;
       Net.SocketType := SCK_VIRTIO;
       Net.Minor := VirtIOVSocketDev.GuestID;

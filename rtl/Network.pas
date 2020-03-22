@@ -860,13 +860,14 @@ begin
      DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil
   end;
   DedicateNetworks[CPUID].NetworkInterface.TimeStamp := read_rdtsc;
+  Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
   if Packet.Delete then
   begin
     {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: Freeing packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
     ToroFreeMem(Packet);
+    Exit;
   end;
   Packet.Ready := True;
-  Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
 end;
 
 procedure ProcessARPPacket(Packet: PPacket); forward;

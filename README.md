@@ -33,7 +33,7 @@ To try Toro, you can follow a simple tutorial [here](https://github.com/mesarpe/
 
 ## Contributing
 
-You have many ways to contribute to Toro. One of them is by joining the Google Group [here](https://groups.google.com/forum/#!forum/torokernel). In addition, you can find more information at [here](
+You have many ways to contribute to Toro. One of them is by joining the Google Group [here](https://groups.google.com/forum/#!forum/torokernel). In addition, you can find more information [here](
 https://github.com/MatiasVara/torokernel/wiki/How-to-Contribute).
 
 ## License

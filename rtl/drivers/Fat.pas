@@ -20,7 +20,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-Unit Fat;
+unit Fat;
 
 interface
 
@@ -115,7 +115,7 @@ type
     name3 : array[1..4] of char ;
   end;
 
-function FatLoadTable (sb: PSuperBlock): boolean ;
+function FatLoadTable (sb: PSuperBlock): Boolean ;
 var
   j: LongInt;
   sb_fat : psb_fat;

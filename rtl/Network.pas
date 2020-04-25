@@ -2108,7 +2108,7 @@ begin
   SysNetworkSend(Packet);
   ToroFreeMem(Packet);
   SetSocketTimeOut(Socket, WAIT_ACK);
-  while true do
+  while True do
   begin
     SysThreadActive;
     if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
@@ -2258,7 +2258,7 @@ begin
   end;
   CPUID := GetApicid;
   Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
-  While true do
+  while True do
   begin
     NextSocket := Service.ClientSocket;
     SysThreadActive;
@@ -2366,7 +2366,7 @@ begin
   end else
   begin
     SetSocketTimeOut(Socket, TimeOut);
-    while true do
+    while True do
     begin
       SysThreadActive;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}

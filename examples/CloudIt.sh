@@ -43,7 +43,7 @@ if [ -f $qemufile ]; then
    qemuparams=`cat $qemufile`
 else
    # parameters by default
-   qemuparams="-m 512 -smp 2 -nographic"
+   qemuparams="-m 16 -smp 1 -nographic -device isa-debug-exit,iobase=0xf4,iosize=0x04"
 fi
 
 # remove all compiled files

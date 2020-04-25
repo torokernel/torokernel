@@ -342,7 +342,7 @@ begin
 end;
 
 // TODO: Use net to get the IRQ
-procedure virtIOVSocketStart(net: PNetworkInterface);
+procedure VirtIOVSocketStart(net: PNetworkInterface);
 begin
   IrqOn(VirtIOVSocketDev.IRQ);
 end;
@@ -477,8 +477,8 @@ begin
       CaptureInt(32+VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);
       Net := @VirtIOVSocketDev.Driverinterface;
       Net.Name:= 'virtiovsocket';
-      Net.start:= @virtIOVSocketStart;
-      Net.send:= @virtIOVSocketSend;
+      Net.start:= @VirtIOVSocketStart;
+      Net.send:= @VirtIOVSocketSend;
       Net.TimeStamp := 0;
       Net.SocketType := SCK_VIRTIO;
       Net.Minor := VirtIOVSocketDev.GuestID;

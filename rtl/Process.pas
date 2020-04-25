@@ -1091,7 +1091,7 @@ begin
     end else
     begin
       tmp := CurrentThread.CPU.PollingThreads;
-      While tmp.NextPollingThread <> CurrentThread do
+      while tmp.NextPollingThread <> CurrentThread do
       begin
         tmp := tmp.NextPollingThread;
       end;
@@ -1514,7 +1514,7 @@ begin
     PrintBackTraceStr(addr);
     DumpDebugRing;
   {$ENDIF}
-  while true do;
+  while True do;
 end;
 
 procedure ProcessInit;

@@ -860,13 +860,14 @@ begin
      DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil
   end;
   DedicateNetworks[CPUID].NetworkInterface.TimeStamp := read_rdtsc;
+  Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
   if Packet.Delete then
   begin
     {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: Freeing packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
     ToroFreeMem(Packet);
+    Exit;
   end;
   Packet.Ready := True;
-  Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
 end;
 
 procedure ProcessARPPacket(Packet: PPacket); forward;
@@ -2107,7 +2108,7 @@ begin
   SysNetworkSend(Packet);
   ToroFreeMem(Packet);
   SetSocketTimeOut(Socket, WAIT_ACK);
-  while true do
+  while True do
   begin
     SysThreadActive;
     if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
@@ -2257,7 +2258,7 @@ begin
   end;
   CPUID := GetApicid;
   Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
-  While true do
+  while True do
   begin
     NextSocket := Service.ClientSocket;
     SysThreadActive;
@@ -2365,7 +2366,7 @@ begin
   end else
   begin
     SetSocketTimeOut(Socket, TimeOut);
-    while true do
+    while True do
     begin
       SysThreadActive;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}

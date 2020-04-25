@@ -193,7 +193,7 @@ begin
 
   VirtIOSendBuffer(Blk, @bi[0], 3);
 
-  while true do
+  while True do
   begin
     r := read_portb(PtrUInt(Blk.Regs) + $13);
     if (r and 1 = 1) then
@@ -372,7 +372,7 @@ begin
   GetDevice(FileDesc.BlockDriver);
   Block := Block + BlkVirtIO.Minors[FileDesc.Minor].StartSector;
   {$IFDEF DebugVirtioBlk}WriteDebug('virtIOReadBlock: Reading block: %d count: %d\n',[Block, Count]);{$ENDIF}
-  While Count <> 0 do
+  while Count <> 0 do
   begin
     DisableInt;
     BlkVirtIO.Driver.WaitOn.state := tsSuspended;
@@ -411,7 +411,7 @@ begin
   GetDevice(FileDesc.BlockDriver);
   Block := Block + BlkVirtIO.Minors[FileDesc.Minor].StartSector;
   {$IFDEF DebugVirtioBlk}WriteDebug('virtIOWriteBlock: Writing block: %d count: %d\n',[Block, Count]);{$ENDIF}
-  While Count <> 0 do
+  while Count <> 0 do
   begin
     DisableInt;
     BlkVirtIO.Driver.WaitOn.state := tsSuspended;

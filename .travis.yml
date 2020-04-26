@@ -1,57 +1,45 @@
-# Part of `travis-lazarus` (https://github.com/nielsAD/travis-lazarus)
-# License: MIT
-
 language: generic
 sudo: required
 dist: trusty
-
 os:
-  - linux
-
+- linux
 env:
   global:
-    - DISPLAY=:99.0
+  - DISPLAY=:99.0
+  - secure: NTLgTJzm9OrNuUkdtyDCi3fH2wTMBgrBXkJOny2w7Eh6mxmkcII5Kntlu64s6lzi1ZxONxnKAtrw6S9YUbSfhzUcf5bkb4LPfExmgLfRTvUIEv2OnZKcdXjTXcZlLD/q/46FcugecbLSpyHFvN0w3GRWZ5GXZvm1iIkBt2spG7MONArkDg5NJM37fe0c3uwo8EF5axLT3sivpYpOjxq+KsoMWNDHs6ZF9d0rfAKLQ0/9yBc4pDqRYW7onbxBGU4ffrHvc4gTVOcVUZTvStH8cVMrThp1NO8hKbuZ+CAiwY7Zwn7MFbRJyMJUHPsrExO88mLaiUAPo13PWmkkn9rFH3KOQlkQ3it5slNMnOAj443WEFVQVsg7NqS1nyowLAqGzrT7axd6pjtgUgRCMQn/cG9Aj3N+SoemA0l3T5jYy8BA+BpP49N+NbpmvM82lvc//OJYRxZ0orLir0FSEJFLj0xYu5nnC3ZGsBmqM1zDIojR4+54cD/6jjxhtPoOStXFoqGTKfZ59IkuIfSc8X2iD1GjVbShIjrhkHBtMeQxDh19BcFkqtIXMn3Ie+4PHAAscT18dbzLvCsL1JItvlCF/oHoL1sczC7Bk265e72AphwOZ/iw/zAy7bjL1qTO+CK0ndj4BIhYVa/uLqB6nGmtX0Bx5DWRb7Ss1qOyXWn8d2c=
   matrix:
-    - LAZ_VER=1.8.2 LAZ_ENV=linux LAZ_OPT="--os=linux --cpu=x86_64"
-
+  - LAZ_VER=1.8.2 LAZ_ENV=linux LAZ_OPT="--os=linux --cpu=x86_64"
 before_deploy:
-      - git config --local user.name "Travis CI"
-      - git config --local user.email "matiasevara@gmail.com"
-      - export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
-      - git tag $GIT_TAG -m "Generated tag from TravisCI for build $TRAVIS_BUILD_NUMBER"
-
+- git config --local user.name "Travis CI"
+- git config --local user.email "matiasevara@gmail.com"
+- export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
+- git tag $GIT_TAG -m "Generated tag from TravisCI for build $TRAVIS_BUILD_NUMBER"
 deploy:
   provider: releases
-  api_key:
-    secure: $GH_TOKEN
-  file: 
-    - ./examples/HelloWorld/HelloWorld.img
-    - ./examples/HelloWorld/HelloWorld.img.sha256
-    - ./examples/ExceptionHandling/ExceptionHandling.img
-    - ./examples/ExceptionHandling/ExceptionHandling.img.sha256
-    - ./examples/StaticWebServer/StaticWebServer.img
-    - ./examples/StaticWebServer/StaticWebServer.img.sha256
-    - ./examples/WebSocketServer/WebSocketsServer.img
-    - ./examples/WebSocketServer/WebSocketsServer.img.sha256
+  api_key: "$GH_TOKEN"
+  file:
+  - "./examples/HelloWorld/HelloWorld.img"
+  - "./examples/HelloWorld/HelloWorld.img.sha256"
+  - "./examples/ExceptionHandling/ExceptionHandling.img"
+  - "./examples/ExceptionHandling/ExceptionHandling.img.sha256"
+  - "./examples/StaticWebServer/StaticWebServer.img"
+  - "./examples/StaticWebServer/StaticWebServer.img.sha256"
+  - "./examples/WebSocketServer/WebSocketsServer.img"
+  - "./examples/WebSocketServer/WebSocketsServer.img.sha256"
   on:
-     branch: master
+    branch: master
   skip_cleanup: true
-
 before_install:
-  # Start virtual display server
-  - Xvfb $DISPLAY &
-  - chmod +x ./ci/travis.install.py
-  - chmod +x ./ci/travis.compile.py
-  - chmod +x ./ci/travis.test.py
-
+- Xvfb $DISPLAY &
+- chmod +x ./ci/travis.install.py
+- chmod +x ./ci/travis.compile.py
+- chmod +x ./ci/travis.test.py
 install:
-  - ./ci/travis.install.py
-  - sudo apt-get install qemu-kvm
-
+- "./ci/travis.install.py"
+- sudo apt-get install qemu-kvm
 script:
-  - ./ci/travis.compile.py
-  - ./ci/travis.test.py
- 
+- "./ci/travis.compile.py"
+- "./ci/travis.test.py"
 notifications:
   email:
     on_success: false

@@ -159,6 +159,9 @@ const
   HasException: Boolean = True;
   HasFloatingPointUnit : Boolean = True;
   INTER_CORE_IRQ = 80;
+  PVH_MEMMAP_PADDR = 40;
+  PVH_MEMMAP_ENTRIES = 48;
+  PVH_CMDLINE_PADDR = 24;
 
 var
   CPU_COUNT: LongInt;
@@ -279,7 +282,8 @@ type
 
 var
   idt_gates: PInterruptGateArray; // Pointer to IDT
-  mbpointer: Pointer;
+  // pointer to start of the day structure
+  sodpointer: Pointer;
 
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
@@ -799,13 +803,12 @@ type
   end;
   PInt15h_info = ^Int15h_info;
 
-  Pmbentry = ^Tmbentry;
-
-  Tmbentry = packed record
-    Size: dword;
+  PPVHentry = ^TPVHentry;
+  TPVHentry = packed record
     Addr: qword;
-    Len: qword;
+    Size: qword;
     Tp: dword;
+    res: dword;
   end;
 
 const
@@ -817,14 +820,14 @@ var
 function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
-  DescMB: Pmbentry;
-  mbp: ^DWORD;
+  DescMB: PPVHentry;
+  mbp: ^QWORD;
 begin
   if ID > CounterID then
     Result := 0
   else
     Result := SizeOf(TMemoryRegion);
-  if mbpointer = nil then
+  if sodpointer = nil then
   begin
     Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
     Buffer.Base := Desc.Base;
@@ -832,26 +835,30 @@ begin
     Buffer.Flag := Desc.tipe;
   end
   else begin
-    mbp := Pointer(mbpointer + 48);
+    mbp := Pointer(sodpointer + PVH_MEMMAP_PADDR);
     DescMB := Pointer(PtrUInt(mbp^));
     Inc(DescMB, ID-1);
     Buffer.Base := DescMB.Addr;
-    Buffer.Length := DescMB.Len;
+    Buffer.Length := DescMB.Size;
     Buffer.Flag := DescMB.Tp;
   end;
 end;
 
+const
+  E820_TYPE_RAM = 1;
+
 // Count available memory after $100000
 procedure MemoryCounterInit;
 var
-  Magic, maplen, mapaddr: ^DWORD;
+  Magic: ^DWORD;
+  maplen, mapaddr: ^QWORD;
   Desc: PInt15h_info;
-  DescMB: Pmbentry;
+  DescMB: PPVHentry;
   Count: DWORD;
 begin
   CounterID := 0;
   AvailableMemory := 0;
-  if mbpointer = nil then
+  if sodpointer = nil then
   begin
     Magic := Pointer(INT15H_TABLE);
     Desc := Pointer(INT15H_TABLE);
@@ -867,17 +874,17 @@ begin
     CounterID := CounterID div SizeOf(Int15h_info);
   end else
   begin
-    maplen := mbpointer + 44;
-    mapaddr := mbpointer + 48;
+    maplen := sodpointer + PVH_MEMMAP_ENTRIES;
+    mapaddr := sodpointer + PVH_MEMMAP_PADDR;
     DescMB := Pointer(PtrUInt(mapaddr^));
     Count := maplen^;
     while count <> 0 do
     begin
-      if (DescMB.tp = 1) and (DescMB.addr >= $100000) then
-        AvailableMemory := AvailableMemory + DescMB.Len;
+      if (DescMB.tp = E820_TYPE_RAM) and (DescMB.addr >= $100000) then
+        AvailableMemory := AvailableMemory + DescMB.Size;
       Inc(DescMB);
       Inc(CounterID);
-      Dec(Count, sizeof(Tmbentry));
+      Dec(Count, 1);
     end;
   end;
 end;
@@ -1090,7 +1097,7 @@ asm
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
-  mov mbpointer, rbx
+  mov sodpointer, rbx
   call KernelStart
 end;
 {$ENDIF}
@@ -1495,14 +1502,14 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
-  tmp: ^DWORD;
+  tmp: ^QWORD;
   p: PChar;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
-  if mbpointer <> Nil then
+  if sodpointer <> Nil then
   begin
-    tmp := mbpointer + 16;
+    tmp := sodpointer + PVH_CMDLINE_PADDR;
     p := PChar(PtrUInt(tmp^));
     KernelParam := Pointer(Kernel_Param);
     while p^ <> #0 do

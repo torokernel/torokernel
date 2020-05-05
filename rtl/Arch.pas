@@ -234,9 +234,14 @@ type
   p_mp_table_header = ^mp_table_header ;
   mp_table_header = record
     signature : array[0..3] of XChar ;
-    res: array[0..6] of DWORD ;
+    len: Word;
+    spec: byte;
+    checksum: byte;
+    oem: array[0..7] of Char;
+    productid: array[0..11] of Char;
+    prt: DWORD;
     size: Word ;
-    count: Word ;
+    oemcount: Word ;
     addres_apic: DWORD;
     resd: DWORD ;
   end;
@@ -1127,36 +1132,30 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// Detect APICs on MP table
+// Detect cores by using the MP table
+// The algorithm assumes that the first structure
+// is a p_mp_processor_entry and they are stored
+// one after the other
 procedure mp_apic_detect(table: p_mp_table_header);
 var
   m: ^Byte;
-  I: LongInt;
   cp: p_mp_processor_entry ;
 begin
-  m := Pointer(SizeUInt(table) + SizeOf(mp_table_header));
-  I := 0;
-  while I < table.count do
+  m := Pointer(PtrUInt(table) + SizeOf(mp_table_header));
+  while (m^ = cpu_type) and (CPU_COUNT < MAX_CPU-1) do
   begin
-    if (m^  = cpu_type) and (CPU_COUNT < MAX_CPU-1) then
+    cp := Pointer(m);
+    Inc(CPU_COUNT);
+    Cores[cp.Apic_id].ApicID := cp.Apic_id;
+    Cores[cp.Apic_id].Present := True;
+    m := Pointer(PtrUInt(m)+SizeOf(mp_processor_entry));
+    // boot core doesn't need initialization
+    if (cp.flags and 2 ) = 2 then
     begin
-      cp := Pointer(m);
-      Inc(CPU_COUNT);
-      Cores[cp.Apic_id].ApicID := cp.Apic_id;
+      Cores[cp.Apic_id].CpuBoot := True;
+      Cores[cp.Apic_id].InitConfirmation := True;
       Cores[cp.Apic_id].Present := True;
-      m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
-      // boot core doesn't need initialization
-      if (cp.flags and 2 ) = 2 then
-      begin
-        Cores[cp.Apic_id].CpuBoot := True;
-        Cores[cp.Apic_id].InitConfirmation := True;
-	Cores[cp.Apic_id].Present := True;
-      end;
-    end else
-    begin
-      m := Pointer(SizeUInt(m)+SizeOf(mp_apic_entry));
     end;
-    Inc(I);
   end;
 end;
 
@@ -1165,14 +1164,15 @@ procedure mp_table_detect;
 var
   find: p_mp_floating_struct;
 begin
-  find := Pointer(MP_START_ADD) ;
-  while SizeUInt(find) < $fffff do
+  find := Pointer(0) ;
+  while PtrUInt(find) < $fffff do
   begin
-    if (find.signature[0]='_') and (find.signature[1]='M') then
+    if (find.signature[0]='_') and (find.signature[1]='M')
+    and (find.signature [2] = 'P') and (find.signature[3] = '_') then
     begin
-      if SizeUInt(find.phys) <> 0 then
+      if PtrUInt(find.phys) <> 0 then
       begin
-        mp_apic_detect(Pointer(SizeUint(find.phys)));
+        mp_apic_detect(Pointer(PtrUInt(find.phys)));
         Exit;
       end;
       Exit;

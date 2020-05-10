@@ -11,8 +11,8 @@ import re, sys
 regex=r"\[\s*\d+\]\s*(?!NULL)(\S+)\s+(PROGBITS|NOBITS)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)"
 baseaddress=int(sys.argv[1], 0)
 #print baseaddress
-k64f = open(sys.argv[2], "r")
-f = open(sys.argv[3], "w")
+k64f = open(sys.argv[2], "rb")
+f = open(sys.argv[3], "wb")
 for line in sys.stdin:
 	r = re.search(regex, line)
 	if not r:

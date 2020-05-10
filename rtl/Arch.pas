@@ -103,6 +103,7 @@ function GetApicBaseAddr: Pointer;
 function get_irq_master: Byte;
 function get_irq_slave: Byte;
 procedure IrqOn(irq: Byte);
+procedure IOApicIrqOn(Irq: Byte);
 procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
@@ -145,6 +146,8 @@ procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 function GetKernelParam(I: LongInt): Pchar;
+function read_ioapic_reg(offset: dword): dword;
+procedure write_ioapic_reg(offset, val: dword);
 
 const
   MP_START_ADD = $e0000;
@@ -162,6 +165,7 @@ const
   PVH_MEMMAP_PADDR = 40;
   PVH_MEMMAP_ENTRIES = 48;
   PVH_CMDLINE_PADDR = 24;
+  BASE_IRQ = 32;
 
 var
   CPU_COUNT: LongInt;
@@ -185,6 +189,7 @@ uses Kernel, Console;
 {$DEFINE RestoreInt := asm popf;end;}
 
 const
+  IOApic_Base = $FEC00000;
   Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
   apicid_reg = apic_base + $20;
   icrlo_reg = apic_base + $300;
@@ -409,6 +414,26 @@ begin
   Delay(10);
 end;
 
+procedure write_ioapic_reg(offset, val: dword);
+var
+  tmp: ^dword;
+begin
+  tmp := pointer(IOApic_Base);
+  tmp^ := offset;
+  tmp := pointer(IOApic_Base + $10);
+  tmp^ := val;
+end;
+
+function read_ioapic_reg(offset: dword): dword;
+var
+  tmp: ^dword;
+begin
+  tmp := pointer(IOApic_Base);
+  tmp^:= offset;
+  tmp := pointer(IOApic_Base+ $10);
+  Result := tmp^;
+end;
+
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
   @spin:
@@ -559,6 +584,12 @@ begin
     write_portb(read_portb($a1) and (not pic_mask[irq-8]), $a1)
   else
     write_portb(read_portb($21) and (not pic_mask[irq]), $21);
+end;
+
+// TODO: all irq are sent to core #0
+procedure IOApicIrqOn(Irq: Byte);
+begin
+  write_ioapic_reg(irq * 2 + $10, irq + BASE_IRQ);
 end;
 
 procedure IrqOff(irq: Byte);
@@ -1528,14 +1559,10 @@ begin
     KernelParamEnd := KernelParam;
     KernelParam := Pointer(Kernel_Param);
   end;
-  RelocateIrqs;
   MemoryCounterInit;
   CacheManagerInit;
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
-  IrqOn(2);
   EnableNMI;
-  for I := 33 to 47 do
-    CaptureInt(I, @IRQ_Ignore);
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
   CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);

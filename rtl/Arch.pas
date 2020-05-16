@@ -411,7 +411,7 @@ var
 begin
   tmp := Pointer(eoi_reg);
   tmp^ := 0;
-  Delay(10);
+  //Delay(10);
 end;
 
 procedure write_ioapic_reg(offset, val: dword);

@@ -164,6 +164,22 @@ begin
   GuestPageSize^ := Value;
 end;
 
+function GetIntStatus(Base: QWORD): DWORD;
+var
+  IntStatus: ^DWORD;
+begin
+  IntStatus := Pointer(VirtIOVSocketDev.Base + MMIO_INTSTATUS);
+  Result := IntStatus^;
+end;
+
+procedure SetIntACK(Base: QWORD; Value: DWORD);
+var
+  IntACK: ^DWORD;
+begin
+  IntACK := Pointer(VirtIOVSocketDev.Base + MMIO_INTACK);
+  IntAck^ := Value;
+end;
+
 procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
@@ -384,16 +400,16 @@ end;
 
 procedure VirtIOVSocketHandler;
 var
-  r, s: ^DWORD;
+  r: DWORD;
 begin
-  r := Pointer(VirtIOVSocketDev.Base + MMIO_INTSTATUS);
-  if (r^ and 1 = 1) then
-  begin
+  r := GetIntStatus(VirtIOVSocketDev.Base);
+  // TODO: to understand why I am missing interruptions
+  // if (r^ and 1 = 1) then
+  // begin
     VirtIOProcessRxQueue (@VirtIOVSocketDev);
     VirtIOProcessTxQueue (@VirtIOVSocketDev);
-  end;
-  s := Pointer(VirtIOVSocketDev.Base + MMIO_INTACK);
-  s^ := r^;
+  // end;
+  SetIntACK(VirtIOVSocketDev.Base, r);
   eoi_apic;
 end;
 
@@ -469,7 +485,6 @@ end;
 procedure FindVirtIOSocketonMMIO;
 var
   magic, device, version, guestid: ^DWORD;
-  QueueNotify: ^DWORD;
   tx: PVirtQueue;
   Net: PNetworkInterface;
 begin

@@ -215,6 +215,9 @@ const
 
   size_start_stack = 700;
 
+  MSR_KVM_SYSTEM_TIME_NEW = $4b564d01;
+  MSR_KVM_WALL_CLOCK_NEW =  $4b564d00;
+
 type
   p_apicid_register = ^apicid_register ;
   apicid_register = record
@@ -288,6 +291,18 @@ type
   PDirectoryPage = ^TDirectoryPageEntry;
   TDirectoryPageEntry = record
     PageDescriptor: QWORD;
+  end;
+
+  PWallClock = ^TWallClock;
+  TWallClock = packed record
+    version: DWORD;
+    pad0: DWORD;
+    tsc_timestamp: QWORD;
+    system_time: QWORD;
+    tsc_to_system_mul: DWORD;
+    tsc_shift: BYTE;
+    flags: BYTE;
+    pad: array[0..1] of BYTE;
   end;
 
 var
@@ -930,39 +945,60 @@ begin
   val := (val and 15) + ((val shr 4) * 10);
 end;
 
+// this is not used
+procedure KVMInstallClock(PClock: PWallClock);
+var
+  l, h: DWORD;
+begin
+  l := (PTrUInt(PClock) and $ffffffff ) or 1;
+  h := PTrUInt(PClock) shr 32;
+  asm
+    mov eax, l
+    mov edx, h
+    mov ecx, MSR_KVM_SYSTEM_TIME_NEW
+    wrmsr
+  end;
+end;
+
+Type
+  PKVMClock = ^KVMClock;
+  KVMClock = packed record
+    version: DWORD;
+    sec: DWORD;
+    nsec: DWORD;
+  end;
+
+procedure KVMGetClock(Clock: PKVMClock);
+var
+  l, h: DWORD;
+begin
+  l := PTrUInt(Clock) and $ffffffff;
+  h := PTrUInt(Clock) shr 32;
+  asm
+    mov eax, l
+    mov edx, h
+    mov ecx, MSR_KVM_WALL_CLOCK_NEW
+    wrmsr
+  end;
+end;
+
 procedure Now(Data: PNow);
 var
-  Sec, Min, Hour,
-  Day, Mon, Year: LongInt;
+  Sec, Min, Hour: LongInt;
+  clk: KVMClock;
 begin
-  repeat
-    Sec  := Cmos_Read(0);
-    Min  := Cmos_Read(2);
-    Hour := Cmos_Read(4);
-    Day  := Cmos_Read(7);
-    Mon  := Cmos_Read(8);
-    Year := Cmos_Read(9);
-  until Sec = Cmos_Read(0);
-  Bcd_To_Bin(Sec);
-  Bcd_To_Bin(Min);
-  Bcd_To_Bin(Hour);
-  Bcd_To_Bin(Day);
-  Bcd_To_Bin(Mon);
-  Bcd_To_Bin(Year);
-  if 0 >= Mon then
-  begin
-    Mon := Mon + 12 ;
-    Year := Year + 1;
-  end;
+  KVMGetClock(@clk);
+  Sec  := clk.sec mod 86400;
+  Min  := (Sec div 60) mod 60;
+  Hour := Sec div 3600;
+  Sec := Sec mod 60;
   Data.Sec := sec;
   Data.Min := min;
   Data.Hour := hour;
-  Data.Month:= Mon;
-  Data.Day := Day;
-  if (Year < 90) then
-    Data.Year := 2000 + Year
-  else
-    Data.Year := 1900 + Year;
+  // TODO: add year, month and day
+  Data.Month:= 2;
+  Data.Day := 27;
+  Data.Year := 1987;
 end;
 
 function SecondsBetween(const ANow: TNow;const AThen: TNow): Longint;

@@ -134,7 +134,8 @@ const
   MMIO_INTACK = $64;
 
   // TODO: get this from command-line
-  BASE_MICROVM_MMIO = $c0000e00;
+  // the address varies from host to host
+  BASE_MICROVM_MMIO = $feb00e00;
   IRQ_MICROVM_MMIO = 12;
 
 var
@@ -546,7 +547,13 @@ begin
       Net.Minor := VirtIOVSocketDev.GuestID;
       RegisterNetworkInterface(Net);
       WriteConsoleF('VirtIOVSocket: driver registered\n',[]);
+    end else
+    begin
+      WriteConsoleF('VirtIOVSocket: device %d unknow\n', [device^]);
     end;
+  end else
+  begin
+    WriteConsoleF('VirtIOVsocket: magic or version unknow, base-address may be wrong\n', []);
   end;
 end;
 

@@ -426,7 +426,7 @@ var
 begin
   tmp := Pointer(eoi_reg);
   tmp^ := 0;
-  //Delay(10);
+  Delay(10);
 end;
 
 procedure write_ioapic_reg(offset, val: dword);
@@ -601,10 +601,13 @@ begin
     write_portb(read_portb($21) and (not pic_mask[irq]), $21);
 end;
 
+const
+  Level = $8000;
 // TODO: all irq are sent to core #0
 procedure IOApicIrqOn(Irq: Byte);
 begin
-  write_ioapic_reg(irq * 2 + $10, irq + BASE_IRQ);
+  // from linux, set to level otherwise remote-IRR is not clear
+  write_ioapic_reg(irq * 2 + $10, irq + BASE_IRQ + Level);
 end;
 
 procedure IrqOff(irq: Byte);

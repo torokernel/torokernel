@@ -150,11 +150,6 @@ start64:
   push rax
   ; We need to page more memory
   call paging
-  ; Initialize CMOS shutdown code to 0ah
-  mov al, 0fh
-  out 070h, al
-  mov al, 0ah
-  out 071h, al
   ; When the signal INIT is sent, the execution starts in trampoline_add address 
   ; Move trampoline code
   mov rsi , trampoline_init

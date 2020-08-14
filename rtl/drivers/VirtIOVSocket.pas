@@ -132,6 +132,13 @@ const
   MMIO_QUEUEALIGN = $3C;
   MMIO_INTSTATUS = $60;
   MMIO_INTACK = $64;
+  MMIO_MODERN = 2;
+  MMIO_DESCLOW = $80;
+  MMIO_DESCHIGH = $84;
+  MMIO_AVAILLOW = $90;
+  MMIO_AVAILHIGH = $94;
+  MMIO_USEDLOW = $a0;
+  MMIO_USEDHIGH = $a4;
 
   // TODO: get this from command-line
   // the address varies from host to host
@@ -243,9 +250,9 @@ var
   sizeofQueueAvailable, sizeofQueueUsed: DWORD;
   buff: PChar;
   bi: TBufferInfo;
-  QueueSel, QueueAlign: ^DWORD;
-  QueueNumMax, QueueNum: ^DWORD;
-  QueuePFN, QueueNotify: ^DWORD;
+  QueueSel: ^DWORD;
+  QueueNumMax, QueueNum, AddrLow: ^DWORD;
+  QueueNotify, EnableQueue: ^DWORD;
 begin
   Result := False;
   FillByte(Queue^, sizeof(TVirtQueue), 0);
@@ -287,11 +294,23 @@ begin
   Queue.next_buffer := 0;
   Queue.lock := 0;
 
-  QueueAlign := Pointer(Base + MMIO_QUEUEALIGN);
-  QueueAlign^ := PAGE_SIZE;
+  AddrLow := Pointer(Base + MMIO_DESCLOW);
+  AddrLow^ := DWORD(PtrUint(Queue.buffers) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_DESCHIGH);
+  AddrLow^ := 0;
 
-  QueuePFN := Pointer(Base + MMIO_QUEUEPFN);
-  QueuePFN^ := PtrUInt(buff) div PAGE_SIZE;
+  AddrLow := Pointer(Base + MMIO_AVAILLOW);
+  AddrLow^ := DWORD(PtrUInt(Queue.available) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_AVAILHIGH);
+  AddrLow^ := 0;
+
+  AddrLow := Pointer(Base + MMIO_USEDLOW);
+  AddrLow^ := DWORD(PtrUInt(Queue.used) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_USEDHIGH);
+  AddrLow^ := 0;
+
+  EnableQueue := Pointer(Base + MMIO_QUEUEREADY);
+  EnableQueue^ := 1;
 
   // Device queues are fill
   if HeaderLen <> 0 then
@@ -492,7 +511,7 @@ begin
   magic := Pointer(BASE_MICROVM_MMIO);
   version := Pointer(BASE_MICROVM_MMIO + MMIO_VERSION);
 
-  if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_LEGACY) then
+  if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
   begin
     device := Pointer(BASE_MICROVM_MMIO + MMIO_DEVICEID);
     if device^ = VIRTIO_ID_VSOCKET then
@@ -510,8 +529,6 @@ begin
       guestid := Pointer(VirtIOVSocketDev.Base + MMIO_GUESTID);
       VirtIOVSocketDev.GuestID := guestid^;
       WriteConsoleF('VirtIOVSocket: CID: %d\n',[VirtIOVSocketDev.GuestID]);
-
-      SetDeviceGuestPageSize(VirtIOVSocketDev.Base, PAGE_SIZE);
 
       if VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
         WriteConsoleF('VirtIOVSocket: RX_QUEUE has been initializated\n', [])

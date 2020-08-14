@@ -876,12 +876,7 @@ begin
   VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
   
   while not Done do
-  begin
     ReadWriteBarrier;
-    // WriteConsoleF('readinode %d %d\n', [FsVirtIO.RqQueue.used.index, FsVirtIO.RqQueue.last_used_index]);
-  end;
-
-  //VirtIOProcessQueue(@FsVirtIO.RqQueue);
 
   If OutHeader.error <> 0 then
     Exit;
@@ -1054,7 +1049,7 @@ begin
       FsVirtio.QueueNotify := Pointer(BASE_MICROVM_MMIO +  MMIO_QUEUENOTIFY);
       FsVirtio.FsConfig := Pointer(BASE_MICROVM_MMIO + MMIO_CONFIG);
       WriteConsoleF('VirtIOFS: Detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
-      FsVirtio.IsrConfig := Pointer (BASE_MICROVM_MMIO + MMIO_INTSTATUS);
+      FsVirtio.IsrConfig := Pointer(BASE_MICROVM_MMIO + MMIO_INTSTATUS);
       
       if VirtIONegociateFeatures (BASE_MICROVM_MMIO, VirtIOGetDeviceFeatures (BASE_MICROVM_MMIO)) then
       begin

@@ -252,7 +252,7 @@ var
   bi: TBufferInfo;
   QueueSel: ^DWORD;
   QueueNumMax, QueueNum, AddrLow: ^DWORD;
-  QueueNotify, EnableQueue: ^DWORD;
+  EnableQueue: ^DWORD;
 begin
   Result := False;
   FillByte(Queue^, sizeof(TVirtQueue), 0);

@@ -1351,7 +1351,7 @@ begin
   end;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
-  WriteConsoleF('Starting MainThread: /V%d/n\n', [InitialThreadID]);
+  WriteConsoleF('Starting MainThread: /V%h/n\n', [InitialThreadID]);
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI

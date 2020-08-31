@@ -34,13 +34,8 @@ uses
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\drivers\Pci.pas',
-  // Ide in '..\..\rtl\drivers\IdeDisk.pas',
   VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-  Fat in '..\..\rtl\drivers\Fat.pas',
   VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
-  VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas';
 
@@ -258,7 +253,7 @@ begin
   begin
     // parameters are [ip/vsocket],[fsdriver],[blkdriver]
     // configure networking
-    // TODO: compare the full virtiosocket string
+    // TODO: compare the whole string
     if GetKernelParam(1)[0] = 'v' then
       DedicateNetworkSocket('virtiovsocket')
     else If GetKernelParam(1)^ = #0 then
@@ -276,8 +271,8 @@ begin
       SysMount('fat', 'virtioblk', 0);
     end else
     begin
-      fsdriver := GetKernelParam(2);
-      blkdriver := GetKernelParam(3);
+      fsdriver := GetKernelParam(1);
+      blkdriver := GetKernelParam(2);
       DedicateBlockDriver(blkdriver, 0);
       SysMount(fsdriver, blkdriver, 0);
     end;

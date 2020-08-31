@@ -18,14 +18,12 @@ deploy:
   provider: releases
   api_key: "$GH_TOKEN"
   file:
-  - "./examples/HelloWorld/HelloWorld.img"
-  - "./examples/HelloWorld/HelloWorld.img.sha256"
-  - "./examples/ExceptionHandling/ExceptionHandling.img"
-  - "./examples/ExceptionHandling/ExceptionHandling.img.sha256"
-  - "./examples/StaticWebServer/StaticWebServer.img"
-  - "./examples/StaticWebServer/StaticWebServer.img.sha256"
-  - "./examples/WebSocketServer/WebSocketsServer.img"
-  - "./examples/WebSocketServer/WebSocketsServer.img.sha256"
+  - "./examples/HelloWorld/HelloWorld"
+  - "./examples/HelloWorld/HelloWorld.sha256"
+  - "./examples/ExceptionHandling/ExceptionHandling"
+  - "./examples/ExceptionHandling/ExceptionHandling.sha256"
+  - "./examples/StaticWebServer/StaticWebServer"
+  - "./examples/StaticWebServer/StaticWebServer.sha256"
   on:
     branch: master
   skip_cleanup: true

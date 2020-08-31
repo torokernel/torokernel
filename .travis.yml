@@ -33,7 +33,6 @@ before_install:
 - Xvfb $DISPLAY &
 - chmod +x ./ci/travis.install.py
 - chmod +x ./ci/travis.compile.py
-- chmod +x ./ci/travis.test.py
 install:
 - "./ci/travis.install.py"
 - sudo apt-get install qemu-kvm

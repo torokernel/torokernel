@@ -34,6 +34,7 @@ uses
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
+  VirtIO in '..\..\rtl\drivers\VirtIO.pas',
   VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
   VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
   Console in '..\..\rtl\drivers\Console.pas',

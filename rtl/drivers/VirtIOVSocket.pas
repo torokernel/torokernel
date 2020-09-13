@@ -32,7 +32,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, Console, Network, Process, Memory;
+  Arch, VirtIO, Console, Network, Process, Memory;
 
 type
 
@@ -139,11 +139,6 @@ const
   MMIO_AVAILHIGH = $94;
   MMIO_USEDLOW = $a0;
   MMIO_USEDHIGH = $a4;
-
-  // TODO: get this from command-line
-  // the address varies from host to host
-  BASE_MICROVM_MMIO = $feb00e00;
-  IRQ_MICROVM_MMIO = 12;
 
 var
   VirtIOVSocketDev: TVirtIOVSocketDevice;
@@ -507,70 +502,71 @@ var
   magic, device, version, guestid: ^DWORD;
   tx: PVirtQueue;
   Net: PNetworkInterface;
+  j: LongInt;
 begin
-  magic := Pointer(BASE_MICROVM_MMIO);
-  version := Pointer(BASE_MICROVM_MMIO + MMIO_VERSION);
+  for j := 0 to (VirtIOMMIODevicesCount -1) do
+  begin  
+    magic := Pointer(VirtIOMMIODevices[j].Base);
+    version := Pointer(VirtIOMMIODevices[j].Base + MMIO_VERSION);
 
-  if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
-  begin
-    device := Pointer(BASE_MICROVM_MMIO + MMIO_DEVICEID);
-    if device^ = VIRTIO_ID_VSOCKET then
+    if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
     begin
-      VirtIOVSocketDev.IRQ := IRQ_MICROVM_MMIO;
-      VirtIOVSocketDev.Base := BASE_MICROVM_MMIO;
+      device := Pointer(VirtIOMMIODevices[j].Base + MMIO_DEVICEID);
+      if device^ = VIRTIO_ID_VSOCKET then
+      begin
+        VirtIOVSocketDev.IRQ := VirtIOMMIODevices[j].Irq;
+        VirtIOVSocketDev.Base := VirtIOMMIODevices[j].Base;
 
-      // reset
-      SetDeviceStatus(VirtIOVSocketDev.Base, 0);
+        // reset
+        SetDeviceStatus(VirtIOVSocketDev.Base, 0);
 
-      // tell driver we found it
-      SetDeviceStatus(VirtIOVSocketDev.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER);
+        // tell driver we found it
+        SetDeviceStatus(VirtIOVSocketDev.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER);
 
-      // get cid
-      guestid := Pointer(VirtIOVSocketDev.Base + MMIO_GUESTID);
-      VirtIOVSocketDev.GuestID := guestid^;
-      WriteConsoleF('VirtIOVSocket: CID: %d\n',[VirtIOVSocketDev.GuestID]);
+        // get cid
+        guestid := Pointer(VirtIOVSocketDev.Base + MMIO_GUESTID);
+        VirtIOVSocketDev.GuestID := guestid^;
+        WriteConsoleF('VirtIOVSocket: CID: %d\n',[VirtIOVSocketDev.GuestID]);
 
-      if VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
-        WriteConsoleF('VirtIOVSocket: RX_QUEUE has been initializated\n', [])
-      else
-        WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
+        if VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
+          WriteConsoleF('VirtIOVSocket: RX_QUEUE has been initializated\n', [])
+        else
+          WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
 
-      if VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
-        WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has been initializated\n', [])
-      else
-        WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
+        if VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
+          WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has been initializated\n', [])
+        else
+          WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
 
-      if VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], 0) then
-        WriteConsoleF('VirtIOVSocket: TX_QUEUE has been initializated\n', [])
-      else
-        WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
+        if VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], 0) then
+          WriteConsoleF('VirtIOVSocket: TX_QUEUE has been initializated\n', [])
+        else
+          WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
 
-      // set up buffers for transmission
-      tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
-      tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + PAGE_SIZE);
-      tx.buffer := Pointer(PtrUInt(tx.buffer) + (PAGE_SIZE - PtrUInt(tx.buffer) mod PAGE_SIZE));
-      tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
+        // set up buffers for transmission
+        tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
+        tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + PAGE_SIZE);
+        tx.buffer := Pointer(PtrUInt(tx.buffer) + (PAGE_SIZE - PtrUInt(tx.buffer) mod PAGE_SIZE));
+        tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
 
-      // driver is alive
-      SetDeviceStatus(VirtIOVSocketDev.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
+        // driver is alive
+        SetDeviceStatus(VirtIOVSocketDev.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
 
-      CaptureInt(BASE_IRQ + VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);
-      Net := @VirtIOVSocketDev.Driverinterface;
-      Net.Name := 'virtiovsocket';
-      Net.start := @VirtIOVSocketStart;
-      Net.send := @VirtIOVSocketSend;
-      Net.TimeStamp := 0;
-      Net.SocketType := SCK_VIRTIO;
-      Net.Minor := VirtIOVSocketDev.GuestID;
-      RegisterNetworkInterface(Net);
-      WriteConsoleF('VirtIOVSocket: driver registered\n',[]);
+        CaptureInt(BASE_IRQ + VirtIOVSocketDev.IRQ, @VirtIOVSocketIrqHandler);
+        Net := @VirtIOVSocketDev.Driverinterface;
+        Net.Name := 'virtiovsocket';
+        Net.start := @VirtIOVSocketStart;
+        Net.send := @VirtIOVSocketSend;
+        Net.TimeStamp := 0;
+        Net.SocketType := SCK_VIRTIO;
+        Net.Minor := VirtIOVSocketDev.GuestID;
+        RegisterNetworkInterface(Net);
+        WriteConsoleF('VirtIOVSocket: driver registered\n',[]);
+      end;
     end else
     begin
-      WriteConsoleF('VirtIOVSocket: device %d unknow\n', [device^]);
+      WriteConsoleF('VirtIOVsocket: magic or version unknow, base-address may be wrong\n', []);
     end;
-  end else
-  begin
-    WriteConsoleF('VirtIOVsocket: magic or version unknow, base-address may be wrong\n', []);
   end;
 end;
 

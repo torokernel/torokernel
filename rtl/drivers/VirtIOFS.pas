@@ -32,7 +32,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  FileSystem,
+  FileSystem, VirtIO,
   Arch, Console, Network, Process, Memory;
 
 implementation
@@ -91,6 +91,7 @@ type
   TVirtIOFSDevice = record
     IRQ: LongInt;
     tag: PChar;
+    Base: QWord;
     FsConfig: PVirtioFsConfig;
     IsrConfig: ^DWORD;
     QueueNotify: ^WORD;
@@ -311,7 +312,6 @@ const
   MMIO_VERSION = 4;
   MMIO_SIGNATURE = $74726976;
   MMIO_DEVICEID = $8;
-  BASE_MICROVM_MMIO = $feb00c00;
   MMIO_QUEUENOTIFY = $50;
   MMIO_CONFIG = $100;
   MMIO_FEATURES = $10;
@@ -564,7 +564,7 @@ begin
   BufferInfo[2].size := sizeof(OutHeader);
   BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
   while not Done do
     ReadWriteBarrier;
 
@@ -610,7 +610,7 @@ begin
   BufferInfo[3].size := sizeof(OpenOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -671,7 +671,7 @@ begin
   BufferInfo[3].size := sizeof(OutHeader);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -723,7 +723,7 @@ begin
   BufferInfo[4].size := sizeof(WriteOut);
   BufferInfo[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
 
   while not Done do
     ReadWriteBarrier;
@@ -782,7 +782,7 @@ begin
   BufferInfo[3].size := Count;
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -830,7 +830,7 @@ begin
   BufferInfo[3].size := sizeof(EntryOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -873,7 +873,7 @@ begin
   BufferInfo[3].size := sizeof(GetAttrOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
   
   while not Done do
     ReadWriteBarrier;
@@ -928,7 +928,7 @@ begin
   BufferInfo[3].buffer := @InitOut;
   BufferInfo[3].size := sizeof(InitOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-  VirtIOSendBuffer(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
   
   while not Done do
     ReadWriteBarrier;
@@ -983,7 +983,7 @@ var
   r: DWORD;
 begin
   r := FsVirtio.IsrConfig^;
-  SetIntACK(BASE_MICROVM_MMIO, r);
+  SetIntACK(FsVirtio.Base, r);
   VirtIOProcessQueue (@FsVirtio.RqQueue);
   eoi_apic;
 end;
@@ -1036,74 +1036,73 @@ end;
 procedure FindVirtIOFSOnMMIO;
 var
   magic, device, version: ^DWORD;
+  j: LongInt;
 begin
-  magic := Pointer(BASE_MICROVM_MMIO);
-  version := Pointer(BASE_MICROVM_MMIO + MMIO_VERSION);
-
-  if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
+  for j := 0 to (VirtIOMMIODevicesCount -1) do
   begin
-    device := Pointer(BASE_MICROVM_MMIO + MMIO_DEVICEID);
-    if device^ = VIRTIO_ID_FS then
+    magic := Pointer(VirtIOMMIODevices[j].Base);
+    version := Pointer(VirtIOMMIODevices[j].Base + MMIO_VERSION);
+    if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
     begin
-      FsVirtio.IRQ := 11; 
-      FsVirtio.QueueNotify := Pointer(BASE_MICROVM_MMIO +  MMIO_QUEUENOTIFY);
-      FsVirtio.FsConfig := Pointer(BASE_MICROVM_MMIO + MMIO_CONFIG);
-      WriteConsoleF('VirtIOFS: Detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
-      FsVirtio.IsrConfig := Pointer(BASE_MICROVM_MMIO + MMIO_INTSTATUS);
-      
-      if VirtIONegociateFeatures (BASE_MICROVM_MMIO, VirtIOGetDeviceFeatures (BASE_MICROVM_MMIO)) then
+      device := Pointer(VirtIOMMIODevices[j].Base + MMIO_DEVICEID);
+      if device^ = VIRTIO_ID_FS then
       begin
-        WriteConsoleF('VirtIOFS: Device accepted features\n',[])
-      end else
-      begin
-        WriteConsoleF('VirtioFS: Device did not accept features\n', []);
-        Exit;
-      end;
+        FsVirtio.IRQ := VirtIOMMIODevices[j].Irq; 
+        FsVirtio.Base := VirtIOMMIODevices[j].Base;
+        FsVirtio.QueueNotify := Pointer(VirtIOMMIODevices[j].Base + MMIO_QUEUENOTIFY);
+        FsVirtio.FsConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_CONFIG);
+        WriteConsoleF('VirtIOFS: Detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+        FsVirtio.IsrConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_INTSTATUS);
+        if VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
+        begin
+          WriteConsoleF('VirtIOFS: Device accepted features\n',[])
+        end else
+        begin
+          WriteConsoleF('VirtioFS: Device did not accept features\n', []);
+          Exit;
+        end;
 
-      if VirtIOInitQueue(BASE_MICROVM_MMIO, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
-      begin
-        WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.queue_size, FsVirtio.IRQ]);
-      end else
-      begin
-        WriteConsoleF('VirtIOFS: Queue 0, failed\n', []);
-        Exit;
+        if VirtIOInitQueue(VirtIOMMIODevices[j].Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
+        begin
+          WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.queue_size, FsVirtio.IRQ]);
+        end else
+        begin
+          WriteConsoleF('VirtIOFS: Queue 0, failed\n', []);
+          Exit;
+        end;
+      
+        SetDeviceStatus(VirtIOMMIODevices[j].Base, VIRTIO_ACKNOWLEDGE or VIRTIO_FEATURES_OK or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
+        CaptureInt(BASE_IRQ + FsVirtio.IRQ, @VirtIOFSIrqHandler);
+        IOApicIrqOn(FsVirtio.IRQ);
+      
+        FsVirtio.Driver.name := 'virtiofs';
+        FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
+        FsVirtio.Driver.ReadInode := VirtioFSReadInode;
+        FsVirtio.Driver.WriteInode := VirtioFSWriteInode;
+        FsVirtio.Driver.CreateInode := VirtIOFSCreateInode;
+        FsVirtio.Driver.LookUpInode := VirtioFSLookUpInode;
+        FsVirtio.Driver.ReadFile := VirtioFSReadFile;
+        FsVirtio.Driver.WriteFile := VirtIOFSWriteFile;
+        FsVirtio.Driver.OpenFile := VirtioFSOpenFile;
+        FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
+        RegisterFilesystem(@FsVirtio.Driver);
+        Move(FsVirtio.FsConfig.tag, FsVirtio.BlkDriver.name, StrLen(FsVirtio.FsConfig.tag)+1);
+        FsVirtio.BlkDriver.Busy := false;
+        FsVirtio.BlkDriver.WaitOn := nil;
+        FsVirtio.BlkDriver.major := 0;
+        FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
+        FsVirtIO.BlkDriver.CPUID := -1;
+        FsVirtIO.FileDesc.Minor := 0;
+        FsVirtIO.FileDesc.Next := nil;
+        FsVirtIO.FileDesc.BlockDriver := @FsVirtIO.BlkDriver;
+        RegisterBlockDriver(@FsVirtio.BlkDriver);
       end;
-      
-      SetDeviceStatus(BASE_MICROVM_MMIO, VIRTIO_ACKNOWLEDGE or VIRTIO_FEATURES_OK or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
-      CaptureInt(BASE_IRQ + FsVirtio.IRQ, @VirtIOFSIrqHandler);
-      IOApicIrqOn(FsVirtio.IRQ);
-      
-      FsVirtio.Driver.name := 'virtiofs';
-      FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
-      FsVirtio.Driver.ReadInode := VirtioFSReadInode;
-      FsVirtio.Driver.WriteInode := VirtioFSWriteInode;
-      FsVirtio.Driver.CreateInode := VirtIOFSCreateInode;
-      FsVirtio.Driver.LookUpInode := VirtioFSLookUpInode;
-      FsVirtio.Driver.ReadFile := VirtioFSReadFile;
-      FsVirtio.Driver.WriteFile := VirtIOFSWriteFile;
-      FsVirtio.Driver.OpenFile := VirtioFSOpenFile;
-      FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
-      RegisterFilesystem(@FsVirtio.Driver);
-      Move(FsVirtio.FsConfig.tag, FsVirtio.BlkDriver.name, StrLen(FsVirtio.FsConfig.tag)+1);
-      FsVirtio.BlkDriver.Busy := false;
-      FsVirtio.BlkDriver.WaitOn := nil;
-      FsVirtio.BlkDriver.major := 0;
-      FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
-      FsVirtIO.BlkDriver.CPUID := -1;
-      FsVirtIO.FileDesc.Minor := 0;
-      FsVirtIO.FileDesc.Next := nil;
-      FsVirtIO.FileDesc.BlockDriver := @FsVirtIO.BlkDriver;
-      RegisterBlockDriver(@FsVirtio.BlkDriver);
-    end else
+    end else 
     begin
-      WriteConsoleF('VirtIOFS: device unknow\n', []);
+      WriteConsoleF('VirtIOFS: magic number or version wrong, base address may be wrong\n', []);
     end;
-  end else 
-  begin
-    WriteConsoleF('VirtIOFS: magic number or version wrong, base address may be wrong\n', []);
   end;
 end;
-
 
 initialization
   FindVirtIOFSOnMMIO;

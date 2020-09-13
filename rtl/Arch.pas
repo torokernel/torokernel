@@ -201,6 +201,7 @@ const
   divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
   svr_reg = apic_base + $f0;
+  lint1_reg = apic_base + $360;
 
   // IDT descriptors
   gate_syst = $8E;
@@ -498,6 +499,15 @@ asm
   nop;
 end;
 
+procedure EnableLint1;
+var
+ vector: ^DWORD;
+begin
+  vector := Pointer(lint1_reg);
+  // lint1 triggers vector 2 as NMI (4) 
+  vector^ := 2 or (4 shl 8);
+end;
+
 procedure Delay(ms: LongInt);
 var
   tmp : ^DWORD ;
@@ -779,10 +789,13 @@ begin
   Result := speed;
 end;
 
-// add "-device isa-debug-exit,iobase=0xf4,iosize=0x04"
 procedure ShutdownInQemu;
 begin
-  write_portb(0, $f4);
+  // the following code triggers a triple-fault
+  asm
+    lidt [$400]
+    db $ff, $ff
+  end;
 end;
 
 // reboot using keyboard
@@ -1601,13 +1614,13 @@ begin
   MemoryCounterInit;
   CacheManagerInit;
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
-  EnableNMI;
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
   CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
   Now(@StartTime);
   enable_local_apic;
+  EnableLint1;
   SMPInitialization;
   SSEInit;
   MWaitInit;

@@ -528,20 +528,23 @@ begin
         VirtIOVSocketDev.GuestID := guestid^;
         WriteConsoleF('VirtIOVSocket: CID: %d\n',[VirtIOVSocketDev.GuestID]);
 
-        if VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
-          WriteConsoleF('VirtIOVSocket: RX_QUEUE has been initializated\n', [])
-        else
+        if not VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
+        begin
           WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
+          Exit;
+        end;
 
-        if VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
-          WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has been initializated\n', [])
-        else
+        if not VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
+        begin
           WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
+          Exit;
+        end;
 
-        if VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], 0) then
-          WriteConsoleF('VirtIOVSocket: TX_QUEUE has been initializated\n', [])
-        else
+        if not VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], 0) then
+        begin
           WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
+          Exit;
+        end;
 
         // set up buffers for transmission
         tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];

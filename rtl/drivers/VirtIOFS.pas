@@ -1051,23 +1051,17 @@ begin
         FsVirtio.Base := VirtIOMMIODevices[j].Base;
         FsVirtio.QueueNotify := Pointer(VirtIOMMIODevices[j].Base + MMIO_QUEUENOTIFY);
         FsVirtio.FsConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_CONFIG);
-        WriteConsoleF('VirtIOFS: Detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+        WriteConsoleF('VirtIOFS: detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
         FsVirtio.IsrConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_INTSTATUS);
-        if VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
+        if not VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
         begin
-          WriteConsoleF('VirtIOFS: Device accepted features\n',[])
-        end else
-        begin
-          WriteConsoleF('VirtioFS: Device did not accept features\n', []);
+          WriteConsoleF('VirtioFS: device did not accept features\n', []);
           Exit;
         end;
 
-        if VirtIOInitQueue(VirtIOMMIODevices[j].Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
+        if not VirtIOInitQueue(VirtIOMMIODevices[j].Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
         begin
-          WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.queue_size, FsVirtio.IRQ]);
-        end else
-        begin
-          WriteConsoleF('VirtIOFS: Queue 0, failed\n', []);
+          WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
           Exit;
         end;
       

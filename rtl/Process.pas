@@ -268,58 +268,9 @@ begin
   raise EDivException.Create ('Division by Zero');
 end;
 
-type
-  ENMI = class(Exception);
-
+// NMI handler just triggers the shutting down procedure
 procedure ExceptNMI;
-var
-  rbx_reg: QWord;
-  rcx_reg: QWord;
-  rax_reg: QWord;
-  rdx_reg: QWord;
-  rsp_reg: QWord;
-  rip_reg: QWord;
-  rbp_reg: QWord;
-  errc_reg: QWord;
-  rflags_reg: Qword;
-  addr: pointer;
 begin
-  errc_reg := 0;
-  asm
-    mov  rbx_reg, rbx
-    mov  rcx_reg, rcx
-    mov  rax_reg, rax
-    mov  rdx_reg, rdx
-    mov  rsp_reg, rsp
-    mov  rbp_reg, rbp
-    mov rbx, rbp
-    mov rax, [rbx] + 8
-    mov rip_reg, rax
-    mov rax, [rbx] + 24
-    mov rflags_reg, rax
-    mov rbp, rbp_reg
-  end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RNMI/n\n',[GetApicid]);
-  WriteConsoleF('Thread#%d registers:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
-  WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
-  WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
-  WriteConsoleF('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-  {$IFDEF DebugCrash}
-     WriteDebug('Exception: NMI\n',[]);
-     WriteDebug('Thread dump:\n',[]);
-     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
-     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
-     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-     WriteDebug('Backtrace:\n',[]);
-  {$ENDIF}
-  WriteConsoleF('Backtrace:\n',[]);
-  get_caller_stackinfo(pointer(rbp_reg), addr);
-  PrintBackTraceStr(pointer(rip_reg));
-  while rbp_reg <> 0 do
-  begin
-    get_caller_stackinfo(pointer(rbp_reg), addr);
-    PrintBackTraceStr(addr);
-  end;
   if @ShutdownProcedure <> nil then
     ShutdownProcedure;
   {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}

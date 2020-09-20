@@ -526,7 +526,7 @@ begin
         // get cid
         guestid := Pointer(VirtIOVSocketDev.Base + MMIO_GUESTID);
         VirtIOVSocketDev.GuestID := guestid^;
-        WriteConsoleF('VirtIOVSocket: CID: %d\n',[VirtIOVSocketDev.GuestID]);
+        WriteConsoleF('VirtIOVSocket: cid=%d\n',[VirtIOVSocketDev.GuestID]);
 
         if not VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
         begin
@@ -564,7 +564,6 @@ begin
         Net.SocketType := SCK_VIRTIO;
         Net.Minor := VirtIOVSocketDev.GuestID;
         RegisterNetworkInterface(Net);
-        WriteConsoleF('VirtIOVSocket: driver registered\n',[]);
       end;
     end else
     begin

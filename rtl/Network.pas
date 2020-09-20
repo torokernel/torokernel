@@ -52,6 +52,7 @@ const
   VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
   VIRTIO_VSOCK_TYPE_STREAM = 1;
   VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
+  MAX_NET_NAME = 30;
 
 type
   PNetworkInterface = ^TNetworkInterface;
@@ -145,7 +146,7 @@ type
   end;
 
   TNetworkInterface = record
-    Name: AnsiString;
+    Name: array[0..MAX_NET_NAME-1] of Char;
     Minor: LongInt;
     MaxPacketSize: LongInt;
     SocketType: Longint;
@@ -296,8 +297,8 @@ procedure IPStrtoArray(Ip: Pchar; out Result: array of Byte);
 function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: Longint; seq, id: word): Longint;
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
-procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
-procedure DedicateNetworkSocket(const Name: AnsiString);
+procedure DedicateNetwork(const Name: PXChar; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetworkSocket(const Name: PXChar);
 
 implementation
 
@@ -1671,7 +1672,7 @@ begin
   Result := True;
 end;
 
-procedure DedicateNetworkSocket(const Name: AnsiString);
+procedure DedicateNetworkSocket(const Name: PXChar);
 var
   Net: PNetworkInterface;
   CPUID: Longint;
@@ -1680,7 +1681,7 @@ begin
   CPUID:= GetApicid;
   while Net <> nil do
   begin
-    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    if StrCmp(@Net.Name, Name, StrLen(Name)) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
     begin
       Net.CPUID := CPUID;
       DedicateNetworks[CPUID].NetworkInterface := Net;
@@ -1697,7 +1698,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetworkSocket: fail, driver not found\n', []); {$ENDIF}
 end;
 
-procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetwork(const Name: PXChar; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 var
   Net: PNetworkInterface;
   Network: PNetworkDedicate;
@@ -1709,7 +1710,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: dedicating on CPU%d\n', [CPUID]); {$ENDIF}
   while Net <> nil do
   begin
-    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    if StrCmp(@Net.Name, Name, StrLen(Name)) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
     begin
       Net.CPUID := CPUID;
       DedicateNetworks[CPUID].NetworkInterface := Net;
@@ -2537,6 +2538,3 @@ begin
 end;
 
 end.
-
-
-

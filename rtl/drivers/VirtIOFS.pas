@@ -1051,7 +1051,7 @@ begin
         FsVirtio.Base := VirtIOMMIODevices[j].Base;
         FsVirtio.QueueNotify := Pointer(VirtIOMMIODevices[j].Base + MMIO_QUEUENOTIFY);
         FsVirtio.FsConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_CONFIG);
-        WriteConsoleF('VirtIOFS: detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+        WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
         FsVirtio.IsrConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_INTSTATUS);
         if not VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
         begin

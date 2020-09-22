@@ -191,7 +191,7 @@ begin
     ResponseSize := PResponse-Response;
 //    WriteConsoleF('\t Headers.Size: %d\n', [ResponseSize]);
     Response[ResponseSize] := #0;
-    WriteConsoleF('%p\n', [PtrUInt(Response)]);
+//    WriteConsoleF('%p\n', [PtrUInt(Response)]);
     SysSocketSend(Socket, Response, ResponseSize, 0);
 //    Move(Content^, PResponse^, ContentLength);
 //    Inc(ResponseSize, ContentLength);

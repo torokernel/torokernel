@@ -1553,7 +1553,7 @@ end;
 
 procedure ReadWriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
 asm
-  mfence
+  lock add DWORD [rsp] - 4, 0
 end;
 
 procedure WriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}

@@ -1505,10 +1505,9 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch(True);
+      SysSetCoreIdle;
       Continue;
     end;
-    SysThreadActive;
     VPacket := Packet.Data;
     case VPacket.hdr.op of
       VIRTIO_VSOCK_OP_REQUEST:
@@ -1615,10 +1614,10 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch(True);
+      //SysThreadSwitch(True);
       Continue;
     end;
-    SysThreadActive;
+    //SysThreadActive;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1934,10 +1933,10 @@ begin
   begin
     NetworkDispatcher(Handler);
     Service := GetCurrentThread.NetworkService;
-    if Service.ClientSocket = nil then
-      SysThreadSwitch(True)
-    else
-      SysThreadSwitch(False);
+    // if Service.ClientSocket = nil then
+    //  SysThreadSwitch(True)
+    // else
+    //  SysThreadSwitch(False);
   end;
   Result := 0;
 end;
@@ -2111,7 +2110,6 @@ begin
   SetSocketTimeOut(Socket, WAIT_ACK);
   while True do
   begin
-    SysThreadActive;
     if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
     begin
       ToroFreeMem(Socket.Buffer);
@@ -2123,7 +2121,7 @@ begin
     end
     else if Socket.State = SCK_TRANSMITTING then
       Exit;
-    SysThreadSwitch(True);
+    SysThreadSwitch;
   end;
 end;
 
@@ -2262,7 +2260,6 @@ begin
   while True do
   begin
     NextSocket := Service.ClientSocket;
-    SysThreadActive;
     while NextSocket <> nil do
     begin
       tmp := NextSocket;
@@ -2277,7 +2274,7 @@ begin
         Exit;
       end;
     end;
-    SysThreadSwitch(True);
+    SysThreadSwitch;
   end;
 end;
 
@@ -2369,7 +2366,6 @@ begin
     SetSocketTimeOut(Socket, TimeOut);
     while True do
     begin
-      SysThreadActive;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
       if Socket.State = SCK_LOCALCLOSING then
       begin
@@ -2390,7 +2386,7 @@ begin
         Result := False;
         Exit;
       end;
-      SysThreadSwitch(True);
+      SysThreadSwitch;
     end;
   end;
 end;
@@ -2494,9 +2490,8 @@ begin
 
     while FragLen = Socket.RemoteWinLen - Socket.RemoteWinCount do
     begin
-      SysThreadSwitch(True);
+      SysThreadSwitch;
     end;
-    SysThreadActive;
 
     if FragLen > Socket.RemoteWinLen - Socket.RemoteWinCount then
       FragLen := Socket.RemoteWinLen - Socket.RemoteWinCount;

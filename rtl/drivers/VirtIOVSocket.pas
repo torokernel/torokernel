@@ -423,6 +423,7 @@ begin
   // begin
     VirtIOProcessRxQueue (@VirtIOVSocketDev);
     VirtIOProcessTxQueue (@VirtIOVSocketDev);
+  UpdateLastIrq;
   // end;
   SetIntACK(VirtIOVSocketDev.Base, r);
   eoi_apic;

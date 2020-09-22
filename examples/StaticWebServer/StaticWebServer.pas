@@ -42,7 +42,7 @@ uses
 
 const
   HeaderNotFound = 'HTTP/1.1 404 File not found'#13#10'Connection: close'#13#10'Content-Length: 0'#13#10#13#10;
-  SERVICE_TIMEOUT = 20000;
+  SERVICE_TIMEOUT = 1000;
   Max_Path_Len = 200;
   SERVICE_BACKLOG = 100;
 

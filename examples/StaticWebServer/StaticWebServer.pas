@@ -41,255 +41,231 @@ uses
   Network in '..\..\rtl\Network.pas';
 
 const
-  HeaderNotFound = 'HTTP/1.1 404 File not found'#13#10'Connection: close'#13#10'Content-Length: 0'#13#10#13#10;
+  HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
+  ContentLen = #13#10'Content-length: ';
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
+  HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 1000;
   Max_Path_Len = 200;
-  SERVICE_BACKLOG = 100;
 
 type
   PRequest = ^TRequest;
   TRequest = record
     BufferStart: pchar;
     BufferEnd: pchar;
-    Counter: Longint;
+    counter: Longint;
   end;
 
 var
   HttpServer, HttpClient: PSocket;
-  Request: PRequest;
-  ThreadID: TThreadID;
+  tid: TThreadID;
+  rq: PRequest;
+  netdriver: PChar;
+  fsdriver: PChar;
+  blkdriver: PChar;
 
-function FetchHttpRequest(Socket: PSocket): Boolean;
+function GetRequest(Socket: PSocket): Boolean;
 var
-  Buf: Char;
-  Buffer: PChar;
-  I, Len: LongInt;
-  Request: PRequest;
+   i, Len: longint;
+   buf: char;
+   rq: PRequest;
+   buffer: Pchar;
 begin
   Result := False;
-  Request:= Socket.UserDefined;
-  I := Request.Counter;
-  Buffer := Request.BufferEnd;
+  rq := Socket.UserDefined;
+  i := rq.counter;
+  buffer := rq.BufferEnd;
   // Calculate len of the request
-  if I <> 0 then
-    Len := I-3
+  if i <> 0 then
+    Len :=  i - 3
   else
     Len := 0;
-  while SysSocketRecv(Socket, @buf, 1, 0) <> 0 do
+  while (SysSocketRecv(Socket, @buf,1,0) <> 0)do
   begin
-    if ((i > 3) and (buf = #32)) or (Len = Max_Path_Len) then
+    if ((i>3) and (buf = #32)) or (Len = Max_Path_Len) then
     begin
-      Buffer^ := #0;
+      buffer^ := #0;
       Result := True;
       Exit;
     end;
-    if I > 3 then
+    if (i>3) then
     begin
-      Len := I-3;
-      Buffer^ := buf;
-      Inc(Buffer);
-      Inc(Request.BufferEnd);
+      Len := i - 3;
+      buffer^ := buf;
+      Inc(buffer);
+      Inc(rq.BufferEnd);
     end;
-    Inc(I);
+    Inc(i);
   end;
-  Request.Counter := I;
+  rq.counter := i;
 end;
 
-function GetContentType(const FileName: PChar): PChar;
+procedure SendStream(Socket: Psocket; Stream: Pchar; Len: Longint);
 begin
-  if StrCmp(PChar(FileName+StrLen(FileName)-4), 'html', 4) then
-    Result := 'text/html'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'htm', 3) then
-    Result := 'text/html'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-4), 'json', 4) then
-    Result := 'text/json'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'css', 3) then
-    Result := 'text/css'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-2), 'js', 2) then
-    Result := 'text/javascript'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-2), 'md', 2) then
-    Result := 'text/markdown'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'png', 3) then
-    Result := 'image/png'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'jpg', 3) then
-    Result := 'image/jpg'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'gif', 3) then
-    Result := 'image/gif'
-  else if StrCmp(PChar(FileName+StrLen(FileName)-3), 'ico', 3) then
-    Result := 'image/x-icon'
+  If Len = 0 then
+    SysSocketSend(Socket, Stream, Length(Stream), 0)
   else
+    SysSocketSend(Socket, Stream, Len, 0);
+end;
+
+procedure ProcessRequest (Socket: PSocket; Answer: pchar; Len: LongInt; Header: Pchar);
+var
+  dst, tmp: ^char;
+  anssizechar: array[0..10] of char;
+  AnsSize: LongInt;
+  TotalLen: Longint;
+begin
+  if Answer = nil then
   begin
-    WriteConsoleF('\t ContentType not found from FileName: %p\n', [PtrUInt(FileName)]);
-    Result := 'application/octet-stream';
+    SendStream(Socket, HeaderNotFound, 0);
+  end
+  else begin
+    If Len = 0 then
+      AnsSize := Strlen(Answer)
+    else
+      AnsSize := Len;
+    InttoStr(AnsSize,@anssizechar[0]);
+    TotalLen := StrLen(@anssizechar[0]) + StrLen(HeaderOk) + StrLen(Header) + Strlen(ContentLen) + StrLen(ContentOK) + AnsSize;
+    dst := ToroGetMem(TotalLen);
+    tmp := dst;
+    StrConcat(HeaderOk, Header, dst);
+    dst := dst + StrLen(HeaderOk) + StrLen(Header);
+    StrConcat(dst, ContentLen, dst);
+    dst := dst + StrLen(ContentLen);
+    StrConcat(dst, @anssizechar[0], dst);
+    dst := dst + StrLen(@anssizechar[0]);
+    StrConcat(dst, ContentOK, dst);
+    dst := dst + StrLen(ContentOK) ;
+    if Len = 0 then
+    begin
+      StrConcat(dst, Answer, dst);
+      SendStream(Socket,tmp, 0);
+    end
+    else begin
+      Move(Answer^, dst^, AnsSize);
+      SendStream(Socket,tmp, TotalLen);
+    end;
+    ToroFreeMem(tmp);
   end;
 end;
 
-function GetFileContent(const FileName: PChar; var FileContent: PChar): LongInt;
+function GetFileContent(entry: pchar; var Content: pchar): LongInt;
 var
-  BytesRead: LongInt;
-  FileHandle: THandle;
-  FileInfo: TInode;
-  FileSize: Int64;
+  idx: TInode;
+  indexSize: LongInt;
+  Buf: Pchar;
+  tmp: THandle;
 begin
-  FileContent:= nil;
+  Content := nil;
   Result := 0;
-  if SysStatFile(FileName, @FileInfo) = 0 then
+  if SysStatFile(entry, @idx) = 0 then
   begin
-    WriteConsoleF('\t Http Server: %p not found\n', [PtrUInt(FileName)]);
+    WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
     Exit;
-  end;
-  FileSize := FileInfo.Size;
-  FileContent := ToroGetMem(FileSize+1);
-  FileHandle := SysOpenFile(FileName, O_RDONLY);
-  if FileHandle = 0 then
+  end else
+    Buf := ToroGetMem(idx.Size + 1);
+  tmp := SysOpenFile(entry, O_RDONLY);
+  if (tmp <> 0) then
   begin
-    WriteConsoleF ('Cannot open file: %p\n', [PtrUInt(FileName)]);
-    Exit;
-  end;
-  try
-    BytesRead := SysReadFile(FileHandle, FileSize, FileContent);
-    if BytesRead <> FileSize then
-      WriteConsoleF('\t Warning: %p BytesRead: %d != FileSize: %d\n', [PtrUInt(FileName), BytesRead, FileSize]);
-    FileContent[BytesRead] := #0;
-  finally
-    SysCloseFile(FileHandle);
-  end;
-  WriteConsoleF('\t Http Server: %p loaded, size: %d bytes\n', [PtrUInt(FileName), FileSize]);
-  Result := FileSize;
-end;
-
-procedure HttpSend404(Socket: PSocket; var ConnectionClosed: Boolean);
-begin
-  SysSocketSend(Socket, HeaderNotFound, StrLen(HeaderNotFound), 0);
-  SysSocketClose(Socket);
-  ConnectionClosed := True;
-end;
-
-procedure Concat(var PResponse: PChar; const Value: PChar);
-begin
-  StrConcat(PResponse, Value, PResponse);
-  Inc(PResponse, StrLen(Value));
-end;
-
-procedure HttpSendResponse(Socket: PSocket; const Content: PChar; ContentLength: LongInt; ContentType: PChar; var ConnectionClosed: Boolean);
-var
-  SContentLength: array[0..10] of char;
-  Response, PResponse: PChar;
-  ResponseSize: LongInt;
-begin
-//  if ContentLength = 0 then
-//    ContentLength := Strlen(Content);
-  Response := ToroGetMem(1024+ContentLength);
-  try
-    PResponse := Response; 
-    Concat(PResponse, 'HTTP/1.1 200 OK'#13#10'Content-Type: ');
-    Concat(PResponse, ContentType);
-    Concat(PResponse, #13#10'Content-Length: ');
-    IntToStr(ContentLength, SContentLength);
-    Concat(PResponse, SContentLength);
-    Concat(PResponse, #13#10'Connection: close'#13#10'Server: ToroHttpServer'#13#10#13#10);
-    ResponseSize := PResponse-Response;
-//    WriteConsoleF('\t Headers.Size: %d\n', [ResponseSize]);
-    Response[ResponseSize] := #0;
-//    WriteConsoleF('%p\n', [PtrUInt(Response)]);
-    SysSocketSend(Socket, Response, ResponseSize, 0);
-//    Move(Content^, PResponse^, ContentLength);
-//    Inc(ResponseSize, ContentLength);
-//    WriteConsoleF('\t ResponseSize: %d\n', [ResponseSize]);
-//    SysSocketSend(Socket, Response, ResponseSize, 0);
-    SysSocketSend(Socket, Content, ContentLength, 0);
-    SysSocketClose(Socket);
-    ConnectionClosed := True;
-  finally
-    ToroFreeMem(Response);
-  end;
-end;
-
-function ServiceHttpRequest(Socket: PSocket; var ConnectionClosed: Boolean): LongInt;
-var
-  ContentType: PChar;
-  FileName, FileContent: PChar;
-  FileSize: LongInt;
-  Request: PRequest;
-begin
-  Result := 0;
-  if not FetchHttpRequest(Socket) then
-    Exit;  
-  Request := Socket.UserDefined;
-  FileName := Request.BufferStart;
-  FileSize := GetFileContent(Request.BufferStart, FileContent);
-  if FileContent = nil then
+    indexSize := SysReadFile(tmp, idx.Size, Buf);
+    pchar(Buf+idx.Size)^ := #0;
+    SysCloseFile(tmp);
+    WriteConsoleF('\t WebServer: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
+    Result := idx.Size;
+    Content := Buf;
+  end else
   begin
-    HttpSend404(Socket, ConnectionClosed);
-    Exit;
+    WriteConsoleF ('file not found\n',[]);
   end;
-  ContentType := GetContentType(FileName);
-  HttpSendResponse(Socket, FileContent, FileSize, ContentType, ConnectionClosed);  
-  WriteConsoleF('\t Http Server: closing %d:%d\n', [Socket.DestIp, Socket.DestPort]);
-  if FileContent <> nil then
-    ToroFreeMem(FileContent);
 end;
 
-function ServiceHttp(ASocket: Pointer): PtrInt;
+function ServiceReceive(Socket: PSocket): LongInt;
 var
-  ConnectionClosed: Boolean;
-  Socket: PSocket;
+  rq: PRequest;
+  entry, content: PChar;
+  len: LongInt;
 begin
-  Socket := ASocket;
-  try
-    while True do
+  while true do
+  begin
+    if GetRequest(Socket) then
+    begin
+      rq := Socket.UserDefined;
+      entry := rq.BufferStart;
+      len := GetFileContent(rq.BufferStart, content);
+      if StrCmp(Pchar(entry + StrLen(entry) - 4), 'html', 4) then
+        ProcessRequest(Socket, content, 0, 'Text/html')
+      else if StrCmp(PChar(entry + StrLen(entry) - 4), 'json', 4) then
+        ProcessRequest(Socket, content, 0, 'Text/json')
+      else if StrCmp(Pchar(entry + StrLen(entry) - 3), 'htm', 3) then
+        ProcessRequest(Socket, content, 0, 'Text/htm')
+      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'css', 3) then
+        ProcessRequest(Socket, content, 0, 'Text/css')
+      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'js', 2) then
+        ProcessRequest(Socket, content, 0, 'Text/javascript')
+      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'md', 2) then
+        ProcessRequest(Socket, content, 0, 'Text/markdown')
+      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
+        ProcessRequest(Socket, content, len, 'Image/png')
+      else
+        WriteConsoleF('\t WebServer: file format not found\n', []);
+      SysSocketClose(Socket);
+      if content <> nil then
+        ToroFreeMem(content);
+      ToroFreeMem(rq.BufferStart);
+      ToroFreeMem(rq);
+      Exit;
+    end
+    else
     begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
-        WriteConsoleF('\t HttpServer: closing after timeout %d:%d\n', [Socket.DestIp, Socket.DestPort]);
         SysSocketClose(Socket);
-        Break;
+        rq := Socket.UserDefined;
+        ToroFreeMem(rq.BufferStart);
+        ToroFreeMem(rq);
+        Exit;
       end;
-      ConnectionClosed := False;
-      ServiceHttpRequest(Socket, ConnectionClosed);
-      if ConnectionClosed then
-	      Break;
     end;
-  finally
-    Request := Socket.UserDefined;
-    ToroFreeMem(Request.BufferStart);
-    ToroFreeMem(Request);
   end;
   Result := 0;
 end;
 
-var
-  fsdriver: PChar;
-  blkdriver: PChar;
-  netdriver: PChar;
+function ProcessesSocket(Socket: Pointer): PtrInt;
+begin
+  ServiceReceive (Socket);
+  Result := 0;
+end;
+
 begin
   if KernelParamCount = 0 then
   begin
+    WriteConsoleF('Wrong number of kernel parameters, exiting\n', []);
     Exit;
-  end else
+  end
+  else
   begin
-    // parameters are [ip/vsocket],[fsdriver],[blkdriver]
     netdriver := GetKernelParam(0);
-    DedicateNetworkSocket(netdriver);
+    DedicateNetworkSocket(netdriver); 
     fsdriver := GetKernelParam(1);
     blkdriver := GetKernelParam(2);
     DedicateBlockDriver(blkdriver, 0);
     SysMount(fsdriver, blkdriver, 0);
+    if StrCmp(GetKernelParam(3), 'noconsole', strlen('noconsole')) then
+      HeadLess := True;
   end;
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
-  SysSocketListen(HttpServer, SERVICE_BACKLOG);
-  WriteConsoleF('\t Http Server: listening at %d ..\n', [HttpServer.SourcePort]);
-  while True do
+  SysSocketListen(HttpServer, 50);
+  WriteConsoleF('\t WebServer: listening ... %d\n', [KernelParamCount]);
+  while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);
-    WriteConsoleF('\t Http Server: new connection from %d:%d\n', [HttpClient.DestIp, HttpClient.DestPort]);
-    Request := ToroGetMem(SizeOf(TRequest));
-    Request.BufferStart := ToroGetMem(Max_Path_Len);
-    Request.BufferEnd := Request.BufferStart;
-    Request.Counter := 0;
-    HttpClient.UserDefined := Request;
-    ThreadID := BeginThread(nil, 4096*2, ServiceHttp, HttpClient, 0, ThreadID);
+    rq := ToroGetMem(sizeof(TRequest));
+    rq.BufferStart := ToroGetMem(Max_Path_Len);
+    rq.BufferEnd := rq.BufferStart;
+    rq.counter := 0;
+    HttpClient.UserDefined := rq;
+    tid := BeginThread(nil, 4096*2, ProcessesSocket, HttpClient, 0, tid);
   end;
 end.

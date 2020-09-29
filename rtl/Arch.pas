@@ -123,8 +123,6 @@ procedure ArchInit;
 procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
-function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
-function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
@@ -133,9 +131,7 @@ function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 procedure ShutdownInQemu;
 procedure Reboot;
 procedure DelayMicro(microseg: LongInt);
-procedure PciWriteWord (const bus, device, func, regnum, value: Word);
 function read_portw(port: Word): Word;
-function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 procedure SetPageReadOnly(Add: Pointer);
 procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
@@ -555,53 +551,6 @@ const
   Status_Port : array[0..1] of Byte = ($20,$A0);
   Mask_Port : array[0..1] of Byte = ($21,$A1);
   PIC_MASK: array [0..7] of Byte =(1,2,4,8,16,32,64,128);
-
-// relocate the irq to 31-46
-procedure RelocateIrqs ;
-asm
-  mov   al , 00010001b
-  out   20h, al
-  nop
-  nop
-  nop
-  out  0A0h, al
-  nop
-  nop
-  nop
-  mov   al , 20h
-  out   21h, al
-  nop
-  nop
-  nop
-  mov   al , 28h
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 00000100b
-  out   21h, al
-  nop
-  nop
-  nop
-  mov   al , 2
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 1
-  out   21h, al
-  nop
-  nop
-  nop
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 0FFh
-  out   21h, al
-  mov   al , 0FFh
-  out  0A1h, al
-end;
 
 procedure IrqOn(irq: Byte);
 begin
@@ -1058,49 +1007,6 @@ asm
   db $48, $cf
 end;
 
-const
- PCI_CONF_PORT_INDEX = $CF8;
- PCI_CONF_PORT_DATA  = $CFC;
-
-function PciReadDword(const bus, device, func, regnum: UInt32): UInt32;
-var
-  Send: DWORD;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum shl 2);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  read_portd(@Send, PCI_CONF_PORT_DATA);
-  Result := Send;
-end;
-
-function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
-var
-  tmp, off: DWORD;
-begin
-  tmp := PciReadDword(bus, device, func, offset shr 2);
-  off := offset mod 4;
-  Result := (tmp shr (off shl 3)) and $ff;
-end;
-
-function PciReadWord(const bus, device, func, regnum: UInt32): Word;
-var
-  Send: DWORD;
-  tmp: Word;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  tmp := read_portw(PCI_CONF_PORT_DATA);
-  Result := (tmp shr ((regnum and 2) * 8 )) and $ffff;
-end;
-
-procedure PciWriteWord (const bus, device, func, regnum, value: Word);
-var
-  Send: DWORD;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  write_portw(value, PCI_CONF_PORT_DATA);
-end;
-
 // Initialize SSE and SSE2 extensions
 // Do this for every core
 // TODO : Floating-Point exception is ignored
@@ -1264,123 +1170,7 @@ begin
    end;
 end;
 
-type
-  TAcpiRsdp = packed record
-    Signature: array[0..7] of XChar;
-    Checksum: Byte;
-    oem_id:array[0..5] of Byte;
-    Revision: Byte;
-    rsdt_address: DWORD;
-    Length: DWORD;
-    xsdt_address: QWord;
-    ext_checksum: Byte;
-    Reserved: array[0..2] of Byte;
-  end;
-  PAcpiRsdp = ^TAcpiRsdp;
-
-  TAcpiTableHeader = packed record
-    Signature: array[0..3] of XChar;
-    Length: DWORD;
-    Revision: Byte;
-    Checksum: Byte;
-    oem_id: array[0..5] of XChar;
-    oem_table_id : array[0..7] of XChar;
-    oem_revision: DWORD;
-    asl_compiler_id:array[0..3] of XChar;
-    asl_compiler_revision: DWORD;
-  end;
-  PAcpiTableHeader = ^TAcpiTableHeader;
-
-  TAcpiRstd = packed record
-    Header: TAcpiTableHeader;
-    Entry: array[0..8] of DWORD;
-  end;
-  PAcpiRstd = ^TAcpiRstd;
-
-  TAcpiMadt = packed record
-    Header: TAcpiTableHeader;
-    ApicAddr: DWORD;
-    Res: DWORD;
-  end;
-  PAcpiMadt = ^TAcpiMadt;
-
-  TAcpiMadtEntry = packed record
-    nType: Byte;
-    Length: Byte;
-  end;
-  PAcpiMadtEntry = ^TAcpiMadtEntry;
-
-  TAcpiMadtProcessor = packed record
-    Header: TAcpiMadtEntry;
-    AcpiId: Byte;
-    ApicId: Byte;
-    Flags: DWORD;
-  end;
-  PAcpiMadtProcessor = ^TAcpiMadtProcessor;
-
-procedure acpi_table_detect;
-var
-  Counter, J: LongInt;
-  Entry: PAcpiMadtEntry;
-  madt: PAcpiMadt;
-  MadEnd: Pointer;
-  P: PChar;
-  Processor: PAcpiMadtProcessor;
-  RSDP: PAcpiRsdp;
-  RSTD: PAcpiRstd;
-  TableHeader: PAcpiTableHeader;
-begin
-  P := Pointer($e0000);
-  while p < Pointer($100000) do
-  begin
-    // looking for RSD sign
-    if (p[0] = 'R') and (p[1]='S') and (p[2]='D') then
-    begin
-      RSDP :=  Pointer(p);
-      // maybe some sing detection on RSTD
-      RSTD := Pointer(QWord(RSDP.rsdt_address));
-      // number of entries in table
-      Counter:= (RSTD.Header.Length - SizeOf(TAcpiTableHeader)) div 4;
-      for J := 0 to Counter-1 do
-      begin
-        TableHeader := Pointer(QWord(RSTD.Entry[j])); // table header
-        // look for the "APIC" signature
-        if (TableHeader.Signature[0] = 'A') and (TableHeader.Signature[1] = 'P')  then
-        begin
-          madt := Pointer(TableHeader);
-          MadEnd := Pointer(SizeUInt(madt) + TableHeader.Length);
-          Entry := Pointer(SizeUInt(madt) + SizeOf(TAcpiMadt));
-          while SizeUInt(Entry) < SizeUInt(MadEnd) do
-          begin // that 's a new Processor.
-            if Entry.nType=0 then
-            begin
-              Processor := Pointer(Entry);
-              // Is Processor Enabled ??
-              if Processor.flags and 1 = 1 then
-              begin
-                Inc(CPU_COUNT);
-                Cores[Processor.apicid].ApicID := Processor.apicid;
-                Cores[Processor.apicid].Present := True;
-                // CPU#0 is a BOOT cpu
-                if Processor.apicid = 0 then
-                begin
-                  Cores[Processor.apicid].CPUBoot := True;
-                  Cores[Processor.apicid].InitConfirmation := True;
-		  Cores[Processor.apicid].Present := True;
-                end;
-              end;
-            end;
-            Entry := Pointer(SizeUInt(Entry) + Entry.Length);
-          end;
-        end;
-      end;
-      Break;
-    end;
-    Inc(P, 16);
-  end;
-end;
-
-// Detect all Cores using MP's Intel tables and ACPI Tables.
+// detect cores using MP's Intel table
 procedure SMPInitialization;
 var
   J: LongInt;
@@ -1394,9 +1184,7 @@ begin
     Cores[J].InitProc := nil;
   end;
   CPU_COUNT := 0;
-  acpi_table_detect; // ACPI detection
-  if CPU_COUNT = 0 then
-    mp_table_detect; // if cpu_count is zero then use a MP Tables
+  mp_table_detect;
   if CPU_COUNT = 0 then
     CPU_COUNT := 1;
   // setting boot core

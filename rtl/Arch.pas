@@ -306,6 +306,7 @@ var
   idt_gates: PInterruptGateArray; // Pointer to IDT
   // pointer to start of the day structure
   sodpointer: Pointer;
+  ToroClock: TWallClock;
 
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
@@ -944,6 +945,7 @@ begin
     mov edx, h
     mov ecx, MSR_KVM_WALL_CLOCK_NEW
     wrmsr
+    sfence
   end;
 end;
 
@@ -952,12 +954,11 @@ var
   Sec, Min, Hour: LongInt;
   clk: KVMClock;
 begin
-  KVMGetClock(@clk);
-  Sec  := clk.sec mod 86400;
-  Min  := (Sec div 60) mod 60;
-  Hour := Sec div 3600;
+  Sec  := (StartTime.sec + (ToroClock.system_time div 1000000000)) mod 86400;
+  Min  := (Sec div 60) mod 60 + StartTime.Min;
+  Hour := Sec div 3600 + StartTime.Hour;
   Sec := Sec mod 60;
-  Data.Sec := sec;
+  Data.Sec := Sec;
   Data.Min := min;
   Data.Hour := hour;
   // TODO: add year, month and day
@@ -1375,6 +1376,7 @@ var
   I: LongInt;
   tmp: ^QWORD;
   p: PChar;
+  clk: KVMClock;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
@@ -1406,7 +1408,12 @@ begin
     CaptureInt(I, @Interruption_Ignore);
   CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
-  Now(@StartTime);
+  KVMInstallClock(@ToroClock);
+  KVMGetClock(@clk);
+  StartTime.Sec := clk.sec mod 86400;
+  StartTime.Min := (StartTime.Sec  div 60) mod 60;
+  StartTime.Hour := StartTime.Sec div 3600;
+  StartTime.Sec := StartTime.Sec  mod 60;
   enable_local_apic;
   EnableLint1;
   SMPInitialization;

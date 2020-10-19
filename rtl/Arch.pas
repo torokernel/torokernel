@@ -103,6 +103,7 @@ function GetApicBaseAddr: Pointer;
 function get_irq_master: Byte;
 function get_irq_slave: Byte;
 procedure IrqOn(irq: Byte);
+procedure IOApicIrqOn(Irq: Byte);
 procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
@@ -122,8 +123,6 @@ procedure ArchInit;
 procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 procedure IRQ_Ignore;
-function PciReadDWORD(const bus, device, func, regnum: UInt32): UInt32;
-function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
@@ -132,9 +131,7 @@ function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 procedure ShutdownInQemu;
 procedure Reboot;
 procedure DelayMicro(microseg: LongInt);
-procedure PciWriteWord (const bus, device, func, regnum, value: Word);
 function read_portw(port: Word): Word;
-function PciReadWORD(const bus, device, func, regnum: UInt32): Word;
 procedure SetPageReadOnly(Add: Pointer);
 procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
@@ -145,6 +142,8 @@ procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 function GetKernelParam(I: LongInt): Pchar;
+function read_ioapic_reg(offset: dword): dword;
+procedure write_ioapic_reg(offset, val: dword);
 
 const
   MP_START_ADD = $e0000;
@@ -159,6 +158,10 @@ const
   HasException: Boolean = True;
   HasFloatingPointUnit : Boolean = True;
   INTER_CORE_IRQ = 80;
+  PVH_MEMMAP_PADDR = 40;
+  PVH_MEMMAP_ENTRIES = 48;
+  PVH_CMDLINE_PADDR = 24;
+  BASE_IRQ = 32;
 
 var
   CPU_COUNT: LongInt;
@@ -182,6 +185,7 @@ uses Kernel, Console;
 {$DEFINE RestoreInt := asm popf;end;}
 
 const
+  IOApic_Base = $FEC00000;
   Apic_Base = $FEE00000; // $FFFFFFFF - $11FFFFF // = 18874368 -> 18MB from the top end
   apicid_reg = apic_base + $20;
   icrlo_reg = apic_base + $300;
@@ -193,6 +197,7 @@ const
   divide_reg = apic_base + $3e0;
   eoi_reg = apic_base + $b0;
   svr_reg = apic_base + $f0;
+  lint1_reg = apic_base + $360;
 
   // IDT descriptors
   gate_syst = $8E;
@@ -206,6 +211,9 @@ const
   Kernel_Data_Sel = $10;
 
   size_start_stack = 700;
+
+  MSR_KVM_SYSTEM_TIME_NEW = $4b564d01;
+  MSR_KVM_WALL_CLOCK_NEW =  $4b564d00;
 
 type
   p_apicid_register = ^apicid_register ;
@@ -231,9 +239,14 @@ type
   p_mp_table_header = ^mp_table_header ;
   mp_table_header = record
     signature : array[0..3] of XChar ;
-    res: array[0..6] of DWORD ;
+    len: Word;
+    spec: byte;
+    checksum: byte;
+    oem: array[0..7] of Char;
+    productid: array[0..11] of Char;
+    prt: DWORD;
     size: Word ;
-    count: Word ;
+    oemcount: Word ;
     addres_apic: DWORD;
     resd: DWORD ;
   end;
@@ -277,9 +290,23 @@ type
     PageDescriptor: QWORD;
   end;
 
+  PWallClock = ^TWallClock;
+  TWallClock = packed record
+    version: DWORD;
+    pad0: DWORD;
+    tsc_timestamp: QWORD;
+    system_time: QWORD;
+    tsc_to_system_mul: DWORD;
+    tsc_shift: BYTE;
+    flags: BYTE;
+    pad: array[0..1] of BYTE;
+  end;
+
 var
   idt_gates: PInterruptGateArray; // Pointer to IDT
-  mbpointer: Pointer;
+  // pointer to start of the day structure
+  sodpointer: Pointer;
+  ToroClock: TWallClock;
 
 procedure CaptureInt(int: Byte; Handler: Pointer);
 begin
@@ -400,6 +427,26 @@ begin
   Delay(10);
 end;
 
+procedure write_ioapic_reg(offset, val: dword);
+var
+  tmp: ^dword;
+begin
+  tmp := pointer(IOApic_Base);
+  tmp^ := offset;
+  tmp := pointer(IOApic_Base + $10);
+  tmp^ := val;
+end;
+
+function read_ioapic_reg(offset: dword): dword;
+var
+  tmp: ^dword;
+begin
+  tmp := pointer(IOApic_Base);
+  tmp^:= offset;
+  tmp := pointer(IOApic_Base+ $10);
+  Result := tmp^;
+end;
+
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
   @spin:
@@ -447,6 +494,15 @@ asm
   nop;
   nop;
   nop;
+end;
+
+procedure EnableLint1;
+var
+ vector: ^DWORD;
+begin
+  vector := Pointer(lint1_reg);
+  // lint1 triggers vector 2 as NMI (4) 
+  vector^ := 2 or (4 shl 8);
 end;
 
 procedure Delay(ms: LongInt);
@@ -497,59 +553,21 @@ const
   Mask_Port : array[0..1] of Byte = ($21,$A1);
   PIC_MASK: array [0..7] of Byte =(1,2,4,8,16,32,64,128);
 
-// relocate the irq to 31-46
-procedure RelocateIrqs ;
-asm
-  mov   al , 00010001b
-  out   20h, al
-  nop
-  nop
-  nop
-  out  0A0h, al
-  nop
-  nop
-  nop
-  mov   al , 20h
-  out   21h, al
-  nop
-  nop
-  nop
-  mov   al , 28h
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 00000100b
-  out   21h, al
-  nop
-  nop
-  nop
-  mov   al , 2
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 1
-  out   21h, al
-  nop
-  nop
-  nop
-  out  0A1h, al
-  nop
-  nop
-  nop
-  mov   al , 0FFh
-  out   21h, al
-  mov   al , 0FFh
-  out  0A1h, al
-end;
-
 procedure IrqOn(irq: Byte);
 begin
   if irq > 7 then
     write_portb(read_portb($a1) and (not pic_mask[irq-8]), $a1)
   else
     write_portb(read_portb($21) and (not pic_mask[irq]), $21);
+end;
+
+const
+  Level = $8000;
+// TODO: all irq are sent to core #0
+procedure IOApicIrqOn(Irq: Byte);
+begin
+  // from linux, set to level otherwise remote-IRR is not clear
+  write_ioapic_reg(irq * 2 + $10, irq + BASE_IRQ + Level);
 end;
 
 procedure IrqOff(irq: Byte);
@@ -721,10 +739,13 @@ begin
   Result := speed;
 end;
 
-// add "-device isa-debug-exit,iobase=0xf4,iosize=0x04"
 procedure ShutdownInQemu;
 begin
-  write_portb(0, $f4);
+  // the following code triggers a triple-fault
+  asm
+    lidt [$400]
+    db $ff, $ff
+  end;
 end;
 
 // reboot using keyboard
@@ -799,13 +820,12 @@ type
   end;
   PInt15h_info = ^Int15h_info;
 
-  Pmbentry = ^Tmbentry;
-
-  Tmbentry = packed record
-    Size: dword;
+  PPVHentry = ^TPVHentry;
+  TPVHentry = packed record
     Addr: qword;
-    Len: qword;
+    Size: qword;
     Tp: dword;
+    res: dword;
   end;
 
 const
@@ -817,14 +837,14 @@ var
 function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
-  DescMB: Pmbentry;
-  mbp: ^DWORD;
+  DescMB: PPVHentry;
+  mbp: ^QWORD;
 begin
   if ID > CounterID then
     Result := 0
   else
     Result := SizeOf(TMemoryRegion);
-  if mbpointer = nil then
+  if sodpointer = nil then
   begin
     Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
     Buffer.Base := Desc.Base;
@@ -832,26 +852,30 @@ begin
     Buffer.Flag := Desc.tipe;
   end
   else begin
-    mbp := Pointer(mbpointer + 48);
+    mbp := Pointer(sodpointer + PVH_MEMMAP_PADDR);
     DescMB := Pointer(PtrUInt(mbp^));
     Inc(DescMB, ID-1);
     Buffer.Base := DescMB.Addr;
-    Buffer.Length := DescMB.Len;
+    Buffer.Length := DescMB.Size;
     Buffer.Flag := DescMB.Tp;
   end;
 end;
 
+const
+  E820_TYPE_RAM = 1;
+
 // Count available memory after $100000
 procedure MemoryCounterInit;
 var
-  Magic, maplen, mapaddr: ^DWORD;
+  Magic: ^DWORD;
+  maplen, mapaddr: ^QWORD;
   Desc: PInt15h_info;
-  DescMB: Pmbentry;
+  DescMB: PPVHentry;
   Count: DWORD;
 begin
   CounterID := 0;
   AvailableMemory := 0;
-  if mbpointer = nil then
+  if sodpointer = nil then
   begin
     Magic := Pointer(INT15H_TABLE);
     Desc := Pointer(INT15H_TABLE);
@@ -867,17 +891,17 @@ begin
     CounterID := CounterID div SizeOf(Int15h_info);
   end else
   begin
-    maplen := mbpointer + 44;
-    mapaddr := mbpointer + 48;
+    maplen := sodpointer + PVH_MEMMAP_ENTRIES;
+    mapaddr := sodpointer + PVH_MEMMAP_PADDR;
     DescMB := Pointer(PtrUInt(mapaddr^));
     Count := maplen^;
     while count <> 0 do
     begin
-      if (DescMB.tp = 1) and (DescMB.addr >= $100000) then
-        AvailableMemory := AvailableMemory + DescMB.Len;
+      if (DescMB.tp = E820_TYPE_RAM) and (DescMB.addr >= $100000) then
+        AvailableMemory := AvailableMemory + DescMB.Size;
       Inc(DescMB);
       Inc(CounterID);
-      Dec(Count, sizeof(Tmbentry));
+      Dec(Count, 1);
     end;
   end;
 end;
@@ -887,39 +911,60 @@ begin
   val := (val and 15) + ((val shr 4) * 10);
 end;
 
+// this is not used
+procedure KVMInstallClock(PClock: PWallClock);
+var
+  l, h: DWORD;
+begin
+  l := (PTrUInt(PClock) and $ffffffff ) or 1;
+  h := PTrUInt(PClock) shr 32;
+  asm
+    mov eax, l
+    mov edx, h
+    mov ecx, MSR_KVM_SYSTEM_TIME_NEW
+    wrmsr
+  end;
+end;
+
+Type
+  PKVMClock = ^KVMClock;
+  KVMClock = packed record
+    version: DWORD;
+    sec: DWORD;
+    nsec: DWORD;
+  end;
+
+procedure KVMGetClock(Clock: PKVMClock);
+var
+  l, h: DWORD;
+begin
+  l := PTrUInt(Clock) and $ffffffff;
+  h := PTrUInt(Clock) shr 32;
+  asm
+    mov eax, l
+    mov edx, h
+    mov ecx, MSR_KVM_WALL_CLOCK_NEW
+    wrmsr
+    sfence
+  end;
+end;
+
 procedure Now(Data: PNow);
 var
-  Sec, Min, Hour,
-  Day, Mon, Year: LongInt;
+  Sec, Min, Hour: LongInt;
+  clk: KVMClock;
 begin
-  repeat
-    Sec  := Cmos_Read(0);
-    Min  := Cmos_Read(2);
-    Hour := Cmos_Read(4);
-    Day  := Cmos_Read(7);
-    Mon  := Cmos_Read(8);
-    Year := Cmos_Read(9);
-  until Sec = Cmos_Read(0);
-  Bcd_To_Bin(Sec);
-  Bcd_To_Bin(Min);
-  Bcd_To_Bin(Hour);
-  Bcd_To_Bin(Day);
-  Bcd_To_Bin(Mon);
-  Bcd_To_Bin(Year);
-  if 0 >= Mon then
-  begin
-    Mon := Mon + 12 ;
-    Year := Year + 1;
-  end;
-  Data.Sec := sec;
+  Sec  := (StartTime.sec + (ToroClock.system_time div 1000000000)) mod 86400;
+  Min  := (Sec div 60) mod 60 + StartTime.Min;
+  Hour := Sec div 3600 + StartTime.Hour;
+  Sec := Sec mod 60;
+  Data.Sec := Sec;
   Data.Min := min;
   Data.Hour := hour;
-  Data.Month:= Mon;
-  Data.Day := Day;
-  if (Year < 90) then
-    Data.Year := 2000 + Year
-  else
-    Data.Year := 1900 + Year;
+  // TODO: add year, month and day
+  Data.Month:= 2;
+  Data.Day := 27;
+  Data.Year := 1987;
 end;
 
 function SecondsBetween(const ANow: TNow;const AThen: TNow): Longint;
@@ -961,49 +1006,6 @@ procedure Apic_IRQ_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
 asm
   call eoi_apic
   db $48, $cf
-end;
-
-const
- PCI_CONF_PORT_INDEX = $CF8;
- PCI_CONF_PORT_DATA  = $CFC;
-
-function PciReadDword(const bus, device, func, regnum: UInt32): UInt32;
-var
-  Send: DWORD;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum shl 2);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  read_portd(@Send, PCI_CONF_PORT_DATA);
-  Result := Send;
-end;
-
-function PciReadByte(const bus, device, func: DWORD; offset: Byte): Byte;
-var
-  tmp, off: DWORD;
-begin
-  tmp := PciReadDword(bus, device, func, offset shr 2);
-  off := offset mod 4;
-  Result := (tmp shr (off shl 3)) and $ff;
-end;
-
-function PciReadWord(const bus, device, func, regnum: UInt32): Word;
-var
-  Send: DWORD;
-  tmp: Word;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  tmp := read_portw(PCI_CONF_PORT_DATA);
-  Result := (tmp shr ((regnum and 2) * 8 )) and $ffff;
-end;
-
-procedure PciWriteWord (const bus, device, func, regnum, value: Word);
-var
-  Send: DWORD;
-begin
-  Send := $80000000 or (bus shl 16) or (device shl 11) or (func shl 8) or (regnum and $fc);
-  write_portd(@Send, PCI_CONF_PORT_INDEX);
-  write_portw(value, PCI_CONF_PORT_DATA);
 end;
 
 // Initialize SSE and SSE2 extensions
@@ -1090,7 +1092,7 @@ asm
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
-  mov mbpointer, rbx
+  mov sodpointer, rbx
   call KernelStart
 end;
 {$ENDIF}
@@ -1120,36 +1122,30 @@ begin
   esp_tmp := Pointer(SizeUInt(esp_tmp) - size_start_stack);
 end;
 
-// Detect APICs on MP table
+// Detect cores by using the MP table
+// The algorithm assumes that the first structure
+// is a p_mp_processor_entry and they are stored
+// one after the other
 procedure mp_apic_detect(table: p_mp_table_header);
 var
   m: ^Byte;
-  I: LongInt;
   cp: p_mp_processor_entry ;
 begin
-  m := Pointer(SizeUInt(table) + SizeOf(mp_table_header));
-  I := 0;
-  while I < table.count do
+  m := Pointer(PtrUInt(table) + SizeOf(mp_table_header));
+  while (m^ = cpu_type) and (CPU_COUNT < MAX_CPU-1) do
   begin
-    if (m^  = cpu_type) and (CPU_COUNT < MAX_CPU-1) then
+    cp := Pointer(m);
+    Inc(CPU_COUNT);
+    Cores[cp.Apic_id].ApicID := cp.Apic_id;
+    Cores[cp.Apic_id].Present := True;
+    m := Pointer(PtrUInt(m)+SizeOf(mp_processor_entry));
+    // boot core doesn't need initialization
+    if (cp.flags and 2 ) = 2 then
     begin
-      cp := Pointer(m);
-      Inc(CPU_COUNT);
-      Cores[cp.Apic_id].ApicID := cp.Apic_id;
+      Cores[cp.Apic_id].CpuBoot := True;
+      Cores[cp.Apic_id].InitConfirmation := True;
       Cores[cp.Apic_id].Present := True;
-      m := Pointer(SizeUInt(m)+SizeOf(mp_processor_entry));
-      // boot core doesn't need initialization
-      if (cp.flags and 2 ) = 2 then
-      begin
-        Cores[cp.Apic_id].CpuBoot := True;
-        Cores[cp.Apic_id].InitConfirmation := True;
-	Cores[cp.Apic_id].Present := True;
-      end;
-    end else
-    begin
-      m := Pointer(SizeUInt(m)+SizeOf(mp_apic_entry));
     end;
-    Inc(I);
   end;
 end;
 
@@ -1158,14 +1154,15 @@ procedure mp_table_detect;
 var
   find: p_mp_floating_struct;
 begin
-  find := Pointer(MP_START_ADD) ;
-  while SizeUInt(find) < $fffff do
+  find := Pointer(0) ;
+  while PtrUInt(find) < $fffff do
   begin
-    if (find.signature[0]='_') and (find.signature[1]='M') then
+    if (find.signature[0]='_') and (find.signature[1]='M')
+    and (find.signature [2] = 'P') and (find.signature[3] = '_') then
     begin
-      if SizeUInt(find.phys) <> 0 then
+      if PtrUInt(find.phys) <> 0 then
       begin
-        mp_apic_detect(Pointer(SizeUint(find.phys)));
+        mp_apic_detect(Pointer(PtrUInt(find.phys)));
         Exit;
       end;
       Exit;
@@ -1174,123 +1171,7 @@ begin
    end;
 end;
 
-type
-  TAcpiRsdp = packed record
-    Signature: array[0..7] of XChar;
-    Checksum: Byte;
-    oem_id:array[0..5] of Byte;
-    Revision: Byte;
-    rsdt_address: DWORD;
-    Length: DWORD;
-    xsdt_address: QWord;
-    ext_checksum: Byte;
-    Reserved: array[0..2] of Byte;
-  end;
-  PAcpiRsdp = ^TAcpiRsdp;
-
-  TAcpiTableHeader = packed record
-    Signature: array[0..3] of XChar;
-    Length: DWORD;
-    Revision: Byte;
-    Checksum: Byte;
-    oem_id: array[0..5] of XChar;
-    oem_table_id : array[0..7] of XChar;
-    oem_revision: DWORD;
-    asl_compiler_id:array[0..3] of XChar;
-    asl_compiler_revision: DWORD;
-  end;
-  PAcpiTableHeader = ^TAcpiTableHeader;
-
-  TAcpiRstd = packed record
-    Header: TAcpiTableHeader;
-    Entry: array[0..8] of DWORD;
-  end;
-  PAcpiRstd = ^TAcpiRstd;
-
-  TAcpiMadt = packed record
-    Header: TAcpiTableHeader;
-    ApicAddr: DWORD;
-    Res: DWORD;
-  end;
-  PAcpiMadt = ^TAcpiMadt;
-
-  TAcpiMadtEntry = packed record
-    nType: Byte;
-    Length: Byte;
-  end;
-  PAcpiMadtEntry = ^TAcpiMadtEntry;
-
-  TAcpiMadtProcessor = packed record
-    Header: TAcpiMadtEntry;
-    AcpiId: Byte;
-    ApicId: Byte;
-    Flags: DWORD;
-  end;
-  PAcpiMadtProcessor = ^TAcpiMadtProcessor;
-
-procedure acpi_table_detect;
-var
-  Counter, J: LongInt;
-  Entry: PAcpiMadtEntry;
-  madt: PAcpiMadt;
-  MadEnd: Pointer;
-  P: PChar;
-  Processor: PAcpiMadtProcessor;
-  RSDP: PAcpiRsdp;
-  RSTD: PAcpiRstd;
-  TableHeader: PAcpiTableHeader;
-begin
-  P := Pointer($e0000);
-  while p < Pointer($100000) do
-  begin
-    // looking for RSD sign
-    if (p[0] = 'R') and (p[1]='S') and (p[2]='D') then
-    begin
-      RSDP :=  Pointer(p);
-      // maybe some sing detection on RSTD
-      RSTD := Pointer(QWord(RSDP.rsdt_address));
-      // number of entries in table
-      Counter:= (RSTD.Header.Length - SizeOf(TAcpiTableHeader)) div 4;
-      for J := 0 to Counter-1 do
-      begin
-        TableHeader := Pointer(QWord(RSTD.Entry[j])); // table header
-        // look for the "APIC" signature
-        if (TableHeader.Signature[0] = 'A') and (TableHeader.Signature[1] = 'P')  then
-        begin
-          madt := Pointer(TableHeader);
-          MadEnd := Pointer(SizeUInt(madt) + TableHeader.Length);
-          Entry := Pointer(SizeUInt(madt) + SizeOf(TAcpiMadt));
-          while SizeUInt(Entry) < SizeUInt(MadEnd) do
-          begin // that 's a new Processor.
-            if Entry.nType=0 then
-            begin
-              Processor := Pointer(Entry);
-              // Is Processor Enabled ??
-              if Processor.flags and 1 = 1 then
-              begin
-                Inc(CPU_COUNT);
-                Cores[Processor.apicid].ApicID := Processor.apicid;
-                Cores[Processor.apicid].Present := True;
-                // CPU#0 is a BOOT cpu
-                if Processor.apicid = 0 then
-                begin
-                  Cores[Processor.apicid].CPUBoot := True;
-                  Cores[Processor.apicid].InitConfirmation := True;
-		  Cores[Processor.apicid].Present := True;
-                end;
-              end;
-            end;
-            Entry := Pointer(SizeUInt(Entry) + Entry.Length);
-          end;
-        end;
-      end;
-      Break;
-    end;
-    Inc(P, 16);
-  end;
-end;
-
-// Detect all Cores using MP's Intel tables and ACPI Tables.
+// detect cores using MP's Intel table
 procedure SMPInitialization;
 var
   J: LongInt;
@@ -1304,9 +1185,7 @@ begin
     Cores[J].InitProc := nil;
   end;
   CPU_COUNT := 0;
-  acpi_table_detect; // ACPI detection
-  if CPU_COUNT = 0 then
-    mp_table_detect; // if cpu_count is zero then use a MP Tables
+  mp_table_detect;
   if CPU_COUNT = 0 then
     CPU_COUNT := 1;
   // setting boot core
@@ -1463,7 +1342,7 @@ end;
 
 procedure ReadWriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
 asm
-  mfence
+  lock add DWORD [rsp] - 4, 0
 end;
 
 procedure WriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
@@ -1495,14 +1374,15 @@ end;
 procedure ArchInit;
 var
   I: LongInt;
-  tmp: ^DWORD;
+  tmp: ^QWORD;
   p: PChar;
+  clk: KVMClock;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
-  if mbpointer <> Nil then
+  if sodpointer <> Nil then
   begin
-    tmp := mbpointer + 16;
+    tmp := sodpointer + PVH_CMDLINE_PADDR;
     p := PChar(PtrUInt(tmp^));
     KernelParam := Pointer(Kernel_Param);
     while p^ <> #0 do
@@ -1521,20 +1401,21 @@ begin
     KernelParamEnd := KernelParam;
     KernelParam := Pointer(Kernel_Param);
   end;
-  RelocateIrqs;
   MemoryCounterInit;
   CacheManagerInit;
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
-  IrqOn(2);
-  EnableNMI;
-  for I := 33 to 47 do
-    CaptureInt(I, @IRQ_Ignore);
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);
   CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
-  Now(@StartTime);
+  KVMInstallClock(@ToroClock);
+  KVMGetClock(@clk);
+  StartTime.Sec := clk.sec mod 86400;
+  StartTime.Min := (StartTime.Sec  div 60) mod 60;
+  StartTime.Hour := StartTime.Sec div 3600;
+  StartTime.Sec := StartTime.Sec  mod 60;
   enable_local_apic;
+  EnableLint1;
   SMPInitialization;
   SSEInit;
   MWaitInit;

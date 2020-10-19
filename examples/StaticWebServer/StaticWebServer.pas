@@ -34,28 +34,19 @@ uses
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\drivers\Pci.pas',
-  // Ide in '..\..\rtl\drivers\IdeDisk.pas',
+  VirtIO in '..\..\rtl\drivers\VirtIO.pas',
   VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-  Fat in '..\..\rtl\drivers\Fat.pas',
   VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
-  VirtIONet in '..\..\rtl\drivers\VirtIONet.pas',
   Console in '..\..\rtl\drivers\Console.pas',
   Network in '..\..\rtl\Network.pas';
 
 const
-  MaskIP: array[0..3] of Byte   = (255, 255, 255, 0);
-  Gateway: array[0..3] of Byte  = (192, 100, 200, 1);
-  DefaultLocalIP: array[0..3] of Byte  = (192, 100, 200, 100);
-
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
   ContentLen = #13#10'Content-length: ';
-  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroHttpServer'#13#10''#13#10;
+  ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
-  SERVICE_TIMEOUT = 20000;
+  SERVICE_TIMEOUT = 1000;
   Max_Path_Len = 200;
-  SERVICE_BACKLOG = 100;
 
 type
   PRequest = ^TRequest;
@@ -67,9 +58,9 @@ type
 
 var
   HttpServer, HttpClient: PSocket;
-  LocalIp: array[0..3] of Byte;
   tid: TThreadID;
   rq: PRequest;
+  netdriver: PChar;
   fsdriver: PChar;
   blkdriver: PChar;
 
@@ -169,7 +160,7 @@ begin
   Result := 0;
   if SysStatFile(entry, @idx) = 0 then
   begin
-    WriteConsoleF ('\t Http Server: %p not found\n',[PtrUInt(entry)]);
+    WriteConsoleF ('%p not found\n',[PtrUInt(entry)]);
     Exit;
   end else
     Buf := ToroGetMem(idx.Size + 1);
@@ -179,7 +170,7 @@ begin
     indexSize := SysReadFile(tmp, idx.Size, Buf);
     pchar(Buf+idx.Size)^ := #0;
     SysCloseFile(tmp);
-    WriteConsoleF('\t Http Server: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
+    WriteConsoleF('\t WebServer: %p loaded, size: %d bytes\n', [PtrUInt(entry),idx.Size]);
     Result := idx.Size;
     Content := Buf;
   end else
@@ -216,8 +207,7 @@ begin
       else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
         ProcessRequest(Socket, content, len, 'Image/png')
       else
-        WriteConsoleF('\t Http Server: file format not found\n', []);
-      WriteConsoleF('\t Http Server: closing from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
+        WriteConsoleF('\t WebServer: file format not found\n', []);
       SysSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
@@ -229,7 +219,6 @@ begin
     begin
       if not SysSocketSelect(Socket, SERVICE_TIMEOUT) then
       begin
-        WriteConsoleF('\t Http Server: closing for timeout from %d:%d\n', [Socket.DestIp, Socket.DestPort]);
         SysSocketClose(Socket);
         rq := Socket.UserDefined;
         ToroFreeMem(rq.BufferStart);
@@ -248,50 +237,30 @@ begin
 end;
 
 begin
-  // default parameters
   if KernelParamCount = 0 then
   begin
-    DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil);
-    DedicateBlockDriver('virtioblk', 0);
-    SysMount('fat', 'virtioblk', 0)
-  end else
+    WriteConsoleF('Wrong number of kernel parameters, exiting\n', []);
+    Exit;
+  end
+  else
   begin
-    // parameters are [ip/vsocket],[fsdriver],[blkdriver]
-    // configure networking
-    // TODO: compare the full virtiosocket string
-    if GetKernelParam(1)[0] = 'v' then
-      DedicateNetworkSocket('virtiovsocket')
-    else If GetKernelParam(1)^ = #0 then
-    begin
-      DedicateNetwork('virtionet', DefaultLocalIP, Gateway, MaskIP, nil)
-    end else
-    begin
-      IPStrtoArray(GetKernelParam(1), LocalIp);
-      DedicateNetwork('virtionet', LocalIP, Gateway, MaskIP, nil);
-    end;
-    // configure filesystem
-    if GetKernelParam(2)^ = #0 then
-    begin
-      DedicateBlockDriver('virtioblk', 0);
-      SysMount('fat', 'virtioblk', 0);
-    end else
-    begin
-      fsdriver := GetKernelParam(2);
-      blkdriver := GetKernelParam(3);
-      DedicateBlockDriver(blkdriver, 0);
-      SysMount(fsdriver, blkdriver, 0);
-    end;
+    netdriver := GetKernelParam(0);
+    DedicateNetworkSocket(netdriver); 
+    fsdriver := GetKernelParam(1);
+    blkdriver := GetKernelParam(2);
+    DedicateBlockDriver(blkdriver, 0);
+    SysMount(fsdriver, blkdriver, 0);
+    if StrCmp(GetKernelParam(3), 'noconsole', strlen('noconsole')) then
+      HeadLess := True;
   end;
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
-  SysSocketListen(HttpServer, SERVICE_BACKLOG);
-  WriteConsoleF('\t Http Server: listening at %d ..\n',[HttpServer.Sourceport]);
-
+  SysSocketListen(HttpServer, 50);
+  WriteConsoleF('\t WebServer: listening ...\n', []);
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);
-    WriteConsoleF('\t Http Server: new connection from %d:%d\n', [HttpClient.DestIp, HttpClient.DestPort]);
     rq := ToroGetMem(sizeof(TRequest));
     rq.BufferStart := ToroGetMem(Max_Path_Len);
     rq.BufferEnd := rq.BufferStart;

@@ -40,6 +40,7 @@ procedure ConsoleInit;
 
 var
  Color: Byte = 10;
+ HeadLess: Boolean;
 
 const
   HEX_CHAR: array[0..15] of XChar = ('0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F');
@@ -221,9 +222,8 @@ var
   tmp: TNow;
   ValueSt: PAnsiString;
 begin
-  {$IFDEF ToroHeadLess}
+  If HeadLess then
     Exit;
-  {$ENDIF}
   DisableInt;
   SpinLock (3,4,LockConsole);
 
@@ -508,31 +508,22 @@ end;
 
 procedure EnabledConsole;
 begin
-  {$IFDEF ToroHeadLess}
-  {$ELSE}
-    IrqOn(1);
-  {$ENDIF}
+  IrqOn(1);
 end;
 
 procedure DisabledConsole;
 begin
-  {$IFDEF ToroHeadLess}
-  {$ELSE}
-    IrqOff(1);
-  {$ENDIF}
+  IrqOff(1);
 end;
 
 procedure ConsoleInit;
 begin
+  HeadLess := false;
   {$IFDEF UseSerialasConsole}
     write_portb ($83, BASE_COM_PORT+3);
     write_portb (0, BASE_COM_PORT+1);
     write_portb (1, BASE_COM_PORT);
     write_portb (3, BASE_COM_PORT+3);
-  {$ENDIF}
-  {$IFDEF ToroHeadLess}
-  {$ELSE}
-    //CaptureInt(33,@IrqKeyb);
   {$ENDIF}
 end;
 

@@ -43,7 +43,7 @@ if [ -f $qemufile ]; then
    qemuparams=`cat $qemufile`
 else
    # parameters by default
-   qemuparams="-m 16 -smp 1 -nographic -device isa-debug-exit,iobase=0xf4,iosize=0x04"
+   qemuparams="-enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 16 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot"
 fi
 
 # remove all compiled files
@@ -62,19 +62,20 @@ if [ -f $appsrc ]; then
       ../../builder/BuildMultibootKernel.sh $app "$compileropt"
       echo "qemu.args=$qemuparams"
       echo "Press Ctrl-a x to exit emulator"
-      kvm -kernel $appbin $qemuparams $3
+      ~/qemulast/build/x86_64-softmmu/qemu-system-x86_64 -kernel $appbin $qemuparams $3
    elif [ "$imageformat" = "img" ]; then
       fpc $compileropt -TLinux -O2 $appsrc -o$app -Fu../../rtl/ -Fu../../rtl/drivers -MObjfpc
       ../../builder/build 4 $app ../../builder/boot.o $appimg
       echo "qemu.args=$qemuparams"
       echo "Press Ctrl-a x to exit emulator"
-      kvm -drive format=raw,file=$appimg $qemuparams $3
+      ~/qemulast/build/x86_64-softmmu/qemu-system-x86_64 -drive format=raw,file=$appimg $qemuparams $3
    elif [ "$imageformat" = "elf64" ]; then
-      fpc $compileropt -TLinux -O2 $appsrc -o$app -Fu../../rtl/ -Fu../../rtl/drivers -MObjfpc
+      fpc $compileropt -Xm -Si -TLinux -O2 $appsrc -o$app -Fu../../rtl/ -Fu../../rtl/drivers -MObjfpc
    else
       echo "$imageformat is not recognized, exiting"
       exit 1
    fi
+   ~/qemulast/build/x86_64-softmmu/qemu-system-x86_64 -kernel $app $qemuparams $3
 else
    echo "$appsrc does not exist, exiting"
    exit 1

@@ -52,6 +52,7 @@ const
   VIRTIO_VSOCK_OP_CREDIT_UPDATE = 6;
   VIRTIO_VSOCK_TYPE_STREAM = 1;
   VIRTIO_VSOCK_MAX_PKT_BUF_SIZE = 64 * 1024;
+  MAX_NET_NAME = 30;
 
 type
   PNetworkInterface = ^TNetworkInterface;
@@ -145,7 +146,7 @@ type
   end;
 
   TNetworkInterface = record
-    Name: AnsiString;
+    Name: array[0..MAX_NET_NAME-1] of Char;
     Minor: LongInt;
     MaxPacketSize: LongInt;
     SocketType: Longint;
@@ -296,8 +297,8 @@ procedure IPStrtoArray(Ip: Pchar; out Result: array of Byte);
 function ICMPSendEcho(IpDest: TIPAddress; Data: Pointer; len: Longint; seq, id: word): Longint;
 function ICMPPoolPackets: PPacket;
 function SwapWORD(n: Word): Word; {$IFDEF INLINE}inline;{$ENDIF}
-procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
-procedure DedicateNetworkSocket(const Name: AnsiString);
+procedure DedicateNetwork(const Name: PXChar; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetworkSocket(const Name: PXChar);
 
 implementation
 
@@ -1504,10 +1505,9 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch(True);
+      SysSetCoreIdle;
       Continue;
     end;
-    SysThreadActive;
     VPacket := Packet.Data;
     case VPacket.hdr.op of
       VIRTIO_VSOCK_OP_REQUEST:
@@ -1614,10 +1614,10 @@ begin
     Packet := SysNetworkRead;
     if Packet = nil then
     begin
-      SysThreadSwitch(True);
+      //SysThreadSwitch(True);
       Continue;
     end;
-    SysThreadActive;
+    //SysThreadActive;
     EthPacket := Packet.Data;
     case SwapWORD(EthPacket.ProtocolType) of
       ETH_FRAME_ARP:
@@ -1671,7 +1671,7 @@ begin
   Result := True;
 end;
 
-procedure DedicateNetworkSocket(const Name: AnsiString);
+procedure DedicateNetworkSocket(const Name: PXChar);
 var
   Net: PNetworkInterface;
   CPUID: Longint;
@@ -1680,7 +1680,7 @@ begin
   CPUID:= GetApicid;
   while Net <> nil do
   begin
-    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    if StrCmp(@Net.Name, Name, StrLen(Name)) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
     begin
       Net.CPUID := CPUID;
       DedicateNetworks[CPUID].NetworkInterface := Net;
@@ -1697,7 +1697,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetworkSocket: fail, driver not found\n', []); {$ENDIF}
 end;
 
-procedure DedicateNetwork(const Name: AnsiString; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
+procedure DedicateNetwork(const Name: PXChar; const IP, Gateway, Mask: array of Byte; Handler: TThreadFunc);
 var
   Net: PNetworkInterface;
   Network: PNetworkDedicate;
@@ -1709,7 +1709,7 @@ begin
   {$IFDEF DebugNetwork} WriteDebug('DedicateNetwork: dedicating on CPU%d\n', [CPUID]); {$ENDIF}
   while Net <> nil do
   begin
-    if (Net.Name = Name) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
+    if StrCmp(@Net.Name, Name, StrLen(Name)) and (Net.CPUID = -1) and (DedicateNetworks[CPUID].NetworkInterface = nil) then
     begin
       Net.CPUID := CPUID;
       DedicateNetworks[CPUID].NetworkInterface := Net;
@@ -1933,10 +1933,10 @@ begin
   begin
     NetworkDispatcher(Handler);
     Service := GetCurrentThread.NetworkService;
-    if Service.ClientSocket = nil then
-      SysThreadSwitch(True)
-    else
-      SysThreadSwitch(False);
+    // if Service.ClientSocket = nil then
+    //  SysThreadSwitch(True)
+    // else
+    //  SysThreadSwitch(False);
   end;
   Result := 0;
 end;
@@ -2110,7 +2110,6 @@ begin
   SetSocketTimeOut(Socket, WAIT_ACK);
   while True do
   begin
-    SysThreadActive;
     if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
     begin
       ToroFreeMem(Socket.Buffer);
@@ -2122,7 +2121,7 @@ begin
     end
     else if Socket.State = SCK_TRANSMITTING then
       Exit;
-    SysThreadSwitch(True);
+    SysThreadSwitch;
   end;
 end;
 
@@ -2261,7 +2260,6 @@ begin
   while True do
   begin
     NextSocket := Service.ClientSocket;
-    SysThreadActive;
     while NextSocket <> nil do
     begin
       tmp := NextSocket;
@@ -2276,7 +2274,7 @@ begin
         Exit;
       end;
     end;
-    SysThreadSwitch(True);
+    SysThreadSwitch;
   end;
 end;
 
@@ -2368,7 +2366,6 @@ begin
     SetSocketTimeOut(Socket, TimeOut);
     while True do
     begin
-      SysThreadActive;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
       if Socket.State = SCK_LOCALCLOSING then
       begin
@@ -2389,7 +2386,7 @@ begin
         Result := False;
         Exit;
       end;
-      SysThreadSwitch(True);
+      SysThreadSwitch;
     end;
   end;
 end;
@@ -2493,9 +2490,8 @@ begin
 
     while FragLen = Socket.RemoteWinLen - Socket.RemoteWinCount do
     begin
-      SysThreadSwitch(True);
+      SysThreadSwitch;
     end;
-    SysThreadActive;
 
     if FragLen > Socket.RemoteWinLen - Socket.RemoteWinCount then
       FragLen := Socket.RemoteWinLen - Socket.RemoteWinCount;
@@ -2537,6 +2533,3 @@ begin
 end;
 
 end.
-
-
-

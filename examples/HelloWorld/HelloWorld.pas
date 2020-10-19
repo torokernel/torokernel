@@ -3,7 +3,7 @@
 //
 // Clasical example using a minimal kernel to print "Hello World".
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -38,7 +38,6 @@ uses
   Debug in '..\..\rtl\Debug.pas',
   Arch in '..\..\rtl\Arch.pas',
   Filesystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\drivers\Pci.pas',
   Console in '..\..\rtl\drivers\Console.pas';
 
 procedure ShutdownHelloWorld;

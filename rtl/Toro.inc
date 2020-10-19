@@ -17,7 +17,6 @@
 //{$DEFINE UseSerialasConsole}
 //{$DEFINE ShutdownWhenFinished}
 //{$DEFINE ProfileBootTime}
-//{$DEFINE ToroHeadLess}
 //{$DEFINE DebugCrash}
 //{$DEFINE DebugArch}
 //{$DEFINE DebugFS}

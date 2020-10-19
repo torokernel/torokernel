@@ -4,7 +4,7 @@
 // This unit contains the Scheduler and the Interruption Manager.
 // It also does the SMP initialization and contains the API for thread manipulation.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -55,7 +55,6 @@ type
     ThreadID: TThreadID;
     Next: PThread;
     Previous: PThread;
-    NextPollingThread: PThread;
     Parent: PThread;
     IOScheduler: IOInfo;
     State: Byte;
@@ -69,8 +68,6 @@ type
     StackSize: SizeUInt;
     ret_thread_sp: Pointer;
     sleep_rdtsc: Int64;
-    IdleTime: Int64;
-    IsPollThread: Boolean;
     NetworkService: Pointer;
     CPU: PCPU;
   end;
@@ -80,10 +77,7 @@ type
     Idle: Boolean;
     CurrentThread: PThread;
     Threads: PThread;
-    PollingThreads: PThread;
-    PollingThreadsTail: PThread;
-    PollingThreadCount: LongInt;
-    PollingThreadTotal: Longint;
+    LastIRQ: QWORD;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
   end;
 
@@ -114,10 +108,11 @@ procedure SysEndThread(ExitCode: DWORD);
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
-procedure SysThreadSwitch(const Idle: Boolean = False);
+procedure SysThreadSwitch;
 procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
-procedure SysThreadActive;
+procedure UpdateLastIrq;
+procedure SysSetCoreIdle;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -176,7 +171,8 @@ const
   SPINLOCK_BUSY = 4;
   EXCEP_TERMINATION = -1;
   THREADVAR_BLOCKSIZE: DWORD = 0;
-  WAIT_IDLE_THREAD_MS = 200;
+  // this value should be longer than any timer
+  WAIT_IDLE_CORE_MS = 2000;
 
 procedure SystemExit; forward;
 procedure Scheduling(Candidate: PThread); forward;
@@ -211,6 +207,11 @@ begin
   nextaddr:=get_caller_addr(framebp,addr);
   framebp:=nextbp;
   addr:=nextaddr;
+end;
+
+procedure UpdateLastIrq;
+begin
+  CPU[GetApicId].LastIrq := read_rdtsc;
 end;
 
 type
@@ -268,58 +269,9 @@ begin
   raise EDivException.Create ('Division by Zero');
 end;
 
-type
-  ENMI = class(Exception);
-
+// NMI handler just triggers the shutting down procedure
 procedure ExceptNMI;
-var
-  rbx_reg: QWord;
-  rcx_reg: QWord;
-  rax_reg: QWord;
-  rdx_reg: QWord;
-  rsp_reg: QWord;
-  rip_reg: QWord;
-  rbp_reg: QWord;
-  errc_reg: QWord;
-  rflags_reg: Qword;
-  addr: pointer;
 begin
-  errc_reg := 0;
-  asm
-    mov  rbx_reg, rbx
-    mov  rcx_reg, rcx
-    mov  rax_reg, rax
-    mov  rdx_reg, rdx
-    mov  rsp_reg, rsp
-    mov  rbp_reg, rbp
-    mov rbx, rbp
-    mov rax, [rbx] + 8
-    mov rip_reg, rax
-    mov rax, [rbx] + 24
-    mov rflags_reg, rax
-    mov rbp, rbp_reg
-  end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RNMI/n\n',[GetApicid]);
-  WriteConsoleF('Thread#%d registers:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
-  WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
-  WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
-  WriteConsoleF('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-  {$IFDEF DebugCrash}
-     WriteDebug('Exception: NMI\n',[]);
-     WriteDebug('Thread dump:\n',[]);
-     WriteDebug('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
-     WriteDebug('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
-     WriteDebug('rsp: %h, rip: %h,   rflags: %h\n',[rsp_reg, rip_reg, rflags_reg]);
-     WriteDebug('Backtrace:\n',[]);
-  {$ENDIF}
-  WriteConsoleF('Backtrace:\n',[]);
-  get_caller_stackinfo(pointer(rbp_reg), addr);
-  PrintBackTraceStr(pointer(rip_reg));
-  while rbp_reg <> 0 do
-  begin
-    get_caller_stackinfo(pointer(rbp_reg), addr);
-    PrintBackTraceStr(addr);
-  end;
   if @ShutdownProcedure <> nil then
     ShutdownProcedure;
   {$IFDEF EnableDebug}DumpDebugRing;{$ENDIF}
@@ -862,11 +814,7 @@ begin
     CPU[I].ApicID := 0 ;
     CPU[I].CurrentThread := nil;
     CPU[I].Threads := nil;
-    CPU[I].Idle:= False;
-    CPU[I].PollingThreads := nil;
-    CPU[I].PollingThreadsTail := nil;
-    CPU[I].PollingThreadCount:= 0;
-    CPU[I].PollingThreadTotal:= 0;
+    CPU[I].LastIrq := 0;
     for J := 0 to Max_CPU-1 do
     begin
       CPU[I].MsgsToBeDispatched[J] := nil;
@@ -900,19 +848,6 @@ begin
         WriteConsoleF('Core#%d ... /RDown\n/n', [Cores[I].ApicID]);
     end else if Cores[I].CPUBoot then
       WriteConsoleF('Core#0 ... /VUp\n/n',[]);
-  end;
-end;
-
-procedure SysThreadActive;
-var
- T: PThread;
-begin
-  T := GetCurrentThread;
-  if (T.State = tsIdle) then
-  begin
-    T.IdleTime := 0;
-    T.State := tsReady;
-    T.CPU.PollingThreadCount -=1 ;
   end;
 end;
 
@@ -1026,9 +961,6 @@ begin
     NewThread.ThreadID := TThreadID(NewThread);
     NewThread.CPU := @CPU[CPUID];
     NewThread.Parent :=  GetCurrentThread;
-    NewThread.IsPollThread := False;
-    NewThread.NextPollingThread:= nil;
-    NewThread.IdleTime:= 0;
     ip_ret := NewThread.ret_thread_sp;
     Dec(ip_ret);
     ip_ret^ := PtrUInt(@ThreadMain);
@@ -1048,7 +980,7 @@ begin
     NewThreadMsg.Next := nil;
     AddThreadMsg(@NewThreadMsg);
     Current.State := tsSuspended;
-    SysThreadSwitch(False);
+    SysThreadSwitch;
     Result := NewThreadMsg.RemoteResult;
   end;
 end;
@@ -1066,7 +998,7 @@ end;
 
 procedure ThreadExit(Schedule: Boolean);
 var
-  CurrentThread, NextThread, tmp: PThread;
+  CurrentThread, NextThread: PThread;
 begin
   CurrentThread := GetCurrentThread ;
   XHeapRelease(CurrentThread.PrivateHeap);
@@ -1082,24 +1014,6 @@ begin
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem(CurrentThread.StackAddress);
-  if CurrentThread.IsPollThread then
-  begin
-    Dec(CurrentThread.CPU.PollingThreadTotal);
-    if CurrentThread.CPU.PollingThreads = CurrentThread then
-    begin
-      CurrentThread.CPU.PollingThreads := CurrentThread.NextPollingThread
-    end else
-    begin
-      tmp := CurrentThread.CPU.PollingThreads;
-      while tmp.NextPollingThread <> CurrentThread do
-      begin
-        tmp := tmp.NextPollingThread;
-      end;
-      tmp.NextPollingThread := CurrentThread.NextPollingThread;
-    end;
-    if CurrentThread.CPU.PollingThreadsTail = CurrentThread then
-      CurrentThread.CPU.PollingThreadsTail := CurrentThread.NextPollingThread;
-  end;
   ToroFreeMem(CurrentThread);
   {$IFDEF DebugProcess} WriteDebug('ThreadExit: ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
   if Schedule then
@@ -1138,7 +1052,7 @@ begin
   if (Thread = nil) or (CurrentThread.ThreadID = ThreadID) then
   begin
     CurrentThread.state := tsSuspended;
-    SysThreadSwitch(False);
+    SysThreadSwitch;
     {$IFDEF DebugProcess} WriteDebug('SuspendThread: Current Threads was Suspended\n',[]); {$ENDIF}
   end else
     Thread.State := tsSuspended;
@@ -1251,8 +1165,6 @@ begin
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
       if Candidate.State = tsReady then
         Break
-      else if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
-        Break
       else if (Candidate.State = tsIOPending) and not Candidate.IOScheduler.DeviceState^ then
       begin
         Candidate.State := tsReady;
@@ -1261,44 +1173,6 @@ begin
         Candidate := Candidate.Next;
     until Candidate = LastThread;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
-    if (Candidate.State = tsIdle) and (CurrentCPU.PollingThreadCount <> CurrentCPU.PollingThreadTotal) then
-    else
-    begin
-      if (Candidate.State <> tsReady) then
-      begin
-        if (CurrentCPU.PollingThreadCount = CurrentCPU.PollingThreadTotal) and (CurrentCPU.PollingThreadCount <> 0) then
-        begin
-          {$IFDEF DebugProcess} WriteDebug('Scheduling: whole system in poll, sleeping\n', []); {$ENDIF}
-          CurrentCPU.Idle := True;
-          // TODO: this is broken, comment it until fix it
-          // hlt;
-          CurrentCPU.Idle := False;
-          {$IFDEF DebugProcess} WriteDebug('Scheduling: waking up from poll mode\n', []); {$ENDIF}
-          Th := CurrentCPU.PollingThreads;
-          while Th <> nil do
-          begin
-            Th.State := tsReady;
-            Th.IdleTime := 0;
-            Dec(CurrentCPU.PollingThreadCount);
-            Th := th.NextPollingThread;
-          end;
-          Continue;
-        end;
-        if NextTurnHalt then
-        begin
-          CurrentCPU.Idle := True;
-          hlt;
-          CurrentCPU.Idle := False;
-          NextTurnHalt := False;
-        end else
-        begin
-          DelayMicro(50);
-          NextTurnHalt := True;
-        end;
-        Continue;
-      end;
-    end;
-    NextTurnHalt := False;
     CurrentCPU.CurrentThread := Candidate;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate), Candidate.State, PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
@@ -1351,7 +1225,7 @@ begin
   end;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
-  WriteConsoleF('Starting MainThread: /V%d/n\n', [InitialThreadID]);
+  WriteConsoleF('Starting MainThread: /V%h/n\n', [InitialThreadID]);
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI
@@ -1364,54 +1238,13 @@ begin
 end;
 
 // Yield the current CPU to the next ready thread
-procedure SysThreadSwitch(const Idle: Boolean = False);
+procedure SysThreadSwitch;
 var
  idletime: Int64;
  tmp: PCPU;
  Thread: PThread;
 begin
   SaveContext;
-  if Idle then
-  begin
-     {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: Idle = True\n', []); {$ENDIF}
-     if not GetCurrentThread.IsPollThread then
-     begin
-      {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: IsPollThread = True\n', []); {$ENDIF}
-      Thread := GetCurrentThread;
-      tmp := Thread.CPU;
-      Thread.IsPollThread:= True;
-      Inc(tmp.PollingThreadTotal);
-      if tmp.PollingThreads = nil then
-      begin
-       tmp.PollingThreads := Thread;
-       tmp.PollingThreadsTail:= Thread;
-      end else begin
-       tmp.PollingThreadsTail.NextPollingThread := Thread;
-       tmp.PollingThreadsTail := Thread;
-      end;
-     end;
-     idletime := GetCurrentThread.IdleTime;
-     if (idletime = 0) then
-     begin
-       GetCurrentThread.IdleTime := read_rdtsc;
-       {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: setting GetCurrentThread.IdleTime = %d\n', [read_rdtsc]); {$ENDIF}
-     end else
-     begin
-       if (read_rdtsc - idletime) > (LocalCpuSpeed * 1000)*WAIT_IDLE_THREAD_MS then
-       begin
-          if GetCurrentThread.State <> tsIdle then
-          begin
-           GetCurrentThread.State := tsIdle;
-           Inc(GetCurrentThread.CPU.PollingThreadCount);
-           {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread in idle state\n', []); {$ENDIF}
-          end;
-        end;
-     end;
-  end else
-  begin
-   {$IFDEF DebugProcess} WriteDebug('SysThreadSwitch: thread is active\n', []); {$ENDIF}
-   SysThreadActive;
-  end;
   Scheduling(nil);
   if CPU[GetApicID].CurrentThread.FlagKill then
   begin
@@ -1515,6 +1348,16 @@ begin
     DumpDebugRing;
   {$ENDIF}
   while True do;
+end;
+
+// Halt core if time since last irq is longer than WAIT_IDLE_CORE_MS
+// otherwise call the scheduler
+procedure SysSetCoreIdle;
+begin
+  If (read_rdtsc - CPU[GetApicId].LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
+    hlt
+  else
+    SysThreadSwitch;
 end;
 
 procedure ProcessInit;

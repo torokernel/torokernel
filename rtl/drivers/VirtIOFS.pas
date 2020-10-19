@@ -3,7 +3,7 @@
 //
 // This unit contains the code of the VirtIOFS driver.
 //
-// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -32,8 +32,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  FileSystem,
-  Pci,
+  FileSystem, VirtIO,
   Arch, Console, Network, Process, Memory;
 
 implementation
@@ -47,7 +46,6 @@ type
   PByte = ^TByte;
   TByte = array[0..0] of byte;
   PVirtioFsConfig = ^TVirtioFsConfig;
-  PVirtIOPciCommonCfg = ^TVirtIOPciCommonCfg;
 
   VirtIOUsedItem = record
     Index: Dword;
@@ -78,24 +76,23 @@ type
 
   PVirtQueue = ^TVirtQueue;
   TVirtQueue = record
-    QueueSize: word;
-    Buffers: PQueueBuffer;
-    Available: PVirtIOAvailable;
-    Used: PVirtIOUsed;
-    LastUsedIndex: word;
-    LastAvailableIndex: word;
-    Buffer: PByte;
-    ChunkSize: dword;
-    NextBuffer: word;
-    Lock: QWord;
+    queue_size: WORD;
+    buffers: PQueueBuffer;
+    available: PVirtIOAvailable;
+    used: PVirtIOUsed;
+    last_used_index: word;
+    last_available_index: word;
+    buffer: PByte;
+    chunk_size: dword;
+    next_buffer: word;
+    lock: QWord;
   end;
 
   TVirtIOFSDevice = record
     IRQ: LongInt;
     tag: PChar;
-    NotifyOffMultiplier: DWORD;
+    Base: QWord;
     FsConfig: PVirtioFsConfig;
-    CommonConfig: PVirtIOPciCommonCfg;
     IsrConfig: ^DWORD;
     QueueNotify: ^WORD;
     HpQueue: TVirtQueue;
@@ -115,36 +112,6 @@ type
   TVirtIOFsConfig = packed record
     tag: array[0..35] of Char;
     numQueues: DWORD;
-  end;
-
-  TVirtIOPciCommonCfg = packed record
-    DeviceFeature_select: DWORD;
-    DeviceFeature: DWORD;
-    DriverFeature_select: DWORD;
-    DriverFeature: DWORD;
-    MsixConfig: WORD;
-    NumQueues: WORD;
-    DeviceStatus: Byte;
-    ConfigGeneration: Byte;
-    QueueSelect: WORD;
-    QueueSize: WORD;
-    QueueMsixVector: WORD;
-    QueueEnable: WORD;
-    QueueNotifyOff: WORD;
-    QueueDesc: QWORD;
-    QueueAvail: QWORD;
-    QueueUsed: QWORD;
-  end;
-
-  TVirtIOPciCap = packed record
-    CapVndr: Byte;
-    CapNext: Byte;
-    CapLen: Byte;
-    CfgType: Byte;
-    Bar: Byte;
-    Padding: array [0..2] of Byte;
-    Offset: DWORD;
-    Length: DWORD;
   end;
 
   TFuseInHeader = packed record
@@ -287,18 +254,11 @@ const
   VIRTIO_DRIVER_OK = 4;
   VIRTIO_DESC_FLAG_WRITE_ONLY = 2;
   VIRTIO_DESC_FLAG_NEXT = 1;
-  VIRTIO_ID_FS = $105a;
 
-  VIRTIO_PCI_CAP_DEVICE_CFG = 4;
-  VIRTIO_PCI_CAP_ISR_CFG = 3;
-  VIRTIO_PCI_CAP_COMMON_CFG = 1;
-  VIRTIO_PCI_CAP_NOTIFY_CFG = 2;
-
-  PCI_CAP_ID_VNDR = 9;
   DEVICE_NEEDS_RESET = 64;
   FUSE_ROOT_ID = 1;
 
-  // The values come from
+  // These values come from
   // FUSE_KERNEL_VERSION and FUSE_KERNEL_MINOR_VERSION
   FUSE_MAJOR_VERSION = 7;
   FUSE_MINOR_VERSION = 31;
@@ -347,105 +307,221 @@ const
 
   ROOT_UID = 0;
 
+  VIRTIO_ID_FS = $1a;
+  MMIO_MODERN = 2;
+  MMIO_VERSION = 4;
+  MMIO_SIGNATURE = $74726976;
+  MMIO_DEVICEID = $8;
+  MMIO_QUEUENOTIFY = $50;
+  MMIO_CONFIG = $100;
+  MMIO_FEATURES = $10;
+  MMIO_STATUS = $70;
+  MMIO_GUESTFEATURES = $20;
+  MMIO_QUEUESEL = $30;
+  MMIO_QUEUENUMMAX = $34;
+  MMIO_QUEUENUM = $38;
+  MMIO_QUEUEREADY = $44;
+  MMIO_GUESTPAGESIZE = $28;
+  MMIO_QUEUEPFN = $40;
+  MMIO_QUEUEALIGN = $3C;
+  MMIO_INTSTATUS = $60;
+  MMIO_INTACK = $64;
+  MMIO_READY = $44;
+  MMIO_DESCLOW = $80;
+  MMIO_DESCHIGH = $84;
+  MMIO_AVAILLOW = $90;
+  MMIO_AVAILHIGH = $94;
+  MMIO_USEDLOW = $a0;
+  MMIO_USEDHIGH = $a4;
+
 var
   FSVirtIO: TVirtIOFSDevice;
 
 function VirtioFSLookUpInode(Ino: PInode; Name: PXChar): PInode; forward;
+procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord); forward;
+procedure VirtIOProcessQueue(vq: PVirtQueue); forward;
 
-function VirtIOGetDeviceFeatures(Dev: PVirtIOPciCommonCfg): DWORD;
+procedure SetDeviceStatus(Base: QWORD; Value: DWORD);
+var
+  status: ^DWORD;
 begin
-  Result := Dev.DeviceFeature;
+  status := Pointer(Base + MMIO_STATUS);
+  status^ := Value;
+  ReadWriteBarrier;
+end;
+
+function GetDeviceStatus (Base: QWORD): DWORD;
+var
+  status: ^DWORD;
+begin
+  status := Pointer(Base + MMIO_STATUS);
+  Result := status^;
+end;
+
+function VirtIOGetDeviceFeatures(Base: QWORD): DWORD;
+var
+  value: ^DWORD;
+begin
+  value := Pointer(BASE + MMIO_FEATURES);
+  Result := value^;
 end;
 
 // Reset device and negotiate features
-function VirtIONegociateFeatures(Dev: PVirtIOPciCommonCfg; Features: DWORD): Boolean;
+function VirtIONegociateFeatures(Base: QWORD; Features: DWORD): Boolean;
 var
   devfeat: DWORD;
+  status: ^DWORD;
 begin
   Result := False;
-  Dev.DeviceStatus := 0;
-  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE;
-  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER;
-  devfeat := Dev.DeviceFeature;
+  status := Pointer (BASE + MMIO_STATUS);
+  status^ := 0;
+  status^ := VIRTIO_ACKNOWLEDGE;
+  status^ := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER;
+  devfeat := VirtIOGetDeviceFeatures(Base);
   devfeat := devfeat and Features;
   // TODO: To check if this is the right field
-  Dev.DeviceFeature_select := devfeat;
-  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK;
-  if ((Dev.DeviceStatus and VIRTIO_FEATURES_OK) = 0) then
+  //guestfeatures := Pointer (BASE + MMIO_GUESTFEATURES);
+  // TODO: the features to negociate are not clear so just ignore them
+  // This should be replaced with something better
+  //guestfeatures^ := devfeat;
+  status^ := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK;
+  if ((status^ and VIRTIO_FEATURES_OK) = 0) then
     Exit;
   Result := True;
 end;
 
-function VirtIOInitQueue(Dev: PVirtIOPciCommonCfg; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
 var
-  sizeOfBuffers: DWORD;
-  sizeofQueueAvailable: DWORD;
-  sizeofQueueUsed: DWORD;
+  j: LongInt;
+  QueueSize, sizeOfBuffers: DWORD;
+  sizeofQueueAvailable, sizeofQueueUsed: DWORD;
   buff: PChar;
+  bi: TBufferInfo;
+  QueueSel, EnableQueue: ^DWORD;
+  QueueNumMax, QueueNum: ^DWORD;
+  AddrLow: ^DWORD;
 begin
   Result := False;
   FillByte(Queue^, sizeof(TVirtQueue), 0);
-  Dev.QueueSelect := QueueId;
-  Queue.QueueSize := Dev.QueueSize;
-  sizeOfBuffers := (sizeof(TQueueBuffer) * Queue.QueueSize);
-  sizeofQueueAvailable := (2*sizeof(WORD)+2) + (Queue.QueueSize*sizeof(WORD));
-  sizeofQueueUsed := (2*sizeof(WORD)+2)+(Queue.QueueSize*sizeof(VirtIOUsedItem));
+
+  QueueSel := Pointer(Base + MMIO_QUEUESEL);
+  QueueSel^ := QueueId;
+  ReadWriteBarrier;
+
+  QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
+  QueueSize := QueueNumMax^;
+  if QueueSize = 0 then
+    Exit;
+  Queue.queue_size := QueueSize;
+
+  // set queue size
+  QueueNum := Pointer (Base + MMIO_QUEUENUM);
+  QueueNum^ := QueueSize;
+  ReadWriteBarrier;
+
+  sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
+  sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));
+  sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
+
   // buff must be 4k aligned
-  buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2);
-  FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + 4096 * 2, 0);
-  buff := buff + (4096 - PtrUInt(buff) mod 4096);
+  buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2);
+  If buff = nil then
+    Exit;
+  FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2, 0);
+  buff := buff + (PAGE_SIZE - PtrUInt(buff) mod PAGE_SIZE);
+
   // 16 bytes aligned
   Queue.buffers := PQueueBuffer(buff);
+
   // 2 bytes aligned
   Queue.available := @buff[sizeOfBuffers];
+
   // 4 bytes aligned
-  Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable+$0FFF) and not $FFF)]);
-  Queue.NextBuffer:= 0;
+  Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable + $0FFF) and not($0FFF))]);
+  Queue.next_buffer := 0;
   Queue.lock := 0;
-  Dev.QueueDesc := QWORD(Queue.buffers);
-  Dev.QueueAvail := QWORD(Queue.available);
-  Dev.QueueUsed := QWORD(Queue.used);
-  Dev.QueueEnable := 1;
-  Dev.DeviceStatus := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK or VIRTIO_DRIVER_OK;
-  if ((Dev.DeviceStatus and DEVICE_NEEDS_RESET) = DEVICE_NEEDS_RESET) then
-    Exit;
+	
+  AddrLow := Pointer(Base + MMIO_DESCLOW);
+  AddrLow^ := DWORD(PtrUint(Queue.buffers) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_DESCHIGH);
+  AddrLow^ := 0;
+
+  AddrLow := Pointer(Base + MMIO_AVAILLOW);
+  AddrLow^ := DWORD(PtrUInt(Queue.available) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_AVAILHIGH);
+  AddrLow^ := 0;
+
+  AddrLow := Pointer(Base + MMIO_USEDLOW);
+  AddrLow^ := DWORD(PtrUInt(Queue.used) and $ffffffff);
+  AddrLow := Pointer(Base + MMIO_USEDHIGH);
+  AddrLow^ := 0;
+  
+  EnableQueue := Pointer(Base + MMIO_QUEUEREADY);
+  EnableQueue^ := 1;
+
+  // Device queues are fill
   if HeaderLen <> 0 then
   begin
-    Queue.Buffer := ToroGetMem(queue.QueueSize * (HeaderLen) + 4096);
-    Queue.Buffer := Pointer(PtrUint(queue.Buffer) + (4096 - PtrUInt(queue.Buffer) mod 4096));
-    Queue.ChunkSize := HeaderLen;
+    Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen) + PAGE_SIZE);
+    if Queue.Buffer = nil then
+      Exit;
+    Queue.Buffer := Pointer(PtrUint(queue.Buffer) + (PAGE_SIZE - PtrUInt(Queue.Buffer) mod PAGE_SIZE));
+    Queue.chunk_size := HeaderLen;
+
+    bi.size := HeaderLen;
+    bi.buffer := nil;
+    bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+    for j := 0 to Queue.queue_size - 1 do
+    begin
+      VirtIOSendBuffer(Base, QueueId, Queue, @bi, 1);
+    end;
   end;
+
   Result := True;
 end;
 
-procedure VirtIOSendBuffer(vq: PVirtQueue; BufferInfo:PBufferInfo; count: QWord; QueueIdx: WORD);
+procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
-  index, buffer_index, NextBuffer_index: word;
+  index, buffer_index, next_buffer_index: word;
+  vq: PVirtQueue;
   b: PBufferInfo;
   i: LongInt;
-  QueueBuffer: PQueueBuffer;
+  tmp: PQueueBuffer;
+  QueueNotify: ^DWORD;
 begin
-  index := vq.available.index mod vq.QueueSize;
-  buffer_index := vq.NextBuffer;
+  vq := Queue;
+
+  index := vq.available.index mod vq.queue_size;
+  buffer_index := vq.next_buffer;
   vq.available.rings[index] := buffer_index;
+
   for i := 0 to (count-1) do
   begin
-    NextBuffer_index:= (buffer_index +1) mod vq.QueueSize;
-    b := Pointer(PtrUInt(BufferInfo) + i * sizeof(TBufferInfo));
-    QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    QueueBuffer.flags := b.flags;
-    QueueBuffer.next := NextBuffer_index;
-    QueueBuffer.length := b.size;
+    next_buffer_index:= (buffer_index +1) mod vq.queue_size;
+    b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
+
+    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+    tmp.flags := b.flags;
+    tmp.next := next_buffer_index;
+    tmp.length := b.size;
     if (i <> (count-1)) then
-        QueueBuffer.flags := QueueBuffer.flags or VIRTIO_DESC_FLAG_NEXT;
-    QueueBuffer.address:= PtrUInt(b.buffer);
-    buffer_index := NextBuffer_index;
+        tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
+
+    tmp.address := PtrUInt(b.buffer);
+    buffer_index := next_buffer_index;
   end;
+
   ReadWriteBarrier;
-  vq.NextBuffer := buffer_index;
-  Inc(vq.available.index);
+  vq.next_buffer := buffer_index;
+  vq.available.index:= vq.available.index + 1;
+
+  // notification are not needed
+  // TODO: remove the use of base
   if (vq.used.flags and 1 <> 1) then
-    FsVirtio.QueueNotify^ := QueueIdx;
+  begin
+    QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
+    QueueNotify^ := queue_index;
+  end;
 end;
 
 procedure virtIOFSDedicate(Driver:PBlockDriver; CPUID: LongInt);
@@ -488,7 +564,7 @@ begin
   BufferInfo[2].size := sizeof(OutHeader);
   BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 3, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
   while not Done do
     ReadWriteBarrier;
 
@@ -534,7 +610,7 @@ begin
   BufferInfo[3].size := sizeof(OpenOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -595,7 +671,7 @@ begin
   BufferInfo[3].size := sizeof(OutHeader);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -647,7 +723,7 @@ begin
   BufferInfo[4].size := sizeof(WriteOut);
   BufferInfo[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 5, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
 
   while not Done do
     ReadWriteBarrier;
@@ -706,7 +782,7 @@ begin
   BufferInfo[3].size := Count;
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -754,7 +830,7 @@ begin
   BufferInfo[3].size := sizeof(EntryOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -797,8 +873,8 @@ begin
   BufferInfo[3].size := sizeof(GetAttrOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
 
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
-
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  
   while not Done do
     ReadWriteBarrier;
 
@@ -824,7 +900,6 @@ var
   Done: Boolean;
 begin
   Result := nil;
-
   InHeader.opcode := FUSE_INIT;
   InHeader.len := sizeof(InHeader) + sizeof(InitIn);
   InHeader.uid := ROOT_UID;
@@ -853,17 +928,19 @@ begin
   BufferInfo[3].buffer := @InitOut;
   BufferInfo[3].size := sizeof(InitOut);
   BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  VirtIOSendBuffer(@FsVirtio.RqQueue, @BufferInfo[0], 4, REQUEST_QUEUE);
+  VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  
   while not Done do
     ReadWriteBarrier;
 
   if OutHeader.error <> 0 then
    Exit;
-
+  
   Super.InodeROOT := GetInode(FUSE_ROOT_ID);
+  
   If Super.InodeROOT = nil then
     Exit;
+  
   Result := Super;
 end;
 
@@ -874,12 +951,12 @@ var
   InHeader: ^TFuseInHeader;
   p: ^Boolean;
 begin
-  if vq.LastUsedIndex = vq.used.index then
+  if vq.last_used_index = vq.used.index then
     Exit;
-  index := vq.LastUsedIndex;
+  index := vq.last_used_index;
   while index <> vq.used.index do
   begin
-    norm_index := index mod vq.QueueSize;
+    norm_index := index mod vq.queue_size;
     buffer_index := vq.used.rings[norm_index].index;
     QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
     InHeader := Pointer(QueueBuffer.address);
@@ -889,8 +966,16 @@ begin
     inc(index);
   end;
 
-  vq.LastUsedIndex := index;
+  vq.last_used_index := index;
   ReadWriteBarrier;
+end;
+
+procedure SetIntACK(Base: QWORD; Value: DWORD);
+var
+  IntACK: ^DWORD;
+begin
+  IntACK := Pointer(Base + MMIO_INTACK);
+  IntAck^ := Value;
 end;
 
 procedure VirtIOFSHandler;
@@ -898,9 +983,9 @@ var
   r: DWORD;
 begin
   r := FsVirtio.IsrConfig^;
-  if (r and 1 = 1) then
-     VirtIOProcessQueue (@FsVirtio.RqQueue);
-  eoi;
+  SetIntACK(FsVirtio.Base, r);
+  VirtIOProcessQueue (@FsVirtio.RqQueue);
+  eoi_apic;
 end;
 
 procedure VirtIOFSIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -948,92 +1033,42 @@ asm
   db $cf
 end;
 
-procedure FindVirtIOFSonPci;
+procedure FindVirtIOFSOnMMIO;
 var
-  PciDev: PBusDevInfo;
-  off, multi: DWORD;
-  cap_vndr, cap: Byte;
-  cfg, Bar, next: Byte;
+  magic, device, version: ^DWORD;
+  j: LongInt;
 begin
-  PciDev := PCIDevices;
-  while PciDev <> nil do
+  for j := 0 to (VirtIOMMIODevicesCount -1) do
   begin
-    if (PciDev.vendor = $1AF4) and (PciDev.device >= $1040) and (PciDev.device <= $107F) then
+    magic := Pointer(VirtIOMMIODevices[j].Base);
+    version := Pointer(VirtIOMMIODevices[j].Base + MMIO_VERSION);
+    if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
     begin
-     // this is a modern virtio driver
-     if PciDev.device = VIRTIO_ID_FS then
+      device := Pointer(VirtIOMMIODevices[j].Base + MMIO_DEVICEID);
+      if device^ = VIRTIO_ID_FS then
       begin
-        FsVirtio.IRQ := PciDev.IRQ;
-        multi := 0;
-        Cap := PciGetNextCapability(PciDev, 0);
-        while Cap <> 0 do
+        FsVirtio.IRQ := VirtIOMMIODevices[j].Irq; 
+        FsVirtio.Base := VirtIOMMIODevices[j].Base;
+        FsVirtio.QueueNotify := Pointer(VirtIOMMIODevices[j].Base + MMIO_QUEUENOTIFY);
+        FsVirtio.FsConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_CONFIG);
+        WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+        FsVirtio.IsrConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_INTSTATUS);
+        if not VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
         begin
-          cap_vndr := PciReadByte(PciDev.bus, PciDev.dev, PciDev.func, Cap);
-          cfg := PciReadByte(PciDev.bus, PciDev.dev, PciDev.func, Cap + 3);
-          bar := PciReadByte(PciDev.bus, PciDev.dev, PciDev.func, Cap + 4);
-          off := PciReadDword(PciDev.bus, PciDev.dev, PciDev.func, (Cap div 4) + 2);
-          next := PciGetNextCapability(PciDev, Cap);
-          multi := PciReadDword(PciDev.bus, PciDev.dev, PciDev.func, (Cap div 4) + 4);
-          Cap := next;
-          if cap_vndr <> PCI_CAP_ID_VNDR then
-            continue;
-          if cfg = VIRTIO_PCI_CAP_NOTIFY_CFG then
-          begin
-            if IsPCI64Bar(PciDev.IO[bar]) then
-              FsVirtio.QueueNotify := Pointer((PciDev.IO[bar] and $FFFFFFF0) + ((PciDev.IO[bar+1] and $FFFFFFFF) * (1 shl 32)) + off)
-            else
-              FsVirtio.QueueNotify := Pointer((PciDev.IO[bar] and $FFFFFFF0) + off);
-            FsVirtio.NotifyOffMultiplier := multi;
-          end;
-          if cfg = VIRTIO_PCI_CAP_DEVICE_CFG then
-          begin
-            if IsPCI64Bar(PciDev.IO[bar]) then
-              FsVirtio.FsConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + ((PciDev.IO[bar+1] and $FFFFFFFF) * (1 shl 32)) + off)
-            else
-              FsVirtio.FsConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + off);
-            WriteConsoleF('VirtIOFS: Detected device tagged: %p, queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
-          end;
-          if cfg = VIRTIO_PCI_CAP_COMMON_CFG then
-          begin
-            if IsPCI64Bar(PciDev.IO[bar]) then
-              FsVirtio.CommonConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + ((PciDev.IO[bar+1] and $FFFFFFFF) * (1 shl 32)) + off)
-            else
-              FsVirtio.CommonConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + off);
-          end;
-          if cfg = VIRTIO_PCI_CAP_ISR_CFG then
-          begin
-            if IsPCI64Bar(PciDev.IO[bar]) then
-              FsVirtio.IsrConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + ((PciDev.IO[bar+1] and $FFFFFFFF) * (1 shl 32)) + off)
-            else
-              FsVirtio.IsrConfig := Pointer((PciDev.IO[bar] and $FFFFFFF0) + off);
-          end;
-        end;
-
-        if VirtIONegociateFeatures (FsVirtio.CommonConfig, VirtIOGetDeviceFeatures (FsVirtio.CommonConfig)) then
-        begin
-          WriteConsoleF('VirtIOFS: Device accepted features\n',[])
-        end else
-        begin
-          WriteConsoleF('VirtioFS: Device did not accept features\n', []);
+          WriteConsoleF('VirtioFS: device did not accept features\n', []);
           Exit;
         end;
 
-        if VirtIOInitQueue(FsVirtio.CommonConfig, 0, @FsVirtio.RqQueue, 0) then
+        if not VirtIOInitQueue(VirtIOMMIODevices[j].Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
         begin
-          WriteConsoleF('VirtIOFS: Queue 0, size: %d, initiated, irq: %d\n', [FsVirtio.RqQueue.QueueSize, FsVirtio.IRQ]);
-        end else
-        begin
-          WriteConsoleF('VirtIOFS: Queue 0, failed\n', []);
+          WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
           Exit;
         end;
-
-        // Set up notification queue
-        FsVirtio.QueueNotify := Pointer(PtrUInt(FsVirtio.QueueNotify) + FsVirtio.CommonConfig.QueueNotifyOff * FsVirtio.NotifyOffMultiplier);
-        // enable the irq
-        CaptureInt(32+FsVirtio.IRQ, @VirtIOFSIrqHandler);
-        IrqOn(FsVirtio.IRQ);
-        PciSetMaster(PciDev);
-        FsVirtio.RqQueue.used.flags := 0;
+      
+        SetDeviceStatus(VirtIOMMIODevices[j].Base, VIRTIO_ACKNOWLEDGE or VIRTIO_FEATURES_OK or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
+        CaptureInt(BASE_IRQ + FsVirtio.IRQ, @VirtIOFSIrqHandler);
+        IOApicIrqOn(FsVirtio.IRQ);
+      
         FsVirtio.Driver.name := 'virtiofs';
         FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
         FsVirtio.Driver.ReadInode := VirtioFSReadInode;
@@ -1056,12 +1091,13 @@ begin
         FsVirtIO.FileDesc.BlockDriver := @FsVirtIO.BlkDriver;
         RegisterBlockDriver(@FsVirtio.BlkDriver);
       end;
+    end else 
+    begin
+      WriteConsoleF('VirtIOFS: magic number or version wrong, base address may be wrong\n', []);
     end;
-    PciDev := PciDev.Next;
   end;
 end;
 
 initialization
-  FindVirtIOFSonPci;
-
+  FindVirtIOFSOnMMIO;
 end.

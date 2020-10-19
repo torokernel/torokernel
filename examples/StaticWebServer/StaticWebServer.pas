@@ -257,7 +257,7 @@ begin
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
   SysSocketListen(HttpServer, 50);
-  WriteConsoleF('\t WebServer: listening ... %d\n', [KernelParamCount]);
+  WriteConsoleF('\t WebServer: listening ...\n', []);
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);

@@ -24,7 +24,7 @@ The repository of Toro includes examples that show basic functionalities of the 
 
 `apt-get install lazarus`
 
-To install qemu-kvm and build a CephFS cluster to create you can follow [here](https://github.com/torokernel/torocloudscripts). 
+To install qemu-kvm and build a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
 
 ## Contributing
 You have many ways to contribute to Toro. One of them is by joining the Google Group [here](https://groups.google.com/forum/#!forum/torokernel). In addition, you can find more information [here](

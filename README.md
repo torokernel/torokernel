@@ -1,6 +1,6 @@
 # Toro Kernel ![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
 ## Introduction
-Toro is a kernel dedicated to run a single application. The kernel compiles together with the user application and this results in a binary that user can run on top of a hypervisor, e.g., KVM, Xen, VirtualBox, or baremetal. To know more about Toro, visit the [blog](http://www.torokernel.io) and the [wiki](https://github.com/MatiasVara/torokernel/wiki). Currently Toro is focus on microVM technologies like QEMU microvm or Firecracker, and on the devices virtio-fs for filesystem and virtio-vsocket for networking. 
+Toro is a kernel dedicated to run a single application. The kernel compiles together with the user application and this results in a binary that user can run on top of a hypervisor, e.g., KVM, Xen, VirtualBox, or baremetal. To know more about Toro, visit the [blog](http://www.torokernel.io) and the [wiki](https://github.com/MatiasVara/torokernel/wiki). In the repository, the tag ToroKernel points to last commit for the ToroKernel project. Since this tag, the project focuses on microVM technologies like QEMU microvm or Firecracker, and on the devices virtio-fs for filesystem and virtio-vsocket for networking. 
 
 ## Features
 * Support x86-64 architecture

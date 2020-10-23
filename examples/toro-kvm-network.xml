@@ -1,8 +1,0 @@
-<network>
-    <forward mode='nat'> 
-    </forward>
-    <name>toronetwork</name> 
-    <bridge name='toro-bridge' stp='on' delay='0'/> 
-    <ip address='192.100.200.1' netmask='255.255.255.0'> 
-    </ip>    
-</network>

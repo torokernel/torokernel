@@ -1,7 +1,7 @@
 //
 // VirtIOFS.pas
 //
-// This unit contains the code of the VirtIOFS driver.
+// This unit contains code for VirtIOFS driver.
 //
 // Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -43,70 +43,19 @@ implementation
 {$DEFINE RestoreInt := asm popfq;end;}
 
 type
-  PByte = ^TByte;
-  TByte = array[0..0] of byte;
   PVirtioFsConfig = ^TVirtioFsConfig;
-
-  VirtIOUsedItem = record
-    Index: Dword;
-    Length: Dword;
-  end;
-
-  PVirtIOUsed = ^TVirtIOUsed;
-  TVirtIOUsed = record
-    Flags: word;
-    Index: word;
-    Rings: array[0..0] of VirtIOUsedItem;
-  end;
-
-  PVirtIOAvailable = ^TVirtIOAvailable;
-  TVirtIOAvailable = record
-    Flags: Word;
-    Index: Word;
-    Rings: Array[0..0] of Word;
-  end;
-
-  PQueueBuffer = ^TQueueBuffer;
-  TQueueBuffer = record
-    Address: QWord;
-    Length: DWord;
-    Flags: Word;
-    Next: Word;
-  end;
-
-  PVirtQueue = ^TVirtQueue;
-  TVirtQueue = record
-    queue_size: WORD;
-    buffers: PQueueBuffer;
-    available: PVirtIOAvailable;
-    used: PVirtIOUsed;
-    last_used_index: word;
-    last_available_index: word;
-    buffer: PByte;
-    chunk_size: dword;
-    next_buffer: word;
-    lock: QWord;
-  end;
 
   TVirtIOFSDevice = record
     IRQ: LongInt;
     tag: PChar;
     Base: QWord;
     FsConfig: PVirtioFsConfig;
-    IsrConfig: ^DWORD;
     QueueNotify: ^WORD;
     HpQueue: TVirtQueue;
     RqQueue: TVirtQueue;
     Driver: TFilesystemDriver;
     BlkDriver: TBlockDriver;
     FileDesc: TFileBlock;
-  end;
-
-  PBufferInfo = ^TBufferInfo;
-  TBufferInfo = record
-    Buffer: ^Byte;
-    Size: QWord;
-    Flags: Byte;
   end;
 
   TVirtIOFsConfig = packed record
@@ -245,17 +194,6 @@ type
   end;
 
 const
-  VIRTIO_ACKNOWLEDGE = 1;
-  VIRTIO_DRIVER = 2;
-  VIRTIO_CTRL_VQ = 17;
-  VIRTIO_MRG_RXBUF = 15;
-  VIRTIO_CSUM = 0;
-  VIRTIO_FEATURES_OK = 8;
-  VIRTIO_DRIVER_OK = 4;
-  VIRTIO_DESC_FLAG_WRITE_ONLY = 2;
-  VIRTIO_DESC_FLAG_NEXT = 1;
-
-  DEVICE_NEEDS_RESET = 64;
   FUSE_ROOT_ID = 1;
 
   // These values come from
@@ -308,221 +246,12 @@ const
   ROOT_UID = 0;
 
   VIRTIO_ID_FS = $1a;
-  MMIO_MODERN = 2;
-  MMIO_VERSION = 4;
-  MMIO_SIGNATURE = $74726976;
-  MMIO_DEVICEID = $8;
-  MMIO_QUEUENOTIFY = $50;
-  MMIO_CONFIG = $100;
-  MMIO_FEATURES = $10;
-  MMIO_STATUS = $70;
-  MMIO_GUESTFEATURES = $20;
-  MMIO_QUEUESEL = $30;
-  MMIO_QUEUENUMMAX = $34;
-  MMIO_QUEUENUM = $38;
-  MMIO_QUEUEREADY = $44;
-  MMIO_GUESTPAGESIZE = $28;
-  MMIO_QUEUEPFN = $40;
-  MMIO_QUEUEALIGN = $3C;
-  MMIO_INTSTATUS = $60;
-  MMIO_INTACK = $64;
-  MMIO_READY = $44;
-  MMIO_DESCLOW = $80;
-  MMIO_DESCHIGH = $84;
-  MMIO_AVAILLOW = $90;
-  MMIO_AVAILHIGH = $94;
-  MMIO_USEDLOW = $a0;
-  MMIO_USEDHIGH = $a4;
 
 var
   FSVirtIO: TVirtIOFSDevice;
 
 function VirtioFSLookUpInode(Ino: PInode; Name: PXChar): PInode; forward;
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord); forward;
 procedure VirtIOProcessQueue(vq: PVirtQueue); forward;
-
-procedure SetDeviceStatus(Base: QWORD; Value: DWORD);
-var
-  status: ^DWORD;
-begin
-  status := Pointer(Base + MMIO_STATUS);
-  status^ := Value;
-  ReadWriteBarrier;
-end;
-
-function GetDeviceStatus (Base: QWORD): DWORD;
-var
-  status: ^DWORD;
-begin
-  status := Pointer(Base + MMIO_STATUS);
-  Result := status^;
-end;
-
-function VirtIOGetDeviceFeatures(Base: QWORD): DWORD;
-var
-  value: ^DWORD;
-begin
-  value := Pointer(BASE + MMIO_FEATURES);
-  Result := value^;
-end;
-
-// Reset device and negotiate features
-function VirtIONegociateFeatures(Base: QWORD; Features: DWORD): Boolean;
-var
-  devfeat: DWORD;
-  status: ^DWORD;
-begin
-  Result := False;
-  status := Pointer (BASE + MMIO_STATUS);
-  status^ := 0;
-  status^ := VIRTIO_ACKNOWLEDGE;
-  status^ := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER;
-  devfeat := VirtIOGetDeviceFeatures(Base);
-  devfeat := devfeat and Features;
-  // TODO: To check if this is the right field
-  //guestfeatures := Pointer (BASE + MMIO_GUESTFEATURES);
-  // TODO: the features to negociate are not clear so just ignore them
-  // This should be replaced with something better
-  //guestfeatures^ := devfeat;
-  status^ := VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK;
-  if ((status^ and VIRTIO_FEATURES_OK) = 0) then
-    Exit;
-  Result := True;
-end;
-
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
-var
-  j: LongInt;
-  QueueSize, sizeOfBuffers: DWORD;
-  sizeofQueueAvailable, sizeofQueueUsed: DWORD;
-  buff: PChar;
-  bi: TBufferInfo;
-  QueueSel, EnableQueue: ^DWORD;
-  QueueNumMax, QueueNum: ^DWORD;
-  AddrLow: ^DWORD;
-begin
-  Result := False;
-  FillByte(Queue^, sizeof(TVirtQueue), 0);
-
-  QueueSel := Pointer(Base + MMIO_QUEUESEL);
-  QueueSel^ := QueueId;
-  ReadWriteBarrier;
-
-  QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
-  QueueSize := QueueNumMax^;
-  if QueueSize = 0 then
-    Exit;
-  Queue.queue_size := QueueSize;
-
-  // set queue size
-  QueueNum := Pointer (Base + MMIO_QUEUENUM);
-  QueueNum^ := QueueSize;
-  ReadWriteBarrier;
-
-  sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
-  sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));
-  sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
-
-  // buff must be 4k aligned
-  buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2);
-  If buff = nil then
-    Exit;
-  FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2, 0);
-  buff := buff + (PAGE_SIZE - PtrUInt(buff) mod PAGE_SIZE);
-
-  // 16 bytes aligned
-  Queue.buffers := PQueueBuffer(buff);
-
-  // 2 bytes aligned
-  Queue.available := @buff[sizeOfBuffers];
-
-  // 4 bytes aligned
-  Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable + $0FFF) and not($0FFF))]);
-  Queue.next_buffer := 0;
-  Queue.lock := 0;
-	
-  AddrLow := Pointer(Base + MMIO_DESCLOW);
-  AddrLow^ := DWORD(PtrUint(Queue.buffers) and $ffffffff);
-  AddrLow := Pointer(Base + MMIO_DESCHIGH);
-  AddrLow^ := 0;
-
-  AddrLow := Pointer(Base + MMIO_AVAILLOW);
-  AddrLow^ := DWORD(PtrUInt(Queue.available) and $ffffffff);
-  AddrLow := Pointer(Base + MMIO_AVAILHIGH);
-  AddrLow^ := 0;
-
-  AddrLow := Pointer(Base + MMIO_USEDLOW);
-  AddrLow^ := DWORD(PtrUInt(Queue.used) and $ffffffff);
-  AddrLow := Pointer(Base + MMIO_USEDHIGH);
-  AddrLow^ := 0;
-  
-  EnableQueue := Pointer(Base + MMIO_QUEUEREADY);
-  EnableQueue^ := 1;
-
-  // Device queues are fill
-  if HeaderLen <> 0 then
-  begin
-    Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen) + PAGE_SIZE);
-    if Queue.Buffer = nil then
-      Exit;
-    Queue.Buffer := Pointer(PtrUint(queue.Buffer) + (PAGE_SIZE - PtrUInt(Queue.Buffer) mod PAGE_SIZE));
-    Queue.chunk_size := HeaderLen;
-
-    bi.size := HeaderLen;
-    bi.buffer := nil;
-    bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-    for j := 0 to Queue.queue_size - 1 do
-    begin
-      VirtIOSendBuffer(Base, QueueId, Queue, @bi, 1);
-    end;
-  end;
-
-  Result := True;
-end;
-
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
-var
-  index, buffer_index, next_buffer_index: word;
-  vq: PVirtQueue;
-  b: PBufferInfo;
-  i: LongInt;
-  tmp: PQueueBuffer;
-  QueueNotify: ^DWORD;
-begin
-  vq := Queue;
-
-  index := vq.available.index mod vq.queue_size;
-  buffer_index := vq.next_buffer;
-  vq.available.rings[index] := buffer_index;
-
-  for i := 0 to (count-1) do
-  begin
-    next_buffer_index:= (buffer_index +1) mod vq.queue_size;
-    b := Pointer(PtrUInt(bi) + i * sizeof(TBufferInfo));
-
-    tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    tmp.flags := b.flags;
-    tmp.next := next_buffer_index;
-    tmp.length := b.size;
-    if (i <> (count-1)) then
-        tmp.flags := tmp.flags or VIRTIO_DESC_FLAG_NEXT;
-
-    tmp.address := PtrUInt(b.buffer);
-    buffer_index := next_buffer_index;
-  end;
-
-  ReadWriteBarrier;
-  vq.next_buffer := buffer_index;
-  vq.available.index:= vq.available.index + 1;
-
-  // notification are not needed
-  // TODO: remove the use of base
-  if (vq.used.flags and 1 <> 1) then
-  begin
-    QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
-    QueueNotify^ := queue_index;
-  end;
-end;
 
 procedure virtIOFSDedicate(Driver:PBlockDriver; CPUID: LongInt);
 begin
@@ -532,6 +261,14 @@ end;
 procedure VirtioFSWriteInode(Ino: PInode);
 begin
   WriteConsoleF('VirtioFSWriteInode: This is not implemented yet\n', []);
+end;
+
+procedure SetBufferInfo(Buffer: PBufferInfo; Header: Pointer; size: QWORD; flags: Byte);
+begin
+  Buffer.buffer := Header;
+  Buffer.size := size;
+  Buffer.flags := flags;
+  Buffer.copy := false;
 end;
 
 function VirtioFSCloseFile(FileDesc: PFileRegular): LongInt;
@@ -552,17 +289,9 @@ begin
   InHeader.uid := ROOT_UID;
   ReleaseIn.fh := FileDesc.Opaque;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @ReleaseIn;
-  BufferInfo[1].size := sizeof(ReleaseIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @ReleaseIn, sizeof(ReleaseIn), 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
   while not Done do
@@ -594,21 +323,10 @@ begin
 
   OpenIn.flags := Flags;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @OpenIn;
-  BufferInfo[1].size := sizeof(OpenIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[3].buffer := @OpenOut;
-  BufferInfo[3].size := sizeof(OpenOut);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @OpenIn, sizeof(OpenIn), 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[3], @OpenOut, sizeof(OpenOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
@@ -655,22 +373,11 @@ begin
   MknodIn.rdev := 0;
   MknodIn.umask := 0;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @MknodIn;
-  BufferInfo[1].size := sizeof(MknodIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := Pointer(Name);
-  BufferInfo[2].size := Len;
-  BufferInfo[2].flags := 0;
-
-  BufferInfo[3].buffer := @OutHeader;
-  BufferInfo[3].size := sizeof(OutHeader);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @MknodIn, sizeof(MknodIn), 0);
+  SetBufferInfo(@BufferInfo[2], Pointer(Name), Len, 0);
+  SetBufferInfo(@BufferInfo[3], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+ 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
@@ -703,25 +410,11 @@ begin
   WriteIn.size := Count;
   WriteIn.offset := FileDesc.FilePos;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @WriteIn;
-  BufferInfo[1].size := sizeof(WriteIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := Pointer(buffer);
-  BufferInfo[2].size := Count;
-  BufferInfo[2].flags := 0;
-
-  BufferInfo[3].buffer := @OutHeader;
-  BufferInfo[3].size := sizeof(OutHeader);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[4].buffer := @WriteOut;
-  BufferInfo[4].size := sizeof(WriteOut);
-  BufferInfo[4].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @WriteIn, sizeof(WriteIn), 0);
+  SetBufferInfo(@BufferInfo[2], Pointer(buffer), Count, 0);
+  SetBufferInfo(@BufferInfo[3], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[4], @WriteOut, sizeof(WriteOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
 
@@ -766,21 +459,10 @@ begin
   ReadIn.size := Count;
   ReadIn.offset := FileDesc.FilePos;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @ReadIn;
-  BufferInfo[1].size := sizeof(ReadIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[3].buffer := Pointer(buffer);
-  BufferInfo[3].size := Count;
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @ReadIn, sizeof(ReadIn), 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[3], Pointer(buffer), Count, VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
@@ -814,21 +496,10 @@ begin
   InHeader.nodeid := Ino.ino;
   InHeader.uid := ROOT_UID;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := Pointer(Name);
-  BufferInfo[1].size := Len;
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[3].buffer := @EntryOut;
-  BufferInfo[3].size := sizeof(EntryOut);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], Pointer(Name), Len, 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[3], @EntryOut, sizeof(EntryOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
@@ -857,21 +528,10 @@ begin
   Done := False;
   InHeader.unique := PtrUInt(@Done);
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
-
-  BufferInfo[1].buffer := @GetAttrIn;
-  BufferInfo[1].size := sizeof(GetAttrIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[3].buffer := @GetAttrOut;
-  BufferInfo[3].size := sizeof(GetAttrOut);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @GetAttrIn, sizeof(GetAttrIn), 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[3], @GetAttrOut, sizeof(GetAttrOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
   
@@ -913,21 +573,11 @@ begin
   InitIn.flags := 0;
   InitIn.MaxReadahead := TORO_MAX_READAHEAD_SIZE;
 
-  BufferInfo[0].buffer := @InHeader;
-  BufferInfo[0].size := sizeof(InHeader);
-  BufferInfo[0].flags := 0;
+  SetBufferInfo(@BufferInfo[0], @InHeader, sizeof(InHeader), 0);
+  SetBufferInfo(@BufferInfo[1], @InitIn, sizeof(InitIn), 0);
+  SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
+  SetBufferInfo(@BufferInfo[3], @InitOut, sizeof(InitOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  BufferInfo[1].buffer := @InitIn;
-  BufferInfo[1].size := sizeof(InitIn);
-  BufferInfo[1].flags := 0;
-
-  BufferInfo[2].buffer := @OutHeader;
-  BufferInfo[2].size := sizeof(OutHeader);
-  BufferInfo[2].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-  BufferInfo[3].buffer := @InitOut;
-  BufferInfo[3].size := sizeof(InitOut);
-  BufferInfo[3].flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
   VirtIOSendBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
   
   while not Done do
@@ -951,153 +601,61 @@ var
   InHeader: ^TFuseInHeader;
   p: ^Boolean;
 begin
-  if vq.last_used_index = vq.used.index then
-    Exit;
   index := vq.last_used_index;
-  while index <> vq.used.index do
-  begin
-    norm_index := index mod vq.queue_size;
-    buffer_index := vq.used.rings[norm_index].index;
-    QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-    InHeader := Pointer(QueueBuffer.address);
-    p := Pointer(InHeader.unique);
-    Panic(p^ = True, 'VirtioFS: Waking up a thread in ready state\n', []);
-    p^ := True;
-    inc(index);
-  end;
-
-  vq.last_used_index := index;
+  norm_index := index mod vq.queue_size;
+  buffer_index := vq.used.rings[norm_index].index;
+  QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
+  InHeader := Pointer(QueueBuffer.address);
+  p := Pointer(InHeader.unique);
+  Panic(p^ = True, 'VirtioFS: Waking up a thread in ready state\n', []);
+  p^ := True;
   ReadWriteBarrier;
 end;
 
-procedure SetIntACK(Base: QWORD; Value: DWORD);
-var
-  IntACK: ^DWORD;
+function InitVirtIOFS(Device: PVirtIOMMIODevice): Boolean;
 begin
-  IntACK := Pointer(Base + MMIO_INTACK);
-  IntAck^ := Value;
-end;
-
-procedure VirtIOFSHandler;
-var
-  r: DWORD;
-begin
-  r := FsVirtio.IsrConfig^;
-  SetIntACK(FsVirtio.Base, r);
-  VirtIOProcessQueue (@FsVirtio.RqQueue);
-  eoi_apic;
-end;
-
-procedure VirtIOFSIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  // save registers
-  push rbp
-  push rax
-  push rbx
-  push rcx
-  push rdx
-  push rdi
-  push rsi
-  push r8
-  push r9
-  push r10
-  push r11
-  push r12
-  push r13
-  push r14
-  push r15
-  mov r15 , rsp
-  mov rbp , r15
-  sub r15 , 32
-  mov  rsp , r15
-  xor rcx , rcx
-  Call VirtIOFSHandler
-  mov rsp , rbp
-  pop r15
-  pop r14
-  pop r13
-  pop r12
-  pop r11
-  pop r10
-  pop r9
-  pop r8
-  pop rsi
-  pop rdi
-  pop rdx
-  pop rcx
-  pop rbx
-  pop rax
-  pop rbp
-  db $48
-  db $cf
-end;
-
-procedure FindVirtIOFSOnMMIO;
-var
-  magic, device, version: ^DWORD;
-  j: LongInt;
-begin
-  for j := 0 to (VirtIOMMIODevicesCount -1) do
+  Result := False;
+  FsVirtio.IRQ := Device.Irq; 
+  FsVirtio.Base := Device.Base;
+  FsVirtio.QueueNotify := Pointer(Device.Base + MMIO_QUEUENOTIFY);
+  FsVirtio.FsConfig := Pointer(Device.Base + MMIO_CONFIG);
+  WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+  SetDeviceStatus(Device.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK);
+  if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
   begin
-    magic := Pointer(VirtIOMMIODevices[j].Base);
-    version := Pointer(VirtIOMMIODevices[j].Base + MMIO_VERSION);
-    if (magic^ = MMIO_SIGNATURE) and (version^ = MMIO_MODERN) then
-    begin
-      device := Pointer(VirtIOMMIODevices[j].Base + MMIO_DEVICEID);
-      if device^ = VIRTIO_ID_FS then
-      begin
-        FsVirtio.IRQ := VirtIOMMIODevices[j].Irq; 
-        FsVirtio.Base := VirtIOMMIODevices[j].Base;
-        FsVirtio.QueueNotify := Pointer(VirtIOMMIODevices[j].Base + MMIO_QUEUENOTIFY);
-        FsVirtio.FsConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_CONFIG);
-        WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
-        FsVirtio.IsrConfig := Pointer(VirtIOMMIODevices[j].Base + MMIO_INTSTATUS);
-        if not VirtIONegociateFeatures (VirtIOMMIODevices[j].Base, VirtIOGetDeviceFeatures (VirtIOMMIODevices[j].Base)) then
-        begin
-          WriteConsoleF('VirtioFS: device did not accept features\n', []);
-          Exit;
-        end;
-
-        if not VirtIOInitQueue(VirtIOMMIODevices[j].Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
-        begin
-          WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
-          Exit;
-        end;
-      
-        SetDeviceStatus(VirtIOMMIODevices[j].Base, VIRTIO_ACKNOWLEDGE or VIRTIO_FEATURES_OK or VIRTIO_DRIVER or VIRTIO_DRIVER_OK);
-        CaptureInt(BASE_IRQ + FsVirtio.IRQ, @VirtIOFSIrqHandler);
-        IOApicIrqOn(FsVirtio.IRQ);
-      
-        FsVirtio.Driver.name := 'virtiofs';
-        FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
-        FsVirtio.Driver.ReadInode := VirtioFSReadInode;
-        FsVirtio.Driver.WriteInode := VirtioFSWriteInode;
-        FsVirtio.Driver.CreateInode := VirtIOFSCreateInode;
-        FsVirtio.Driver.LookUpInode := VirtioFSLookUpInode;
-        FsVirtio.Driver.ReadFile := VirtioFSReadFile;
-        FsVirtio.Driver.WriteFile := VirtIOFSWriteFile;
-        FsVirtio.Driver.OpenFile := VirtioFSOpenFile;
-        FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
-        RegisterFilesystem(@FsVirtio.Driver);
-        Move(FsVirtio.FsConfig.tag, FsVirtio.BlkDriver.name, StrLen(FsVirtio.FsConfig.tag)+1);
-        FsVirtio.BlkDriver.Busy := false;
-        FsVirtio.BlkDriver.WaitOn := nil;
-        FsVirtio.BlkDriver.major := 0;
-        FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
-        FsVirtIO.BlkDriver.CPUID := -1;
-        FsVirtIO.FileDesc.Minor := 0;
-        FsVirtIO.FileDesc.Next := nil;
-        FsVirtIO.FileDesc.BlockDriver := @FsVirtIO.BlkDriver;
-        RegisterBlockDriver(@FsVirtio.BlkDriver);
-      end;
-    end else 
-    begin
-      WriteConsoleF('VirtIOFS: magic number or version wrong, base address may be wrong\n', []);
-    end;
+    WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
+    Exit;
   end;
+      
+  FsVirtio.RqQueue.VqHandler := @VirtIOProcessQueue;
+  Device.Vqs := @FsVirtio.RqQueue;
+ 
+  IOApicIrqOn(FsVirtio.IRQ);
+      
+  FsVirtio.Driver.name := 'virtiofs';
+  FsVirtio.Driver.ReadSuper := VirtioFSReadSuper;
+  FsVirtio.Driver.ReadInode := VirtioFSReadInode;
+  FsVirtio.Driver.WriteInode := VirtioFSWriteInode;
+  FsVirtio.Driver.CreateInode := VirtIOFSCreateInode;
+  FsVirtio.Driver.LookUpInode := VirtioFSLookUpInode;
+  FsVirtio.Driver.ReadFile := VirtioFSReadFile;
+  FsVirtio.Driver.WriteFile := VirtIOFSWriteFile;
+  FsVirtio.Driver.OpenFile := VirtioFSOpenFile;
+  FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
+  RegisterFilesystem(@FsVirtio.Driver);
+  Move(FsVirtio.FsConfig.tag, FsVirtio.BlkDriver.name, StrLen(FsVirtio.FsConfig.tag)+1);
+  FsVirtio.BlkDriver.Busy := false;
+  FsVirtio.BlkDriver.WaitOn := nil;
+  FsVirtio.BlkDriver.major := 0;
+  FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
+  FsVirtIO.BlkDriver.CPUID := -1;
+  FsVirtIO.FileDesc.Minor := 0;
+  FsVirtIO.FileDesc.Next := nil;
+  FsVirtIO.FileDesc.BlockDriver := @FsVirtIO.BlkDriver;
+  RegisterBlockDriver(@FsVirtio.BlkDriver);
+  Result := True;
 end;
 
 initialization
-  FindVirtIOFSOnMMIO;
+  InitVirtIODriver(VIRTIO_ID_FS, @InitVirtIOFS);
 end.

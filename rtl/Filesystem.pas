@@ -3,7 +3,7 @@
 //
 // This unit contains the virtual filesystem.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -30,7 +30,6 @@ uses
   Arch, Process, Console, Memory;
 
 const
-  MAX_BUFFERS_IN_CACHE = 5000;
   MAX_INODES_IN_CACHE= 300;
 
   INODE_DIR = 1;
@@ -50,7 +49,6 @@ type
   PBlockDriver = ^TBlockDriver;
   PStorage = ^TStorage;
   PFileBlock = ^TFileBlock;
-  PBufferHead = ^TBufferHead;
   PFileRegular = ^TFileRegular;
   PSuperBlock = ^TSuperBlock;
   PFileSystemDriver = ^TFileSystemDriver;
@@ -68,28 +66,10 @@ type
     Next: PBlockDriver;
   end;
 
-  TBufferCacheSlot = record
-    BuffersInCache: Int64;
-    BlockCache: PBufferHead;
-    FreeBlocksCache: PBufferHead;
-  end;
-
   TFileBlock = record
     BlockDriver:PBlockDriver;
-    BlockSize: LongInt;
-    BufferCache: TBufferCacheSlot;
     Minor: LongInt;
     Next: PFileBlock;
-  end;
-
-  TBufferHead = record
-    Block: LongInt ;
-    size:  LongInt;
-    Count: int64;
-    Dirty: Boolean;
-    data: Pointer;
-    next: PBufferHead;
-    Prev: PBufferHead;
   end;
 
   TFileRegular = record
@@ -168,8 +148,6 @@ function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
 function SysStatFile(Path: PXChar; Buffer: PInode): LongInt;
 function SysReadFile(FileHandle: THandle; Count: LongInt;Buffer:Pointer): LongInt;
 function SysWriteFile(FileHandle: THandle; Count: LongInt; Buffer:Pointer): LongInt;
-function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
-procedure PutBlock(FileBlock: PFileBlock; BufferHead: PBufferHead);
 function GetInode(Inode: LongInt): PInode;
 procedure PutInode(Inode: PInode);
 function SysCreateFile(Path:  PXChar): THandle;
@@ -215,19 +193,6 @@ begin
   {$IFDEF DebugFS} WriteDebug('FreeDevice: Device is Free\n', []); {$ENDIF}
 end;
 
-procedure DedicateBlockFile(FBlock: PFileBlock; CPUID: LongInt);
-var
-  Storage: PStorage;
-begin
-  Storage := @Storages[CPUID];
-  FBlock.Next := Storage.BlockFiles;
-  Storage.BlockFiles := FBlock;
-  FBlock.BufferCache.BuffersInCache := MAX_BUFFERS_IN_CACHE;
-  FBlock.BufferCache.BlockCache := nil;
-  FBlock.BufferCache.FreeBlocksCache := nil;
-  {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d\n', [CPUID, FBlock.Minor]); {$ENDIF}
-end;
-
 procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 var
   Dev: PBlockDriver;
@@ -247,135 +212,14 @@ begin
   {$IFDEF DebugFS} WriteDebug('DedicateBlockDriver: Driver does not exist\n',[]); {$ENDIF}
 end;
 
-function FindBlock(Buffer: PBufferHead; Block, Size: LongInt): PBufferHead;
+procedure DedicateBlockFile(FBlock: PFileBlock; CPUID: LongInt);
 var
-  BufferHead: PBufferHead;
+  Storage: PStorage;
 begin
-  Result := nil;
-  if Buffer = nil then
-    Exit;
-  BufferHead := Buffer;
-  repeat
-    if (Buffer.Block = Block) and (Buffer.Size = Size) then
-    begin
-      Result := Buffer;
-      Exit;
-    end;
-    Buffer := Buffer.Next;
-  until Buffer = BufferHead;
-end;
-
-procedure AddBuffer(var Queue: PBufferHead; BufferHead: PBufferHead);
-begin
-  if Queue = nil then
-  begin
-    Queue := BufferHead;
-    BufferHead.Next := BufferHead;
-    BufferHead.Prev := BufferHead;
-    Exit;
-  end;
-  BufferHead.Prev := Queue.Prev;
-  BufferHead.Next := Queue;
-  Queue.Prev.Next := BufferHead;
-  Queue.Prev := BufferHead;
-end;
-
-procedure RemoveBuffer(var Queue: PBufferHead; BufferHead: PBufferHead);
-begin
-  if (Queue = BufferHead) and (Queue.Next = Queue) then
-  begin
-    Queue := nil;
-    BufferHead.Next := nil;
-    BufferHead.Prev := nil;
-    Exit;
-  end;
-  if Queue = BufferHead then
-    Queue := BufferHead.Next;
-  BufferHead.Prev.Next := BufferHead.Next;
-  BufferHead.Next.Prev := BufferHead.Prev;
-  BufferHead.Next := nil;
-  BufferHead.Prev := nil;
-end;
-
-function GetBlock(FileBlock: PFileBlock; Block, Size: LongInt): PBufferHead;
-var
-  BufferHead: PBufferHead;
-begin
-  Result := nil;
-  BufferHead := FindBlock(FileBlock.BufferCache.BlockCache, Block, Size);
-  if BufferHead <> nil then
-  begin
-    Inc(BufferHead.Count);
-    Result := BufferHead;
-    {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In use\n', [Block, Size]); {$ENDIF}
-    Exit;
-  end;
-  BufferHead := FindBlock(FileBlock.BufferCache.FreeBlocksCache, Block, Size);
-  if BufferHead <> nil then
-  begin
-    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache, BufferHead);
-    AddBuffer(FileBlock.BufferCache.BlockCache, BufferHead);
-    BufferHead.Count := 1;
-    Result := BufferHead;
-    {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, In Free Block\n', [Block, Size]); {$ENDIF}
-    Exit;
-  end;
-  if FileBlock.BufferCache.BuffersInCache=0 then
-  begin
-    BufferHead := FileBlock.BufferCache.FreeBlocksCache;
-    if BufferHead = nil then
-      Exit;
-    BufferHead := BufferHead.Prev;
-    if FileBlock.BlockDriver.ReadBlock(FileBlock, Block*(BufferHead.size div FileBlock.BlockSize), BufferHead.size div FileBlock.BlockSize, BufferHead.data) = 0 then
-      Exit;
-    BufferHead.Count := 1;
-    BufferHead.Block := block;
-    BufferHead.Dirty := False;
-    RemoveBuffer(FileBlock.BufferCache.FreeBlocksCache,BufferHead);
-    AddBuffer(FileBlock.BufferCache.BlockCache,BufferHead);
-    Result := BufferHead;
-    Exit;
-  end;
-  BufferHead := ToroGetMem(SizeOf(TBufferHead));
-  if BufferHead = nil then
-    Exit;
-  BufferHead.data := ToroGetMem(Size);
-  if BufferHead.data = nil then
-  begin
-    ToroFreeMem(BufferHead);
-    Exit;
-  end;
-  BufferHead.Count := 1;
-  BufferHead.size := Size;
-  BufferHead.Dirty := False;
-  BufferHead.Block := Block;
-  if FileBlock.BlockDriver.ReadBlock(FileBlock, Block *(BufferHead.size div FileBlock.BlockSize), Size div FileBlock.BlockSize, BufferHead.data) = 0 then
-  begin
-    ToroFreeMem(BufferHead.data);
-    ToroFreeMem(BufferHead);
-    Exit;
-  end;
-  AddBuffer(FileBlock.BufferCache.BlockCache,BufferHead);
-  Dec(FileBlock.BufferCache.BuffersInCache);
-  Result := BufferHead;
-  {$IFDEF DebugFS} WriteDebug('GetBlock: Block: %d , Size: %d, New in Buffer\n', [Block, Size]); {$ENDIF}
-end;
-
-procedure PutBlock(FileBlock: PFileBlock; BufferHead: PBufferHead);
-begin
-  Dec(BufferHead.Count);
-  if BufferHead.Count = 0 then
-  begin
-    if BufferHead.Dirty then
-    begin
-      FileBlock.BlockDriver.WriteBlock(FileBlock, BufferHead.Block *(BufferHead.size div FileBlock.BlockSize), BufferHead.size div FileBlock.BlockSize, BufferHead.data);
-      {$IFDEF DebugFS} WriteDebug('PutBlock: Writing Block: %d\n', [BufferHead.Block]); {$ENDIF}
-    end;
-    BufferHead.Dirty := False;
-    RemoveBuffer(FileBlock.BufferCache.BlockCache, BufferHead);
-    AddBuffer(FileBlock.BufferCache.FreeBlocksCache, BufferHead);
-  end;
-  {$IFDEF DebugFS} WriteDebug('PutBlock: Block: %d\n', [BufferHead.Block]); {$ENDIF}
+  Storage := @Storages[CPUID];
+  FBlock.Next := Storage.BlockFiles;
+  Storage.BlockFiles := FBlock;
+  {$IFDEF DebugFS} WriteDebug('DedicateBlockFile: New Block File Descriptor on CPU#%d , Minor: %d\n', [CPUID, FBlock.Minor]); {$ENDIF}
 end;
 
 function FindInode(Buffer: PInode;Inode: LongInt): PInode;

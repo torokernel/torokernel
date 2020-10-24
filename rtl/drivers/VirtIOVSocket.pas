@@ -561,8 +561,6 @@ begin
         Net.Name := 'virtiovsocket';
         Net.start := @VirtIOVSocketStart;
         Net.send := @VirtIOVSocketSend;
-        Net.TimeStamp := 0;
-        Net.SocketType := SCK_VIRTIO;
         Net.Minor := VirtIOVSocketDev.GuestID;
         RegisterNetworkInterface(Net);
       end;

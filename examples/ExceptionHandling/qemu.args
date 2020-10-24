@@ -1,1 +1,0 @@
--enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 512 -smp 2 -nographic

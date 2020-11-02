@@ -34,8 +34,6 @@ procedure PrintDecimal(Value: PtrUInt);
 procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 procedure ReadConsole(out C: XChar);
 procedure ReadlnConsole(Format: PXChar);
-procedure DisabledConsole;
-procedure EnabledConsole;
 procedure ConsoleInit;
 
 var
@@ -376,7 +374,7 @@ var
   Key: Byte;
   PBuff: PXChar;
 begin
-  EOI;
+  // EOI;
   while (read_portb($64) and 1) = 1 do
   begin
     Key := read_portb($60);
@@ -504,16 +502,6 @@ begin
     Format^ := C;
     Inc(Format);
   end;
-end;
-
-procedure EnabledConsole;
-begin
-  IrqOn(1);
-end;
-
-procedure DisabledConsole;
-begin
-  IrqOff(1);
 end;
 
 procedure ConsoleInit;

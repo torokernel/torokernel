@@ -55,7 +55,6 @@ var
 begin
   {$IFDEF ProfileBootTime}
     ShutdownInQemu;
-    Reboot;
   {$ENDIF}
   ConsoleInit;
   WriteConsoleF('/c/VLoading Toro ... HEAD:%p\n/n', [PtrUInt(Kernel_Head)]);

@@ -1,10 +1,9 @@
 //
 // Arch.pas
 //
-// This unit contains the functions and procedures for a particular architecture.
-// In this case, the unit is defined for x86-64.
-//
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// This units contains the the code that is platform-dependent.
+// 
+// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -97,14 +96,9 @@ procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 procedure Delay(ms: LongInt);
-procedure eoi;
 function GetApicID: Byte;
 function GetApicBaseAddr: Pointer;
-function get_irq_master: Byte;
-function get_irq_slave: Byte;
-procedure IrqOn(irq: Byte);
 procedure IOApicIrqOn(Irq: Byte);
-procedure IrqOff(irq: Byte);
 function is_apic_ready: Boolean ;
 procedure NOP;
 function read_portb(port: Word): Byte;
@@ -122,14 +116,12 @@ procedure CaptureException(Exception: Byte; Handler: Pointer);
 procedure ArchInit;
 procedure Now (Data: PNow);
 procedure Interruption_Ignore;
-procedure IRQ_Ignore;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
 function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
 function SecondsBetween(const ANow: TNow;const AThen: TNow): LongInt;
 procedure ShutdownInQemu;
-procedure Reboot;
 procedure DelayMicro(microseg: LongInt);
 function read_portw(port: Word): Word;
 procedure SetPageReadOnly(Add: Pointer);
@@ -549,75 +541,12 @@ asm
 end;
 
 const
-  Status_Port : array[0..1] of Byte = ($20,$A0);
-  Mask_Port : array[0..1] of Byte = ($21,$A1);
-  PIC_MASK: array [0..7] of Byte =(1,2,4,8,16,32,64,128);
-
-procedure IrqOn(irq: Byte);
-begin
-  if irq > 7 then
-    write_portb(read_portb($a1) and (not pic_mask[irq-8]), $a1)
-  else
-    write_portb(read_portb($21) and (not pic_mask[irq]), $21);
-end;
-
-const
   Level = $8000;
 // TODO: all irq are sent to core #0
 procedure IOApicIrqOn(Irq: Byte);
 begin
   // from linux, set to level otherwise remote-IRR is not clear
   write_ioapic_reg(irq * 2 + $10, irq + BASE_IRQ + Level);
-end;
-
-procedure IrqOff(irq: Byte);
-begin
-  if irq > 7 then
-    write_portb(read_portb($a1) or pic_mask[irq-8], $a1)
-  else
-    write_portb(read_portb($21) or pic_mask[irq], $21);
-end;
-
-procedure eoi;
-begin
-  write_portb($20, status_port[0]);
-  write_portb($20, status_port[1]);
-end;
-
-procedure all_irq_off;
-begin
-  write_portb($ff, mask_port[0]);
-  write_portb($ff, mask_port[1]);
-end;
-
-function get_irq_master: Byte ;
-begin
-  write_portb($b, $20);
-  NOP;
-  Result := read_portb($20);
-end;
-
-function get_irq_slave : Byte ;
-begin
-  write_portb($b, $a0);
-  NOP;
-  Result := read_portb($a0);
-end;
-
-const
-  cmos_port_reg = $70 ;
-  cmos_port_rw  = $71 ;
-
-procedure cmos_write(Data, Reg: Byte);
-begin
-  write_portb(Reg, cmos_port_reg);
-  write_portb(Data, cmos_port_rw);
-end;
-
-function cmos_read(Reg: Byte): Byte;
-begin
-  write_portb(Reg, cmos_port_reg);
-  Result := read_portb(cmos_port_rw);
 end;
 
 // This code has been extracted from DelphineOS <delphineos.sourceforge.net>
@@ -746,18 +675,6 @@ begin
     lidt [$400]
     db $ff, $ff
   end;
-end;
-
-// reboot using keyboard
-procedure Reboot;
-var
-  good: Byte;
-begin
-  good := 2;
-  while good and 2 = 1 do
-    good := read_portb($64);
-  write_portb($FE, $64);
-  hlt;
 end;
 
 function read_rdtsc: Int64;
@@ -952,7 +869,6 @@ end;
 procedure Now(Data: PNow);
 var
   Sec, Min, Hour: LongInt;
-  clk: KVMClock;
 begin
   Sec  := (StartTime.sec + (ToroClock.system_time div 1000000000)) mod 86400;
   Min  := (Sec div 60) mod 60 + StartTime.Min;
@@ -993,12 +909,6 @@ end;
 
 procedure Interruption_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
 asm
-  db $48, $cf
-end;
-
-procedure IRQ_Ignore; {$IFDEF FPC} [nostackframe]; assembler ; {$ENDIF}
-asm
-  call EOI;
   db $48, $cf
 end;
 

@@ -27,18 +27,20 @@ program StaticWebServer;
 {%RunCommand qemu-system-x86_64 -m 256 -smp 1 -drive format=raw,file=StaticWebServer.img -net nic,model=virtio -net tap,ifname=TAP2 -drive file=fat:rw:StaticWebServerFiles,if=none,id=drive-virtio-disk0 -device virtio-blk-pci,drive=drive-virtio-disk0,addr=06 -serial file:torodebug.txt}
 {%RunFlags BUILD-}
 
+{$L prt0.o}
+
 uses
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  Filesystem in '..\..\rtl\Filesystem.pas',
-  VirtIO in '..\..\rtl\drivers\VirtIO.pas',
-  VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-  VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
-  Console in '..\..\rtl\drivers\Console.pas',
-  Network in '..\..\rtl\Network.pas';
+  Kernel,
+  Process,
+  Memory,
+  Debug,
+  Arch,
+  Filesystem,
+  VirtIO,
+  VirtIOFS,
+  VirtIOVSocket,
+  Console,
+  Network;
 
 const
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';

@@ -29,16 +29,17 @@ program HelloWorld;
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img -device isa-debug-exit,iobase=0xf4,iosize=0x04}
 {%RunFlags BUILD-}
 
+{$L prt0.o}
+
 // only include the needed units
 uses
-  SysUtils,
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  Filesystem in '..\..\rtl\Filesystem.pas',
-  Console in '..\..\rtl\drivers\Console.pas';
+ Kernel,
+ Process,
+ Memory,
+ Debug,
+ Arch,
+ Filesystem,
+ Console;
 
 procedure ShutdownHelloWorld;
 begin

@@ -18,7 +18,7 @@
 ;
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-global _start
+global _pvstart
 STACKSPACE  equ 0x4000                                     
 IDT         equ  3020h
 
@@ -67,7 +67,7 @@ mbinfo:
   dd 0
 
 [BITS 32] 
-_start:                 
+_pvstart:
   ; load gdt
   cli
   mov esp, _sys_stack
@@ -268,7 +268,7 @@ SECTION .note
 SECTION .note
 elfnotes:
 XEN_ELFNOTE_PHYS32_ENTRY equ 18
-ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _start
+ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _pvstart
 
 SECTION .bss
 _sys_stackend:

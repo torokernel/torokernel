@@ -778,8 +778,10 @@ asm
   {$IFDEF LINUX} bts [rdi], rsi {$ENDIF}
 end;
 
-procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}
+// change_sp() is only used to start executing PASCALMAIN
+procedure change_sp(new_esp: Pointer); [nostackframe] assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
+  xor rbp, rbp
   mov rsp, new_esp
   ret
 end;

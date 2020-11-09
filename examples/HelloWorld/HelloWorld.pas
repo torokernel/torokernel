@@ -29,8 +29,6 @@ program HelloWorld;
 {%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img -device isa-debug-exit,iobase=0xf4,iosize=0x04}
 {%RunFlags BUILD-}
 
-{$L prt0.o}
-
 // only include the needed units
 uses
  Kernel,

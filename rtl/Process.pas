@@ -74,7 +74,6 @@ type
 
   TCPU = record
     ApicID: LongInt;
-    Idle: Boolean;
     CurrentThread: PThread;
     Threads: PThread;
     LastIRQ: QWORD;
@@ -96,7 +95,6 @@ const
   tsReady = 2 ;
   tsSuspended = 1 ;
   tsZombie = 4 ;
-  tsIdle = 6;
 
 // Interface function matching common declaration
 function BeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFunction: TThreadFunc; Parameter: Pointer; CreationFlags: DWORD; var ThreadID: TThreadID): TThreadID;
@@ -897,8 +895,6 @@ begin
   FirstMsg := CurrentCPU.MsgsToBeDispatched[ApicID];
   Msg.Next := FirstMsg;
   CurrentCPU.MsgsToBeDispatched[ApicID] := Msg;
-  if CPU[ApicID].Idle then
-    send_apic_int(ApicID, INTER_CORE_IRQ);
 end;
 
 function GetCurrentThread: PThread;
@@ -913,7 +909,7 @@ function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: T
 var
   NewThread, Current: PThread;
   NewThreadMsg: TThreadCreateMsg;
-  ip_ret: ^THandle;
+  ip_ret: ^QWORD;
 begin
   if CPUID = GetApicID then
   begin
@@ -1089,15 +1085,6 @@ begin
       begin
         RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
         RemoteMsgs.Parent.state := tsReady;
-        if CPU[RemoteCpuID].Idle then
-        begin
-          send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
-        end else
-        begin
-          Delay(100);
-          if CPU[RemoteCpuID].Idle then
-            send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
-        end;
         RemoteMsgs := RemoteMsgs.Next;
       end;
       CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] := nil;
@@ -1116,8 +1103,6 @@ begin
     begin
       CpuMxSlots[RemoteCpuID][CurrentCPU.ApicID] := CurrentCPU.MsgsToBeDispatched[RemoteCpuID];
       CurrentCPU.MsgsToBeDispatched[RemoteCpuID] := nil;
-      if CPU[RemoteCpuID].Idle then
-        send_apic_int(RemoteCpuID, INTER_CORE_IRQ);
       {$IFDEF DebugProcessEmigrating} WriteDebug('Emigrating - Switch Threads of DispatchArray[%d] to EmigrateArray[%d]\n', [CurrentCPU.ApicID, RemoteCpuID]); {$ENDIF}
     end;
   end;
@@ -1140,9 +1125,6 @@ begin
       {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
       while CurrentCPU.Threads = nil do
       begin
-        CurrentCPU.Idle := True;
-        hlt;
-        CurrentCPU.Idle := False;
         Inmigrating(CurrentCPU);
       end;
       CurrentCPU.CurrentThread := CurrentCPU.Threads;
@@ -1173,6 +1155,8 @@ begin
         Candidate := Candidate.Next;
     until Candidate = LastThread;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
+    if Candidate.state <> tsReady then
+      Continue;
     CurrentCPU.CurrentThread := Candidate;
     {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate), Candidate.State, PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
     if Candidate = CurrentThread then
@@ -1240,7 +1224,6 @@ end;
 // Yield the current CPU to the next ready thread
 procedure SysThreadSwitch;
 var
- idletime: Int64;
  tmp: PCPU;
  Thread: PThread;
 begin
@@ -1354,10 +1337,28 @@ end;
 // otherwise call the scheduler
 procedure SysSetCoreIdle;
 begin
+  // TODO: Set the core idle in the table
   If (read_rdtsc - CPU[GetApicId].LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
     hlt
   else
     SysThreadSwitch;
+end;
+
+// TODO: critical sections are important when using objpascal in multicore
+procedure SysInitCriticalSection(var cs : TRTLCriticalSection);
+begin
+end;
+
+procedure SysDoneCriticalSection(var cs : TRTLCriticalSection);
+begin
+end;
+
+procedure SysLeaveCriticalSection(var cs : TRTLCriticalSection);
+begin
+end;
+
+procedure SysEnterCriticalSection(var cs : TRTLCriticalSection);
+begin
 end;
 
 procedure ProcessInit;
@@ -1389,10 +1390,10 @@ begin
     ThreadSetPriority      := nil;
     ThreadGetPriority      := nil;
     GetCurrentThreadId     := @SysGetCurrentThreadID;
-    InitCriticalSection    := nil;
-    DoneCriticalSection    := nil;
-    EnterCriticalSection   := nil;
-    LeaveCriticalSection   := nil;
+    InitCriticalSection    := @SysInitCriticalSection;
+    DoneCriticalSection    := @SysDoneCriticalSection;
+    EnterCriticalSection   := @SysEnterCriticalSection;
+    LeaveCriticalSection   := @SysLeaveCriticalSection;
     InitThreadVar          := @SysInitThreadVar;
     RelocateThreadVar      := @SysRelocateThreadVar;
     AllocateThreadVars     := @SysAllocateThreadVars;

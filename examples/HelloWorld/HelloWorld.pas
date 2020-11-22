@@ -31,14 +31,13 @@ program HelloWorld;
 
 // only include the needed units
 uses
-  SysUtils,
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  Filesystem in '..\..\rtl\Filesystem.pas',
-  Console in '..\..\rtl\drivers\Console.pas';
+ Kernel,
+ Process,
+ Memory,
+ Debug,
+ Arch,
+ Filesystem,
+ Console;
 
 procedure ShutdownHelloWorld;
 begin

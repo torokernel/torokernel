@@ -1,30 +1,75 @@
-# Toro Kernel ![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
+# ToroMicroVM ![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
 ## Introduction
-Toro is a kernel dedicated to run a single application. The kernel compiles together with the user application and this results in a binary that user can run on top of a hypervisor, e.g., KVM, Xen, VirtualBox, or baremetal. To know more about Toro, visit the [blog](http://www.torokernel.io) and the [wiki](https://github.com/MatiasVara/torokernel/wiki). In the repository, the tag ToroKernel points to last commit for the ToroKernel project. Since this tag, the project focuses on microVM technologies like QEMU microvm or Firecracker, and on the devices virtio-fs for filesystem and virtio-vsocket for networking. 
+ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMicroVM leverages on virtio-fs and virtio-vsocket to provide a minimalistic architecture. Microservices are deployed as Toro guests in which binaries and files are distributed in a Ceph cluster. The common fileystem allows to easely launch microvms from any node of the cluster.
 
 ## Features
 * Support x86-64 architecture
 * Support up to 512GB of RAM
-* Support KVM, Xen, HyperV, VirtualBox
-* Support QEMU microvm and Firecracker
+* Support QEMU-KVM microvm and Firecracker
 * Cooperative and I/O bound threading scheduler
-* Virtual FileSystem
-* Network Stack
-* Network drivers:
-  - Virtio-vsocket, Virtio-net, E1000, NE2000
-* Disk drivers:
-  - Virtio-blk, ATA
-* FileSystem drivers:
-  - Ext2, Fat, VirtioFS
+* Support virtio-vsocket for networking
+* Support virtio-fs for filesystem
 * Fast boot up
 * Tiny image
 
-## Examples
-The repository of Toro includes examples that show basic functionalities of the kernel. These examples are in the **examples** directory. Each example contains the instruction to compile it and run it on QEMU-KVM. We recommend to start with the **HelloWorld** example. Before go to the example, you need to install Lazarus and QEMU-KVM:
+## How compile ToroMicroVM?
 
-`apt-get install lazarus`
+### Step 1. Install Freepascal
+```bash
+apt-get install fpc
+```
+You have to install version 3.2.0.
+ 
+### Step 2. Build latest Qemu-KVM
+```bash
+apt-get install libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
+git clone https://github.com/qemu/qemu.git qemuforvmm
+cd qemuforvmm
+mkdir build 
+cd build
+../configure --target-list=x86_64-softmmu
+make
+```
 
-To install qemu-kvm and build a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
+### Step 3. Get ToroMicroVM
+```bash
+git clone https://github.com/torokernel/torokernel.git
+```
+
+### Step 4. Get system.pas for ToroMicroVM
+```bash
+git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
+``` 
+
+### Step 5. Edit path to Qemu and FPC in CloudIt.sh
+Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
+
+## Run the HelloWorld Example
+You have just to go to `examples/HelloWorld/` and execute:
+```bash
+../CloudIt.sh HelloWorld "-dUseSerialasConsole"
+```
+
+## Run the StaticWebServer Example
+To run the StaticWebServer example, you have first to compile vsock-socat and virtiofds. The latter is built during the building of Qemu. In a terminal, launch vsock-socat by executing:
+
+```bash
+./socat TCP4-LISTEN:4000,reuseaddr,fork VSOCK-CONNECT:5:80
+```
+In a second terminal, execute:
+
+```bash
+./virtiofsd -d --socket-path=/tmp/vhostqemu1 -o source=/root/qemulast/build/testdir/ -o cache=always
+```
+
+Replace `source` with the directory to serve. Finally, launch the static webserver by executing:  
+
+```bash
+../CloudIt.sh StaticWebServer "-dUseSerialasConsole -dShutdownWhenFinished"
+``` 
+
+## Create your own distributed filesystem with CephFS
+To create a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
 
 ## Contributing
 You have many ways to contribute to Toro. One of them is by joining the Google Group [here](https://groups.google.com/forum/#!forum/torokernel). In addition, you can find more information [here](

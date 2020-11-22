@@ -91,6 +91,11 @@ type
     InitProc: procedure;
   end;
 
+// Utils
+procedure InttoStr(Value: PtrUInt; buff: PXChar);
+function StrCmp(p1, p2: PXChar; Len: LongInt): Boolean;
+procedure StrConcat(left, right, dst: PXChar);
+
 procedure bit_reset(Value: Pointer; Offset: QWord);
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
@@ -293,6 +298,63 @@ type
     flags: BYTE;
     pad: array[0..1] of BYTE;
   end;
+
+
+procedure InttoStr(Value: PtrUInt; buff: PXChar);
+var
+  I, Len: Byte;
+  // 21 is the max number of characters needed to represent 64 bits number in decimal
+  S: string[21];
+begin
+  Len := 0;
+  I := 21;
+  if Value = 0 then
+  begin
+    buff^ := '0';
+    buff  := buff + 1;
+    buff^ := #0;
+  end else
+  begin
+    while Value <> 0 do
+    begin
+      S[I] := AnsiChar((Value mod 10) + $30);
+      Value := Value div 10;
+      I := I-1;
+      Len := Len+1;
+    end;
+    S[0] := Char(Len);
+   for I := (sizeof(S)-Len) to sizeof(S)-1 do
+   begin
+    buff^ := S[I];
+    buff +=1;
+   end;
+   buff^ := #0;
+  end;
+end;
+
+function StrCmp(p1, p2: PXChar; Len: LongInt): Boolean;
+var
+  i: LongInt;
+begin
+  Result := False;
+  for i := 0 to Len-1 do
+  begin
+    if p1^ <> p2^ then
+      Exit;
+    p1 += 1;
+    p2 += 1;
+  end;
+  Result := true;
+end;
+
+procedure StrConcat(left, right, dst: PXChar);
+begin
+  Move(left^,dst^,Length(left));
+  dst := dst + Length(left);
+  Move(right^,dst^,Length(right));
+  dst +=Length(right);
+  dst^ := #0;
+end;
 
 var
   idt_gates: PInterruptGateArray; // Pointer to IDT
@@ -716,8 +778,10 @@ asm
   {$IFDEF LINUX} bts [rdi], rsi {$ENDIF}
 end;
 
-procedure change_sp(new_esp: Pointer); assembler ;{$IFDEF ASMINLINE} inline; {$ENDIF}
+// change_sp() is only used to start executing PASCALMAIN
+procedure change_sp(new_esp: Pointer); [nostackframe] assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
+  xor rbp, rbp
   mov rsp, new_esp
   ret
 end;

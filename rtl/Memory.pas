@@ -139,7 +139,7 @@ function XHeapUnstack(Heap: PXHeap): PXHeap;
 function ToroGetMem(Size: PtrUInt): Pointer;
 function ToroFreeMem(P: Pointer): Integer;
 function NumaFreeMem(P: Pointer): Integer;
-function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
+function ToroReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 function NumaReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
 function SysCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
 function SysUnCacheRegion(Add: Pointer; Size: PtrUInt): Boolean;
@@ -877,7 +877,7 @@ begin
 end;
 
 // Expand (or truncate) the size of block pointed by p and return the new pointer
-function ToroReAllocMem(P: Pointer; NewSize: PtrUInt): Pointer;
+function ToroReAllocMem(var P: Pointer; NewSize: PtrUInt): Pointer;
 var
   CPU: Byte;
   IsFree: Byte;
@@ -1142,6 +1142,8 @@ begin
   ToroMemoryManager.FreeMem := @ToroFreeMem;
   ToroMemoryManager.AllocMem := @ToroAllocMem;
   ToroMemoryManager.ReAllocMem := @ToroReAllocMem;
+  ToroMemoryManager.RelocateHeap := nil;
+  ToroMemoryManager.InitThread := nil;
   SetMemoryManager(ToroMemoryManager);
 end;
 

@@ -28,17 +28,17 @@ program StaticWebServer;
 {%RunFlags BUILD-}
 
 uses
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  Filesystem in '..\..\rtl\Filesystem.pas',
-  VirtIO in '..\..\rtl\drivers\VirtIO.pas',
-  VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-  VirtIOVSocket in '..\..\rtl\drivers\VirtIOVSocket.pas',
-  Console in '..\..\rtl\drivers\Console.pas',
-  Network in '..\..\rtl\Network.pas';
+  Kernel,
+  Process,
+  Memory,
+  Debug,
+  Arch,
+  Filesystem,
+  VirtIO,
+  VirtIOFS,
+  VirtIOVSocket,
+  Console,
+  Network;
 
 const
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';

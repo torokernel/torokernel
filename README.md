@@ -19,7 +19,7 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 apt-get install fpc
 ```
 You have to install version 3.2.0.
- 
+
 ### Step 2. Build latest Qemu-KVM
 ```bash
 apt-get install libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
@@ -36,10 +36,10 @@ make
 git clone https://github.com/torokernel/torokernel.git
 ```
 
-### Step 4. Get system.pas for ToroMicroVM
+### Step 4. Get the RTL for ToroMicroVM
 ```bash
 git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
-``` 
+```
 
 ### Step 5. Edit path to Qemu and FPC in CloudIt.sh
 Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
@@ -66,9 +66,30 @@ Replace `source` with the directory to serve. Finally, launch the static webserv
 
 ```bash
 ../CloudIt.sh StaticWebServer "-dUseSerialasConsole -dShutdownWhenFinished"
-``` 
+```
+
+## Building Toro in Windows by using Lazarus
+
+First you have to follow [this](https://github.com/torokernel/torokernel/wiki/How-to-get-a-Crosscompiler-of-Freepascal-for-a-Windows-host-and-Linux-target) tutorial to get a FPC cross-compiler from Windows to Linux.  Then, you have to execute the following script which compiles the RTL for Toro and outputs the generated files in the *x86_64-linux* directory. Note that this script overwrites the RTL for Linux, which is used when the *-TLinux* parameter is passed. This script requires three paths to set up:
+
+1.  *fpcrtlsource*, which is the path to the repository from https://github.com/torokernel/freepascal
+2.  *fpcrtllinuxbin*, which is the path to the cross-compiled linux RTL
+3. *fpcbinlinux*, which is the path to the fpc compiler.
+
+```bash
+fpcrtlsource="c:\Users\Matias\Desktop\fpc-3.2.0\rtl"
+fpcrtllinuxbin="c:\fpcupdeluxefortoromicrovm\fpc\bin\x86_64-linux"
+fpcbinlinux="c:\fpcupdeluxefortoromicrovm\fpc\bin\x86_64-win64"
+
+$fpcbinlinux/ppcx64.exe -TLinux -dFPC_NO_DEFAULT_MEMORYMANAGER -dHAS_MEMORYMANAGER -uFPC_HAS_INDIRECT_ENTRY_INFORMATION -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix/ -Fu$fpcrtlsource/linux/ -MObjfpc $fpcrtlsource/linux/si_prc.pp -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc -FE$fpcrtllinuxbin
+
+$fpcbinlinux/ppcx64.exe -Us -TLinux -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc $fpcrtlsource/linux/system.pp -FE$fpcrtllinuxbin
+```
+
+Then, you have to go to Lazarus and open the project **HelloWorld.lpi**. You are able to compile the project from compile.
 
 ## Create your own distributed filesystem with CephFS
+
 To create a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
 
 ## Contributing

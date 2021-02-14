@@ -37,7 +37,7 @@ implementation
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, Console, Process, Memory, FileSystem, Network;
+  Arch, Console, Process, Memory, FileSystem, Network, Gdbstub;
 
 const
   MainThreadStackSize = 64*1024;
@@ -60,6 +60,7 @@ begin
   WriteConsoleF('/c/VLoading Toro ... HEAD:%p\n/n', [PtrUInt(Kernel_Head)]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
+  GdbstubInit;
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;

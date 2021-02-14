@@ -33,6 +33,8 @@ procedure CleanConsole;
 procedure PrintDecimal(Value: PtrUInt);
 procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 procedure ConsoleInit;
+procedure ReadFromSerial(out C: XChar);
+procedure PutCtoSerial(C: XChar);
 
 var
  Color: Byte = 10;
@@ -71,7 +73,6 @@ var
 
 procedure PrintString(const S: AnsiString); forward;
 procedure PutCtoScreen(const Car: XChar); forward;
-procedure PutCtoSerial(C: XChar); forward;
 
 var
   PConsole: ^TConsole;
@@ -129,8 +130,14 @@ end;
 
 procedure PutCtoSerial(C: XChar);
 begin
-  write_portb(Byte(C), BASE_COM_PORT);
   WaitForCompletion;
+  write_portb(Byte(C), BASE_COM_PORT);
+end;
+
+procedure ReadFromSerial(out C: XChar);
+begin
+  while (read_portb(BASE_COM_PORT+5) and 1 = 0) do;
+  C := Char(read_portb(BASE_COM_PORT));
 end;
 
 {$IFDEF DCC}
@@ -369,7 +376,7 @@ end;
 
 procedure ConsoleInit;
 begin
-  HeadLess := false;
+  HeadLess := true;
   {$IFDEF UseSerialasConsole}
     write_portb ($83, BASE_COM_PORT+3);
     write_portb (0, BASE_COM_PORT+1);

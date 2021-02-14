@@ -785,7 +785,6 @@ begin
   raise EFPUException.Create ('FPU');
 end;
 
-
 procedure InitializeExceptions;
 begin
   CaptureInt(EXC_DIVBYZERO, @ExceptDIVBYZERO);

@@ -29,6 +29,7 @@ interface
 const
   EXC_DIVBYZERO = 0;
   EXC_INT3 = 3;
+  EXC_INT1 = 1;
   EXC_NMI = 2;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;

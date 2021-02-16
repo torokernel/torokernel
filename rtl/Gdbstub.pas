@@ -1,9 +1,9 @@
 //
-// Console.pas
+// GDBstub.pas
 //
 // This unit contains the functions that handle the console.
 //
-// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -294,19 +294,20 @@ const
   NB_REG = 16;
 
 var
-  dgb_regs: array[0..15] of QWORD;
-  breaks: array[0..4] of QWord;
-  breaksData: array[0..4] of Byte;
+  dgb_regs: array[0..17] of QWORD;
+  breaks: array[0..10] of QWord;
+  breaksData: array[0..10] of Byte;
   count : Byte = 0 ;
 
 procedure DbgHandler (Signal: Boolean);
 var
-  buf: array[0..255] of Char;
-  l: array[0..255] of Char;
+  buf: array[0..300] of Char;
+  l: array[0..300] of Char;
   Len, i, Size: LongInt;
   reg: QWORD;
   g: ^Char;
   addr: ^DWORD;
+  p: QWORD;
 begin
   if Signal then
     DbgSendSignalPacket(@buf, sizeof(buf), Char(5)); 
@@ -314,12 +315,22 @@ begin
   begin
     DbgRecvPacket(@buf, sizeof(buf), Len);
     case buf[0] of
+      'P': begin
+             reg := Byte(HexStrtoQWord(@buf[1], @buf[Len]));
+             i := 1;
+             while buf[i] <> '=' do
+               Inc(i);
+             reg := Byte(HexStrtoQWord(@buf[1], @buf[i]));
+             DbgDecHex(@buf[i+1], Len - i - 1, Pchar(@p), sizeof(QWORD));
+             if reg < 16 then
+               dgb_regs[reg] := p;
+             DbgSendPacket(OK, Jaja(OK));
+           end;
       'p':begin
-            reg := HexStrtoQWord(@buf[1], @buf[Len]);
-            // TODO: fix this
-            if reg > 15 then reg := 15;
-            DbgEncHex(@buf, sizeof(buf), @dgb_regs[reg], 8);
-            DbgSendPacket(@buf, 8 * 2);
+            reg := Byte(HexStrtoQWord(@buf[1], @buf[Len]));
+            if reg > 17 then reg := 17;
+            DbgEncHex(@buf[0], sizeof(buf), Pchar(@dgb_regs[reg]), sizeof(QWORD));
+            DbgSendPacket(@buf[0], 8 * 2);
           end;
       'm':begin
             i := 1;
@@ -338,8 +349,9 @@ begin
             DbgSendPacket(@buf, Size * 2);
           end;
       'g': begin
-             DbgEncHex(@buf, sizeof(buf), @dgb_regs, sizeof(dgb_regs));
-             DbgSendPacket(@buf, sizeof(dgb_regs) * 2);
+             // these are only general registers
+             DbgEncHex(@buf, sizeof(buf), @dgb_regs, sizeof(dgb_regs)-16);
+             DbgSendPacket(@buf, (sizeof(dgb_regs)-16) * 2);
            end;
       'q': begin
              if strcomp(@buf[1], 'Supported') then
@@ -365,6 +377,10 @@ begin
              else if strcomp(@buf[1], 'Symbol') then
              begin
                DbgSendPacket(OK, Jaja(OK)); 
+             end
+             else if strcomp(@buf[1], 'Offsets') then
+             begin
+               DbgSendPacket(Empty, Jaja(Empty)); 
              end;
              // TODO: handle the case that we do not know the command
            end;
@@ -373,7 +389,7 @@ begin
              while buf[i] <> ',' do
                Inc(i);
              addr := Pointer(HexStrtoQWord(@buf[3], @buf[i]));
-             for i := 0 to 4 do
+             for i := 0 to 10 do
              begin
                if breaks[i] = QWORD(addr) then
                  break;
@@ -386,7 +402,7 @@ begin
              while buf[i] <> ',' do
                Inc(i);
              addr := Pointer(HexStrtoQWord(@buf[3], @buf[i]));
-             for i := 0 to 4 do
+             for i := 0 to 10 do
              begin
                if breaks[i] = QWORD(addr) then
                  break;
@@ -397,7 +413,7 @@ begin
                inc(count) ;
                breaks[i] := QWORD(addr);
              end;
-             breaksData[i] := Byte(addr^ and $ffffff00);
+             breaksData[i] := Byte(addr^ and $ff);
              addr^ := (addr^ and $ffffff00) or $cc;
              DbgSendPacket(OK, Jaja(OK));
            end;
@@ -423,7 +439,12 @@ begin
              DbgSendPacket(Signal05, Jaja(Signal05));
            end;
       'c':begin
+            dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
             break
+          end;
+      's':begin
+            dgb_regs[17] := dgb_regs[17] or (1 shl 8);
+            break;
           end;
     end;
   end;
@@ -434,42 +455,102 @@ begin
   DbgHandler(true);
 end;
 
+procedure Int1Handler;
+begin
+    DbgHandler(true);
+end;
+
+// these exceptions do not have error code
+procedure ExceptINT1;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
+asm
+  {$IFDEF DCC} .noframe {$ENDIF}
+  // save state registers
+  mov [dgb_regs], rax
+  mov [dgb_regs+8], rbx
+  mov [dgb_regs+8*2], rcx
+  mov [dgb_regs+8*3], rdx
+  mov [dgb_regs+8*4], rsi
+  mov [dgb_regs+8*5], rdi
+  mov [dgb_regs+8*6], rbp
+  mov [dgb_regs+8*7], rsp
+  mov [dgb_regs+8*8], r8
+  mov [dgb_regs+8*9], r9
+  mov [dgb_regs+8*10], r10
+  mov [dgb_regs+8*11], r11
+  mov [dgb_regs+8*12], r12
+  mov [dgb_regs+8*13], r13
+  mov [dgb_regs+8*14], r14
+  mov [dgb_regs+8*15], r15
+  // save rflags
+  mov rax, [rsp + 2 * 8]
+  mov [dgb_regs+8*17], rax
+  // save rip
+  mov rbx, rsp
+  mov rax, [rbx]
+  mov [dgb_regs+8*16], rax
+  // protect stack
+  mov r15 , rsp
+  mov rbp , r15
+  sub r15 , 32
+  mov  rsp , r15
+  xor rcx , rcx
+  Call Int1Handler
+  mov rsp , rbp
+  // set rip
+  pop rax
+  mov rax, [dgb_regs+8*16]
+  push rax
+  // set rflags
+  mov rax, qword [dgb_regs+8*17]
+  mov [rsp + 2 * 8], rax
+  mov rax, [dgb_regs]
+  mov rbx, [dgb_regs+8]
+  mov rcx, [dgb_regs+8*2]
+  mov rdx, [dgb_regs+8*3]
+  mov rsi, [dgb_regs+8*4]
+  mov rdi, [dgb_regs+8*5]
+  mov rbp, [dgb_regs+8*6]
+  mov r9,  [dgb_regs+8*8]
+  mov r9,  [dgb_regs+8*9]
+  mov r10, [dgb_regs+8*10]
+  mov r11, [dgb_regs+8*11]
+  mov r12, [dgb_regs+8*12]
+  mov r13, [dgb_regs+8*13]
+  mov r14, [dgb_regs+8*14]
+  mov r15, [dgb_regs+8*15]
+  db $48
+  db $cf
+end;
+
+
 procedure ExceptINT3;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
   {$IFDEF DCC} .noframe {$ENDIF}
-  // save registers
-  push rbp
-  push rax
-  push rbx
-  push rcx
-  push rdx
-  push rdi
-  push rsi
-  push r8
-  push r9
-  push r10
-  push r11
-  push r12
-  push r13
-  push r14
-  push r15
   // save state registers
-  mov dgb_regs[0], rax
-  mov dgb_regs[1], rbx
-  mov dgb_regs[2], rcx
-  mov dgb_regs[3], rdx
-  mov dgb_regs[4], rsi
-  mov dgb_regs[5], rdi
-  mov dgb_regs[6], rbp
-  mov dgb_regs[7], rsp
-  mov dgb_regs[8], r8
-  mov dgb_regs[9], r9
-  mov dgb_regs[10], r10
-  mov dgb_regs[11], r11
-  mov dgb_regs[12], r12
-  mov dgb_regs[13], r13
-  mov dgb_regs[14], r14
-  mov dgb_regs[15], r15
+  mov [dgb_regs], rax
+  mov [dgb_regs+8], rbx
+  mov [dgb_regs+8*2], rcx
+  mov [dgb_regs+8*3], rdx
+  mov [dgb_regs+8*4], rsi
+  mov [dgb_regs+8*5], rdi
+  mov [dgb_regs+8*6], rbp
+  mov [dgb_regs+8*7], rsp
+  mov [dgb_regs+8*8], r8
+  mov [dgb_regs+8*9], r9
+  mov [dgb_regs+8*10], r10
+  mov [dgb_regs+8*11], r11
+  mov [dgb_regs+8*12], r12
+  mov [dgb_regs+8*13], r13
+  mov [dgb_regs+8*14], r14
+  mov [dgb_regs+8*15], r15
+  // save rflags
+  mov rax, [rsp+2*8]
+  mov [dgb_regs+8*17], rax
+  // save rip
+  mov rbx, rsp
+  mov rax, [rbx]
+  mov [dgb_regs+8*16], rax
+  // protect the stack
   mov r15 , rsp
   mov rbp , r15
   sub r15 , 32
@@ -477,37 +558,38 @@ asm
   xor rcx , rcx
   Call Int3Handler
   mov rsp , rbp
-  pop r15
-  pop r14
-  pop r13
-  pop r12
-  pop r11
-  pop r10
-  pop r9
-  pop r8
-  pop rsi
-  pop rdi
-  pop rdx
-  pop rcx
-  pop rbx
+  // restore rip
   pop rax
-  pop rbp
+  mov rax, [dgb_regs+8*16]
+  push rax
+  // restore rflags
+  mov rax, qword [dgb_regs+8*17]
+  mov [rsp+2*8], rax
+  mov rax, [dgb_regs]
+  mov rbx, [dgb_regs+8]
+  mov rcx, [dgb_regs+8*2]
+  mov rdx, [dgb_regs+8*3]
+  mov rsi, [dgb_regs+8*4]
+  mov rdi, [dgb_regs+8*5]
+  mov rbp, [dgb_regs+8*6]
+  mov r9,  [dgb_regs+8*8]
+  mov r9,  [dgb_regs+8*9]
+  mov r10, [dgb_regs+8*10]
+  mov r11, [dgb_regs+8*11]
+  mov r12, [dgb_regs+8*12]
+  mov r13, [dgb_regs+8*13]
+  mov r14, [dgb_regs+8*14]
+  mov r15, [dgb_regs+8*15]
   db $48
   db $cf
 end;
 
 procedure GdbstubInit;
-var
-  buf: array[0..255] of Char;
-  Len: LongInt;
-  // 16 registers of 64 bits
-  regs: array[0..NB_REG-1] of QWord;
-  nbuf: array[0..((NB_REG * 8 * 2)-1)] of Char;
-  addr: ^DWORD;
 begin
   // disable console
   HeadLess := true;
   CaptureInt(EXC_INT3, @ExceptINT3); 
+  CaptureInt(EXC_INT1, @ExceptINT1);
 
   while true do
   begin

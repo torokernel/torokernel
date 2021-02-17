@@ -339,6 +339,7 @@ begin
             reg := HexStrtoQWord(@buf[1], @buf[i]);
             Inc (i);
             Size := HexStrtoQWord(@buf[i], @buf[Len]);
+            // this can contain an invalid value!!!
             g := Pointer(reg);
             for i:= 0 to size - 1 do
             begin
@@ -598,108 +599,6 @@ begin
   end;
  
   DbgHandler(false);
-
-  {
-  // qstatus
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(Empty, Jaja(Empty));
-
-  //Thread Info
-  // l
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket('l', 1);
-
-  // Hc-1
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(OK, Jaja(OK));
-
-  // qC
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(Empty, Jaja(Empty));
-
-  // qAttached
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket('1', 1);
-  {
-  // qOffset
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(Empty, Jaja(Empty));
-
-  // send registers
-  // if you negociate QStartNoAckMode+ you do not require to ack each packet
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs, sizeof(regs));
-  DbgSendPacket(@nbuf, sizeof(nbuf));
-
-  // este es el 10
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], sizeof(QWORD));
-  DbgSendPacket(@nbuf, 8 * 2);
-
-  // ThreadInfo
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket('l', 1);
-
-  // m0,1
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 1);
-  DbgSendPacket(@nbuf, 2);
-  
-  // m0,1
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 1);
-  DbgSendPacket(@nbuf, 2);
-
-  // m0,9
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 9);
-  DbgSendPacket(@nbuf, 9 * 2); 
-
-  // $qSymbol
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(OK, Jaja(OK));  
-    
-  // here the initialization has finished
-  // here we need to loop by reading commands until user does continue
-  // then we break and we continue kernel execution
-  // 
-  // start the breakpoint 
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 40);
-  DbgSendPacket(@nbuf, 40 * 2);
-
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 18);
-  DbgSendPacket(@nbuf, 18 * 2);
-
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 6);
-  DbgSendPacket(@nbuf, 6 * 2);
-  
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgEncHex(@nbuf, sizeof(nbuf), @regs[0], 1);
-  DbgSendPacket(@nbuf, 1 * 2);
-
-  // this contain the breakpoint
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(OK, Jaja(OK));
-  
-  //$Z0,42abc0,1 
-  addr := Pointer(HexStrtoQWord(@buf[3], @buf[9]));
-  breaks := byte(addr^ and $ffffff00);
-  addr^ := (addr^ and $ffffff00) or $cc;
-   
-  // vCont?
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(Empty, Jaja(Empty));
-
-  // Hc-0
-  DbgRecvPacket(@buf, sizeof(buf), Len);
-  DbgSendPacket(OK, Jaja(OK));
-
-  // c command
-  DbgRecvPacket(@buf, sizeof(buf), Len);}
 end;
 
 end.

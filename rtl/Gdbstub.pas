@@ -1,7 +1,7 @@
 //
 // GDBstub.pas
 //
-// This unit contains the functions that handle the console.
+// This unit contains a gdbstub to enable debugging by using GDB
 //
 // Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -266,7 +266,7 @@ const
   OK : PChar = 'OK';
   Signal05 : PChar = 'S05';//thread:p01.01';
 
-function Jaja(C: PChar) : LongInt;
+function strlen(C: PChar) : LongInt;
 var r: LongInt;
 begin
   r := 0;
@@ -324,7 +324,7 @@ begin
              DbgDecHex(@buf[i+1], Len - i - 1, Pchar(@p), sizeof(QWORD));
              if reg < 16 then
                dgb_regs[reg] := p;
-             DbgSendPacket(OK, Jaja(OK));
+             DbgSendPacket(OK, strlen(OK));
            end;
       'p':begin
             reg := Byte(HexStrtoQWord(@buf[1], @buf[Len]));
@@ -339,10 +339,14 @@ begin
             reg := HexStrtoQWord(@buf[1], @buf[i]);
             Inc (i);
             Size := HexStrtoQWord(@buf[i], @buf[Len]);
-            // this can contain an invalid value!!!
             g := Pointer(reg);
             for i:= 0 to size - 1 do
             begin
+              if g > Pointer(MAX_ADDR_MEM) then
+              begin
+                l[i] := Char(0);
+                break;
+              end;
               l[i] := g^;
               Inc(g);
             end;  
@@ -357,7 +361,7 @@ begin
       'q': begin
              if strcomp(@buf[1], 'Supported') then
              begin
-               DbgSendPacket(QSupported, Jaja(QSupported));
+               DbgSendPacket(QSupported, strlen(QSupported));
              end
              else if strcomp(@buf[1], 'fThreadInfo') then
              begin
@@ -365,7 +369,7 @@ begin
              end
              else if buf[1] = 'C' then
              begin
-               DbgSendPacket(Empty, Jaja(Empty));
+               DbgSendPacket(Empty, strlen(Empty));
              end
              else if strcomp(@buf[1], 'Attached') then
              begin
@@ -373,15 +377,15 @@ begin
              end
              else if strcomp(@buf[1], 'TStatus') then
              begin
-                DbgSendPacket(Empty, Jaja(Empty));
+                DbgSendPacket(Empty, strlen(Empty));
              end
              else if strcomp(@buf[1], 'Symbol') then
              begin
-               DbgSendPacket(OK, Jaja(OK)); 
+               DbgSendPacket(OK, strlen(OK)); 
              end
              else if strcomp(@buf[1], 'Offsets') then
              begin
-               DbgSendPacket(Empty, Jaja(Empty)); 
+               DbgSendPacket(Empty, strlen(Empty)); 
              end;
              // TODO: handle the case that we do not know the command
            end;
@@ -396,7 +400,7 @@ begin
                  break;
              end;
              addr^ := (addr^ and $ffffff00) or breaksData[i];
-             DbgSendPacket(OK, Jaja(OK)); 
+             DbgSendPacket(OK, strlen(OK)); 
           end;
       'Z': begin
              i := 3;
@@ -416,28 +420,28 @@ begin
              end;
              breaksData[i] := Byte(addr^ and $ff);
              addr^ := (addr^ and $ffffff00) or $cc;
-             DbgSendPacket(OK, Jaja(OK));
+             DbgSendPacket(OK, strlen(OK));
            end;
       'v': begin
            if strcomp(@buf[1], 'MustReplyEmpty') then
            begin
-             DbgSendPacket(Empty, Jaja(Empty));   
+             DbgSendPacket(Empty, strlen(Empty));   
            end else if strcomp(@buf[1], 'Cont') then
            begin
-             DbgSendPacket(Empty, Jaja(Empty));
+             DbgSendPacket(Empty, strlen(Empty));
            end;
           end;
       'H': begin
              if strcomp(@buf[1],'g0') then
              begin
-               DbgSendPacket(OK, Jaja(OK)); 
+               DbgSendPacket(OK, strlen(OK)); 
              end else if buf[1] = 'c' then
              begin
-               DbgSendPacket(OK, Jaja(OK));
+               DbgSendPacket(OK, strlen(OK));
              end;
            end;
       '?': begin
-             DbgSendPacket(Signal05, Jaja(Signal05));
+             DbgSendPacket(Signal05, strlen(Signal05));
            end;
       'c':begin
             dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));

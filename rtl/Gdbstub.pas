@@ -306,7 +306,7 @@ var
   Len, i, Size: LongInt;
   reg: QWORD;
   g: ^Char;
-  addr: ^DWORD;
+  addr: ^Byte;
   p: QWORD;
 begin
   if Signal then
@@ -399,7 +399,7 @@ begin
                if breaks[i] = QWORD(addr) then
                  break;
              end;
-             addr^ := (addr^ and $ffffff00) or breaksData[i];
+             addr^ := breaksData[i];
              DbgSendPacket(OK, strlen(OK)); 
           end;
       'Z': begin
@@ -417,9 +417,9 @@ begin
                i := count ;
                inc(count) ;
                breaks[i] := QWORD(addr);
+               breaksData[i] := addr^;
              end;
-             breaksData[i] := Byte(addr^ and $ff);
-             addr^ := (addr^ and $ffffff00) or $cc;
+             addr^ := $cc;
              DbgSendPacket(OK, strlen(OK));
            end;
       'v': begin
@@ -590,18 +590,22 @@ asm
 end;
 
 procedure GdbstubInit;
+var
+  i: LongInt;
 begin
   // disable console
   HeadLess := true;
   CaptureInt(EXC_INT3, @ExceptINT3); 
   CaptureInt(EXC_INT1, @ExceptINT1);
+  for i:=0 to 10 do
+     breaks[i] := 0 ;
 
   while true do
   begin
     if DbgSerialGetC = '+' then
       break;
   end;
- 
+
   DbgHandler(false);
 end;
 

@@ -43,6 +43,14 @@ type
     reg: array[0..30] of LongInt;
 end;
 
+const
+  QSupported : PChar = 'PacketSize=1000';
+  Empty : Pchar = '';
+  OK : PChar = 'OK';
+  Signal05 : PChar = 'S05';
+  NB_REG = 16;
+  MAX_NR_BREAKPOINTS = 50;
+
 function DbgSerialGetC: XChar;
 var
   R: XChar;
@@ -68,12 +76,12 @@ begin
   Result := 0;
 end;
 
-// TODO: falta cuando falla de leer todo
 function DbgRead(C: Pchar; BufLen: LongInt; Len: Longint): LongInt;
 begin
   Result := 0;
   if BufLen < Len then
     Exit;
+  Result := Len;
   while Len > 0 do
   begin
     C^ := DbgSerialGetC;
@@ -258,14 +266,6 @@ begin
   DbgSerialPutC('+');
 end;
 
-// the - in features is to not send the registers
-// maybe is better to reduce the number of features
-const
-  QSupported : PChar = 'PacketSize=1000'; //;qXfer:features:read-;vContSupported+;multiprocess-';
-  Empty : Pchar = '';
-  OK : PChar = 'OK';
-  Signal05 : PChar = 'S05';//thread:p01.01';
-
 function strlen(C: PChar) : LongInt;
 var r: LongInt;
 begin
@@ -290,13 +290,10 @@ begin
     Result := True;
 end;
 
-const
-  NB_REG = 16;
-
 var
   dgb_regs: array[0..17] of QWORD;
-  breaks: array[0..10] of QWord;
-  breaksData: array[0..10] of Byte;
+  breaks: array[0..MAX_NR_BREAKPOINTS-1] of QWord;
+  breaksData: array[0..MAX_NR_BREAKPOINTS-1] of Byte;
   count : Byte = 0 ;
 
 procedure DbgHandler (Signal: Boolean);
@@ -394,7 +391,7 @@ begin
              while buf[i] <> ',' do
                Inc(i);
              addr := Pointer(HexStrtoQWord(@buf[3], @buf[i]));
-             for i := 0 to 10 do
+             for i := 0 to MAX_NR_BREAKPOINTS-1 do
              begin
                if breaks[i] = QWORD(addr) then
                  break;
@@ -407,7 +404,7 @@ begin
              while buf[i] <> ',' do
                Inc(i);
              addr := Pointer(HexStrtoQWord(@buf[3], @buf[i]));
-             for i := 0 to 10 do
+             for i := 0 to MAX_NR_BREAKPOINTS-1 do
              begin
                if breaks[i] = QWORD(addr) then
                  break;
@@ -599,13 +596,12 @@ begin
   CaptureInt(EXC_INT1, @ExceptINT1);
   for i:=0 to 10 do
      breaks[i] := 0 ;
-
+  // wait for client
   while true do
   begin
     if DbgSerialGetC = '+' then
       break;
   end;
-
   DbgHandler(false);
 end;
 

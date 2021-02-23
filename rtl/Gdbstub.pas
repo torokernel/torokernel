@@ -48,7 +48,8 @@ const
   Empty : Pchar = '';
   OK : PChar = 'OK';
   Signal05 : PChar = 'S05';
-  NB_REG = 16;
+  NB_GENERAL_REG = 16;
+  NB_EXTRA_REG = 2;
   MAX_NR_BREAKPOINTS = 50;
 
 function DbgSerialGetC: XChar;
@@ -291,7 +292,7 @@ begin
 end;
 
 var
-  dgb_regs: array[0..17] of QWORD;
+  dgb_regs: array[0..NB_GENERAL_REG + NB_EXTRA_REG -1] of QWORD;
   breaks: array[0..MAX_NR_BREAKPOINTS-1] of QWord;
   breaksData: array[0..MAX_NR_BREAKPOINTS-1] of Byte;
   count : Byte = 0 ;
@@ -325,7 +326,7 @@ begin
            end;
       'p':begin
             reg := Byte(HexStrtoQWord(@buf[1], @buf[Len]));
-            if reg > 17 then reg := 17;
+            if reg > NB_GENERAL_REG + NB_EXTRA_REG -1 then reg := NB_GENERAL_REG + NB_EXTRA_REG -1;
             DbgEncHex(@buf[0], sizeof(buf), Pchar(@dgb_regs[reg]), sizeof(QWORD));
             DbgSendPacket(@buf[0], 8 * 2);
           end;
@@ -352,8 +353,8 @@ begin
           end;
       'g': begin
              // these are only general registers
-             DbgEncHex(@buf, sizeof(buf), @dgb_regs, sizeof(dgb_regs)-16);
-             DbgSendPacket(@buf, (sizeof(dgb_regs)-16) * 2);
+             DbgEncHex(@buf, sizeof(buf), @dgb_regs, sizeof(dgb_regs)-NB_EXTRA_REG * sizeof(QWORD));
+             DbgSendPacket(@buf, (sizeof(dgb_regs)-NB_EXTRA_REG * sizeof(QWORD)) * 2);
            end;
       'q': begin
              if strcomp(@buf[1], 'Supported') then

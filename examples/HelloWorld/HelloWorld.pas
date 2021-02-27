@@ -37,7 +37,8 @@ uses
  Debug,
  Arch,
  Filesystem,
- Console;
+ Console,
+ Gdbstub;
 
 procedure ShutdownHelloWorld;
 begin

@@ -513,8 +513,8 @@ asm
   mov rsi, [dgb_regs+8*4]
   mov rdi, [dgb_regs+8*5]
   mov rbp, [dgb_regs+8*6]
-  mov r9,  [dgb_regs+8*8]
-  mov r9,  [dgb_regs+8*9]
+  mov r8,  [dgb_regs+8*8]
+  mov r9, [dgb_regs+8*9]
   mov r10, [dgb_regs+8*10]
   mov r11, [dgb_regs+8*11]
   mov r12, [dgb_regs+8*12]
@@ -575,7 +575,7 @@ asm
   mov rsi, [dgb_regs+8*4]
   mov rdi, [dgb_regs+8*5]
   mov rbp, [dgb_regs+8*6]
-  mov r9,  [dgb_regs+8*8]
+  mov r8,  [dgb_regs+8*8]
   mov r9,  [dgb_regs+8*9]
   mov r10, [dgb_regs+8*10]
   mov r11, [dgb_regs+8*11]
@@ -606,4 +606,6 @@ begin
   DbgHandler(false);
 end;
 
+initialization
+  GdbStubInit;
 end.

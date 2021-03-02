@@ -57,7 +57,7 @@ begin
     ShutdownInQemu;
   {$ENDIF}
   ConsoleInit;
-  WriteConsoleF('/c/VLoading Toro ... HEAD:%p\n/n', [PtrUInt(Kernel_Head)]);
+  WriteConsoleF('Loading Toro ... HEAD:%p\n', [PtrUInt(Kernel_Head)]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}

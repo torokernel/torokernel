@@ -421,7 +421,7 @@ begin
     Exit;
   end;
   {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
-  WriteConsoleF('SysMount: Filesystem /Vmounted/n on CPU#%d\n', [GetApicID]);
+  WriteConsoleF('SysMount: Filesystem mounted on CPU#%d\n', [GetApicID]);
 end;
 
 function NameI(Path: PXChar): PInode;

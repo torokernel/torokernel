@@ -243,7 +243,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RDivision by zero/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Division by zero\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -311,7 +311,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /ROverflow/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Overflow\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -366,7 +366,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RBound instrucction/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Bound instrucction\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -421,7 +421,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RIllegal instrucction/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Illegal instrucction\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -476,7 +476,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RDevice not available/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Device not available\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -531,7 +531,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RDouble fault/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Double fault\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -586,7 +586,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RStack fault/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: Stack fault\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -641,7 +641,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RGeneral protection fault/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: General protection fault\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -703,7 +703,7 @@ begin
     mov rax, cr2
     mov rcr2, rax
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RPage Fault/n, cr2: %h\n',[GetApicid, rcr2]);
+  WriteConsoleF('[\t] CPU#%d Exception: Page Fault, cr2: %h\n',[GetApicid, rcr2]);
   WriteConsoleF('Dumping ThreadID: %d\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -761,7 +761,7 @@ begin
     mov rflags_reg, rax
     mov rbp, rbp_reg
   end;
-  WriteConsoleF('[\t] CPU#%d Exception: /RFPU error/n\n',[GetApicid]);
+  WriteConsoleF('[\t] CPU#%d Exception: FPU error\n',[GetApicid]);
   WriteConsoleF('Thread#%d registers dump:\n',[CPU[GetApicid].CurrentThread.ThreadID]);
   WriteConsoleF('rax: %h, rbx: %h,      rcx: %h\n',[rax_reg, rbx_reg, rcx_reg]);
   WriteConsoleF('rdx: %h, rbp: %h,  errcode: %h\n',[rdx_reg, rbp_reg, errc_reg]);
@@ -820,7 +820,7 @@ begin
   end;
   if CPU_COUNT = 1 then
   begin
-    WriteConsoleF('Core#0 ... /VRunning\n/n',[]);
+    WriteConsoleF('Core#0 ... Running\n',[]);
     Exit;
   end;
   for I := 0 to CPU_COUNT-1 do
@@ -833,18 +833,18 @@ begin
       begin
         if not InitCore(Cores[I].ApicID) then
         begin
-          WriteConsoleF('Core#%d ... /RHardware Issue\n/n', [Cores[I].ApicID]);
+          WriteConsoleF('Core#%d ... Hardware Issue\n', [Cores[I].ApicID]);
           break;
         end;
         if Cores[I].InitConfirmation then
          break;
       end;
       if Cores[I].InitConfirmation then
-        WriteConsoleF('Core#%d ... /VUp\n/n', [Cores[I].ApicID])
+        WriteConsoleF('Core#%d ... Up\n', [Cores[I].ApicID])
       else
-        WriteConsoleF('Core#%d ... /RDown\n/n', [Cores[I].ApicID]);
+        WriteConsoleF('Core#%d ... Down\n', [Cores[I].ApicID]);
     end else if Cores[I].CPUBoot then
-      WriteConsoleF('Core#0 ... /VUp\n/n',[]);
+      WriteConsoleF('Core#0 ... Up\n',[]);
   end;
 end;
 
@@ -1208,7 +1208,7 @@ begin
   end;
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
-  WriteConsoleF('Starting MainThread: /V%h/n\n', [InitialThreadID]);
+  WriteConsoleF('Starting MainThread: %h\n', [InitialThreadID]);
   // only performed explicitely for initialization procedure
   {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
   // TODO: InitThreadVars for DELPHI
@@ -1316,7 +1316,7 @@ begin
   if not cond then
     Exit;
   DisableInt;
-  WriteConsoleF('/RPanic/n:\n',[]);
+  WriteConsoleF('Panic:\n',[]);
   WriteConsoleF(Format, Args);
   {$IFDEF DebugProcess} WriteDebug('Panic: ', []); WriteDebug(Format, Args); {$ENDIF}
   {$IFDEF DebugCrash}

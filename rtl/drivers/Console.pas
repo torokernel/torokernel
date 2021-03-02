@@ -3,7 +3,7 @@
 //
 // This unit contains the functions that handle the console.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 //
@@ -29,7 +29,6 @@ interface
 
 uses Arch, Process;
 
-procedure CleanConsole;
 procedure PrintDecimal(Value: PtrUInt);
 procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 procedure ConsoleInit;
@@ -37,7 +36,6 @@ procedure ReadFromSerial(out C: XChar);
 procedure PutCtoSerial(C: XChar);
 
 var
- Color: Byte = 10;
  HeadLess: Boolean;
 
 const
@@ -50,73 +48,25 @@ implementation
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
 
-
 const
-  CHAR_CODE : array [1..57] of XChar =
-  ('0','1','2','3','4','5','6','7','8','9','0','?','=','0',' ','q','w',
-   'e','r','t','y','u','i','o','p','[',']','0','0','a','s','d','f','g','h',
-   'j','k','l','¤','{','}','0','0','z','x','c','v','b','n','m',',','.','-',
-   '0','*','0',' ');
-
-const
-  VIDEO_OFFSET = $B8000;
   BASE_COM_PORT = $3f8;
-
-type
-  TConsole = record
-    car: XChar;
-    form: Byte;
-  end;
 
 var
   LockConsole: UInt64 = 3;
 
 procedure PrintString(const S: AnsiString); forward;
-procedure PutCtoScreen(const Car: XChar); forward;
 
 var
-  PConsole: ^TConsole;
-  X, Y: Byte;
-  KeyBuffer: array[1..127] of XChar;
-  BufferCount: LongInt = 1 ;
-  ThreadInKey: PThread = nil;
-  LastChar: LongInt = 1;
   {$IFDEF UseSerialasConsole}
    PutC: procedure (C: Char) = PutCtoSerial;
-  {$ELSE}
-   PutC: procedure (const C: Char) = PutCtoScreen;
   {$ENDIF}
-
-procedure SetCursor(X, Y: Byte);
-begin
-  write_portb($0E, $3D4);
-  write_portb(Y, $3D5);
-  write_portb($0f, $3D4);
-  write_portb(X, $3D5);
-end;
 
 procedure FlushUp;
 begin
   {$IFDEF UseSerialasConsole}
     PutCtoSerial(XChar(13));
     PutCtoSerial(XChar(10));
-  {$ELSE}
-   X := 0 ;
-   Move(PXChar(VIDEO_OFFSET+160)^, PXChar(VIDEO_OFFSET)^, 24*80*2);
-   FillWord(PXChar(VIDEO_OFFSET+160*24)^, 80, $0720);
   {$ENDIF}
-end;
-
-procedure PutCtoScreen(const Car: XChar);
-begin
-  Y := 24;
-  if X > 79 then
-   FlushUp;
-  PConsole := Pointer(VIDEO_OFFSET + (80*2)*Y + (X*2));
-  PConsole.form := color;
-  PConsole.car := Car;
-  X := X+1;
-  SetCursor(X, Y);
 end;
 
 procedure WaitForCompletion;
@@ -209,13 +159,6 @@ begin
     PutC(S[I]);
 end;
 
-procedure CleanConsole;
-begin
-  FillWord(PXChar(video_offset)^, 2000, $0720);
-  X := 0;
-  Y := 0;
-end;
-
 procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
 var
   ArgNo: LongInt;
@@ -290,14 +233,12 @@ begin
       case Format[J] of
         'c':
           begin
-            CleanConsole;
             Inc(J);
           end;
         'n':
           begin
             FlushUp;
             Inc(J);
-            x := 0;
           end;
         '\':
           begin
@@ -347,25 +288,6 @@ begin
         end;
     end;
     Continue;
-    end;
-    if Format[J] = '/' then
-    begin
-      Inc(J);
-      if Format[J] = #0 then
-        Exit;
-      case Format[J] of
-        'n': color := 7 ;
-        'a': color := 1;
-        'v': color := 2;
-        'V': color := 10;
-        'z': color := $f;
-        'c': color := 3;
-        'r': color := 4;
-        'R': color := 12 ;
-        'N': color := $af;
-      end;
-      Inc(J);
-      Continue;
     end;
     PutC(Format[J]);
     Inc(J);

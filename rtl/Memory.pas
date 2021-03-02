@@ -1071,8 +1071,8 @@ begin
   Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n', []);
   AssignableMemory := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
   MemoryPerCpu := AssignableMemory div CPU_COUNT;
-  WriteConsoleF('System Memory ... /V%d/n MB\n', [AvailableMemory div 1024 div 1024]);
-  WriteConsoleF('Memory per Core ... /V%d/n MB\n', [MemoryPerCpu div 1024 div 1024]);
+  WriteConsoleF('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsoleF('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
   {$IFDEF DebugMemory}
     WriteDebug('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
     WriteDebug('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
@@ -1085,7 +1085,7 @@ begin
     MemoryAllocator.Size := MemoryPerCpu;
     MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + MemoryAllocator.Size - 1);
     MemoryAllocator.FreeSize := MemoryAllocator.Size;
-    WriteConsoleF('Core#%d, StartAddress: /V%h/n, EndAddress: /V%h/n\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
+    WriteConsoleF('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
     {$IFDEF DebugMemory}
       WriteDebug('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
     {$ENDIF}

@@ -376,7 +376,11 @@ end;
 
 procedure ConsoleInit;
 begin
-  HeadLess := true;
+  {$IFDEF UseGDBstub}
+    HeadLess := true;
+  {$ELSE}
+    HeadLess := false;
+  {$ENDIF}
   {$IFDEF UseSerialasConsole}
     write_portb ($83, BASE_COM_PORT+3);
     write_portb (0, BASE_COM_PORT+1);

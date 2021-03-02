@@ -37,8 +37,8 @@ uses
  Debug,
  Arch,
  Filesystem,
- Console,
- Gdbstub;
+ {$IFDEF UseGDBstub}Gdbstub,{$ENDIF}
+ Console;
 
 procedure ShutdownHelloWorld;
 begin

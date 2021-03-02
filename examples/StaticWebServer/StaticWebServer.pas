@@ -38,6 +38,7 @@ uses
   VirtIOFS,
   VirtIOVSocket,
   Console,
+  {$IFDEF UseGDBstub}Gdbstub,{$ENDIF}
   Network;
 
 const

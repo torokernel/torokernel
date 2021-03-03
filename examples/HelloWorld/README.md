@@ -1,26 +1,34 @@
 # Hello World Example
-
 This is a simple example of an application that outputs "Hello World" on the screen. In Linux to compile and run the application, go to the **HelloWorld** directory and execute:
-
-`../CloudIt.sh HelloWorld "-dUseSerialasConsole"`
-
-If you want to redirect the screen through VNC, run:
-
-`../CloudIt.sh HelloWorld "" "-vnc :0"`
-
-You can connect the vnc client to **localhost:5900**
-
+```bash
+../CloudIt.sh HelloWorld "-dUseSerialasConsole"
+```
 If you want to enable some debug symbols in the unit **Process** and check what Toro is doing just execute:
-
-`../CloudIt.sh HelloWorld "-dEnableDebug -dDebugProcess"`
-
+```bash
+../CloudIt.sh HelloWorld "-dUseSerialasConsole -dEnableDebug -dDebugProcess"
+```
 You will see how toro initializes the unit by first calling the scheduler.
 
+To debug Toro by using the GDBstub built-in and gdb, first execute:
+```bash 
+../CloudIt.sh HelloWorld "-gl -dUseSerialasConsole -dUseGDBstub" "-serial tcp::1234,server"
+```
+Second, execute gdb by doing:
+```bash
+gdb HelloWorld -ex 'set arch i386:x86-64' -ex 'target remote localhost:1234'
+```
+You can set a breakpoint or continue the execution. For example, to set a breakpoint at the beginning of HelloWorld.pas program, execute:
+```bash
+b HelloWorld.pas:49
+c
+```
+The execution will stop when the breakpoint is reached.
 ## NMI Shutdown
 It is possible to shutdown an instance of Toro by using a NMI exception. To do this, create a Toro's instance with the following parameters:
 
-`../CloudIt.sh HelloWorld "-dUseSerialasConsole -dShutdownWhenFinished"` 
-
+```bash
+../CloudIt.sh HelloWorld "-dUseSerialasConsole -dShutdownWhenFinished"
+```
 Then from Qemu Monitor, execute the **nmi** command to shutdown the instance. It is also possible to define a shutdown procedure which will be invoked after the NMI is catched and before the system is shutdown. Check the source code of HelloWorld.pas to see how to register this procedure.   
  
 ## Windows Users

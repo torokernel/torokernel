@@ -1,7 +1,7 @@
 //
 // GDBstub.pas
 //
-// This unit contains a gdbstub to enable debugging by using GDB
+// This unit contains a gdbstub to enable debugging Toro by using GDB
 //
 // Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -31,17 +31,12 @@ interface
 uses
   Arch, Console, Memory, VirtIO;
 
-procedure GdbstubInit;
-
 implementation
-
-type
-  PDbgState = ^TDbgState;
-
-  TDbgState = record 
-    signum: LongInt;
-    reg: array[0..30] of LongInt;
-end;
+{$MACRO ON}
+{$DEFINE EnableInt := asm sti;end;}
+{$DEFINE DisableInt := asm pushfq;cli;end;}
+{$DEFINE RestoreInt := asm popfq;end;}
+{$DEFINE Int3 := asm int 3;end;}
 
 const
   QSupported : PChar = 'PacketSize=1000';
@@ -154,20 +149,15 @@ var
   buf: array[0..2] of Char;
   csum: Char;
 begin
-  
   // send packet start
   DbgSerialPutC('$');
-  
   // send packet
   DbgWrite(PktData, Pktlen);
-  
   // send checksum
   buf[0] := '#';
   csum := Char(DbgChecksum(PktData, PktLen));
-
   DbgEncHex(Pointer(@buf)+1, sizeof(buf)-1, @csum, 1);
   DbgWrite(buf, sizeof(buf));
-
   Result := DbgRecvAck;
 end;
 
@@ -231,16 +221,13 @@ var
   buf: array[0..1] of Char;
 begin
   actual_csum := 0;
-  
   while true do
   begin
     data := DbgSerialGetC;
     if data = '$' then
       break;
   end;
-                                    
   PktLen := 0;
-  
   while true do
   begin
     data := DbgSerialGetC;
@@ -252,18 +239,14 @@ begin
       Inc(PktLen); 
     end;
   end;  
-    
   DbgRead(buf, sizeof(buf), 2);
   DbgDecHex(buf, 2, @expected_csum, 1);
-  
   actual_csum := DbgChecksum(PktBuf, PktLen);
-  
   if actual_csum <> expected_csum then
   begin
     DbgSerialPutC('-');
     Exit;
   end;
-
   DbgSerialPutC('+');
 end;
 
@@ -296,11 +279,12 @@ var
   breaks: array[0..MAX_NR_BREAKPOINTS-1] of QWord;
   breaksData: array[0..MAX_NR_BREAKPOINTS-1] of Byte;
   count : Byte = 0 ;
+  // buff should be per core
+  buf: array[0..300] of Char;
 
 procedure DbgHandler (Signal: Boolean);
 var
-  buf: array[0..300] of Char;
-  l: array[0..300] of Char;
+  l: array[0..100] of Char;
   Len, i, Size: LongInt;
   reg: QWORD;
   g: ^Char;
@@ -337,8 +321,10 @@ begin
             reg := HexStrtoQWord(@buf[1], @buf[i]);
             Inc (i);
             Size := HexStrtoQWord(@buf[i], @buf[Len]);
+            if Size > sizeof(l) then
+              Size := sizeof(l);
             g := Pointer(reg);
-            for i:= 0 to size - 1 do
+            for i:= 0 to Size - 1 do
             begin
               if g > Pointer(MAX_ADDR_MEM) then
               begin
@@ -463,11 +449,9 @@ begin
     DbgHandler(true);
 end;
 
-// these exceptions do not have error code
 procedure ExceptINT1;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
   {$IFDEF DCC} .noframe {$ENDIF}
-  // save state registers
   mov [dgb_regs], rax
   mov [dgb_regs+8], rbx
   mov [dgb_regs+8*2], rcx
@@ -529,7 +513,6 @@ end;
 procedure ExceptINT3;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
 asm
   {$IFDEF DCC} .noframe {$ENDIF}
-  // save state registers
   mov [dgb_regs], rax
   mov [dgb_regs+8], rbx
   mov [dgb_regs+8*2], rcx
@@ -591,11 +574,9 @@ procedure GdbstubInit;
 var
   i: LongInt;
 begin
-  // disable console
-  HeadLess := true;
   CaptureInt(EXC_INT3, @ExceptINT3); 
   CaptureInt(EXC_INT1, @ExceptINT1);
-  for i:=0 to 10 do
+  for i := 0 to MAX_NR_BREAKPOINTS-1 do
      breaks[i] := 0 ;
   // wait for client
   while true do
@@ -603,7 +584,8 @@ begin
     if DbgSerialGetC = '+' then
       break;
   end;
-  DbgHandler(false);
+  // triger debugging
+  int3;
 end;
 
 initialization

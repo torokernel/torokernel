@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="12"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
         <MainUnitHasUsesSectionForAllUnits Value="False"/>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
+        <MainUnitHasScaledStatement Value="False"/>
         <LRSInOutputDirectory Value="False"/>
+        <CompatibilityMode Value="True"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <MainUnit Value="0"/>
       <Title Value="StaticWebServer"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
@@ -26,9 +27,10 @@
       <Version Value="2"/>
     </PublishOptions>
     <RunParams>
-      <local>
-        <FormatVersion Value="1"/>
-      </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default"/>
+      </Modes>
     </RunParams>
     <Units Count="1">
       <Unit0>
@@ -41,7 +43,7 @@
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename ApplyConventions="False"/>
+      <Filename Value="StaticWebServer" ApplyConventions="False"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
@@ -49,6 +51,8 @@
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>
+        <AllowLabel Value="False"/>
+        <CPPInline Value="False"/>
         <UseAnsiStrings Value="False"/>
       </SyntaxOptions>
     </Parsing>
@@ -60,27 +64,32 @@
       </Optimizations>
     </CodeGeneration>
     <Linking>
-      <Debugging>
-        <GenerateDebugInfo Value="False"/>
-      </Debugging>
+      <Options>
+        <PassLinkerOptions Value="True"/>
+        <LinkerOptions Value="prt0.o"/>
+      </Options>
     </Linking>
     <Other>
       <Verbosity>
         <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
-      <CustomOptions Value="-Cg-"/>
+      <CustomOptions Value="-Cg-
+-Si
+-Xm
+-B-"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) ../../builder/build.pas"/>
         <ShowAllMessages Value="True"/>
-        <CompileReasons Run="False"/>
+        <CompileReasons Compile="False" Build="False" Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
         <Command Value="../../builder/build.exe 4 StaticWebServer ../../builder/boot.o StaticWebServer.img"/>
         <ShowAllMessages Value="True"/>
-        <CompileReasons Run="False"/>
+        <CompileReasons Compile="False" Build="False" Run="False"/>
       </ExecuteAfter>
     </Other>
+    <CompileReasons Run="False"/>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

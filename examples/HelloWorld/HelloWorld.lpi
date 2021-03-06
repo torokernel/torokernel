@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="12"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
+        <MainUnitHasScaledStatement Value="False"/>
+        <CompatibilityMode Value="True"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <MainUnit Value="0"/>
       <Title Value="HelloWorld"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
@@ -24,9 +25,10 @@
       <Version Value="2"/>
     </PublishOptions>
     <RunParams>
-      <local>
-        <FormatVersion Value="1"/>
-      </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default"/>
+      </Modes>
     </RunParams>
     <Units Count="9">
       <Unit0>
@@ -76,10 +78,11 @@
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <OtherUnitFiles Value="..\..\rtl;..\..\rtl\drivers"/>
-      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>
+        <AllowLabel Value="False"/>
+        <CPPInline Value="False"/>
         <UseAnsiStrings Value="False"/>
       </SyntaxOptions>
     </Parsing>
@@ -90,24 +93,30 @@
       </Optimizations>
     </CodeGeneration>
     <Linking>
-      <Debugging>
-        <GenerateDebugInfo Value="False"/>
-      </Debugging>
+      <Options>
+        <PassLinkerOptions Value="True"/>
+        <LinkerOptions Value="prt0.o"/>
+      </Options>
     </Linking>
     <Other>
       <Verbosity>
+        <ShowWarn Value="False"/>
+        <ShowNotes Value="False"/>
         <ShowHints Value="False"/>
       </Verbosity>
       <WriteFPCLogo Value="False"/>
-      <CustomOptions Value="-Cg-"/>
+      <CustomOptions Value="-Cg-
+-Si
+-Xm
+-B-"/>
       <ExecuteBefore>
         <Command Value="$(CompPath) ../../builder/build.pas"/>
-        <CompileReasons Run="False"/>
+        <CompileReasons Compile="False" Build="False" Run="False"/>
       </ExecuteBefore>
       <ExecuteAfter>
         <Command Value="../../builder/build.exe 2 HelloWorld ../../builder/boot.o HelloWorld.img"/>
         <ShowAllMessages Value="True"/>
-        <CompileReasons Run="False"/>
+        <CompileReasons Compile="False" Build="False" Run="False"/>
       </ExecuteAfter>
     </Other>
     <CompileReasons Run="False"/>

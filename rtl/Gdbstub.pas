@@ -427,14 +427,19 @@ begin
       '?': begin
              DbgSendPacket(Signal05, strlen(Signal05));
            end;
-      'c':begin
-            dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
-            break
-          end;
-      's':begin
-            dgb_regs[17] := dgb_regs[17] or (1 shl 8);
-            break;
-          end;
+      'c': begin
+              dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
+              break
+           end;
+      's': begin
+             dgb_regs[17] := dgb_regs[17] or (1 shl 8);
+             break;
+           end;
+      'D': begin
+             dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
+             DbgSendPacket(OK, strlen(OK));
+             break;
+           end;
     end;
   end;
 end;

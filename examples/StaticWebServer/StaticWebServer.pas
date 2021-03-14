@@ -38,7 +38,7 @@ uses
   VirtIOFS,
   VirtIOVSocket,
   Console,
-  {$IFDEF UseGDBstub}Gdbstub,{$ENDIF}
+  // Gdbstub,
   Network;
 
 const

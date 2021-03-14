@@ -60,7 +60,7 @@
       <TargetCPU Value="x86_64"/>
       <TargetOS Value="linux"/>
       <Optimizations>
-        <OptimizationLevel Value="2"/>
+        <OptimizationLevel Value="0"/>
       </Optimizations>
     </CodeGeneration>
     <Linking>

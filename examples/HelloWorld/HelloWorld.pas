@@ -3,7 +3,7 @@
 //
 // Clasical example using a minimal kernel to print "Hello World".
 //
-// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -25,9 +25,6 @@ program HelloWorld;
 {$IFDEF FPC}
  {$mode delphi}
 {$ENDIF}
-
-{%RunCommand qemu-system-x86_64 -m 512 -smp 2 -drive format=raw,file=HelloWorld.img -device isa-debug-exit,iobase=0xf4,iosize=0x04}
-{%RunFlags BUILD-}
 
 // only include the needed units
 uses

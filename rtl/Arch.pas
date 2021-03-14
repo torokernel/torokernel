@@ -28,6 +28,8 @@ interface
 
 const
   EXC_DIVBYZERO = 0;
+  EXC_INT3 = 3;
+  EXC_INT1 = 1;
   EXC_NMI = 2;
   EXC_OVERFLOW = 4;
   EXC_BOUND = 5;
@@ -159,6 +161,7 @@ const
   PVH_MEMMAP_ENTRIES = 48;
   PVH_CMDLINE_PADDR = 24;
   BASE_IRQ = 32;
+  MAX_ADDR_MEM = 512*1024*1014*1014;
 
 var
   CPU_COUNT: LongInt;

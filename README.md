@@ -11,6 +11,7 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 * Support virtio-fs for filesystem
 * Fast boot up
 * Tiny image
+* Built-in gdbstub
 
 ## How compile ToroMicroVM?
 

@@ -146,7 +146,8 @@ function GetDeviceFeatures(Base: QWORD): DWORD;
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
 procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
-
+function HexStrtoQWord(start, last: PChar): QWord;
+function LookForChar(p1: PChar; c: Char): PChar;
 
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;

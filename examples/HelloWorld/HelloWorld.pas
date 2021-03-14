@@ -37,6 +37,7 @@ uses
  Debug,
  Arch,
  Filesystem,
+ // Gdbstub,
  Console;
 
 procedure ShutdownHelloWorld;
@@ -46,6 +47,6 @@ end;
 
 begin
   ShutdownProcedure := ShutdownHelloWorld;
-  WriteConsoleF('/RHello World, I am TORO !!!/n\n',[]);
+  WriteConsoleF('Hello World, I am TORO !!!\n',[]);
   While True do hlt;
 end.

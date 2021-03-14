@@ -12,9 +12,8 @@
 //{$DEFINE CPUX86_64}
 {$MACRO ON}
 //{$DEFINE EnableDebug}
-{$DEFINE EnablePing}
 {$DEFINE DebugRingSize:=1*1024*1024}
-//{$DEFINE UseSerialasConsole}
+{$DEFINE UseSerialasConsole}
 //{$DEFINE ShutdownWhenFinished}
 //{$DEFINE ProfileBootTime}
 //{$DEFINE DebugCrash}
@@ -30,4 +29,4 @@
 //{$DEFINE HEAP_STATS}
 //{$DEFINE InformMemory}
 //{$DEFINE UseStampCounterinDebug}
-
+//{$DEFINE UseGDBstub}

@@ -21,7 +21,7 @@ apt-get install fpc
 ```
 You have to install version 3.2.0.
 
-### Step 2. Build latest Qemu-KVM
+### Step 2. Build Qemu-KVM (qemu 5.2.50 or #51204c2f)
 ```bash
 apt-get install libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
 git clone https://github.com/qemu/qemu.git qemuforvmm
@@ -31,6 +31,7 @@ cd build
 ../configure --target-list=x86_64-softmmu
 make
 ```
+Note that this step may require to install Ninja to build Qemu.
 
 ### Step 3. Get ToroMicroVM
 ```bash

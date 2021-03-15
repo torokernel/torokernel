@@ -1248,21 +1248,6 @@ begin
   Bit_Reset(Pointer(SizeUInt(PDE_Table) + SizeOf(TDirectoryPageEntry)*I_PDE), 1);
 end;
 
-procedure CacheManagerInit;
-var
-  Page: Pointer;
-begin
-  Page := nil;
-  PML4_Table := Pointer(PDADD);
-  // first two pages aren't cacheable (0-2*PAGE_SIZE)
-  RemovePageCache(Page);
-  // first page is read only
-  SetPageReadOnly(Page);
-  Page := Pointer(SizeUInt(Page) + PAGE_SIZE);
-  RemovePageCache(Page);
-  FlushCr3;
-end;
-
 // NOTE: addr must be set as a write-back memory
 procedure monitor(addr: Pointer; ext: DWORD; hint: DWORD);
 begin
@@ -1379,7 +1364,7 @@ begin
     KernelParam := Pointer(Kernel_Param);
   end;
   MemoryCounterInit;
-  CacheManagerInit;
+  PML4_Table := Pointer(PDADD);
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);
   for I := 0 to 32 do
     CaptureInt(I, @Interruption_Ignore);

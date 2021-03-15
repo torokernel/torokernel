@@ -235,7 +235,7 @@ begin
 end;
 
 begin
-  if KernelParamCount = 0 then
+  if KernelParamCount < 4 then
   begin
     WriteConsoleF('Wrong number of kernel parameters, exiting\n', []);
     Exit;

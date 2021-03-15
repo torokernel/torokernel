@@ -111,6 +111,7 @@ const
   MMIO_FEATURES = $10;
   MMIO_STATUS = $70;
   MMIO_GUESTFEATURES = $20;
+  MMIO_SELGUESTFEATURES = $24;
   MMIO_QUEUESEL = $30;
   MMIO_QUEUENUMMAX = $34;
   MMIO_QUEUENUM = $38;
@@ -137,12 +138,15 @@ const
   VIRTIO_DRIVER_OK = 4;
   VIRTIO_DESC_FLAG_WRITE_ONLY = 2;
   VIRTIO_DESC_FLAG_NEXT = 1;
+  VIRTIO_F_VERSION_1 = 32;
 
 procedure SetDeviceStatus(Base: QWORD; Value: DWORD);
 procedure SetDeviceGuestPageSize(Base: QWORD; Value: DWORD);
 function GetIntStatus(Base: QWORD): DWORD;
 procedure SetIntACK(Base: QWORD; Value: DWORD);
 function GetDeviceFeatures(Base: QWORD): DWORD;
+procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
+procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
 procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
@@ -262,6 +266,22 @@ var
 begin
   value := Pointer(Base + MMIO_FEATURES);
   Result := value^;
+end;
+
+procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
+var
+  SelFeature: ^DWORD;
+begin
+  SelFeature := Pointer(Base + MMIO_SELGUESTFEATURES);
+  SelFeature^ := Value;
+end;
+
+procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
+var
+  GuestFeatures: ^DWORD;
+begin
+  GuestFeatures := Pointer(Base + MMIO_GUESTFEATURES);
+  GuestFeatures^ := Value;
 end;
 
 procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);

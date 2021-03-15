@@ -619,7 +619,10 @@ begin
   FsVirtio.Base := Device.Base;
   FsVirtio.QueueNotify := Pointer(Device.Base + MMIO_QUEUENOTIFY);
   FsVirtio.FsConfig := Pointer(Device.Base + MMIO_CONFIG);
-  WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]);
+  WriteConsoleF('VirtIOFS: tag: %p, nr queues: %d\n', [PtrUInt(@FsVirtio.FsConfig.tag), FsVirtio.FsConfig.numQueues]); 
+  // set VIRTIO_F_VERSION_1 in the second half of feature QWORD
+  SelDriverFeatures(Device.Base, 1);
+  SetDriverFeatures(Device.Base, (1 shl VIRTIO_F_VERSION_1) shr 32);
   SetDeviceStatus(Device.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK);
   if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
   begin

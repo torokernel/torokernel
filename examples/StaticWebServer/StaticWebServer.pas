@@ -32,10 +32,11 @@ uses
   Arch,
   Filesystem,
   VirtIO,
+  VirtIOConsole,
   VirtIOFS,
   VirtIOVSocket,
   Console,
-  // Gdbstub,
+  Gdbstub,
   Network;
 
 const

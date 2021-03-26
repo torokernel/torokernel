@@ -34,7 +34,10 @@ uses
  Debug,
  Arch,
  Filesystem,
- // Gdbstub,
+ VirtIO,
+ Network,
+ VirtIOConsole,
+ Gdbstub,
  Console;
 
 procedure ShutdownHelloWorld;

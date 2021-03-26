@@ -27,7 +27,7 @@ interface
 {$I ..\Toro.inc}
 
 {$IFDEF EnableDebug}
-       //{$DEFINE DebugVirtioFS}
+       //{$DEFINE DebugVirtio}
 {$ENDIF}
 
 uses

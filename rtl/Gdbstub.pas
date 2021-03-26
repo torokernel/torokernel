@@ -29,7 +29,7 @@ interface
 {$I Toro.inc}
 
 uses
-  Arch, Console, Memory, VirtIO;
+  Arch, Console, Memory, VirtIO, Network, VirtIOConsole;
 
 implementation
 {$MACRO ON}
@@ -49,25 +49,31 @@ const
 
 function DbgSerialGetC: XChar;
 var
-  R: XChar;
+  r: XChar;
 begin
-  ReadFromSerial(r);
-  Result := R;
+  virtIOConsoleRead(@r, 1);
+  Result := r;
 end;
 
 function DbgSerialPutC(C: XChar): XChar;
+var
+  t: TPacket;
 begin
-  PutCtoSerial(C);
+  t.data := @C;
+  t.size := 1;
+  virtIOConsoleSend(@t);
   Result := C;
 end;
 
 function DbgWrite(C: PChar; Len: LongInt): LongInt;
-begin
-  while Len > 0 do
+var
+  t: TPacket;
+Begin
+  if Len > 0 then
   begin
-    DbgSerialPutC(C^);
-    Inc(C);
-    Dec(Len);
+    t.data := C;
+    t.size := Len;
+    virtIOConsoleSend(@t);
   end;
   Result := 0;
 end;
@@ -583,12 +589,7 @@ begin
   CaptureInt(EXC_INT1, @ExceptINT1);
   for i := 0 to MAX_NR_BREAKPOINTS-1 do
      breaks[i] := 0 ;
-  // wait for client
-  while true do
-  begin
-    if DbgSerialGetC = '+' then
-      break;
-  end;
+  WriteConsoleF('Gdbstub: waiting for client ... OK\n', []);
   // triger debugging
   int3;
 end;

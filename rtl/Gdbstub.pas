@@ -244,6 +244,8 @@ begin
       PktBuf[PktLen] := data;
       Inc(PktLen); 
     end;
+    if PktLen > PktBufLen then
+      WriteConsoleF('Gdbstub: buffer has been overwritten\n',[]);
   end;  
   DbgRead(buf, sizeof(buf), 2);
   DbgDecHex(buf, 2, @expected_csum, 1);

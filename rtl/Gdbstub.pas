@@ -36,7 +36,7 @@ implementation
 {$DEFINE EnableInt := asm sti;end;}
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
-{$DEFINE Int3 := asm int 3;end;}
+{$DEFINE Int3 := asm db $cc end;}
 
 const
   QSupported : PChar = 'PacketSize=1000';
@@ -290,7 +290,7 @@ var
   // buff should be per core
   buf: array[0..300] of Char;
 
-procedure DbgHandler (Signal: Boolean);
+procedure DbgHandler (Signal: Boolean; Nr: LongInt);
 var
   l: array[0..100] of Char;
   Len, i, Size: LongInt;
@@ -436,11 +436,13 @@ begin
              DbgSendPacket(Signal05, strlen(Signal05));
            end;
       'c': begin
-              dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
-              break
+             dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
+             break;
            end;
       's': begin
              dgb_regs[17] := dgb_regs[17] or (1 shl 8);
+             if Nr = 3 then
+               Dec(dgb_regs[16]);
              break;
            end;
       'D': begin
@@ -454,12 +456,12 @@ end;
 
 procedure Int3Handler;
 begin
-  DbgHandler(true);
+  DbgHandler(true, 3);
 end;
 
 procedure Int1Handler;
 begin
-    DbgHandler(true);
+  DbgHandler(true, 1);
 end;
 
 procedure ExceptINT1;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -593,7 +595,7 @@ begin
      breaks[i] := 0 ;
   WriteConsoleF('Gdbstub: waiting for client ... OK\n', []);
   // triger debugging
-  int3;
+  Int3;
 end;
 
 initialization

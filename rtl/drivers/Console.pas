@@ -57,16 +57,12 @@ var
 procedure PrintString(const S: AnsiString); forward;
 
 var
-  {$IFDEF UseSerialasConsole}
-   PutC: procedure (C: Char) = PutCtoSerial;
-  {$ENDIF}
+  PutC: procedure (C: Char) = PutCtoSerial;
 
 procedure FlushUp;
 begin
-  {$IFDEF UseSerialasConsole}
-    PutCtoSerial(XChar(13));
-    PutCtoSerial(XChar(10));
-  {$ENDIF}
+  PutCtoSerial(XChar(13));
+  PutCtoSerial(XChar(10));
 end;
 
 procedure WaitForCompletion;
@@ -298,17 +294,11 @@ end;
 
 procedure ConsoleInit;
 begin
-  {$IFDEF UseGDBstub}
-    HeadLess := true;
-  {$ELSE}
-    HeadLess := false;
-  {$ENDIF}
-  {$IFDEF UseSerialasConsole}
-    write_portb ($83, BASE_COM_PORT+3);
-    write_portb (0, BASE_COM_PORT+1);
-    write_portb (1, BASE_COM_PORT);
-    write_portb (3, BASE_COM_PORT+3);
-  {$ENDIF}
+  HeadLess := false;
+  write_portb ($83, BASE_COM_PORT+3);
+  write_portb (0, BASE_COM_PORT+1);
+  write_portb (1, BASE_COM_PORT);
+  write_portb (3, BASE_COM_PORT+3);
 end;
 
 end.

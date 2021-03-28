@@ -1,7 +1,8 @@
 //
 // VirtIOConsole.pas
 //
-// This unit contains code for the VirtIOConsole driver.
+// This unit contains the driver for virtio-console.
+// The driver is implemented without interruptions.
 //
 // Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved

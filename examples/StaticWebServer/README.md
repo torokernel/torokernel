@@ -15,4 +15,4 @@ The next command forwards connections from localhost:4000 to guest:80. The CID i
 ```bash
 ./socat TCP4-LISTEN:4000,reuseaddr,fork VSOCK-CONNECT:5:80
 ```
-To debug this example by using gdb, please read HelloWorld/README.md.
+To debug this example by using gdb, please read HelloWorld/README.md to get the correct command-line.

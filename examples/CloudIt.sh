@@ -43,7 +43,7 @@ if [ -f $qemufile ]; then
    qemuparams=`cat $qemufile`
 else
    # parameters by default
-   qemuparams="-no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -device virtio-serial-device,id=virtio-serial0 -chardev socket,host=0.0.0.0,port=1234,server=on,wait=on,id=charconsole0 -device virtconsole,chardev=charconsole0,id=console0 -global virtio-mmio.force-legacy=false"
+   qemuparams="-no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false"
 fi
 
 # remove all compiled files

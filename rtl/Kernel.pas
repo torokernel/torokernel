@@ -43,6 +43,7 @@ const
   MainThreadStackSize = 64*1024;
   {$IFDEF LINUX}
     Kernel_Head : PChar = {$I %KERNEL_HEAD%};
+    Build_Time : PChar =  {$I %BUILD_TIME%};
   {$ELSE}
     Kernel_Head : PChar = '';
   {$ENDIF}
@@ -57,7 +58,8 @@ begin
     ShutdownInQemu;
   {$ENDIF}
   ConsoleInit;
-  WriteConsoleF('Loading Toro ... HEAD:%p\n', [PtrUInt(Kernel_Head)]);
+  WriteConsoleF('Loading Toro ... \n', []);
+  WriteConsoleF('commit: %p, build time: %p\n', [PtrUInt(Kernel_Head), PtrUInt(Build_Time)]);
   ArchInit;
   FillChar(CPU, sizeof(CPU), 0);
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}

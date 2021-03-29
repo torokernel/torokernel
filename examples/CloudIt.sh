@@ -30,6 +30,7 @@ fpcrtlsource="/root/fpc-3.2.0/rtl/";
 compileropti="-O2"
 
 export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
+export BUILD_TIME=$(date)
 
 # check parameters
 if [ "$#" -lt 1 ]; then

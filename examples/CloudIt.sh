@@ -30,6 +30,7 @@ fpcrtlsource="/root/fpc-3.2.0/rtl/";
 compileropti="-O2"
 
 export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
+export BUILD_TIME=$(date)
 
 # check parameters
 if [ "$#" -lt 1 ]; then
@@ -43,7 +44,7 @@ if [ -f $qemufile ]; then
    qemuparams=`cat $qemufile`
 else
    # parameters by default
-   qemuparams="-no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 32 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot"
+   qemuparams="-no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false"
 fi
 
 # remove all compiled files

@@ -49,7 +49,7 @@ Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qe
 ## Run the HelloWorld Example
 You have just to go to `examples/HelloWorld/` and execute:
 ```bash
-../CloudIt.sh HelloWorld "-dUseSerialasConsole"
+../CloudIt.sh HelloWorld
 ```
 
 ## Run the StaticWebServer Example
@@ -67,7 +67,7 @@ In a second terminal, execute:
 Replace `source` with the directory to serve. Finally, launch the static webserver by executing:  
 
 ```bash
-../CloudIt.sh StaticWebServer "-dUseSerialasConsole -dShutdownWhenFinished"
+../CloudIt.sh StaticWebServer "-dShutdownWhenFinished"
 ```
 
 ## Building Toro in Windows by using Lazarus

@@ -27,7 +27,7 @@ interface
 {$I ..\Toro.inc}
 
 {$IFDEF EnableDebug}
-       //{$DEFINE DebugVirtioFS}
+       //{$DEFINE DebugVirtio}
 {$ENDIF}
 
 uses
@@ -100,7 +100,7 @@ type
   TVirtIODriver = function (device: PVirtIOMMIODevice): Boolean;
 
 const
-  MAX_MMIO_DEVICES = 2;
+  MAX_MMIO_DEVICES = 4;
 
   MMIO_MODERN = 2;
   MMIO_VERSION = 4;

@@ -34,7 +34,11 @@ uses
  Debug,
  Arch,
  Filesystem,
- // Gdbstub,
+ {$IFDEF UseGDBstub}VirtIO,{$ENDIF}
+ Network,
+ {$IFDEF UseGDBstub}VirtIOConsole,
+ Gdbstub,
+ {$ENDIF}
  Console;
 
 procedure ShutdownHelloWorld;

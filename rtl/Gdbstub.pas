@@ -29,14 +29,14 @@ interface
 {$I Toro.inc}
 
 uses
-  Arch, Console, Memory, VirtIO;
+  Arch, Console, Memory, VirtIO, Network, VirtIOConsole;
 
 implementation
 {$MACRO ON}
 {$DEFINE EnableInt := asm sti;end;}
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
-{$DEFINE Int3 := asm int 3;end;}
+{$DEFINE Int3 := asm db $cc end;}
 
 const
   QSupported : PChar = 'PacketSize=1000';
@@ -49,25 +49,31 @@ const
 
 function DbgSerialGetC: XChar;
 var
-  R: XChar;
+  r: XChar;
 begin
-  ReadFromSerial(r);
-  Result := R;
+  virtIOConsoleRead(@r, 1);
+  Result := r;
 end;
 
 function DbgSerialPutC(C: XChar): XChar;
+var
+  t: TPacket;
 begin
-  PutCtoSerial(C);
+  t.data := @C;
+  t.size := 1;
+  virtIOConsoleSend(@t);
   Result := C;
 end;
 
 function DbgWrite(C: PChar; Len: LongInt): LongInt;
-begin
-  while Len > 0 do
+var
+  t: TPacket;
+Begin
+  if Len > 0 then
   begin
-    DbgSerialPutC(C^);
-    Inc(C);
-    Dec(Len);
+    t.data := C;
+    t.size := Len;
+    virtIOConsoleSend(@t);
   end;
   Result := 0;
 end;
@@ -238,6 +244,8 @@ begin
       PktBuf[PktLen] := data;
       Inc(PktLen); 
     end;
+    if PktLen > PktBufLen then
+      WriteConsoleF('Gdbstub: buffer has been overwritten\n',[]);
   end;  
   DbgRead(buf, sizeof(buf), 2);
   DbgDecHex(buf, 2, @expected_csum, 1);
@@ -282,7 +290,7 @@ var
   // buff should be per core
   buf: array[0..300] of Char;
 
-procedure DbgHandler (Signal: Boolean);
+procedure DbgHandler (Signal: Boolean; Nr: LongInt);
 var
   l: array[0..100] of Char;
   Len, i, Size: LongInt;
@@ -428,11 +436,13 @@ begin
              DbgSendPacket(Signal05, strlen(Signal05));
            end;
       'c': begin
-              dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
-              break
+             dgb_regs[17] := dgb_regs[17] and (not(1 shl 8));
+             break;
            end;
       's': begin
              dgb_regs[17] := dgb_regs[17] or (1 shl 8);
+             if Nr = 3 then
+               Dec(dgb_regs[16]);
              break;
            end;
       'D': begin
@@ -446,12 +456,12 @@ end;
 
 procedure Int3Handler;
 begin
-  DbgHandler(true);
+  DbgHandler(true, 3);
 end;
 
 procedure Int1Handler;
 begin
-    DbgHandler(true);
+  DbgHandler(true, 1);
 end;
 
 procedure ExceptINT1;{$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
@@ -583,14 +593,9 @@ begin
   CaptureInt(EXC_INT1, @ExceptINT1);
   for i := 0 to MAX_NR_BREAKPOINTS-1 do
      breaks[i] := 0 ;
-  // wait for client
-  while true do
-  begin
-    if DbgSerialGetC = '+' then
-      break;
-  end;
+  WriteConsoleF('Gdbstub: waiting for client ... OK\n', []);
   // triger debugging
-  int3;
+  Int3;
 end;
 
 initialization

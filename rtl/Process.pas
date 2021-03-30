@@ -805,7 +805,6 @@ var
   I, J: LongInt;
   Attemps: Longint;
 begin
-  WriteConsoleF('Multicore Initialization ...\n',[]);
   for I := 0 to Max_CPU-1 do
   begin
     CPU[I].ApicID := 0 ;

@@ -32,10 +32,11 @@ uses
   Arch,
   Filesystem,
   VirtIO,
+  {$IFDEF UseGDBstub}VirtIOConsole,{$ENDIF}
   VirtIOFS,
   VirtIOVSocket,
   Console,
-  // Gdbstub,
+  {$IFDEF UseGDBstub}Gdbstub,{$ENDIF}
   Network;
 
 const

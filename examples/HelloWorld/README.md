@@ -11,7 +11,7 @@ You will see how toro initializes the unit by first calling the scheduler.
 
 To debug Toro by using the GDBstub built-in and gdb, first execute:
 ```bash 
-../CloudIt.sh HelloWorld "-gl -dUseGDBstub" "-serial tcp::1234,server"
+../CloudIt.sh HelloWorld "-gl -dUseGDBstub" "-device virtio-serial-device,id=virtio-serial0 -chardev socket,host=0.0.0.0,port=1234,server=on,wait=on,id=charconsole0 -device virtconsole,chardev=charconsole0,id=console0"
 ```
 Second, execute gdb by doing:
 ```bash

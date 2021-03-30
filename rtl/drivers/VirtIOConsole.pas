@@ -3,6 +3,7 @@
 //
 // This unit contains the driver for virtio-console.
 // The driver is implemented without interruptions.
+// The read and write are protected by using a Read/Write Lock.
 //
 // Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
@@ -65,6 +66,10 @@ implementation
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
 
+var
+  WriteLockConsole: UInt64 = 3;
+  ReadLockConsole: UInt64 = 3;
+
 type
   TByteArray = array[0..0] of Byte;
   PByteArray = ^TByteArray;
@@ -76,6 +81,7 @@ var
   vq: PVirtQueue;
   tmp: PQueueBuffer;
 begin
+  SpinLock (3, 4, WriteLockConsole);
   vq := @VirtIOConsoleDev.VirtQueues[TX_QUEUE];
   bi.buffer := Packet.Data;
   bi.size := Packet.Size;
@@ -94,6 +100,7 @@ begin
   // mark buffer as free
   tmp.length:= 0;
   ReadWriteBarrier;
+  WriteLockConsole := 3;
 end;
 
 var
@@ -111,6 +118,7 @@ var
   bi: TBufferInfo;
 begin
   Result := len;
+  SpinLock (3, 4, ReadLockConsole);
   while len > 0 do
   begin
     if (CurrentPacket = nil) or (offset > CurrentPacket.size -1) then
@@ -169,6 +177,7 @@ begin
     Inc(offset, count);
     Dec(Len, count); 
   end;  
+  ReadLockConsole := 3;
 end;
 
 function InitVirtIOConsole (Device: PVirtIOMMIODevice): Boolean;
@@ -179,7 +188,6 @@ begin
   VirtIOConsoleDev.IRQ := Device.Irq;
   VirtIOConsoleDev.Base := Device.Base;
  
-  // TODO: disable interruptions in the queues 
   if not VirtIOInitQueue(VirtIOConsoleDev.Base, RX_QUEUE, @VirtIOConsoleDev.VirtQueues[RX_QUEUE], VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE) then
   begin
     WriteConsoleF('VirtIOConsole: RX_QUEUE has not been initializated\n', []);
@@ -207,7 +215,6 @@ begin
   VirtIOConsoleDev.VirtQueues[RX_QUEUE].Next := @VirtIOConsoleDev.VirtQueues[TX_QUEUE];
   VirtIOConsoleDev.VirtQueues[TX_QUEUE].Next := nil; 
  
-  //IOApicIrqOn(Device.Irq); 
   WriteConsoleF('VirtIOConsole: Initiated\n', []);
 
   Result := True;

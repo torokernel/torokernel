@@ -58,7 +58,7 @@ if [ -f $appsrc ]; then
    # The symbols defined/undefined are the same than in system.pp
 fpc -dFPC_NO_DEFAULT_MEMORYMANAGER -dHAS_MEMORYMANAGER -uFPC_HAS_INDIRECT_ENTRY_INFORMATION -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix/ -Fu$fpcrtlsource/linux/ -MObjfpc $fpcrtlsource/linux/si_prc.pp -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc
 fpc -Us -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc $fpcrtlsource/linux/system.pp
-fpc -TLinux -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64 -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ $compileropt -Xm -Si $compopti $appsrc -o$app -Fu../../rtl -Fu../../rtl/drivers -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc -MObjfpc -kprt0.o
+fpc -TLinux -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64 -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ $compileropt -Xm -Si $compileropti $appsrc -o$app -Fu../../rtl -Fu../../rtl/drivers -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc -MObjfpc -kprt0.o
    ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -kernel $app $qemuparams $3
 else
    echo "$appsrc does not exist, exiting"

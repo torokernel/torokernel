@@ -47,10 +47,12 @@ git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
 Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
 
 ## Run the HelloWorld Example
-You have just to go to `examples/HelloWorld/` and execute:
+You have to go to `examples/HelloWorld/` and execute:
 ```bash
 ../CloudIt.sh HelloWorld
 ```
+And you will get the following output:
+![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/helloworld.gif)
 
 ## Run the StaticWebServer Example
 To run the StaticWebServer example, you have first to compile vsock-socat and virtiofds. The latter is built during the building of Qemu. In a terminal, launch vsock-socat by executing:

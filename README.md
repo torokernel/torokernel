@@ -51,7 +51,6 @@ You have to go to `examples/HelloWorld/` and execute:
 ```bash
 ../CloudIt.sh HelloWorld
 ```
-And you will get the following output:
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/helloworld.gif)
 
 ## Run the StaticWebServer Example
@@ -71,6 +70,7 @@ Replace `source` with the directory to serve. Finally, launch the static webserv
 ```bash
 ../CloudIt.sh StaticWebServer "-dShutdownWhenFinished"
 ```
+![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/staticwebser.gif)
 
 ## Building Toro in Windows by using Lazarus
 

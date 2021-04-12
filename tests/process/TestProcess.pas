@@ -3,7 +3,7 @@
 //
 // This program contains unittests for the Process unit.
 //
-// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -30,15 +30,16 @@ program TestProcess;
 
 uses
   SysUtils,
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  FileSystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\Pci.pas',
-  Network in '..\..\rtl\Network.pas',
-  Console in '..\..\rtl\drivers\Console.pas';
+  Kernel,
+  Process,
+  Memory,
+  Debug,
+  Arch,
+  Filesystem,
+  Network,
+  Console,
+  VirtIO,
+  VirtIOConsole;
 
 var
   test, ret: LongInt;
@@ -55,7 +56,7 @@ end;
 function ThreadLoop(Param: Pointer):PtrInt;
 begin
   While true do
-    SysThreadSwitch(False);
+    SysThreadSwitch;
 end;
 
 function TestThreadSwitch(out test: Longint): Boolean;
@@ -76,7 +77,7 @@ var
 begin
   test := 0;
 
-  tmp := BeginThread(nil, 4096, ThreadLoop, nil, 0, tmp);
+  //tmp := BeginThread(nil, 4096, ThreadLoop, nil, 0, tmp);
 
   Result := false;
   asm
@@ -94,8 +95,8 @@ begin
     mov r15_reg, r15
   end;
 
-  SysThreadSwitch(False);
-  SysThreadSwitch(False);
+  SysThreadSwitch;
+  SysThreadSwitch;
 
   asm
     mov rax_regb, rax
@@ -161,7 +162,7 @@ begin
   tmp := BeginThread(nil, 4096, Thread, Pointer($12345), 0, tmp);
 
   while ret = 2 do
-    SysThreadSwitch(False);
+    SysThreadSwitch;
 
   if ret = 1 then
     WriteDebug('TestBeginThread-%d: FAILED\n', [test])
@@ -173,13 +174,12 @@ begin
   tmp := BeginThread(nil, 4096, Thread, Pointer($12345), 1, tmp);
 
   while ret = 2 do
-    SysThreadSwitch(False);
+    SysThreadSwitch;
 
   if ret = 1 then
     WriteDebug('TestBeginThread-%d: FAILED\n', [test])
   else
     WriteDebug('TestBeginThread-%d: PASSED\n', [test]);
-
 end;
 
 procedure TestExceptions;
@@ -206,13 +206,25 @@ begin
   end;
 end;
 
+procedure TestSleep;
+var
+  ResumeTime: Int64;
+begin
+  ResumeTime := read_rdtsc + 2 * LocalCPUSpeed * 1000;
+  Sleep(2);
+  // tolerate no more than 1 ms of error
+  if (read_rdtsc - ResumeTime) > (1 * LocalCPUSpeed * 1000) then
+    WriteDebug('TestSleep: FAILED\n', [])
+  else
+    WriteDebug('TestSleep: PASSED\n', []);
+end;
+
 begin
   TestBeginThread;
-
   if TestThreadSwitch(test) then
     WriteDebug('TestThreadSwitch-%d: PASSED\n', [test])
   else
     WriteDebug('TestThreadSwitch-%d: FAILED\n', [test]);
-
   TestExceptions;
+  TestSleep;
 end.

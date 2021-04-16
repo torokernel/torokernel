@@ -8,9 +8,11 @@ env:
 before_install:
 - openssl aes-256-cbc -K $encrypted_6bc7d5d9b919_key -iv $encrypted_6bc7d5d9b919_iv
   -in test_rsa.enc -out test_rsa -d
-- chmod +x ./ci/travis.install.py
+- chmod +x ./ci/prepare_tests.sh
+- chmod +x ./ci/run_tests.sh
+- ./ci/prepare_tests.sh
 install:
-- sudo apt-get install qemu-kvm
+- ./ci/run_tests.sh
 script: 
 notifications:
   email:

@@ -1,0 +1,3 @@
+ssh $USER_TEST@$IP_TESTHOST <<EOF
+  ls
+EOF

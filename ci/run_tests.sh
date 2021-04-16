@@ -1,3 +1,3 @@
-ssh $USER_TEST@$IP_TESTHOST <<EOF
+ssh -o "StrictHostKeyChecking no" $USER_TEST@$IP_TESTHOST <<EOF
   ls
 EOF

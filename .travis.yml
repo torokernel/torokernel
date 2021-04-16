@@ -7,7 +7,7 @@ env:
   global: 
 before_install:
 - openssl aes-256-cbc -K $encrypted_cfe8bf92ff86_key -iv $encrypted_cfe8bf92ff86_iv
-  -in tests_rsa.enc -out tests_rsa -d
+  -in tests_rsa.enc -out /tmp/tests_rsa -d
 - chmod +x ./ci/prepare_tests.sh
 - chmod +x ./ci/run_tests.sh
 - "./ci/prepare_tests.sh"

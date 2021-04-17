@@ -10,10 +10,12 @@ before_install:
   -in tests_rsa.enc -out /tmp/tests_rsa -d
 - chmod +x ./ci/prepare_tests.sh
 - chmod +x ./ci/run_tests.sh
+- chmod +x ./ci/after_run.sh
 - "./ci/prepare_tests.sh"
 install:
 - "./ci/run_tests.sh"
 after_success:
+- "./ci/after_run.sh"
 notifications:
   email:
     on_success: false

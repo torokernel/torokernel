@@ -17,4 +17,4 @@ script:
 notifications:
   email:
     on_success: false
-    on_failure: false
+    on_failure: true

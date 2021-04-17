@@ -27,9 +27,9 @@ import subprocess
 def main():
   cwd = os.getcwd()
   ret = 1
-  os.chdir (cwd + '/tests/filesystem')
-  if os.system ('./TestFilesystem.sh'):
-    ret = 0
+  #os.chdir (cwd + '/tests/filesystem')
+  #if os.system ('./TestFilesystem.sh'):
+  #  ret = 0
   os.chdir(cwd + '/tests/process')
   if os.system ('./TestProcess.sh'):
     ret = 0

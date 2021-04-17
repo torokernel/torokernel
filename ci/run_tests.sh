@@ -1,4 +1,4 @@
-ssh -i /tmp/tests_rsa $USER_TEST@$IP_TESTHOST <<EOF
+ssh -i /tmp/tests_rsa -o "StrictHostKeyChecking no" $USER_TEST@$IP_TESTHOST <<EOF
   git clone https://github.com/torokernel/torokernel.git -b fixfor#408
   cd torokernel
   chmod +x ./ci/travis.test.py

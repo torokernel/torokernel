@@ -13,7 +13,7 @@ before_install:
 - "./ci/prepare_tests.sh"
 install:
 - "./ci/run_tests.sh"
-script: 
+after_success:
 notifications:
   email:
     on_success: false

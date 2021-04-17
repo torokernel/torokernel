@@ -4,6 +4,6 @@ ssh -i /tmp/tests_rsa -o "StrictHostKeyChecking no" $USER_TEST@$IP_TESTHOST <<EO
   chmod +x ./ci/travis.test.py
   # TODO: this should go to another section
   ./ci/travis.test.py
-  cd ~
+  cd ~/
   rm -rf torokernel
 EOF

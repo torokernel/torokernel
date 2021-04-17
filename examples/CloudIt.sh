@@ -25,7 +25,7 @@ app="$1";
 appsrc="$app.pas";
 qemufile="qemu.args";
 compileropt="$2";
-fpcrtlsource="~/fpc-3.2.0/rtl/";
+fpcrtlsource="$(eval echo ~$USER)""/fpc-3.2.0/rtl/";
 # change to -O- for debugging
 compileropti="-O2"
 

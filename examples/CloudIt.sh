@@ -25,6 +25,7 @@ app="$1";
 appsrc="$app.pas";
 qemufile="qemu.args";
 compileropt="$2";
+# if you change it, do not commit it or CI wont work
 fpcrtlsource="$(eval echo ~$USER)/fpc-3.2.0/rtl/";
 # change to -O- for debugging
 compileropti="-O2"
@@ -60,7 +61,7 @@ fpc -dFPC_NO_DEFAULT_MEMORYMANAGER -dHAS_MEMORYMANAGER -uFPC_HAS_INDIRECT_ENTRY_
 fpc -Us -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc $fpcrtlsource/linux/system.pp
 fpc -TLinux -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64 -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ $compileropt -Xm -Si $compileropti $appsrc -o$app -Fu../../rtl -Fu../../rtl/drivers -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc -MObjfpc -kprt0.o
    # TODO: replace with a command
-   # ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -kernel $app $qemuparams $3
+   ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -kernel $app $qemuparams $3
 else
    echo "$appsrc does not exist, exiting"
    exit 1

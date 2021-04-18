@@ -4,7 +4,7 @@
 #
 # This script runs the test during ci.
 #
-# Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
+# Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved
 #
 # This program is free software: you can redistribute it and/or modify
@@ -36,9 +36,9 @@ def main():
   os.chdir(cwd + '/tests/memory')
   if os.system ('./TestMemory.sh'):
     ret = 0
-  # os.chdir(cwd + '/tests/benchmarks')
-  # os.system ('./ProfileBootTime.sh')
-  # os.system ('./ProfileKernelInitTime.sh')
+  os.chdir(cwd + '/tests/benchmarks')
+  os.system ('./ProfileBootTime.sh')
+  os.system ('./ProfileKernelInitTime.sh')
   os.chdir (cwd)
   return ret
     

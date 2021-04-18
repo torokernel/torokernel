@@ -16,6 +16,8 @@ install:
 - "./ci/run_tests.sh"
 after_success:
 - "./ci/after_run.sh"
+after_fail:
+- "./ci/after_run.sh"
 notifications:
   email:
     on_success: false

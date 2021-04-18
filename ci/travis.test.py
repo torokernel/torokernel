@@ -2,7 +2,7 @@
 #
 # travis.test.py
 #
-# This script runs the test during ci.
+# This script runs the tests during ci.
 #
 # Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 # All Rights Reserved

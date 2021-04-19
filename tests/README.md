@@ -4,4 +4,5 @@ This folder contains tests for the different units of the kernel. Each folder co
 * virtiofsd at ~/qemuvmm/build/tools/viritofsd
 * fpc 3.2.0 installed
 * RTL for Toro at ~/fpc-3.2.0/
+
 Each program is launched by using an script with the same name. For example, *TestProcess.pas* is compiled and launched by *TestProcess.sh*. This script parses the serial output to check if any tests has failed. In that case, the script outputs the serial console and exits with '0'. When this runs in the CI, this makes the travis job to fail. 

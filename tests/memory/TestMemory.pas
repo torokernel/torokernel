@@ -3,7 +3,7 @@
 //
 // This unit contains unittests for the Memory unit.
 //
-// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -26,19 +26,17 @@ program TestMemory;
  {$mode delphi}
 {$ENDIF}
 
-{$DEFINE EnableDebug}
-{$DEFINE DebugCrash}
-
 uses
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  FileSystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\Pci.pas',
-  Network in '..\..\rtl\Network.pas',
-  Console in '..\..\rtl\drivers\Console.pas';
+  Kernel,
+  Process,
+  Memory,
+  Debug,
+  Arch,
+  Filesystem,
+  Network,
+  Console,
+  VirtIO,
+  VirtIOConsole;
 
 var
   test: LongInt;
@@ -86,7 +84,6 @@ begin
       break;
     end;
   end;
-
   if r = nil then
      WriteDebug('TestGetMem-%d: PASSED\n', [test]);
 end.

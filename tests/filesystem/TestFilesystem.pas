@@ -3,7 +3,7 @@
 //
 // This program contains unittests for the Filesystem unit.
 //
-// Copyright (c) 2003-2019 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -27,18 +27,16 @@ program TestFilesystem;
 {$ENDIF}
 
 uses
-  Kernel in '..\..\rtl\Kernel.pas',
-  Process in '..\..\rtl\Process.pas',
-  Memory in '..\..\rtl\Memory.pas',
-  Debug in '..\..\rtl\Debug.pas',
-  Arch in '..\..\rtl\Arch.pas',
-  FileSystem in '..\..\rtl\Filesystem.pas',
-  Pci in '..\..\rtl\Pci.pas',
-  Network in '..\..\rtl\Network.pas',
-  Console in '..\..\rtl\drivers\Console.pas',
-  VirtIOFS in '..\..\rtl\drivers\VirtIOFS.pas',
-  VirtIOBlk in '..\..\rtl\drivers\VirtIOBlk.pas',
-  Fat in '..\..\rtl\drivers\Fat.pas';
+  Kernel,
+  Process,
+  Memory,
+  Debug,
+  Arch,
+  Filesystem,
+  Network,
+  Console,
+  VirtIO,
+  VirtIOFS;
 
 const
   longname: Pchar = 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest';
@@ -57,13 +55,12 @@ var
 begin
   if KernelParamCount = 0 then
   begin
-    DedicateBlockDriver('virtioblk', 0);
-    SysMount('fat', 'virtioblk', 0);
+    Exit;
   end
   else
   begin
-    fsdriver := GetKernelParam(1);
-    blkdriver := GetKernelParam(2);
+    fsdriver := GetKernelParam(0);
+    blkdriver := GetKernelParam(1);
     DedicateBlockDriver(blkdriver, 0);
     SysMount(fsdriver, blkdriver, 0);
   end;
@@ -163,24 +160,6 @@ begin
     WriteDebug('TestStat-%d: FAILED\n', [test])
   else
     WriteDebug('TestStat-%d: PASSED\n', [test]);
-
-  Inc(test);
-  tmp := SysOpenFile('/1Mfilezero', O_RDONLY);
-  i := 0;
-
-  while SysReadFile (tmp, 1, @buf) <> 0 do
-  begin
-    Inc(i);
-    if buf <> #0 then
-      Break;
-  end;
-
-  if i <> 1024*1024 then
-    WriteDebug('TestRead-%d: FAILED\n', [test])
-  else
-    WriteDebug('TestRead-%d: PASSED\n', [test]);
-
-  SysCloseFile(tmp);
 
   Inc(test);
   tmp := SysOpenFile('/1Mfilezero', O_RDONLY);

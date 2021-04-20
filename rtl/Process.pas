@@ -1111,10 +1111,8 @@ procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'schedul
 var
   CurrentCPU: PCPU;
   CurrentThread, LastThread, Th, tmp: PThread;
-  NextTurnHalt: Boolean;
   rbp_reg: pointer;
 begin
-  NextTurnHalt:= False;
   CurrentCPU := @CPU[GetApicID];
   while True do
   begin

@@ -228,6 +228,8 @@ trampoline_idt:
   dw 13ebh
   dd IDT
 trampoline_longmode:
+  mov eax, kernel_data_sel
+  mov ss, eax
   mov esp , 1000h
   ; enable long mode
   mov eax , cr4
@@ -239,9 +241,11 @@ trampoline_longmode:
   rdmsr
   bts eax,8
   wrmsr
-  mov eax,cr0
-  bts eax,31
-  mov cr0,eax
+  mov eax, cr0
+  bts eax, 31
+  btr eax, 29 ; nw
+  btr eax, 30 ; cd
+  mov cr0, eax
   db 066h
   db 0eah
   dd _mainCRTStartup

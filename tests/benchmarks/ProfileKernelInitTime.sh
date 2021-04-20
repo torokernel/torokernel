@@ -1,14 +1,10 @@
-# memory for guest in mb
+# guest memory in MB
 mem=256
 # time on qemu-kvm in ms
-test1=1230
-# time on qemu-kvm with qboot in ms
-test2=900
-rm ../../rtl/Kernel.ppu
-rm ../../rtl/Kernel.o
-../../builder/BuildMultibootKernel.sh TestBootTime "-dShutdownWhenFinished"
+test1=300
+../../examples/CloudIt.sh TestBootTime "-dShutdownWhenFinished" "-M maca"
 starttime=$(($(date +%s%N)/1000000))
-qemu-system-x86_64 -nographic -kernel TestBootTime.bin -m $mem -device isa-debug-exit,iobase=0xf4,iosize=0x04
+sudo ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -nographic -no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -kernel TestBootTime -m $mem -no-reboot
 endtime=$(($(date +%s%N)/1000000))
 test1_r=$((endtime-starttime))
 res=0
@@ -19,15 +15,3 @@ then
 else
   echo "TestKernelInitTime: PASSED"
 fi
-starttime=$(($(date +%s%N)/1000000))
-qemu-system-x86_64 -bios ../../builder/bios.bin -nographic -kernel TestBootTime.bin -m $mem -device isa-debug-exit,iobase=0xf4,iosize=0x04
-endtime=$(($(date +%s%N)/1000000))
-test2_r=$((endtime-starttime))
-if [ "$test2_r" -gt "$test2" ]
-then
-  echo "TestKernelInitTime: Qboot, FAILED"
-  res=1
-else
-  echo "TestKernelInitTime: Qboot, PASSED"
-fi
-exit $res

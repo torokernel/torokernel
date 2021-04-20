@@ -37,7 +37,7 @@ procedure SetDebugRing(Base: PChar; NewSize: LongInt);
 implementation
 
 uses
-  Console, Process;
+  Console, Process, Network, VirtIO, VirtIOConsole;
 
 {$MACRO ON}
 {$DEFINE EnableInt := asm sti;end;}
@@ -47,22 +47,13 @@ uses
 var
   LockDebug: UInt64 = 3;
 
-const
-  BASE_COM_PORT = $3f8;
-
-procedure WaitForCompletion;
-var
-  lsr: Byte;
-begin
-  repeat
-    lsr := read_portb(BASE_COM_PORT+5);
-  until (lsr and $20) = $20;
-end;
-
 procedure SendChartoConsole(C: XChar);
+var
+  t: TPacket;
 begin
-  write_portb(Byte(C), BASE_COM_PORT);
-  WaitForCompletion;
+  t.data := @C;
+  t.size := 1;
+  virtIOConsoleSend(@t);
 end;
 
 const
@@ -86,6 +77,7 @@ var
   p: PChar;
 begin
   p := DebugRingBufferBegin;
+  // TODO: to use full package
   while p < ringPos do
   begin
     SendChartoConsole(p^);
@@ -103,12 +95,6 @@ begin
   DebugRingBufferBegin := Base;
   DebugRingBufferEnd := Base + NewSize - 1;
   ringPos := DebugRingBufferBegin + tmp;
-end;
-
-function ReadChar: XChar;
-begin
-  while (read_portb(BASE_COM_PORT+5) and 1 ) = 0 do;
-  Result := XChar(read_portb(BASE_COM_PORT));
 end;
 
 // Print in decimal form
@@ -312,9 +298,9 @@ begin
   CPUI := GetApicID;
   Thread := Cpu[CPUI].CurrentThread;
   {$IFDEF UseStampCounterinDebug}
-     WriteSerial('[\r] CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
+     WriteSerial('[\r] CPU%d Thread#%h ',[CPUI, Int64(PtrUInt(Thread))]);
   {$ELSE}
-     WriteSerial('[\t] CPU%d Thread#%d ',[CPUI, Int64(PtrUInt(Thread))]);
+     WriteSerial('[\t] CPU%d Thread#%h ',[CPUI, Int64(PtrUInt(Thread))]);
   {$ENDIF}
   WriteSerial (Format, Args);
   LockDebug := 3;
@@ -327,14 +313,8 @@ begin
   DebugRingBufferBegin := @InitialDebugRing;
   DebugRingBufferEnd := @InitialDebugRing[RingBufferInitialSize-1];
   ringPos := DebugRingBufferBegin;
-  {$IFNDEF UseConsoleasSerial}
-    write_portb ($83, BASE_COM_PORT+3);
-    write_portb (0, BASE_COM_PORT+1);
-    write_portb (1, BASE_COM_PORT);
-    write_portb (3, BASE_COM_PORT+3);
-  {$ENDIF}
-  WriteConsoleF ('Toro on /Vdebug mode/n\n',[]);
-  WriteDebug('Initialization of debugging console.\n',[]);
+  WriteConsoleF ('Toro is in Debug mode\n',[]);
+  WriteDebug('Initialization of debugging console\n',[]);
   {$IFDEF DebugCrash}
      WriteDebug('Crash dumping is Enabled\n',[]);
   {$ELSE}

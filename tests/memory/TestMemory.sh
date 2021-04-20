@@ -1,10 +1,6 @@
-rm ../../rtl/*.ppu
-rm ../../rtl/drivers/*.ppu
-rm ../../rtl/*.o
-rm ../../rtl/drivers/*.o
-export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
-../../builder/BuildMultibootKernel.sh TestMemory "-dShutdownWhenFinished -dEnableDebug"
-qemu-system-x86_64 -m 256 -smp 1 -nographic -monitor /dev/null -kernel TestMemory.bin -serial file:testmemory.report -device isa-debug-exit,iobase=0xf4,iosize=0x04
+# use -M maca to not allow qemu run
+../../examples/CloudIt.sh TestMemory "-dShutdownWhenFinished -dEnableDebug" "-M maca"
+sudo ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -nographic -enable-kvm -device virtio-serial-device,id=virtio-serial0 -chardev file,path=./testmemory.report,id=charconsole0 -device virtconsole,chardev=charconsole0,id=console0 -M microvm,pic=off,pit=off,rtc=off -no-reboot -cpu host -smp 1 -m 64 -d guest_errors -D qemu.log -global virtio-mmio.force-legacy=false -no-acpi -kernel TestMemory
 if grep -q FAILED "./testmemory.report"; then
   cat ./testmemory.report
   exit 1

@@ -15,23 +15,29 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 
 ## How compile ToroMicroVM?
 
-### Step 1. Install Freepascal
+### Step 1. Install Freepascal 3.2.0
 ```bash
-apt-get install fpc
+wget https://sourceforge.net/projects/lazarus/files/Lazarus%20Linux%20amd64%20DEB/Lazarus%202.0.10/fpc-laz_3.2.0-1_amd64.deb/download
+mv download fpc-laz_3.2.0-1_amd64.deb
+apt install ./fpc-laz_3.2.0-1_amd64.deb -y
 ```
-You have to install version 3.2.0.
 
 ### Step 2. Build Qemu-KVM (qemu 5.2.50 or #51204c2f)
 ```bash
-apt-get install libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
+apt-get update
+apt-get install python3-pip make git libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
+pip3 install ninja
+# uncomment to change PATH permanently
+# echo 'export PATH=/home/debian/.local/bin:$PATH' >>~/.bashrc
+export PATH="/home/debian/.local/bin:$PATH"
 git clone https://github.com/qemu/qemu.git qemuforvmm
 cd qemuforvmm
+git checkout 51204c2f
 mkdir build 
 cd build
 ../configure --target-list=x86_64-softmmu
 make
 ```
-Note that this step may require to install Ninja to build Qemu.
 
 ### Step 3. Get ToroMicroVM
 ```bash
@@ -42,6 +48,7 @@ git clone https://github.com/torokernel/torokernel.git
 ```bash
 git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
 ```
+Note that Step 1, 2, 3 and 4 can be found in the script at `ci/prepare_host.sh`.
 
 ### Step 5. Edit path to Qemu and FPC in CloudIt.sh
 Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).

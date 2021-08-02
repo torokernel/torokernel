@@ -61,7 +61,15 @@ You have to go to `examples/HelloWorld/` and execute:
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/helloworld.gif)
 
 ## Run the StaticWebServer Example
-To run the StaticWebServer example, you have first to compile vsock-socat and virtiofds. The latter is built during the building of Qemu. In a terminal, launch vsock-socat by executing:
+You can easily get the StaticWebServer up and running by following the tutorial at [here](https://github.com/torokernel/torowebserverappliance). This would require only a Debian 10 installation. For example, you can get a s1-2 host from OVH. If you prefer to run it step by step, follow the next instructions. You have first to compile vsock-socat and virtiofds. The latter is built during the building of Qemu. The former can be built by executing:
+```bash
+git clone git@github.com:stefano-garzarella/socat-vsock.git
+cd socat-vsock
+autoreconf -fiv
+./configure
+make socat
+```
+Then, launch vsock-socat by executing:
 
 ```bash
 ./socat TCP4-LISTEN:4000,reuseaddr,fork VSOCK-CONNECT:5:80

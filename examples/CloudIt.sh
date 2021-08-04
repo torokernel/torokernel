@@ -29,7 +29,7 @@ compileropt="$2";
 fpcrtlsource="$(eval echo ~$USER)/fpc-3.2.0/rtl/";
 # change to -O- for debugging
 compileropti="-O2"
-qemudir="~/qemuforvmm/build/x86_64-softmmu"
+qemudir="/root/qemuforvmm/build/x86_64-softmmu"
 
 export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)
 export BUILD_TIME=$(date)

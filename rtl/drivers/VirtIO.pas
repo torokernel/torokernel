@@ -511,13 +511,8 @@ asm
   push r13
   push r14
   push r15
-  mov r15 , rsp
-  mov rbp , r15
-  sub r15 , 32
-  mov  rsp , r15
   xor rcx , rcx
   Call VirtIOHandler
-  mov rsp , rbp
   pop r15
   pop r14
   pop r13

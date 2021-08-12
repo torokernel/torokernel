@@ -147,7 +147,7 @@ procedure SetIntACK(Base: QWORD; Value: DWORD);
 function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
 procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
@@ -339,7 +339,7 @@ begin
   end;
 end;
 
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; HeaderLen: DWORD): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
 var
   j: LongInt;
   QueueSize, sizeOfBuffers: DWORD;
@@ -359,6 +359,8 @@ begin
 
   QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
   QueueSize := QueueNumMax^;
+  if QueueLen < QueueSize then
+    QueueSize := QueueLen;
   if QueueSize = 0 then
     Exit;
   Queue.queue_size := QueueSize;

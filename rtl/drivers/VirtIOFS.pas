@@ -242,7 +242,7 @@ const
   // TODO: to check the value of this
   TORO_MAX_READAHEAD_SIZE = 1048576;
   TORO_UNIQUE = $2721987;
-
+  QUEUE_LEN = 32;
   ROOT_UID = 0;
 
   VIRTIO_ID_FS = $1a;
@@ -624,7 +624,7 @@ begin
   SelDriverFeatures(Device.Base, 1);
   SetDriverFeatures(Device.Base, (1 shl VIRTIO_F_VERSION_1) shr 32);
   SetDeviceStatus(Device.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK);
-  if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, 0) then
+  if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, QUEUE_LEN, 0) then
   begin
     WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
     Exit;

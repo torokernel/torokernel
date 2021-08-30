@@ -55,6 +55,7 @@ const
 
   PAGE_SIZE = 4096;
   MMIO_GUESTID = $100;
+  QUEUE_LEN = 32;
 
 var
   VirtIOVSocketDev: TVirtIOVSocketDevice;
@@ -168,19 +169,19 @@ begin
   VirtIOVSocketDev.GuestID := guestid^;
   WriteConsoleF('VirtIOVSocket: cid=%d\n',[VirtIOVSocketDev.GuestID]);
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
+  if not VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
   begin
     WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
     Exit;
   end;
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], sizeof(TVirtIOVSockEvent)) then
+  if not VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], QUEUE_LEN, sizeof(TVirtIOVSockEvent)) then
   begin
     WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
     Exit;
   end;
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], 0) then
+  if not VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0) then
   begin
     WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
     Exit;

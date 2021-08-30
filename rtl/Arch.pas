@@ -907,7 +907,7 @@ begin
     mov edx, h
     mov ecx, MSR_KVM_SYSTEM_TIME_NEW
     wrmsr
-  end;
+  end ['EAX', 'EDX', 'ECX'];
 end;
 
 Type
@@ -930,7 +930,7 @@ begin
     mov ecx, MSR_KVM_WALL_CLOCK_NEW
     wrmsr
     sfence
-  end;
+  end ['EAX', 'EDX', 'ECX'];
 end;
 
 procedure Now(Data: PNow);
@@ -1384,4 +1384,3 @@ begin
 end;
 
 end.
-

@@ -594,6 +594,7 @@ begin
   Result := Super;
 end;
 
+// Callback to handle interruptions on vqs
 procedure VirtIOProcessQueue(vq: PVirtQueue);
 var
   index, norm_index, buffer_index: Word;
@@ -629,7 +630,8 @@ begin
     WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
     Exit;
   end;
-      
+
+  // register queue callback handler
   FsVirtio.RqQueue.VqHandler := @VirtIOProcessQueue;
   Device.Vqs := @FsVirtio.RqQueue;
  

@@ -466,6 +466,7 @@ begin
     Exit;
   while (vq.last_used_index <> vq.used.index) do
   begin
+    // invoke callback handler
     vq.VqHandler(vq);
     Inc(vq.last_used_index);
   end;
@@ -484,7 +485,7 @@ begin
       vqs := VirtIOMMIODevices[j].Vqs;
       while vqs <> nil do
       begin
-        if @vqs.VqHandler <> nil then
+	if @vqs.VqHandler <> nil then
           VirtIOProcessQueue(vqs);
         vqs := vqs.Next; 
       end; 

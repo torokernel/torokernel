@@ -14,7 +14,7 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 * Built-in gdbstub
 
 ## How try ToroMicroVM?
-You can quickly get a first taste of ToroMicroVM by running the HelloWorld example using a docker image that includes all the tools to build the example. To do so, execute the following commands in a console.
+You can quickly get a first taste of ToroMicroVM by running the HelloWorld example by building a docker image that includes all the required tools. To do so, execute the following commands in a console:
 
 ```bash
 wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile

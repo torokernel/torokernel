@@ -13,7 +13,19 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 * Tiny image
 * Built-in gdbstub
 
-## How compile ToroMicroVM?
+## How try ToroMicroVM?
+You can quickly get a first taste of ToroMicroVM by running the HelloWorld example using a docker image that includes all the tools to build the example. To do so, execute the following commands in a console.
+
+```bash
+wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile
+sudo docker build -t torokernel-dev .
+sudo docker run --privileged -it torokernel-dev
+cd examples/HelloWorld
+../CloudIt.sh HelloWorld
+```
+These commands require to have installed KVM and Docker. If these commands execute successfully, you will get the output of the HelloWorld example.
+
+## How build ToroMicroVM locally?
 
 ### Step 1. Install Freepascal 3.2.0
 ```bash

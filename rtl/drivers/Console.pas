@@ -177,9 +177,13 @@ begin
     begin
       Inc(J);
       if J > Length(Format) then
-        Exit ;
+      begin
+        LockConsole := 3;
+        RestoreInt;
+        Exit;
+      end;
       case Format[J] of
-        'c': 
+        'c':
            begin
              PutC(XChar(args[ArgNo]));
            end;
@@ -225,7 +229,11 @@ begin
     begin
       Inc(J);
       if J > Length(Format) then
-        Exit ;
+      begin
+        LockConsole := 3;
+        RestoreInt;
+        Exit;
+      end;
       case Format[J] of
         'c':
           begin

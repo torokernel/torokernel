@@ -506,12 +506,15 @@ end;
 
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
+    cmp CPU_COUNT, 0
+    je @break
   @spin:
     mov rax, cmpval
     {$IFDEF LINUX} cmpxchg [rdx], rsi {$ENDIF}
     {$IFDEF WINDOWS} cmpxchg [r8], rdx {$ENDIF}
     pause
     jnz @spin
+ @break:
 end;
 
 function GetApicID: Byte; inline;

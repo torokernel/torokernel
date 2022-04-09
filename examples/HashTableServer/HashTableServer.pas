@@ -45,6 +45,7 @@ const
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 1000;
   Max_Path_Len = 200;
+  MAX_IDX_IN_HASH = 10000;
 
 type
   PRequest = ^TRequest;
@@ -147,22 +148,40 @@ begin
   end;
 end;
 
+var
+  Hash: array[0..MAX_IDX_IN_HASH-1] of PChar;
+
 function GetKey(key: Pchar): PChar;
+var
+  idx: LongInt;
 begin
-WriteConsoleF('GetKey: %p\n', [PtrUInt(key)]);
-Result := nil;
+  idx := CalcChecksum32(key);
+  if idx > MAX_IDX_IN_HASH then
+  begin
+    Result := nil;
+    Exit;
+  end;
+  Result := Hash[idx];
 end;
 
 procedure SetKeyValue(key: PChar; value: Pchar);
+var
+ len, idx: LongInt;
+ buff: PChar;
 begin
-WriteConsoleF('SetKey: key: %p, value: %p\n', [PtrUInt(key), PtrUInt(value)]);
+  len := strlen(value);
+  buff := ToroGetMem(len+1);
+  Move(Value^, Buff^, len+1);
+  idx := CalcChecksum32(key);
+  if Hash[idx] <> nil then
+   ToroFreeMem(Hash[idx]);
+  Hash[idx] := buff;
 end;
 
 // Content must free by caller
 function GetHashContent(entry: pchar; var Content: pchar): LongInt;
 var
-  idx: TInode;
-  indexSize: LongInt;
+  len: LongInt;
   Buf, Key, Value: Pchar;
   tmp: THandle;
 begin
@@ -183,10 +202,23 @@ begin
   Inc(Key);
   if (Value = Nil) or (Value^ = #0) then
   begin
-    Buf := GetKey(Key)
+    Buf := GetKey(Key);
+    if Buf <> nil then
+    begin
+      len := strlen(Buf);
+      Content := ToroGetMem(len+1);
+      Move(Buf^, Content^, len+1);
+      Result := len;
+    end;
   end
   else
+  begin
+    len := strlen(Value);
     SetKeyValue(Key, Value);
+    Content := ToroGetMem(len+1);
+    Move(Value^, Content^, len+1);
+    Result := len;
+  end;
 end;
 
 function ServiceReceive(Socket: PSocket): LongInt;
@@ -202,22 +234,7 @@ begin
       rq := Socket.UserDefined;
       entry := rq.BufferStart;
       len := GetHashContent(rq.BufferStart, content);
-      if StrCmp(Pchar(entry + StrLen(entry) - 4), 'html', 4) then
-        ProcessRequest(Socket, content, 0, 'Text/html')
-      else if StrCmp(PChar(entry + StrLen(entry) - 4), 'json', 4) then
-        ProcessRequest(Socket, content, 0, 'Text/json')
-      else if StrCmp(Pchar(entry + StrLen(entry) - 3), 'htm', 3) then
-        ProcessRequest(Socket, content, 0, 'Text/htm')
-      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'css', 3) then
-        ProcessRequest(Socket, content, 0, 'Text/css')
-      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'js', 2) then
-        ProcessRequest(Socket, content, 0, 'Text/javascript')
-      else if StrCmp(PChar(entry + StrLen(entry) - 2), 'md', 2) then
-        ProcessRequest(Socket, content, 0, 'Text/markdown')
-      else if StrCmp(PChar(entry + StrLen(entry) - 3), 'png', 3) then
-        ProcessRequest(Socket, content, len, 'Image/png')
-      else
-        WriteConsoleF('\t WebServer: file format not found\n', []);
+      ProcessRequest(Socket, content, 0, 'Text/html');
       SysSocketClose(Socket);
       if content <> nil then
         ToroFreeMem(content);
@@ -245,7 +262,8 @@ begin
   ServiceReceive (Socket);
   Result := 0;
 end;
-
+var
+  i: LongInt;
 begin
   if KernelParamCount < 1 then
   begin
@@ -259,12 +277,13 @@ begin
     if StrCmp(GetKernelParam(2), 'noconsole', strlen('noconsole')) then
       HeadLess := True;
   end;
+  for i:= 0 to MAX_IDX_IN_HASH -1 do
+    Hash[i] := nil;
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;
   HttpServer.Blocking := True;
   SysSocketListen(HttpServer, 50);
-  WriteConsoleF('\t WebServer: listening ...\n', []);
-  WriteConsoleF('%d\n',[CalcChecksum32('Fundamentals')]);// = 1250);
+  WriteConsoleF('\t HashTableServer: listening ...\n', []);
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);

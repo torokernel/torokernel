@@ -44,7 +44,7 @@ const
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
   HeaderNotFound = 'HTTP/1.0 404'#13#10;
   SERVICE_TIMEOUT = 1000;
-  Max_Path_Len = 200;
+  Max_Path_Len = 400;
   MAX_IDX_IN_HASH = 10000;
 
 type
@@ -60,8 +60,6 @@ var
   tid: TThreadID;
   rq: PRequest;
   netdriver: PChar;
-  fsdriver: PChar;
-  blkdriver: PChar;
 
 function GetRequest(Socket: PSocket): Boolean;
 var
@@ -190,8 +188,10 @@ begin
   Key := entry;
   while (Key^ <> #0) and (Key^ <> '=') do
       Inc(Key);
-  if Key = #0 then
+  if Key^ = #0 then
+  begin
     Value := Nil
+  end
   else
   begin
     Key^:= #0;
@@ -265,19 +265,10 @@ end;
 var
   i: LongInt;
 begin
-  if KernelParamCount < 1 then
-  begin
-    WriteConsoleF('Wrong number of kernel parameters, exiting\n', []);
-    Exit;
-  end
-  else
-  begin
-    netdriver := GetKernelParam(0);
-    DedicateNetworkSocket(netdriver);
-    if StrCmp(GetKernelParam(2), 'noconsole', strlen('noconsole')) then
-      HeadLess := True;
-  end;
-  for i:= 0 to MAX_IDX_IN_HASH -1 do
+  DedicateNetworkSocket('virtiovsock');
+  if StrCmp(GetKernelParam(0), 'noconsole', strlen('noconsole')) then
+    HeadLess := True;
+  for i:= 0 to MAX_IDX_IN_HASH - 1 do
     Hash[i] := nil;
   HttpServer := SysSocket(SOCKET_STREAM);
   HttpServer.Sourceport := 80;

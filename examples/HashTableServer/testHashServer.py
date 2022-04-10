@@ -1,7 +1,7 @@
 from HashTableClient import HashServer
 import random
 
-URL = "http://127.0.0.1:4000"
+URL = "http://hashtable.torokernel.io/"
 server = HashServer(URL)
 
 # insert a set of random key/value

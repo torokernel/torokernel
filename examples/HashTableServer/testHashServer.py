@@ -17,5 +17,5 @@ for i in range(100):
     server.SetKey(key, value)
     assert server.GetKey(key) == value
 
-# non-existing keys returns the null string
+# not existing keys return the null string
 assert server.GetKey('matiasss') == ''

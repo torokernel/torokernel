@@ -62,7 +62,8 @@ begin
     fsdriver := GetKernelParam(0);
     blkdriver := GetKernelParam(1);
     DedicateBlockDriver(blkdriver, 0);
-    SysMount(fsdriver, blkdriver, 0);
+    if not SysMount(fsdriver, blkdriver, 0) then
+      Exit;
   end;
   test := 0;
   if SysOpenFile('/1kfile', O_RDONLY) = 0 then

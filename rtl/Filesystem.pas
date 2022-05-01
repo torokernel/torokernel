@@ -141,7 +141,7 @@ procedure RegisterFilesystem (Driver: PFileSystemDriver);
 procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 procedure DedicateBlockFile(FBlock: PFileBlock;CPUID: LongInt);
 procedure SysCloseFile(FileHandle: THandle);
-procedure SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt);
+function SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt): LongInt;
 function SysOpenFile(Path: PXChar; Flags: Longint): THandle;
 function SysCreateDir(Path: PXChar): Longint;
 function SysSeekFile(FileHandle: THandle; Offset, Whence: LongInt): LongInt;
@@ -382,13 +382,14 @@ begin
   end;
 end;
 
-procedure SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt);
+function SysMount(const FileSystemName, BlockName: PXChar; const Minor: LongInt): LongInt;
 var
   FileBlock: PFileBlock;
   FileSystem: PFileSystemDriver;
   Storage: PStorage;
   SuperBlock: PSuperBlock;
 begin
+  Result := 0;
   Storage := @Storages[GetApicID];
   FileSystem := FindFileSystemDriver(Storage, FileSystemName, BlockName, Minor, FileBlock);
   if FileSystem = nil then
@@ -422,6 +423,7 @@ begin
   end;
   {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
   WriteConsoleF('SysMount: Filesystem mounted on CPU#%d\n', [GetApicID]);
+  Result := 1;
 end;
 
 function NameI(Path: PXChar): PInode;

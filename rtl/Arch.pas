@@ -2,7 +2,7 @@
 // Arch.pas
 //
 // This units contains the the code that is platform-dependent.
-// 
+//
 // Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
@@ -506,12 +506,15 @@ end;
 
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
 asm
+    cmp CPU_COUNT, 0
+    je @break
   @spin:
     mov rax, cmpval
-    {$IFDEF LINUX} lock cmpxchg [rdx], rsi {$ENDIF}
-    {$IFDEF WINDOWS} lock cmpxchg [r8], rdx {$ENDIF}
+    {$IFDEF LINUX} cmpxchg [rdx], rsi {$ENDIF}
+    {$IFDEF WINDOWS} cmpxchg [r8], rdx {$ENDIF}
     pause
     jnz @spin
+ @break:
 end;
 
 function GetApicID: Byte; inline;
@@ -558,7 +561,7 @@ var
  vector: ^DWORD;
 begin
   vector := Pointer(lint1_reg);
-  // lint1 triggers vector 2 as NMI (4) 
+  // lint1 triggers vector 2 as NMI (4)
   vector^ := 2 or (4 shl 8);
 end;
 

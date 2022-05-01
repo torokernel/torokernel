@@ -270,7 +270,7 @@ begin
 end;
 
 // Inform the Kernel that a new Packet has arrived
-// Disable interruption to prevent concurrent access
+// This procedure is not interruption-safe so caller needs to disable interruptions
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
   PacketQueue: PPacket;

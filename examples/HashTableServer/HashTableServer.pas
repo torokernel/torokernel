@@ -18,7 +18,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program StaticWebServer;
+program HashTableServer;
 
 {$IFDEF FPC}
  {$mode delphi}

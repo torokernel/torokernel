@@ -7,13 +7,17 @@ If you want to enable some debug symbols in the unit **Process** and check what 
 ```bash
 ../CloudIt.sh HelloWorld "-dEnableDebug -dDebugProcess"
 ```
-You will see how toro initializes the unit by first calling the scheduler.
+You can open the file logs to see how toro initializes the unit by first calling the scheduler. Note that debugging always require to have a virtio-console device.
 
-To debug Toro by using the GDBstub built-in and gdb, first execute:
-```bash 
-../CloudIt.sh HelloWorld "-gl -dUseGDBstub" "-device virtio-serial-device,id=virtio-serial0 -chardev socket,host=0.0.0.0,port=1234,server=on,wait=on,id=charconsole0 -device virtconsole,chardev=charconsole0,id=console0"
+To debug Toro by using the GDBstub built-in and gdb, first edit qemu.args and modifiy the followingline:
+```bash
+-chardev socket,host=0.0.0.0,port=1234,server=on,wait=on,id=charconsole0
 ```
-Second, execute gdb by doing:
+Then, execute:
+```bash 
+../CloudIt.sh HelloWorld "-gl -dUseGDBstub"
+```
+Finally, execute gdb by doing:
 ```bash
 gdb HelloWorld -ex 'set arch i386:x86-64' -ex 'target remote localhost:1234'
 ```
@@ -30,6 +34,5 @@ It is possible to shutdown an instance of Toro by using a NMI exception. To do t
 ../CloudIt.sh HelloWorld "-dShutdownWhenFinished"
 ```
 Then from Qemu Monitor, execute the **nmi** command to shutdown the instance. It is also possible to define a shutdown procedure which will be invoked after the NMI is catched and before the system is shutdown. Check the source code of HelloWorld.pas to see how to register this procedure.   
- 
 ## Windows Users
 Windows' users should open **HelloWorld.lpi** and launch compilation and execution from the IDE by doing first **Compile** and then **Run**.

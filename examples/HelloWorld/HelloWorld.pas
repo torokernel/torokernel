@@ -49,5 +49,4 @@ end;
 begin
   ShutdownProcedure := ShutdownHelloWorld;
   WriteConsoleF('Hello World, I am TORO !!!\n',[]);
-  While True do hlt;
 end.

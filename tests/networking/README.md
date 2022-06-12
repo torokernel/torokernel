@@ -15,11 +15,11 @@ Finally, launch the test:
 ./TestNetworking.sh
 ```
 ## Server Test connection
-The Server Test creates a sockets that listens in the guest and wait a connection from the host. The app in the host sends chunks with different seizes to the server and the server sends it back to the app. The tests fails in the app if the connection is broken or the data has been corrupted during the retransmission. To launch the test, first modify `TestNetworking.sh` by adding `server` to the append command:
+The Server Test creates a sockets that listens in the guest and waits a connection from the host. The app in the host sends chunks with different seizes to the server and the server sends it back to the app. The tests fail in the app if the connection is broken or the data has been corrupted during the retransmission. To launch the test, first modify `TestNetworking.sh` by adding `server` to the append command:
 ```bash
 -append virtiovsocket,server
 ```
-Finally, launch the test:
+Finally, launch the test by setting the CID of the guest, e.g., 5, and the port, e.g., 80:
 ```bash
 sudo python3 ./testnetworking.py 5 80 server
 ```

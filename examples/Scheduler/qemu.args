@@ -1,0 +1,1 @@
+-enable-kvm -M microvm,pic=off,pit=off,rtc=off -no-reboot -cpu host -smp 2 -nographic -d guest_errors -D qemu.log -global virtio-mmio.force-legacy=false -no-acpi

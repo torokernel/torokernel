@@ -244,11 +244,12 @@ begin
   else
   begin
     netdriver := GetKernelParam(0);
-    DedicateNetworkSocket(netdriver); 
+    DedicateNetworkSocket(netdriver);
     fsdriver := GetKernelParam(1);
     blkdriver := GetKernelParam(2);
     DedicateBlockDriver(blkdriver, 0);
-    SysMount(fsdriver, blkdriver, 0);
+    if not SysMount(fsdriver, blkdriver, 0) then
+      Exit;
     if StrCmp(GetKernelParam(3), 'noconsole', strlen('noconsole')) then
       HeadLess := True;
   end;

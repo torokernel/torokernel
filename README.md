@@ -19,21 +19,23 @@ You can quickly get a first taste of ToroMicroVM by running the HelloWorld examp
 ```bash
 wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile
 sudo docker build -t torokernel-dev .
-sudo docker run --privileged -it torokernel-dev
+sudo docker run --privileged --rm -it torokernel-dev
 cd examples/HelloWorld
 ../CloudIt.sh HelloWorld
 ```
-These commands require to have installed KVM and Docker. If these commands execute successfully, you will get the output of the HelloWorld example.
+These commands require to have installed KVM and Docker. If these commands execute successfully, you will get the output of the HelloWorld example. You can also pull the image from dockerhub instead of building it:
+```bash
+sudo docker pull torokernel/toro-kernel-dev-debian-10
+sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-10
+```
 
 ## How build ToroMicroVM locally?
-
 ### Step 1. Install Freepascal 3.2.0
 ```bash
 wget https://sourceforge.net/projects/lazarus/files/Lazarus%20Linux%20amd64%20DEB/Lazarus%202.0.10/fpc-laz_3.2.0-1_amd64.deb/download
 mv download fpc-laz_3.2.0-1_amd64.deb
 apt install ./fpc-laz_3.2.0-1_amd64.deb -y
 ```
-
 ### Step 2. Build Qemu-KVM (qemu 5.2.50 or #51204c2f)
 ```bash
 apt-get update
@@ -50,12 +52,10 @@ cd build
 ../configure --target-list=x86_64-softmmu
 make
 ```
-
 ### Step 3. Get ToroMicroVM
 ```bash
 git clone https://github.com/torokernel/torokernel.git
 ```
-
 ### Step 4. Get the RTL for ToroMicroVM
 ```bash
 git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
@@ -100,7 +100,6 @@ Replace `source` with the directory to serve. Finally, launch the static webserv
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/staticwebser.gif)
 
 ## Building Toro in Windows by using Lazarus
-
 First you have to follow [this](https://github.com/torokernel/torokernel/wiki/How-to-get-a-Crosscompiler-of-Freepascal-for-a-Windows-host-and-Linux-target) tutorial to get a FPC cross-compiler from Windows to Linux.  Then, you have to execute the following script which compiles the RTL for Toro and outputs the generated files in the *x86_64-linux* directory. Note that this script overwrites the RTL for Linux, which is used when the *-TLinux* parameter is passed. This script requires three paths to set up:
 
 1.  *fpcrtlsource*, which is the path to the repository from https://github.com/torokernel/freepascal
@@ -120,7 +119,6 @@ $fpcbinlinux/ppcx64.exe -Us -TLinux -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I
 Then, you have to go to Lazarus and open the project **HelloWorld.lpi**. You are able to compile the project from compile.
 
 ## Create your own distributed filesystem with CephFS
-
 To create a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
 
 ## Contributing

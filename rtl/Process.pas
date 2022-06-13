@@ -119,7 +119,7 @@ var
 
 implementation
 
-uses 
+uses
   Console, Memory, lnfodwrfToro;
 
 {$MACRO ON}
@@ -1150,7 +1150,7 @@ begin
       end else
         Candidate := Candidate.Next;
     until Candidate = LastThread;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d, PollingThreadCount: %d, PollingThreadTotal: %d\n', [Candidate.state, CurrentCPU.PollingThreadCount, CurrentCPU.PollingThreadTotal]); {$ENDIF}
+    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d\n', [Candidate.state]); {$ENDIF}
     if Candidate.state <> tsReady then
       Continue;
     CurrentCPU.CurrentThread := Candidate;

@@ -18,7 +18,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program StaticWebServer;
+program HashTableServer;
 
 {$IFDEF FPC}
  {$mode delphi}
@@ -42,10 +42,40 @@ const
   HeaderOK = 'HTTP/1.0 200'#13#10'Content-type: ';
   ContentLen = #13#10'Content-length: ';
   ContentOK = #13#10'Connection: close'#13#10 + 'Server: ToroMicroserver'#13#10''#13#10;
-  HeaderNotFound = 'HTTP/1.0 404'#13#10;
+  HeaderNotFound = 'HTTP/1.1 404'#13#10;
   SERVICE_TIMEOUT = 1000;
   Max_Path_Len = 400;
   MAX_IDX_IN_HASH = 10000;
+  Index = '<!doctype html>'#10 +
+          '<html>'#10 +
+          '<head>'#10 +
+          '<title>Welcome to hashtable.torokernel.io!</title>'#10 +
+          '</head>'#10 +
+
+          '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/styles/agate.min.css">'#10 +
+          '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>'#10 +
+          '<script src="https://unpkg.com/@highlightjs/cdn-assets@11.5.1/languages/python.min.js"></script>'#10 +
+          '<script>hljs.highlightAll();</script>'#10 +
+          '<body>'#10 +
+          '<h1>Hashtable in Toro unikernel</h1>'#10 +
+          '<p>This is a simple hashtable that you can access by using the GET method. We strongly recommend you to use the Python class <a href="https://github.com/torokernel/torokernel/blob/master/examples/HashTableServer/HashTableClient.py">here</a></p>'#10 +
+          '<pre><code class="language-python">'#10 +
+          'from HashTableClient import HashServer'#10 +
+          'import random'#10 +
+          #10 +
+          'URL = "http://hashtable.torokernel.io/"'#10 +
+          'server = HashServer(URL)'#10 +
+          #10 +
+          'key = "toro"'#10 +
+          'value = "kernel"'#10 +
+          #10 +
+          'server.SetKey(key, value)'#10 +
+          'assert server.GetKey(key) == value'#10 +
+          '</code></pre>'#10 +
+          '<p>We have already <strong>'#0;
+
+ Index2 = '</strong> keys stored.</p>'#10'</body>'#10 +
+           '</html>'#10#0;
 
 type
   PRequest = ^TRequest;
@@ -60,6 +90,7 @@ var
   tid: TThreadID;
   rq: PRequest;
   netdriver: PChar;
+  nrkeys: LongInt;
 
 function GetRequest(Socket: PSocket): Boolean;
 var
@@ -174,6 +205,7 @@ begin
   if Hash[idx] <> nil then
    ToroFreeMem(Hash[idx]);
   Hash[idx] := buff;
+  Inc(nrkeys);
 end;
 
 // Content must free by caller
@@ -181,6 +213,7 @@ function GetHashContent(entry: pchar; var Content: pchar): LongInt;
 var
   len: LongInt;
   Buf, Key, Value: Pchar;
+  snrkeys: array[0..10] of char;
   tmp: THandle;
 begin
   Content := nil;
@@ -200,6 +233,16 @@ begin
   end;
   Key := entry;
   Inc(Key);
+  if Key^ = #0 then
+  begin
+    InttoStr(nrkeys, @snrkeys[0]);
+    len := strlen(Index) + strlen(Index2) + strlen(@snrkeys[0]);
+    Content := ToroGetMem(len+1);
+    StrConcat(Index, @snrkeys[0], Content);
+    StrConcat(Content, Index2, Content);
+    Result := len;
+    Exit;
+  end;
   if (Value = Nil) or (Value^ = #0) then
   begin
     Buf := GetKey(Key);
@@ -275,6 +318,7 @@ begin
   HttpServer.Blocking := True;
   SysSocketListen(HttpServer, 50);
   WriteConsoleF('\t HashTableServer: listening ...\n', []);
+  nrkeys := 0;
   while true do
   begin
     HttpClient := SysSocketAccept(HttpServer);

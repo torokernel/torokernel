@@ -1,9 +1,9 @@
 //
-// Hello World Example
+// Scheduler Example
 //
-// Clasical example using a minimal kernel to print "Hello World".
+// This example shows the use of the multicore scheduler.
 //
-// Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program HelloWorld;
+program Scheduler;
 
 {$IFDEF FPC}
  {$mode delphi}
@@ -46,7 +46,21 @@ begin
   // do something
 end;
 
+function Thread(param: Pointer): PtrInt;
+begin
+  //while true do
+  //begin
+    WriteConsoleF('Hello from %d at %d\n', [PtrUInt(param), GetApicId]);
+    //ThreadSwitch;
+  //end;
+end;
+var
+  tmp: TThreadId;
 begin
   ShutdownProcedure := ShutdownHelloWorld;
-  WriteConsoleF('Hello World, I am TORO !!!\n',[]);
+  WriteConsoleF('Starting threads ...\n',[]);
+  tmp := BeginThread(nil, 4096, Thread, Pointer(0), 0, tmp);
+  tmp := BeginThread(nil, 4096, Thread, Pointer(1), 1, tmp);
+  //tmp := BeginThread(nil, 4096, Thread, Pointer(2), 2, tmp);
+  While True do ThreadSwitch;
 end.

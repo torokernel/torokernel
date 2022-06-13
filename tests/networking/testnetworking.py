@@ -2,7 +2,7 @@
 #
 # testnetworking.py
 #
-# This script tests networking by relying on two modes: as a client
+# This script tests the networking stack by relying on two modes: as a client
 # and as a server.
 #
 # Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
@@ -69,7 +69,7 @@ def test_client(port):
     conn.close()
 
 if len(sys.argv) < 4:
-    print("usage: testnetwork.py [cid] [port] [mode]")
+    print("usage: testnetwork.py [cid] [port] [server|client]")
     exit(1)
 
 cid = int(sys.argv[1])

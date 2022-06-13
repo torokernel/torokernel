@@ -62,7 +62,7 @@ begin
   HttpClient.Blocking := True;
   if SysSocketConnect(HttpClient) then
   begin
-    // generate a secuence of numbers
+    // generate a sequence of numbers
     for i := 0 to sizeof(buf)-1 do
       buf[i] := i;
     SysSocketSend(HttpClient, @buf[0], sizeof(buf), 0);
@@ -73,7 +73,7 @@ begin
       total := SysSocketRecv(HttpClient, @buf[0], sizeof(buf), 0);
     end;
     SysSocketClose(HttpClient);
-    // check if the secuence is correctly received
+    // check if the sequence is correctly received
     for i:= 0 to sizeof(buf)-1 do
       if buf[i] <> i Then
         Exit;
@@ -82,7 +82,6 @@ begin
 end;
 
 begin
-  // TODO: add a server and client mode
   netdriver := GetKernelParam(0);
   mode := GetKernelParam(1);
   DedicateNetworkSocket(netdriver);

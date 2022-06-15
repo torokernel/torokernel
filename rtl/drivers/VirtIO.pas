@@ -37,7 +37,7 @@ uses
 type
   PVirtIOMMIODevice = ^TVirtIOMMIODevice;
   PVirtQueue = ^TVirtQueue;
- 
+
   TVirtIOMMIODevice = record
     Base: QWord;
     Irq: byte;
@@ -87,11 +87,11 @@ type
     buffers: PQueueBuffer;
     available: PVirtIOAvailable;
     used: PVirtIOUsed;
+    last_desc_index: word;
     last_used_index: word;
     last_available_index: word;
     buffer: PByte;
     chunk_size: dword;
-    next_buffer: word;
     lock: QWord;
     VqHandler: Procedure(Vq: PVirtQueue);
     Next: PVirtQueue
@@ -156,7 +156,7 @@ function LookForChar(p1: PChar; c: Char): PChar;
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;
   VirtIOMMIODevicesCount: LongInt = 0;
- 
+
 implementation
 
 {$MACRO ON}
@@ -188,7 +188,7 @@ begin
   end;
   if p1^ = Char(0) then
     Exit;
-  Result := p1; 
+  Result := p1;
 end;
 
 function HexStrtoQWord(start, last: PChar): QWord;
@@ -208,7 +208,7 @@ begin
     else if (bt >= Byte('a')) and (bt <= Byte('f')) then
       bt := bt - Byte('a') + 10
     else if (bt >= Byte('A')) and (bt <= Byte('F')) then
-      bt := bt - Byte('A') + 10; 
+      bt := bt - Byte('A') + 10;
     Base := (Base shl 4) or (bt and $F);
   end;
   Result := Base;
@@ -297,7 +297,7 @@ begin
   vq := Queue;
 
   index := vq.available.index mod vq.queue_size;
-  buffer_index := vq.next_buffer;
+  buffer_index := vq.last_desc_index;
   vq.available.rings[index] := buffer_index;
   buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
 
@@ -327,7 +327,7 @@ begin
   end;
 
   ReadWriteBarrier;
-  vq.next_buffer := buffer_index;
+  vq.last_desc_index := buffer_index;
   vq.available.index:= vq.available.index + 1;
 
   // notification are not needed
@@ -389,7 +389,7 @@ begin
 
   // 4 bytes aligned
   Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable + $0FFF) and not($0FFF))]);
-  Queue.next_buffer := 0;
+  Queue.last_desc_index := 0;
   Queue.lock := 0;
 
   AddrLow := Pointer(Base + MMIO_DESCLOW);
@@ -443,7 +443,7 @@ var
   Base: QWord;
   Irq: Byte;
 begin
-  for j:= 1 to KernelParamCount do 
+  for j:= 1 to KernelParamCount do
   begin
     if startsWith (GetKernelParam(j), 'virtio_mmio') then
     begin
@@ -485,10 +485,10 @@ begin
       vqs := VirtIOMMIODevices[j].Vqs;
       while vqs <> nil do
       begin
-	if @vqs.VqHandler <> nil then
+	    if @vqs.VqHandler <> nil then
           VirtIOProcessQueue(vqs);
-        vqs := vqs.Next; 
-      end; 
+        vqs := vqs.Next;
+      end;
       SetIntACK(VirtIOMMIODevices[j].Base, r);
     end;
   end;

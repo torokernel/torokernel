@@ -89,11 +89,11 @@ begin
   bi.flags := 0;
   bi.copy := true;
   Inc(vq.last_used_index);
-  VirtIOSendBuffer(VirtIOConsoleDev.Base, TX_QUEUE, vq, @bi, 1);
-  
+  VirtIOAddBuffer(VirtIOConsoleDev.Base, TX_QUEUE, vq, @bi, 1);
+
   while (vq.last_used_index <> vq.used.index) do
     ReadWriteBarrier;
-  
+
   index := vq.last_used_index;
   norm_index := index mod vq.queue_size;
   buffer_index := vq.used.rings[norm_index].index;
@@ -129,7 +129,7 @@ begin
         ReadWriteBarrier;
       index := vq.last_used_index mod vq.queue_size;
       buffer_index := vq.used.rings[index].index;
-      
+
       buf := vq.buffers;
       Inc(buf, buffer_index);
 
@@ -138,7 +138,7 @@ begin
       if CurrentPacket <> nil then
         ToroFreeMem(CurrentPacket);
       Packet := ToroGetMem(PacketSize+SizeOf(TPacket));
-   
+
       if (Packet <> nil) then
       begin
         Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
@@ -149,17 +149,17 @@ begin
         Data := Packet.data;
         for I := 0 to PacketSize-1 do
           Data^[I] := P^[I];
-      end; 
-      
+      end;
+
       // return the buffer
       bi.size := VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE;
       bi.buffer := Pointer(buf.address);
       bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
       bi.copy := false;
 
-      VirtIOSendBuffer(VirtIOConsoleDev.Base, RX_QUEUE, vq, @bi, 1);
+      VirtIOAddBuffer(VirtIOConsoleDev.Base, RX_QUEUE, vq, @bi, 1);
       ReadWriteBarrier;
-      
+
       Inc(vq.last_used_index);
       CurrentPacket := Packet;
       offset := 0;
@@ -176,8 +176,8 @@ begin
       Inc(M);
     end;
     Inc(offset, count);
-    Dec(Len, count); 
-  end;  
+    Dec(Len, count);
+  end;
   ReadLockConsole := 3;
 end;
 
@@ -188,7 +188,7 @@ begin
   Result := False;
   VirtIOConsoleDev.IRQ := Device.Irq;
   VirtIOConsoleDev.Base := Device.Base;
- 
+
   if not VirtIOInitQueue(VirtIOConsoleDev.Base, RX_QUEUE, @VirtIOConsoleDev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE) then
   begin
     WriteConsoleF('VirtIOConsole: RX_QUEUE has not been initializated\n', []);
@@ -211,11 +211,11 @@ begin
   tx.chunk_size := VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE;
 
   Device.Vqs := @VirtIOConsoleDev.VirtQueues[RX_QUEUE];
-  VirtIOConsoleDev.VirtQueues[RX_QUEUE].VqHandler := nil; 
+  VirtIOConsoleDev.VirtQueues[RX_QUEUE].VqHandler := nil;
   VirtIOConsoleDev.VirtQueues[TX_QUEUE].VqHandler := nil;
   VirtIOConsoleDev.VirtQueues[RX_QUEUE].Next := @VirtIOConsoleDev.VirtQueues[TX_QUEUE];
-  VirtIOConsoleDev.VirtQueues[TX_QUEUE].Next := nil; 
- 
+  VirtIOConsoleDev.VirtQueues[TX_QUEUE].Next := nil;
+
   WriteConsoleF('VirtIOConsole: Initiated\n', []);
 
   Result := True;
@@ -223,5 +223,5 @@ end;
 
 
 initialization
-  InitVirtIODriver(VIRTIO_ID_CONSOLE, @InitVirtIOConsole); 
+  InitVirtIODriver(VIRTIO_ID_CONSOLE, @InitVirtIOConsole);
 end.

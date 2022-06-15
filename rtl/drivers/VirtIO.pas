@@ -148,7 +148,7 @@ function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
 function LookForChar(p1: PChar; c: Char): PChar;
@@ -284,7 +284,7 @@ begin
   GuestFeatures^ := Value;
 end;
 
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
   vq: PVirtQueue;
@@ -425,7 +425,7 @@ begin
     bi.copy := True;
     for j := 0 to Queue.queue_size - 1 do
     begin
-      VirtIOSendBuffer(Base, QueueId, Queue, @bi, 1);
+      VirtIOAddBuffer(Base, QueueId, Queue, @bi, 1);
     end;
   end;
 

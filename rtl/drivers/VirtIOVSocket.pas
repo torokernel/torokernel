@@ -78,7 +78,7 @@ begin
   norm_index := index mod vq.queue_size;
   buffer_index := vq.used.rings[norm_index].index;
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-  
+
   // mark buffer as free
   tmp.length:= 0;
 
@@ -128,7 +128,7 @@ begin
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy := false;
 
-    VirtIOSendBuffer(VirtIOVSocketDev.Base, RX_QUEUE, vq, @bi, 1);
+    VirtIOAddBuffer(VirtIOVSocketDev.Base, RX_QUEUE, vq, @bi, 1);
     ReadWriteBarrier;
 end;
 
@@ -151,7 +151,7 @@ begin
 
   Net.OutgoingPackets := Packet;
   // TODO: Remove the use of VirtIOVSocketDev
-  VirtIOSendBuffer(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
+  VirtIOAddBuffer(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
   DequeueOutgoingPacket;
   RestoreInt;
 end;
@@ -193,12 +193,12 @@ begin
   tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
 
   Device.Vqs := @VirtIOVSocketDev.VirtQueues[RX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue; 
+  VirtIOVSocketDev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue;
   VirtIOVSocketDev.VirtQueues[TX_QUEUE].VqHandler := @VirtIOProcessTxQueue;
 
   VirtIOVSocketDev.VirtQueues[RX_QUEUE].Next := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[TX_QUEUE].Next := nil; 
-  
+  VirtIOVSocketDev.VirtQueues[TX_QUEUE].Next := nil;
+
   Net := @VirtIOVSocketDev.Driverinterface;
   Net.Name := 'virtiovsocket';
   Net.start := @VirtIOVSocketStart;
@@ -209,5 +209,5 @@ begin
 end;
 
 initialization
- InitVirtIODriver(VIRTIO_ID_VSOCKET, @InitVirtIOVSocket); 
+ InitVirtIODriver(VIRTIO_ID_VSOCKET, @InitVirtIOVSocket);
 end.

@@ -90,6 +90,7 @@ type
     last_desc_index: word;
     last_used_index: word;
     last_available_index: word;
+    free_nr_desc: word;
     buffer: PByte;
     chunk_size: dword;
     lock: QWord;
@@ -284,6 +285,7 @@ begin
   GuestFeatures^ := Value;
 end;
 
+// Add a buffer desc to the avail ring
 procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
@@ -298,6 +300,10 @@ begin
 
   index := vq.available.index mod vq.queue_size;
   buffer_index := vq.last_desc_index;
+
+  Panic(vq.free_nr_desc = 0, 'VirtIO: We ran out of desc', []);
+  Dec(vq.free_nr_desc);
+
   vq.available.rings[index] := buffer_index;
   buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
 
@@ -363,7 +369,9 @@ begin
     QueueSize := QueueLen;
   if QueueSize = 0 then
     Exit;
+
   Queue.queue_size := QueueSize;
+  Queue.free_nr_desc := QueueSize;
 
   // set queue size
   QueueNum := Pointer (Base + MMIO_QUEUENUM);

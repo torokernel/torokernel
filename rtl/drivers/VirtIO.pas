@@ -153,6 +153,7 @@ procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
 function LookForChar(p1: PChar; c: Char): PChar;
+function VirtIOGetBuffer(Queue: PVirtQueue): Word;
 
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;
@@ -283,6 +284,16 @@ var
 begin
   GuestFeatures := Pointer(Base + MMIO_GUESTFEATURES);
   GuestFeatures^ := Value;
+end;
+
+// Get a buffer desc from the used ring
+function VirtIOGetBuffer(Queue: PVirtQueue): Word;
+begin
+  // TODO: add vq.last_used_index <> vq.used.index
+  Panic (Queue.free_nr_desc = Queue.queue_size, 'VirtIO: Getting too many desc', []);
+  Result := Queue.last_used_index mod Queue.queue_size;
+  Inc(Queue.free_nr_desc);
+  Inc(Queue.last_used_index);
 end;
 
 // Add a buffer desc to the avail ring
@@ -476,7 +487,6 @@ begin
   begin
     // invoke callback handler
     vq.VqHandler(vq);
-    Inc(vq.last_used_index);
   end;
 end;
 

@@ -69,14 +69,13 @@ implementation
 
 procedure VirtIOProcessTxQueue(vq: PVirtQueue);
 var
-  index, norm_index, buffer_index: Word;
+  index, buffer_index: Word;
   tmp: PQueueBuffer;
 begin
   UpdateLastIrq;
-  index := vq.last_used_index;
+  index := VirtIOGetBuffer(vq);
 
-  norm_index := index mod vq.queue_size;
-  buffer_index := vq.used.rings[norm_index].index;
+  buffer_index := vq.used.rings[index].index;
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
 
   // mark buffer as free
@@ -92,13 +91,13 @@ type
 procedure VirtIOProcessRxQueue(vq: PVirtQueue);
 var
   Packet: PPacket;
-  index, buffer_index, Len, I: dword;
+  index, buffer_index, Len, I: word;
   Data, P: PByteArray;
   buf: PQueueBuffer;
   bi: TBufferInfo;
 begin
    UpdateLastIrq;
-   index := vq.last_used_index mod vq.queue_size;
+   index := VirtIOGetBuffer(vq);
    buffer_index := vq.used.rings[index].index;
 
    buf := vq.buffers;

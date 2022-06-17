@@ -597,14 +597,13 @@ end;
 // Callback to handle interruptions on vqs
 procedure VirtIOProcessQueue(vq: PVirtQueue);
 var
-  index, norm_index, buffer_index: Word;
+  index, buffer_index: Word;
   QueueBuffer: PQueueBuffer;
   InHeader: ^TFuseInHeader;
   p: ^Boolean;
 begin
-  index := vq.last_used_index;
-  norm_index := index mod vq.queue_size;
-  buffer_index := vq.used.rings[norm_index].index;
+  index := VirtIOGetBuffer(vq);
+  buffer_index := vq.used.rings[index].index;
   QueueBuffer := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
   InHeader := Pointer(QueueBuffer.address);
   p := Pointer(InHeader.unique);

@@ -154,6 +154,8 @@ procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
 function LookForChar(p1: PChar; c: Char): PChar;
 function VirtIOGetBuffer(Queue: PVirtQueue): Word;
+function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
+procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
 
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;
@@ -294,6 +296,32 @@ begin
   Result := Queue.last_used_index mod Queue.queue_size;
   Inc(Queue.free_nr_desc);
   Inc(Queue.last_used_index);
+end;
+
+// Get a buffer desc from the avail ring
+function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
+var
+  index: WORD;
+begin
+  Result := nil;
+  if Queue.last_available_index = Queue.available.index then
+    Exit;
+  index := Queue.last_available_index mod Queue.queue_size;
+  buffer_index := Queue.available.rings[index];
+  Result := Pointer(PtrUInt(Queue.buffers) + buffer_index * sizeof(TQueueBuffer));
+  Inc(Queue.last_available_index);
+end;
+
+// Add a buffer desc to the used ring
+// This procedure requires to notify the consumer of this vq
+procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
+var
+  index: WORD;
+begin
+  index := Queue.used.index mod Queue.queue_size;
+  Queue.used.rings[index].index := buffer_index;
+  Queue.used.rings[index].length := Len;
+  Inc(Queue.used.index);
 end;
 
 // Add a buffer desc to the avail ring

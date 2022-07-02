@@ -100,6 +100,7 @@ begin
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
   // mark buffer as free
   tmp.length:= 0;
+  Inc(vq.free_nr_desc);
   ReadWriteBarrier;
   WriteLockConsole := 3;
 end;

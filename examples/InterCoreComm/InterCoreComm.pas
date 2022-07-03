@@ -34,16 +34,15 @@ uses
  Debug,
  Arch,
  Filesystem,
- {$IFDEF UseGDBstub}VirtIO,{$ENDIF}
  Network,
- {$IFDEF UseGDBstub}VirtIOConsole,
+ VirtIO,
+ {$IFDEF UseGDBstub}
+ VirtIOConsole,
  Gdbstub,
  {$ENDIF}
- VirtIO,
  VirtIOBus,
  Console;
 
-{$asmmode intel}
 var
  ping: PChar = 'ping'#0;
  pong: PChar = 'pong'#0;
@@ -61,7 +60,7 @@ begin
     RecvFrom(id, @buff[0]);
     WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [id, GetApicId, PtrUInt(@buff[0])]);
     SendTo(id, pong, strlen(pong)+1);
- end;
+  end;
 end;
 
 begin

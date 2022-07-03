@@ -133,6 +133,7 @@ begin
 
       buf := vq.buffers;
       Inc(buf, buffer_index);
+      Inc(vq.free_nr_desc);
 
       P := Pointer(buf.address);
       PacketSize := vq.used.rings[index].length;

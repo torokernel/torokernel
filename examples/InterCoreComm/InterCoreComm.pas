@@ -53,22 +53,28 @@ var
 function Thread(param: Pointer): PtrInt;
 var
   buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  id: DWORD;
 begin
+  id := PtrUInt(param);
   while true do
   begin
-    RecvFrom(0, @buff[0]);
-    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [0, GetApicId, PtrUInt(@buff[0])]);
-    SendTo(0, pong, strlen(pong)+1);
+    RecvFrom(id, @buff[0]);
+    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [id, GetApicId, PtrUInt(@buff[0])]);
+    SendTo(id, pong, strlen(pong)+1);
  end;
 end;
 
 begin
- tmp := BeginThread(nil, 4096, Thread, Nil, 1, tmp);
+ tmp := BeginThread(nil, 4096, Thread, Pointer(0), 1, tmp);
+ tmp := BeginThread(nil, 4096, Thread, Pointer(0), 2, tmp);
  ThreadSwitch;
  while True do
  begin
    SendTo(1, ping, strlen(ping)+1);
    RecvFrom(1, @buff[0]);
    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [1, GetApicId, PtrUInt(@buff[0])]);
+   SendTo(2, ping, strlen(ping)+1);
+   RecvFrom(2, @buff[0]);
+   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [2, GetApicId, PtrUInt(@buff[0])]);
  end;
 end.

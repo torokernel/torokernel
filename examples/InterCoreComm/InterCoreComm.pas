@@ -1,5 +1,5 @@
 //
-// Inter-core communication example by using VirtIO
+// Inter-core communication by using VirtIO
 //
 // This example shows the use of VirtIO to communicate cores.
 //
@@ -48,29 +48,27 @@ var
  ping: PChar = 'ping'#0;
  pong: PChar = 'pong'#0;
  tmp: TThreadId;
- buff: pointer;
+ buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
 
 function Thread(param: Pointer): PtrInt;
 var
-  buff: pointer;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
 begin
   while true do
   begin
-    RecvFrom(0, buff);
+    RecvFrom(0, @buff[0]);
+    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [0, GetApicId, PtrUInt(@buff[0])]);
     SendTo(0, pong, strlen(pong)+1);
  end;
 end;
 
 begin
-
  tmp := BeginThread(nil, 4096, Thread, Nil, 1, tmp);
-
  ThreadSwitch;
  while True do
  begin
    SendTo(1, ping, strlen(ping)+1);
-   RecvFrom(1, buff);
+   RecvFrom(1, @buff[0]);
+   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [1, GetApicId, PtrUInt(@buff[0])]);
  end;
-
- while true do;
 end.

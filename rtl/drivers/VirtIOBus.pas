@@ -38,6 +38,7 @@ uses
 const
   VIRTIO_CPU_MAX_PKT_BUF_SIZE = 1024;
   QUEUE_LEN = 10;
+  RX_QUEUE = 0;
 
 type
   TVirtIOCPU = record
@@ -198,7 +199,7 @@ begin
     begin
       if rxi = cpu then
         Continue;
-      if VirtIOInitQueue(PtrUInt(mmioconf), 0, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE) then
+      if VirtIOInitQueue(PtrUInt(mmioconf), RX_QUEUE, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE) then
       begin
         WriteConsoleF('VirtIOBus: Core[%d]->Core[%d] queue has been initiated\n', [rxi, cpu]);
       end;

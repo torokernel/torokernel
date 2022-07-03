@@ -83,6 +83,7 @@ type
   end;
 
   TVirtQueue = record
+    index: WORD;
     queue_size: WORD;
     buffers: PQueueBuffer;
     available: PVirtIOAvailable;
@@ -149,7 +150,7 @@ function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
-procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
 function LookForChar(p1: PChar; c: Char): PChar;
@@ -325,7 +326,7 @@ begin
 end;
 
 // Add a buffer desc to the avail ring
-procedure VirtIOAddBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
   vq: PVirtQueue;
@@ -380,7 +381,7 @@ begin
   if (vq.used.flags and 1 <> 1) then
   begin
     QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
-    QueueNotify^ := queue_index;
+    QueueNotify^ := vq.index;
   end;
 end;
 
@@ -400,6 +401,8 @@ begin
 
   QueueSel := Pointer(Base + MMIO_QUEUESEL);
   QueueSel^ := QueueId;
+  Queue.index := QueueId;
+
   ReadWriteBarrier;
 
   QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
@@ -472,7 +475,7 @@ begin
     bi.copy := True;
     for j := 0 to Queue.queue_size - 1 do
     begin
-      VirtIOAddBuffer(Base, QueueId, Queue, @bi, 1);
+      VirtIOAddBuffer(Base, Queue, @bi, 1);
     end;
   end;
 

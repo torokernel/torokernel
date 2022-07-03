@@ -37,7 +37,7 @@ uses
 
 const
   VIRTIO_CPU_MAX_PKT_BUF_SIZE = 1024;
-  QUEUE_LEN = 32;
+  QUEUE_LEN = 10;
 
 type
   TVirtIOCPU = record
@@ -91,7 +91,7 @@ begin
       bi.buffer := Pointer(buf.address);
       bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
       bi.copy := false;
-      VirtIOAddBuffer(PtrUInt(mmioconf), 0, @VirtIOCPUs[id].QueueRx[cpu], @bi, 1);
+      VirtIOAddBuffer(PtrUInt(mmioconf), @VirtIOCPUs[id].QueueRx[cpu], @bi, 1);
     end;
   end;
   eoi_apic;
@@ -178,7 +178,7 @@ begin
   bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
   bi.copy := false;
 
-  VirtIOAddBuffer(PtrUInt(mmioconf), 0, @VirtIOCPUs[id].QueueRx[core], @bi, 1);
+  VirtIOAddBuffer(PtrUInt(mmioconf), @VirtIOCPUs[id].QueueRx[core], @bi, 1);
 end;
 
 procedure InitVirtIOBus;
@@ -200,7 +200,7 @@ begin
         Continue;
       if VirtIOInitQueue(PtrUInt(mmioconf), 0, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE) then
       begin
-        WriteConsoleF('VirtIO: Core[%d]->Core[%d] queue has been initiated\n', [rxi, cpu]);
+        WriteConsoleF('VirtIOBus: Core[%d]->Core[%d] queue has been initiated\n', [rxi, cpu]);
       end;
     end;
   end;
@@ -222,7 +222,6 @@ begin
 
   // Capture inter-core irq in all cores
   CaptureInt(INTER_CORE_IRQ, @VirtIOInterIrqHandler);
-  WriteConsoleF('VirtIOBus: Initiated\n', []);
 end;
 
 initialization

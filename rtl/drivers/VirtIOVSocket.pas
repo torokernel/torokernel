@@ -127,7 +127,7 @@ begin
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy := false;
 
-    VirtIOAddBuffer(VirtIOVSocketDev.Base, RX_QUEUE, vq, @bi, 1);
+    VirtIOAddBuffer(VirtIOVSocketDev.Base, vq, @bi, 1);
     ReadWriteBarrier;
 end;
 
@@ -150,7 +150,7 @@ begin
 
   Net.OutgoingPackets := Packet;
   // TODO: Remove the use of VirtIOVSocketDev
-  VirtIOAddBuffer(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
+  VirtIOAddBuffer(VirtIOVSocketDev.Base, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
   DequeueOutgoingPacket;
   RestoreInt;
 end;

@@ -89,7 +89,7 @@ begin
   bi.flags := 0;
   bi.copy := true;
   Inc(vq.last_used_index);
-  VirtIOAddBuffer(VirtIOConsoleDev.Base, TX_QUEUE, vq, @bi, 1);
+  VirtIOAddBuffer(VirtIOConsoleDev.Base, vq, @bi, 1);
 
   while (vq.last_used_index <> vq.used.index) do
     ReadWriteBarrier;
@@ -158,7 +158,7 @@ begin
       bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
       bi.copy := false;
 
-      VirtIOAddBuffer(VirtIOConsoleDev.Base, RX_QUEUE, vq, @bi, 1);
+      VirtIOAddBuffer(VirtIOConsoleDev.Base, vq, @bi, 1);
       ReadWriteBarrier;
 
       Inc(vq.last_used_index);

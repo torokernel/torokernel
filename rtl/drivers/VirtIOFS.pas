@@ -293,7 +293,7 @@ begin
   SetBufferInfo(@BufferInfo[1], @ReleaseIn, sizeof(ReleaseIn), 0);
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
   while not Done do
     ReadWriteBarrier;
 
@@ -328,7 +328,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[3], @OpenOut, sizeof(OpenOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -378,7 +378,7 @@ begin
   SetBufferInfo(@BufferInfo[2], Pointer(Name), Len, 0);
   SetBufferInfo(@BufferInfo[3], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -416,7 +416,7 @@ begin
   SetBufferInfo(@BufferInfo[3], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[4], @WriteOut, sizeof(WriteOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
 
   while not Done do
     ReadWriteBarrier;
@@ -464,7 +464,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[3], Pointer(buffer), Count, VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -501,7 +501,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[3], @EntryOut, sizeof(EntryOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -533,7 +533,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[3], @GetAttrOut, sizeof(GetAttrOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;
@@ -578,7 +578,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
   SetBufferInfo(@BufferInfo[3], @InitOut, sizeof(InitOut), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
-  VirtIOAddBuffer(FsVirtio.Base, REQUEST_QUEUE, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
+  VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
   while not Done do
     ReadWriteBarrier;

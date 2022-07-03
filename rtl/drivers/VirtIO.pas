@@ -37,7 +37,7 @@ uses
 type
   PVirtIOMMIODevice = ^TVirtIOMMIODevice;
   PVirtQueue = ^TVirtQueue;
- 
+
   TVirtIOMMIODevice = record
     Base: QWord;
     Irq: byte;
@@ -83,15 +83,17 @@ type
   end;
 
   TVirtQueue = record
+    index: WORD;
     queue_size: WORD;
     buffers: PQueueBuffer;
     available: PVirtIOAvailable;
     used: PVirtIOUsed;
+    last_desc_index: word;
     last_used_index: word;
     last_available_index: word;
+    free_nr_desc: word;
     buffer: PByte;
     chunk_size: dword;
-    next_buffer: word;
     lock: QWord;
     VqHandler: Procedure(Vq: PVirtQueue);
     Next: PVirtQueue
@@ -148,15 +150,18 @@ function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
 function LookForChar(p1: PChar; c: Char): PChar;
+function VirtIOGetBuffer(Queue: PVirtQueue): Word;
+function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
+procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
 
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;
   VirtIOMMIODevicesCount: LongInt = 0;
- 
+
 implementation
 
 {$MACRO ON}
@@ -188,7 +193,7 @@ begin
   end;
   if p1^ = Char(0) then
     Exit;
-  Result := p1; 
+  Result := p1;
 end;
 
 function HexStrtoQWord(start, last: PChar): QWord;
@@ -208,7 +213,7 @@ begin
     else if (bt >= Byte('a')) and (bt <= Byte('f')) then
       bt := bt - Byte('a') + 10
     else if (bt >= Byte('A')) and (bt <= Byte('F')) then
-      bt := bt - Byte('A') + 10; 
+      bt := bt - Byte('A') + 10;
     Base := (Base shl 4) or (bt and $F);
   end;
   Result := Base;
@@ -284,7 +289,44 @@ begin
   GuestFeatures^ := Value;
 end;
 
-procedure VirtIOSendBuffer(Base: QWORD; queue_index: word; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
+// Get a buffer desc from the used ring
+function VirtIOGetBuffer(Queue: PVirtQueue): Word;
+begin
+  // TODO: add vq.last_used_index <> vq.used.index
+  Panic (Queue.free_nr_desc = Queue.queue_size, 'VirtIO: Getting too many desc', []);
+  Result := Queue.last_used_index mod Queue.queue_size;
+  Inc(Queue.free_nr_desc);
+  Inc(Queue.last_used_index);
+end;
+
+// Get a buffer desc from the avail ring
+function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
+var
+  index: WORD;
+begin
+  Result := nil;
+  if Queue.last_available_index = Queue.available.index then
+    Exit;
+  index := Queue.last_available_index mod Queue.queue_size;
+  buffer_index := Queue.available.rings[index];
+  Result := Pointer(PtrUInt(Queue.buffers) + buffer_index * sizeof(TQueueBuffer));
+  Inc(Queue.last_available_index);
+end;
+
+// Add a buffer desc to the used ring
+// This procedure requires to notify the consumer of this vq
+procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
+var
+  index: WORD;
+begin
+  index := Queue.used.index mod Queue.queue_size;
+  Queue.used.rings[index].index := buffer_index;
+  Queue.used.rings[index].length := Len;
+  Inc(Queue.used.index);
+end;
+
+// Add a buffer desc to the avail ring
+procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 var
   index, buffer_index, next_buffer_index: word;
   vq: PVirtQueue;
@@ -297,7 +339,11 @@ begin
   vq := Queue;
 
   index := vq.available.index mod vq.queue_size;
-  buffer_index := vq.next_buffer;
+  buffer_index := vq.last_desc_index;
+
+  Panic(vq.free_nr_desc = 0, 'VirtIO: We ran out of desc', []);
+  Dec(vq.free_nr_desc);
+
   vq.available.rings[index] := buffer_index;
   buf := Pointer(PtrUInt(vq.buffer) + vq.chunk_size*buffer_index);
 
@@ -327,7 +373,7 @@ begin
   end;
 
   ReadWriteBarrier;
-  vq.next_buffer := buffer_index;
+  vq.last_desc_index := buffer_index;
   vq.available.index:= vq.available.index + 1;
 
   // notification are not needed
@@ -335,7 +381,7 @@ begin
   if (vq.used.flags and 1 <> 1) then
   begin
     QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
-    QueueNotify^ := queue_index;
+    QueueNotify^ := vq.index;
   end;
 end;
 
@@ -355,6 +401,8 @@ begin
 
   QueueSel := Pointer(Base + MMIO_QUEUESEL);
   QueueSel^ := QueueId;
+  Queue.index := QueueId;
+
   ReadWriteBarrier;
 
   QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
@@ -363,7 +411,9 @@ begin
     QueueSize := QueueLen;
   if QueueSize = 0 then
     Exit;
+
   Queue.queue_size := QueueSize;
+  Queue.free_nr_desc := QueueSize;
 
   // set queue size
   QueueNum := Pointer (Base + MMIO_QUEUENUM);
@@ -389,7 +439,7 @@ begin
 
   // 4 bytes aligned
   Queue.used := PVirtIOUsed(@buff[((sizeOfBuffers + sizeofQueueAvailable + $0FFF) and not($0FFF))]);
-  Queue.next_buffer := 0;
+  Queue.last_desc_index := 0;
   Queue.lock := 0;
 
   AddrLow := Pointer(Base + MMIO_DESCLOW);
@@ -425,7 +475,7 @@ begin
     bi.copy := True;
     for j := 0 to Queue.queue_size - 1 do
     begin
-      VirtIOSendBuffer(Base, QueueId, Queue, @bi, 1);
+      VirtIOAddBuffer(Base, Queue, @bi, 1);
     end;
   end;
 
@@ -443,7 +493,7 @@ var
   Base: QWord;
   Irq: Byte;
 begin
-  for j:= 1 to KernelParamCount do 
+  for j:= 1 to KernelParamCount do
   begin
     if startsWith (GetKernelParam(j), 'virtio_mmio') then
     begin
@@ -468,7 +518,6 @@ begin
   begin
     // invoke callback handler
     vq.VqHandler(vq);
-    Inc(vq.last_used_index);
   end;
 end;
 
@@ -485,10 +534,10 @@ begin
       vqs := VirtIOMMIODevices[j].Vqs;
       while vqs <> nil do
       begin
-	if @vqs.VqHandler <> nil then
+	    if @vqs.VqHandler <> nil then
           VirtIOProcessQueue(vqs);
-        vqs := vqs.Next; 
-      end; 
+        vqs := vqs.Next;
+      end;
       SetIntACK(VirtIOMMIODevices[j].Base, r);
     end;
   end;

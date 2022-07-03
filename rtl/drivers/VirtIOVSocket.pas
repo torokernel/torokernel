@@ -69,16 +69,15 @@ implementation
 
 procedure VirtIOProcessTxQueue(vq: PVirtQueue);
 var
-  index, norm_index, buffer_index: Word;
+  index, buffer_index: Word;
   tmp: PQueueBuffer;
 begin
   UpdateLastIrq;
-  index := vq.last_used_index;
+  index := VirtIOGetBuffer(vq);
 
-  norm_index := index mod vq.queue_size;
-  buffer_index := vq.used.rings[norm_index].index;
+  buffer_index := vq.used.rings[index].index;
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-  
+
   // mark buffer as free
   tmp.length:= 0;
 
@@ -92,13 +91,13 @@ type
 procedure VirtIOProcessRxQueue(vq: PVirtQueue);
 var
   Packet: PPacket;
-  index, buffer_index, Len, I: dword;
+  index, buffer_index, Len, I: word;
   Data, P: PByteArray;
   buf: PQueueBuffer;
   bi: TBufferInfo;
 begin
    UpdateLastIrq;
-   index := vq.last_used_index mod vq.queue_size;
+   index := VirtIOGetBuffer(vq);
    buffer_index := vq.used.rings[index].index;
 
    buf := vq.buffers;
@@ -128,7 +127,7 @@ begin
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy := false;
 
-    VirtIOSendBuffer(VirtIOVSocketDev.Base, RX_QUEUE, vq, @bi, 1);
+    VirtIOAddBuffer(VirtIOVSocketDev.Base, vq, @bi, 1);
     ReadWriteBarrier;
 end;
 
@@ -151,7 +150,7 @@ begin
 
   Net.OutgoingPackets := Packet;
   // TODO: Remove the use of VirtIOVSocketDev
-  VirtIOSendBuffer(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
+  VirtIOAddBuffer(VirtIOVSocketDev.Base, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
   DequeueOutgoingPacket;
   RestoreInt;
 end;
@@ -193,12 +192,12 @@ begin
   tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
 
   Device.Vqs := @VirtIOVSocketDev.VirtQueues[RX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue; 
+  VirtIOVSocketDev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue;
   VirtIOVSocketDev.VirtQueues[TX_QUEUE].VqHandler := @VirtIOProcessTxQueue;
 
   VirtIOVSocketDev.VirtQueues[RX_QUEUE].Next := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[TX_QUEUE].Next := nil; 
-  
+  VirtIOVSocketDev.VirtQueues[TX_QUEUE].Next := nil;
+
   Net := @VirtIOVSocketDev.Driverinterface;
   Net.Name := 'virtiovsocket';
   Net.start := @VirtIOVSocketStart;
@@ -209,5 +208,5 @@ begin
 end;
 
 initialization
- InitVirtIODriver(VIRTIO_ID_VSOCKET, @InitVirtIOVSocket); 
+ InitVirtIODriver(VIRTIO_ID_VSOCKET, @InitVirtIOVSocket);
 end.

@@ -80,8 +80,6 @@ begin
 
   // mark buffer as free
   tmp.length:= 0;
-
-  ReadWriteBarrier;
 end;
 
 type
@@ -128,7 +126,6 @@ begin
     bi.copy := false;
 
     VirtIOAddBuffer(VirtIOVSocketDev.Base, vq, @bi, 1);
-    ReadWriteBarrier;
 end;
 
 // TODO: Use net to get the IRQ

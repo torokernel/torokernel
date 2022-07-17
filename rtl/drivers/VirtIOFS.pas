@@ -294,8 +294,7 @@ begin
   SetBufferInfo(@BufferInfo[2], @OutHeader, sizeof(OutHeader), VIRTIO_DESC_FLAG_WRITE_ONLY);
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 3);
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
     Exit;
@@ -330,8 +329,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
     Exit;
@@ -380,8 +378,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
     Exit;
@@ -418,8 +415,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 5);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
    Exit;
@@ -466,8 +462,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
    Exit;
@@ -503,8 +498,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
     Exit;
@@ -535,8 +529,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   If OutHeader.error <> 0 then
     Exit;
@@ -580,8 +573,7 @@ begin
 
   VirtIOAddBuffer(FsVirtio.Base, @FsVirtIO.RqQueue, @BufferInfo[0], 4);
 
-  while not Done do
-    ReadWriteBarrier;
+  while not Done do;
 
   if OutHeader.error <> 0 then
    Exit;
@@ -609,7 +601,6 @@ begin
   p := Pointer(InHeader.unique);
   Panic(p^ = True, 'VirtioFS: Waking up a thread in ready state\n', []);
   p^ := True;
-  ReadWriteBarrier;
 end;
 
 function InitVirtIOFS(Device: PVirtIOMMIODevice): Boolean;

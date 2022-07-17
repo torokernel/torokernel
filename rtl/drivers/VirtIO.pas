@@ -238,7 +238,6 @@ var
 begin
   status := Pointer(Base + MMIO_STATUS);
   status^ := Value;
-  ReadWriteBarrier;
 end;
 
 procedure SetDeviceGuestPageSize(Base: QWORD; Value: DWORD);
@@ -372,7 +371,6 @@ begin
     buffer_index := next_buffer_index;
   end;
 
-  ReadWriteBarrier;
   vq.last_desc_index := buffer_index;
   vq.available.index:= vq.available.index + 1;
 
@@ -403,8 +401,6 @@ begin
   QueueSel^ := QueueId;
   Queue.index := QueueId;
 
-  ReadWriteBarrier;
-
   QueueNumMax := Pointer(Base + MMIO_QUEUENUMMAX);
   QueueSize := QueueNumMax^;
   if QueueLen < QueueSize then
@@ -418,7 +414,6 @@ begin
   // set queue size
   QueueNum := Pointer (Base + MMIO_QUEUENUM);
   QueueNum^ := QueueSize;
-  ReadWriteBarrier;
 
   sizeOfBuffers := (sizeof(TQueueBuffer) * QueueSize);
   sizeofQueueAvailable := (2*sizeof(WORD)+2) + (QueueSize*sizeof(WORD));

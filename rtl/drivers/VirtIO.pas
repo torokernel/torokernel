@@ -96,6 +96,7 @@ type
     chunk_size: dword;
     lock: QWord;
     VqHandler: Procedure(Vq: PVirtQueue);
+    Device: Pointer;
     Next: PVirtQueue
   end;
 
@@ -455,7 +456,6 @@ begin
   EnableQueue := Pointer(Base + MMIO_QUEUEREADY);
   EnableQueue^ := 1;
 
-  // Device queues are fill
   if HeaderLen <> 0 then
   begin
     Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen) + PAGE_SIZE);

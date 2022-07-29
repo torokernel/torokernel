@@ -44,7 +44,11 @@ const
 var
   root: LongInt = 0;
 
-function Main(param: Pointer): PtrInt;
+{$L MpiReduceC.o}
+
+function mainC(param: Pointer): PtrInt; external name 'mainC';
+
+function Main2(param: Pointer): PtrInt;
 var
   r: ^LongInt;
   s: ^LongInt;
@@ -78,6 +82,7 @@ var
   tmp: QWORD;
 begin
  for i:= 0 to CPU_COUNT-1 do
-   tmp := BeginThread(nil, 4096, @Main, Nil, i, tmp);
+   //tmp := BeginThread(nil, 4096, @Main2, Nil, i, tmp);
+   tmp := BeginThread(nil, 4096, @mainC, Nil, i, tmp);
  while True do ThreadSwitch;
 end.

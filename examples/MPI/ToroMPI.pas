@@ -12,14 +12,32 @@ const
   MPI_SUM = 0;
   MPI_MIN = 1;
 
-function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt;
-function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt;
-function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt;
+function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
+function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
+function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl;
+function GetRank: LongInt; cdecl;
+function GetCores: LongInt; cdecl;
+function printf(p: pchar; param: LongInt): LongInt; cdecl;
 
 implementation
 
+function printf(p: pchar; param: LongInt): LongInt; cdecl; [public, alias: 'printf'];
+begin
+  WriteConsoleF('%p %d\n', [PtrUInt(p), param]);
+end;
+
+function GetCores: Longint; cdecl; [public, alias: 'GetCores'];
+begin
+  Result := CPU_COUNT;
+end;
+
+function GetRank: LongInt; cdecl; [public, alias: 'GetRank'];
+begin
+ Result := GetApicId;
+end;
+
 // assume that data-type are longint
-function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt;
+function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 var
   r, tmp: ^LongInt;
   cpu, len_per_core: LongInt;
@@ -51,7 +69,7 @@ begin
   end;
 end;
 
-function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt;
+function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 var
   r, tmp: ^LongInt;
   cpu, len_per_core: LongInt;
@@ -80,7 +98,7 @@ begin
     SendTo(root, send_data, len_per_core);
 end;
 
-function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt;
+function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl; [public, alias: 'Mpi_Reduce'];
 var
   count, i, j, len: LongInt;
   ret, s: ^LongInt;

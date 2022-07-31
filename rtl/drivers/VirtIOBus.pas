@@ -163,7 +163,7 @@ var
 begin
   id := GetApicId;
 
-  while (VirtIOCPUs[id].QueueRx[core].last_used_index = VirtIOCPUs[id].QueueRx[core].used.index) do;
+  while (VirtIOCPUs[id].QueueRx[core].last_used_index = VirtIOCPUs[id].QueueRx[core].used.index) do ThreadSwitch;
 
   index := VirtIOGetBuffer(@VirtIOCPUs[id].QueueRx[core]);
 

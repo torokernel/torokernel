@@ -1,3 +1,25 @@
+// ToroMPI.pas
+//
+// This unit is a simple implementation of the MPI API for Toro unikernel.
+// The functions are defined by following the cdecl ABI so they can be used from a C program.
+//
+// Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
+// All Rights Reserved
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+
 Unit ToroMPI;
 
 interface
@@ -8,32 +30,38 @@ uses
   Console,
   VirtIOBus;
 
+{$IFDEF FPC}
+ {$mode delphi}
+{$ENDIF}
+
 const
   MPI_SUM = 0;
   MPI_MIN = 1;
+  MPI_COMM_WORLD = 0;
 
 function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl;
-function GetRank: LongInt; cdecl;
-function GetCores: LongInt; cdecl;
-function printf(p: pchar; param: LongInt): LongInt; cdecl;
+procedure printf(p: PChar; param: LongInt); cdecl;
+procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl;
+procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl;
 
 implementation
 
-function printf(p: pchar; param: LongInt): LongInt; cdecl; [public, alias: 'printf'];
+// this is a simple implementation of printf that supports only one parameter
+procedure printf(p: PChar; param: LongInt); cdecl; [public, alias: 'printf'];
 begin
   WriteConsoleF('%p %d\n', [PtrUInt(p), param]);
 end;
 
-function GetCores: Longint; cdecl; [public, alias: 'GetCores'];
+procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl; [public, alias: 'MPI_Comm_size'];
 begin
-  Result := CPU_COUNT;
+  param := CPU_COUNT;
 end;
 
-function GetRank: LongInt; cdecl; [public, alias: 'GetRank'];
+procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl; [public, alias : 'MPI_Comm_rank'];
 begin
- Result := GetApicId;
+  param := GetApicId;
 end;
 
 // assume that data-type are longint

@@ -53,12 +53,14 @@ const
   TX_QUEUE = 1;
   EVENT_QUEUE = 2;
 
+  NR_VSOCKDEV = 1;
   PAGE_SIZE = 4096;
   MMIO_GUESTID = $100;
   QUEUE_LEN = 32;
 
 var
-  VirtIOVSocketDev: TVirtIOVSocketDevice;
+  VirtIOVSocketDev: array[0..NR_VSOCKDEV-1] of TVirtIOVSocketDevice;
+  VSockCount: LongInt;
 
 implementation
 
@@ -80,8 +82,6 @@ begin
 
   // mark buffer as free
   tmp.length:= 0;
-
-  ReadWriteBarrier;
 end;
 
 type
@@ -95,10 +95,13 @@ var
   Data, P: PByteArray;
   buf: PQueueBuffer;
   bi: TBufferInfo;
+  Dev: PVirtIOVSocketDevice;
 begin
    UpdateLastIrq;
    index := VirtIOGetBuffer(vq);
    buffer_index := vq.used.rings[index].index;
+
+   Dev := vq.Device;
 
    buf := vq.buffers;
    Inc(buf, buffer_index);
@@ -127,30 +130,33 @@ begin
     bi.flags := VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy := false;
 
-    VirtIOAddBuffer(VirtIOVSocketDev.Base, vq, @bi, 1);
-    ReadWriteBarrier;
+    VirtIOAddBuffer(Dev.Base, vq, @bi, 1);
 end;
 
 // TODO: Use net to get the IRQ
-procedure VirtIOVSocketStart(net: PNetworkInterface);
+procedure VirtIOVSocketStart(Net: PNetworkInterface);
+var
+  Dev: PVirtIOVSocketDevice;
 begin
-  IOApicIrqOn(VirtIOVSocketDev.IRQ);
+  Dev := Net.Device;
+  IOApicIrqOn(Dev.IRQ);
 end;
 
 procedure virtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
 var
   bi: TBufferInfo;
+  Dev: PVirtIOVSocketDevice;
 begin
   DisableInt;
 
+  Dev := Net.Device;
   bi.buffer := Packet.Data;
   bi.size := Packet.Size;
   bi.flags := 0;
   bi.copy := true;
 
   Net.OutgoingPackets := Packet;
-  // TODO: Remove the use of VirtIOVSocketDev
-  VirtIOAddBuffer(VirtIOVSocketDev.Base, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], @bi, 1);
+  VirtIOAddBuffer(Dev.Base, @Dev.VirtQueues[TX_QUEUE], @bi, 1);
   DequeueOutgoingPacket;
   RestoreInt;
 end;
@@ -160,53 +166,66 @@ var
   guestid: ^DWORD;
   tx: PVirtQueue;
   Net: PNetworkInterface;
+  Dev: PVirtIOVSocketDevice;
 begin
   Result := False;
-  VirtIOVSocketDev.IRQ := Device.Irq;
-  VirtIOVSocketDev.Base := Device.Base;
-  guestid := Pointer(VirtIOVSocketDev.Base + MMIO_GUESTID);
-  VirtIOVSocketDev.GuestID := guestid^;
-  WriteConsoleF('VirtIOVSocket: cid=%d\n',[VirtIOVSocketDev.GuestID]);
+  if VSockCount = NR_VSOCKDEV then
+    Exit;
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, RX_QUEUE, @VirtIOVSocketDev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
+  Dev := @VirtIOVSocketDev[VSockCount];
+
+  Dev.IRQ := Device.Irq;
+  Dev.Base := Device.Base;
+  guestid := Pointer(Dev.Base + MMIO_GUESTID);
+  Dev.GuestID := guestid^;
+  WriteConsoleF('VirtIOVSocket: cid=%d\n',[Dev.GuestID]);
+
+  if not VirtIOInitQueue(Dev.Base, RX_QUEUE, @Dev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
   begin
     WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
     Exit;
   end;
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, EVENT_QUEUE, @VirtIOVSocketDev.VirtQueues[EVENT_QUEUE], QUEUE_LEN, sizeof(TVirtIOVSockEvent)) then
+  if not VirtIOInitQueue(Dev.Base, EVENT_QUEUE, @Dev.VirtQueues[EVENT_QUEUE], QUEUE_LEN, sizeof(TVirtIOVSockEvent)) then
   begin
     WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
     Exit;
   end;
 
-  if not VirtIOInitQueue(VirtIOVSocketDev.Base, TX_QUEUE, @VirtIOVSocketDev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0) then
+  if not VirtIOInitQueue(Dev.Base, TX_QUEUE, @Dev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0) then
   begin
     WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
     Exit;
   end;
 
-  tx := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
+  tx := @Dev.VirtQueues[TX_QUEUE];
   tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + PAGE_SIZE);
   tx.buffer := Pointer(PtrUInt(tx.buffer) + (PAGE_SIZE - PtrUInt(tx.buffer) mod PAGE_SIZE));
   tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
 
-  Device.Vqs := @VirtIOVSocketDev.VirtQueues[RX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue;
-  VirtIOVSocketDev.VirtQueues[TX_QUEUE].VqHandler := @VirtIOProcessTxQueue;
+  Device.Vqs := @Dev.VirtQueues[RX_QUEUE];
+  Dev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue;
+  Dev.VirtQueues[RX_QUEUE].Device := Dev;
 
-  VirtIOVSocketDev.VirtQueues[RX_QUEUE].Next := @VirtIOVSocketDev.VirtQueues[TX_QUEUE];
-  VirtIOVSocketDev.VirtQueues[TX_QUEUE].Next := nil;
+  Dev.VirtQueues[TX_QUEUE].VqHandler := @VirtIOProcessTxQueue;
+  Dev.VirtQueues[TX_QUEUE].Device := Dev;
 
-  Net := @VirtIOVSocketDev.Driverinterface;
+  Dev.VirtQueues[RX_QUEUE].Next := @Dev.VirtQueues[TX_QUEUE];
+  Dev.VirtQueues[TX_QUEUE].Next := nil;
+
+  Net := @Dev.Driverinterface;
+
+  Net.Device := Dev;
   Net.Name := 'virtiovsocket';
   Net.start := @VirtIOVSocketStart;
   Net.send := @VirtIOVSocketSend;
-  Net.Minor := VirtIOVSocketDev.GuestID;
+  Net.Minor := Dev.GuestID;
   RegisterNetworkInterface(Net);
+  Inc(VSockCount);
   Result := True;
 end;
 
 initialization
+ VSockCount := 0;
  InitVirtIODriver(VIRTIO_ID_VSOCKET, @InitVirtIOVSocket);
 end.

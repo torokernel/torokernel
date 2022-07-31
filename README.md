@@ -14,7 +14,7 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 * Built-in gdbstub
 
 ## How try ToroMicroVM?
-You can quickly get a first taste of ToroMicroVM by running the HelloWorld example by building a docker image that includes all the required tools. To do so, execute the following commands in a console:
+You can quickly get a first taste of ToroMicroVM by running the HelloWorld example by building a docker image that includes all the required tools. To do so, execute the following commands in a console (These steps require KVM and Docker):
 
 ```bash
 wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile
@@ -23,7 +23,8 @@ sudo docker run --privileged --rm -it torokernel-dev
 cd examples/HelloWorld
 ../CloudIt.sh HelloWorld
 ```
-These commands require to have installed KVM and Docker. If these commands execute successfully, you will get the output of the HelloWorld example. You can also pull the image from dockerhub instead of building it:
+If these commands execute successfully, you will get the output of the HelloWorld example. 
+You can also pull the image from dockerhub instead of building it:
 ```bash
 sudo docker pull torokernel/toro-kernel-dev-debian-10
 sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-10
@@ -98,6 +99,14 @@ Replace `source` with the directory to serve. Finally, launch the static webserv
 ../CloudIt.sh StaticWebServer "-dShutdownWhenFinished"
 ```
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/staticwebser.gif)
+
+## Run the Intercore Communication example
+This example shows how cores can communicate by using the VirtIOBus device. In this example, core #0 sends a packet to every core in the system with the **ping** string. Each core responds with a packet that contains the message **pong**. This example is configured to use three cores. To launch it, simply executes the following commands in the context of the container presented above:
+```bash
+../CloudIt.sh InterCoreComm
+```
+You will get the following output:
+![InterComm](https://github.com/torokernel/torokernel/wiki/images/intercom.gif)
 
 ## Building Toro in Windows by using Lazarus
 First you have to follow [this](https://github.com/torokernel/torokernel/wiki/How-to-get-a-Crosscompiler-of-Freepascal-for-a-Windows-host-and-Linux-target) tutorial to get a FPC cross-compiler from Windows to Linux.  Then, you have to execute the following script which compiles the RTL for Toro and outputs the generated files in the *x86_64-linux* directory. Note that this script overwrites the RTL for Linux, which is used when the *-TLinux* parameter is passed. This script requires three paths to set up:

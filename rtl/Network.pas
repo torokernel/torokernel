@@ -70,6 +70,7 @@ type
   TNetworkInterface = record
     Name: array[0..MAX_NET_NAME-1] of Char;
     Minor: LongInt;
+    Device: Pointer;
     IncomingPacketTail: PPacket;
     IncomingPackets: PPacket;
     OutgoingPacketTail: PPacket;

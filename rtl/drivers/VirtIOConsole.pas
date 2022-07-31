@@ -91,8 +91,7 @@ begin
   Inc(vq.last_used_index);
   VirtIOAddBuffer(VirtIOConsoleDev.Base, vq, @bi, 1);
 
-  while (vq.last_used_index <> vq.used.index) do
-    ReadWriteBarrier;
+  while (vq.last_used_index <> vq.used.index) do;
 
   index := vq.last_used_index;
   norm_index := index mod vq.queue_size;
@@ -101,7 +100,6 @@ begin
   // mark buffer as free
   tmp.length:= 0;
   Inc(vq.free_nr_desc);
-  ReadWriteBarrier;
   WriteLockConsole := 3;
 end;
 
@@ -126,8 +124,7 @@ begin
     if (CurrentPacket = nil) or (offset > CurrentPacket.size -1) then
     begin
       vq := @VirtIOConsoleDev.VirtQueues[RX_QUEUE];
-      while (vq.last_used_index = vq.used.index) do
-        ReadWriteBarrier;
+      while (vq.last_used_index = vq.used.index) do;
       index := vq.last_used_index mod vq.queue_size;
       buffer_index := vq.used.rings[index].index;
 
@@ -160,8 +157,6 @@ begin
       bi.copy := false;
 
       VirtIOAddBuffer(VirtIOConsoleDev.Base, vq, @bi, 1);
-      ReadWriteBarrier;
-
       Inc(vq.last_used_index);
       CurrentPacket := Packet;
       offset := 0;

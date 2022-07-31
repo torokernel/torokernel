@@ -32,7 +32,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, Console, Network, Process, Memory;
+  Arch, Strings, Console, Network, Process, Memory;
 
 type
   PVirtIOMMIODevice = ^TVirtIOMMIODevice;
@@ -154,7 +154,6 @@ function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen
 procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
-function LookForChar(p1: PChar; c: Char): PChar;
 function VirtIOGetBuffer(Queue: PVirtQueue): Word;
 function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
 procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
@@ -169,33 +168,6 @@ implementation
 {$DEFINE EnableInt := asm sti;end;}
 {$DEFINE DisableInt := asm pushfq;cli;end;}
 {$DEFINE RestoreInt := asm popfq;end;}
-
-function startsWith(p1, p2: PChar): Boolean;
-var
-  j: LongInt;
-begin
-  Result := false;
-  if strlen(p2) > strlen(p1) then
-    Exit;
-  for j:= 0 to (strlen(p2)-1) do
-  begin
-    if p1[j] <> p2[j] then
-      Exit;
-  end;
-  Result := True;
-end;
-
-function LookForChar(p1: PChar; c: Char): PChar;
-begin
-  Result := nil;
-  while (p1^ <> Char(0)) and (p1^ <> c) do
-  begin
-    Inc(p1);
-  end;
-  if p1^ = Char(0) then
-    Exit;
-  Result := p1;
-end;
 
 function HexStrtoQWord(start, last: PChar): QWord;
 var
@@ -490,10 +462,10 @@ var
 begin
   for j:= 1 to KernelParamCount do
   begin
-    if startsWith (GetKernelParam(j), 'virtio_mmio') then
+    if StrPos(GetKernelParam(j), 'virtio_mmio') <> Nil then
     begin
-      Base := HexStrtoQWord(LookForChar(GetKernelParam(j), '@') + 3 , LookForChar(GetKernelParam(j), ':'));
-      Irq := StrtoByte(LookForChar(GetKernelParam(j), ':') + 1);
+      Base := HexStrtoQWord(StrScan(GetKernelParam(j), '@') + 3 , StrScan(GetKernelParam(j), ':'));
+      Irq := StrtoByte(StrScan(GetKernelParam(j), ':') + 1);
       CaptureInt(BASE_IRQ + Irq, @VirtIOIrqHandler);
       VirtIOMMIODevices[VirtIOMMIODevicesCount].Base := Base;
       VirtIOMMIODevices[VirtIOMMIODevicesCount].Irq := Irq;

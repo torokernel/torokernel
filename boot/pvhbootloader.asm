@@ -1,9 +1,9 @@
 ;
 ; pvhbootloader.asm
-; 
+;
 ; PVH bootloader for torokernel
 ;
-; Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>          
+; Copyright (c) 2003-2022 Matias Vara <matiasevara@torokernel.com>
 ; All Rights Reserved
 ;
 ; This program is free software: you can redistribute it and/or modify
@@ -18,34 +18,43 @@
 ;
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-global _pvstart
-STACKSPACE  equ 0x4000                                     
-IDT         equ  3020h
 
-section .text:                  
-align 4                     
+global _pvstart
+STACKSPACE  equ 0x4000
+IDT         equ  3080h
+GDT         equ  3000h
+; number of supported cores
+MAXCORES    equ 8
+NRDESC      equ 5
+
+section .text:
+; macro to build null descriptors
+%macro DESCPERCPU 1
+  %assign i 0
+  %rep %1
+      dd 0
+      dd 0
+  %assign i i+1
+  %endrep
+%endmacro
+align 4
 gdtr:
-  dw fin_gdt - gdt - 1                
-  dd 3000H                  	              
+  dw fin_gdt - gdt - 1
+  dd GDT
 idtr:
   dw 13ebh
   dd IDT
-gdt:                   	 	    
-  dw 0				
-  dw 0			
-  db 0			
-  db 0			
-  db 0			
-  db 0		
-kernel_code_sel equ 8h              
+gdt:
+DESCPERCPU 1
+kernel_code_sel equ 8h
   dw 0xffff
-  dw 00h			
+  dw 00h
   db 0h
-  db 0x9b			            
+  db 0x9b
   db 0x0
   db 0
-kernel_data_sel equ 10h 	      
-  dw 0xffff			      
+kernel_data_sel equ 10h
+  dw 0xffff
   dw 00h
   db 0h
   db 0x93
@@ -54,19 +63,22 @@ kernel_data_sel equ 10h
 kernel_code64 equ 18h
   dd 0ffffh
   dd 0af9b00h
-kernel_data_sel_tmp equ 20h 	      
-  dw 0xffff			      
+kernel_data_sel_tmp equ 20h
+  dw 0xffff
   dw 00h
   db 0h
   db 0x93
   db 0xcf
   db 0
-fin_gdt:  
+data:
+; per-cpu descriptores
+DESCPERCPU MAXCORES
+fin_gdt:
 
-mbinfo: 
+mbinfo:
   dd 0
 
-[BITS 32] 
+[BITS 32]
 _pvstart:
   ; load gdt
   cli
@@ -74,25 +86,25 @@ _pvstart:
 
   ; save multiboot info pointer
   mov [mbinfo], ebx
-  
-  mov   eax , 3000h
+
+  mov   eax , GDT
   mov   edi , eax
   mov   esi , gdt
-  mov   ecx, 8*5
-  rep   movsb  
+  mov   ecx, 8*NRDESC
+  rep   movsb
   lgdt [gdtr]
   lidt [idtr]
-  ; load descriptor  
+  ; load descriptor
   mov eax , kernel_data_sel
   mov ds , eax
   mov es , eax
   mov ss , eax
   mov fs , eax
   mov gs , eax
- 
+
   ; create temporal PD
   mov eax, 90000h
-  mov esi, eax 
+  mov esi, eax
   mov ecx, 2048
   pxor mm0, mm0
 init_paging2M0:
@@ -112,23 +124,23 @@ init_paging2M1:
   add esi,8
   cmp esi,8*512 + 90000h
   jne init_paging2M1
- 
-  ; enable long mode 
+
+  ; enable long mode
   mov eax , cr4
   bts eax , 5
   mov cr4 , eax
-  
+
   ; load temporal PD
   mov eax ,90000h
   mov cr3 , eax
-  mov ecx,0c0000080h 
+  mov ecx,0c0000080h
   rdmsr
-  bts eax,8 
-  wrmsr 
-  
+  bts eax,8
+  wrmsr
+
   ; enable paging
-  mov ebx,cr0                                   
-  bts ebx, 31                              
+  mov ebx,cr0
+  bts ebx, 31
   mov cr0,ebx
 
   mov ebx, [mbinfo]
@@ -150,7 +162,7 @@ start64:
   push rax
   ; We need to page more memory
   call paging
-  ; When the signal INIT is sent, the execution starts in trampoline_add address 
+  ; When the signal INIT is sent, the execution starts in trampoline_add address
   ; Move trampoline code
   mov rsi , trampoline_init
   mov rdi , trampoline_add
@@ -169,7 +181,7 @@ movetrampoline:
   pop rbx
 jumpkernel:
   jmp _mainCRTStartup
- 
+
 ; Creates new page directory for handle 512 gb of memory
 ; we are using 2MB pages
 ; PML4( 512GB) ---> PDPE(1GB) --> PDE(2MB)
@@ -178,11 +190,11 @@ paging:
   pxor mm0 , mm0
   mov ecx , 262145
 cleanpage:
-  movq [esi] , mm0 
+  movq [esi] , mm0
   add esi , 8
   dec ecx
   jnz cleanpage
-  
+
   ; first entry in PML4E table
   mov rsi , pagedir
   mov [rsi],dword pagedir + 4096 + 7
@@ -197,7 +209,7 @@ cleanpage:
    add rcx , 4096
    cmp rsi , pagedir + 4096 * 2
    jne PPD
-  
+
   ; second page is PDE
   mov rsi , pagedir + 4096*2
   mov rcx , 7+128 ; the page is cacheable with writeback
@@ -222,8 +234,8 @@ trampoline_init:
   dd trampoline_longmode - trampoline_init + trampoline_add
   dw 8h
 trampoline_gdt:
-  dw 8 * 5 - 1
-  dd 3000h
+  dw fin_gdt - gdt - 1
+  dd GDT
 trampoline_idt:
   dw 13ebh
   dd IDT
@@ -252,8 +264,8 @@ trampoline_longmode:
   dw kernel_code64
 trampoline_end:
 
-# the following macro allows 
-# the definition of ELFNOTE 
+# the following macro allows
+# the definition of ELFNOTE
 SECTION .note
 %macro ELFNOTE 3
     align 4

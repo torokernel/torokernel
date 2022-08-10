@@ -56,7 +56,7 @@ var
 begin
   // build a vector with the rank of each core
   // and reduce it with the MPI_SUM operation
-  rank := GetApicId;
+  rank := GetCoreId;
   r := ToroGetMem(VECTOR_LEN * sizeof(LongInt));
   s := ToroGetMem(VECTOR_LEN * sizeof(LongInt));
   for i:= 0 to VECTOR_LEN-1 do

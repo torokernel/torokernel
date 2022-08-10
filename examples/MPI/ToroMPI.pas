@@ -61,7 +61,7 @@ end;
 
 procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl; [public, alias : 'MPI_Comm_rank'];
 begin
-  param := GetApicId;
+  param := GetCoreId;
 end;
 
 // assume that data-type are longint
@@ -73,7 +73,7 @@ var
 begin
   r := send_data;
   len_per_core := (send_count * sizeof(LongInt)) div CPU_COUNT;
-  if GetApicID = root then
+  if GetCoreId = root then
   begin
     for cpu:= 0 to CPU_COUNT-1 do
     begin
@@ -105,7 +105,7 @@ var
 begin
   r := recv_data;
   len_per_core := send_count * sizeof(LongInt);
-  if GetApicID = root then
+  if GetCoreId = root then
   begin
     for cpu:= 0 to CPU_COUNT-1 do
     begin
@@ -132,12 +132,12 @@ var
   ret, s: ^LongInt;
 begin
   count := 0;
-  if GetApicID = root then
+  if GetCoreId = root then
     s := ToroGetMem(sizeof(LongInt) * CPU_COUNT * send_count)
   else
     s := nil;
   Mpi_Gather(send_data, send_count, s, len, root);
-  if GetApicId = root then
+  if GetCoreId = root then
   begin
     ret := recv_data;
     if Operation = MPI_SUM then

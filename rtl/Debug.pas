@@ -295,7 +295,7 @@ var
 begin
   DisableInt;
   SpinLock (3,4,LockDebug);
-  CPUI := GetApicID;
+  CPUI := GetCoreId;
   Thread := Cpu[CPUI].CurrentThread;
   {$IFDEF UseStampCounterinDebug}
      WriteSerial('[\r] CPU%d Thread#%h ',[CPUI, Int64(PtrUInt(Thread))]);

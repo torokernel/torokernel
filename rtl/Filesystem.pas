@@ -169,20 +169,17 @@ begin
 end;
 
 procedure GetDevice(Dev: PBlockDriver);
-var
-  CurrentCPU: PCPU;
 begin
-  CurrentCPU := @CPU[GetApicID];
   if Dev.Busy then
   begin
-    CurrentCPU.CurrentThread.State := tsIOPending;
-    CurrentCPU.CurrentThread.IOScheduler.DeviceState:=@Dev.Busy;
+    GetCurrentThread.State := tsIOPending;
+    GetCurrentThread.IOScheduler.DeviceState:= @Dev.Busy;
     {$IFDEF DebugFS} WriteDebug('GetDevice: Sleeping\n',[]); {$ENDIF}
     SysThreadSwitch;
   end;
-  CurrentCPU.CurrentThread.IOScheduler.DeviceState:=nil;
+  GetCurrentThread.IOScheduler.DeviceState:=nil;
   Dev.Busy := True;
-  Dev.WaitOn := CurrentCPU.CurrentThread;
+  Dev.WaitOn := GetCurrentThread;
   {$IFDEF DebugFS} WriteDebug('GetDevice: Device in use\n',[]); {$ENDIF}
 end;
 
@@ -278,7 +275,7 @@ var
   Ino: PInode;
 begin
   Result := nil;
-  Storage := @Storages[GetApicID];
+  Storage := @Storages[GetCoreId];
   Ino := FindInode(Storage.FileSystemMounted.InodeCache.InodeBuffer,Inode);
   if Ino <> nil then
   begin
@@ -390,12 +387,12 @@ var
   SuperBlock: PSuperBlock;
 begin
   Result := False;
-  Storage := @Storages[GetApicID];
+  Storage := @Storages[GetCoreId];
   FileSystem := FindFileSystemDriver(Storage, FileSystemName, BlockName, Minor, FileBlock);
   if FileSystem = nil then
   begin
-    WriteConsoleF('CPU#%d: SysMount Failed, unknown filesystem!\n', [GetApicID]);
-    {$IFDEF DebugFS} WriteDebug('CPU#%d: Mounting FileSystem -> Failed\n', [GetApicID]); {$ENDIF}
+    WriteConsoleF('CPU#%d: SysMount Failed, unknown filesystem!\n', [GetCoreId]);
+    {$IFDEF DebugFS} WriteDebug('CPU#%d: Mounting FileSystem -> Failed\n', [GetCoreId]); {$ENDIF}
   Exit;
   end;
   SuperBlock := ToroGetMem(SizeOf(TSuperBlock));
@@ -415,14 +412,14 @@ begin
   Storage.FileSystemMounted := SuperBlock;
   if FileSystem.ReadSuper(SuperBlock) = nil then
   begin
-    WriteConsoleF('CPU#%d: Fail Reading SuperBlock\n', [GetApicID]);
+    WriteConsoleF('CPU#%d: Fail Reading SuperBlock\n', [GetCoreId]);
     ToroFreeMem(SuperBlock);
     Storage.FileSystemMounted := nil;
     {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem, Cannot read SuperBlock -> Failed\n', []); {$ENDIF}
     Exit;
   end;
   {$IFDEF DebugFS} WriteDebug('SysMount: Mounting Root Filesystem -> Ok\n', []); {$ENDIF}
-  WriteConsoleF('SysMount: Filesystem mounted on CPU#%d\n', [GetApicID]);
+  WriteConsoleF('SysMount: Filesystem mounted on CPU#%d\n', [GetCoreId]);
   Result := True;
 end;
 
@@ -434,7 +431,7 @@ var
   ino: PInode;
 begin
   Result := nil;
-  Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  Base := Storages[GetCoreId].FileSystemMounted.InodeROOT;
   {$IFDEF DebugFS} WriteDebug('NameI: Path: %p, Inode Base: %d, Count: %d\n', [PtrUInt(Path), Base.Ino, Base.Count]); {$ENDIF}
   Inc(Base.Count);
   Inc(Path);
@@ -487,7 +484,7 @@ var
   {$IFDEF DebugFS}SPath: PChar;{$ENDIF}
 begin
   Result := 0;
-  Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  Base := Storages[GetCoreId].FileSystemMounted.InodeROOT;
   Inc(Base.Count);
   Inc(Path);
   Count := 0;
@@ -557,7 +554,7 @@ var
   SPath: PChar;
 begin
   Result := 0;
-  Base := Storages[GetApicID].FileSystemMounted.InodeROOT;
+  Base := Storages[GetCoreId].FileSystemMounted.InodeROOT;
   Inc(Base.Count);
   SPath := Path;
   {$IFDEF DebugFS}

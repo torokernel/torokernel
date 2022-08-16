@@ -547,8 +547,7 @@ asm
   pop rbx
   pop rax
   pop rbp
-  db $48
-  db $cf
+  iretq
 end;
 
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);

@@ -89,7 +89,7 @@ begin
     C^ := DbgSerialGetC;
     Inc(C);
     Dec(Len);
-  end; 
+  end;
 end;
 
 function DbgChecksum(buf: PChar; len: LongInt): Byte;
@@ -122,7 +122,7 @@ begin
 
   if buf_len < data_len * 2 Then
     Exit;
- 
+
   for pos := 0 to data_len - 1 do
   begin
     buff^ := DbgGetDigit((Byte(data[pos]) shr 4) and $f);
@@ -214,7 +214,7 @@ begin
     Inc(buf);
     data[pos] := Char(tmp shl 4);
     tmp := DbgGetVal(Byte(buf^), 16);
-    Inc(buf);                  
+    Inc(buf);
     data[pos] := Char(Byte(data[pos]) or tmp);
   end;
   Result := 0
@@ -239,14 +239,14 @@ begin
     data := DbgSerialGetC;
     if data = '#' then
       break
-    else 
+    else
     begin
       PktBuf[PktLen] := data;
-      Inc(PktLen); 
+      Inc(PktLen);
     end;
     if PktLen > PktBufLen then
       WriteConsoleF('Gdbstub: buffer has been overwritten\n',[]);
-  end;  
+  end;
   DbgRead(buf, sizeof(buf), 2);
   DbgDecHex(buf, 2, @expected_csum, 1);
   actual_csum := DbgChecksum(PktBuf, PktLen);
@@ -300,7 +300,7 @@ var
   p: QWORD;
 begin
   if Signal then
-    DbgSendSignalPacket(@buf, sizeof(buf), Char(5)); 
+    DbgSendSignalPacket(@buf, sizeof(buf), Char(5));
   while true do
   begin
     DbgRecvPacket(@buf, sizeof(buf), Len);
@@ -341,7 +341,7 @@ begin
               end;
               l[i] := g^;
               Inc(g);
-            end;  
+            end;
             DbgEncHex(@buf, sizeof(buf), @l, Size);
             DbgSendPacket(@buf, Size * 2);
           end;
@@ -373,11 +373,11 @@ begin
              end
              else if strcomp(@buf[1], 'Symbol') then
              begin
-               DbgSendPacket(OK, strlen(OK)); 
+               DbgSendPacket(OK, strlen(OK));
              end
              else if strcomp(@buf[1], 'Offsets') then
              begin
-               DbgSendPacket(Empty, strlen(Empty)); 
+               DbgSendPacket(Empty, strlen(Empty));
              end;
              // TODO: handle the case that we do not know the command
            end;
@@ -392,7 +392,7 @@ begin
                  break;
              end;
              addr^ := breaksData[i];
-             DbgSendPacket(OK, strlen(OK)); 
+             DbgSendPacket(OK, strlen(OK));
           end;
       'Z': begin
              i := 3;
@@ -417,7 +417,7 @@ begin
       'v': begin
            if strcomp(@buf[1], 'MustReplyEmpty') then
            begin
-             DbgSendPacket(Empty, strlen(Empty));   
+             DbgSendPacket(Empty, strlen(Empty));
            end else if strcomp(@buf[1], 'Cont') then
            begin
              DbgSendPacket(Empty, strlen(Empty));
@@ -426,7 +426,7 @@ begin
       'H': begin
              if strcomp(@buf[1],'g0') then
              begin
-               DbgSendPacket(OK, strlen(OK)); 
+               DbgSendPacket(OK, strlen(OK));
              end else if buf[1] = 'c' then
              begin
                DbgSendPacket(OK, strlen(OK));
@@ -520,8 +520,7 @@ asm
   mov r13, [dgb_regs+8*13]
   mov r14, [dgb_regs+8*14]
   mov r15, [dgb_regs+8*15]
-  db $48
-  db $cf
+  iretq
 end;
 
 
@@ -581,15 +580,14 @@ asm
   mov r13, [dgb_regs+8*13]
   mov r14, [dgb_regs+8*14]
   mov r15, [dgb_regs+8*15]
-  db $48
-  db $cf
+  iretq
 end;
 
 procedure GdbstubInit;
 var
   i: LongInt;
 begin
-  CaptureInt(EXC_INT3, @ExceptINT3); 
+  CaptureInt(EXC_INT3, @ExceptINT3);
   CaptureInt(EXC_INT1, @ExceptINT1);
   for i := 0 to MAX_NR_BREAKPOINTS-1 do
      breaks[i] := 0 ;

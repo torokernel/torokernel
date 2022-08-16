@@ -111,6 +111,7 @@ procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
+function GetCPU: PCPU;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -172,6 +173,7 @@ const
   // this value should be longer than any timer
   WAIT_IDLE_CORE_MS = 2000;
   PERCPUCURRENTHREAD = 1;
+  PERCPUCURRENTCPU = 2;
 
 procedure SystemExit; forward;
 procedure Scheduling(Candidate: PThread); forward;
@@ -210,7 +212,7 @@ end;
 
 procedure UpdateLastIrq;
 begin
-  CPU[GetCoreId].LastIrq := read_rdtsc;
+  GetCPU.LastIrq := read_rdtsc;
 end;
 
 type
@@ -897,7 +899,7 @@ var
   FirstMsg: PThreadCreateMsg;
   CurrentCPU: PCPU;
 begin
-  CurrentCPU := @CPU[GetCoreId];
+  CurrentCPU := GetCPU;
   ApicID := Msg.CPU.ApicID;
   FirstMsg := CurrentCPU.MsgsToBeDispatched[ApicID];
   Msg.Next := FirstMsg;
@@ -910,6 +912,11 @@ var
 begin
   th := Pointer(GetGSOffset(PERCPUCURRENTHREAD * sizeof(QWORD)));
   Result := th^;
+end;
+
+function GetCPU: PCPU;
+begin
+  Result := Pointer(GetGSOffset(PERCPUCURRENTCPU * sizeof(QWORD)));
 end;
 
 const
@@ -965,7 +972,7 @@ begin
     {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.ThreadFunc: %h\n', [PtrUInt(@NewThread.ThreadFunc)]); {$ENDIF}
     NewThread.PrivateHeap := XHeapAcquire(CPUID);
     NewThread.ThreadID := TThreadID(NewThread);
-    NewThread.CPU := @CPU[CPUID];
+    NewThread.CPU := GetCPU;
     NewThread.Parent :=  GetCurrentThread;
     ip_ret := NewThread.ret_thread_sp;
     Dec(ip_ret);
@@ -980,7 +987,7 @@ begin
     NewThreadMsg.StackSize := StackSize;
     NewThreadMsg.StartArg := Arg;
     NewThreadMsg.ThreadFunc := ThreadFunction;
-    NewThreadMsg.CPU := @CPU[CPUID];
+    NewThreadMsg.CPU := GetCPU;
     Current := GetCurrentThread;
     NewThreadMsg.Parent := Current;
     NewThreadMsg.Next := nil;
@@ -1125,7 +1132,7 @@ var
   CurrentThread, LastThread, Th, tmp: PThread;
   rbp_reg: pointer;
 begin
-  CurrentCPU := @CPU[GetCoreId];
+  CurrentCPU := GetCPU;
   while True do
   begin
     if CurrentCPU.Threads = nil then
@@ -1205,7 +1212,7 @@ var
   LocalCPU: PCPU;
 begin
   {$IFDEF DebugProcess} WriteDebug('CreateInitThread: StackSize: %d\n', [StackSize]); {$ENDIF}
-  LocalCPU := @CPU[GetCoreId];
+  LocalCPU := GetCPU;
   InitThread := ThreadCreate(StackSize, LocalCPU.ApicID, ThreadFunction, nil);
   if InitThread = nil then
   begin
@@ -1343,7 +1350,7 @@ end;
 procedure SysSetCoreIdle;
 begin
   // TODO: Set the core idle in the table
-  If (read_rdtsc - CPU[GetCoreId].LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
+  If (read_rdtsc - GetCPU.LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
     hlt
   else
     SysThreadSwitch;
@@ -1369,6 +1376,7 @@ end;
 procedure InitPerCPUProcessVar;
 begin
   SetPerCPUVar(PERCPUCURRENTHREAD, PtrUInt(@CPU[GetCoreId].CurrentThread));
+  SetPerCPUVar(PERCPUCURRENTCPU, PtrUInt(@CPU[GetCoreId]));
 end;
 
 procedure ProcessInit;

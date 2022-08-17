@@ -107,7 +107,7 @@ procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 procedure Delay(ms: LongInt);
-function GetCoreID: Byte;
+function GetCoreId: Byte; inline;
 function GetApicBaseAddr: Pointer;
 procedure IOApicIrqOn(Irq: Byte);
 function is_apic_ready: Boolean ;
@@ -430,7 +430,7 @@ asm
   mov rax, QWORD PTR gs:off
 end;
 
-function GetCoreId: Byte;
+function GetCoreId: Byte; inline;
 begin
   Result := Byte(GetGSOffset(PERCPUAPICID));
 end;

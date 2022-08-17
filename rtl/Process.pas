@@ -111,7 +111,7 @@ procedure ThreadExit(Schedule: Boolean);
 procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
 procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
-function GetCPU: PCPU;
+function GetCPU: PCPU; inline;
 
 var
   CPU: array[0..MAX_CPU-1] of TCPU;
@@ -906,7 +906,7 @@ begin
   CurrentCPU.MsgsToBeDispatched[ApicID] := Msg;
 end;
 
-function GetCurrentThread: PThread;
+function GetCurrentThread: PThread; inline;
 var
   th: ^PThread;
 begin
@@ -914,7 +914,7 @@ begin
   Result := th^;
 end;
 
-function GetCPU: PCPU;
+function GetCPU: PCPU; inline;
 begin
   Result := Pointer(GetGSOffset(PERCPUCURRENTCPU * sizeof(QWORD)));
 end;

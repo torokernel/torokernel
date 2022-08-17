@@ -208,6 +208,13 @@ const
   DISP_ZOMBIE = 6;
   DISP_CLOSING = 7;
 
+  PERCPUCURRENTNET = 3;
+
+function GetNetwork: PNetworkDedicate; inline;
+begin
+  Result := Pointer(GetGSOffset(PERCPUCURRENTNET * sizeof(QWORD)));
+end;
+
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
   NetInterface.IncomingPackets := nil;
@@ -228,11 +235,9 @@ end;
 
 procedure SysNetworkSend(Packet: PPacket);
 var
-  CPUID: LongInt;
   NetworkInterface: PNetworkInterface;
 begin
-  CPUID := GetCoreId;
-  NetworkInterface := DedicateNetworks[CPUID].NetworkInterface;
+  NetworkInterface := GetNetwork.NetworkInterface;
   Packet.Ready := False; // the packet has been sent when Ready = True
   Packet.Status := False;
   Packet.Next := nil;
@@ -244,23 +249,21 @@ end;
 // Inform the Kernel that the last packet has been sent, returns the next packet to be sent
 function DequeueOutgoingPacket: PPacket;
 var
-  CPUID: LongInt;
   Packet: PPacket;
 begin
-  CPUID := GetCoreId;
-  Packet := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
+  Packet := GetNetwork.NetworkInterface.OutgoingPackets;
   If Packet = nil then
   begin
     {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: OutgoingPackets = NULL\n', []);{$ENDIF}
     Result := nil;
     Exit;
   end;
-  DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := Packet.Next;
+  GetNetwork.NetworkInterface.OutgoingPackets := Packet.Next;
   if Packet.Next = nil then
   begin
-     DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil
+     GetNetwork.NetworkInterface.OutgoingPacketTail := nil
   end;
-  Result := DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets;
+  Result := GetNetwork.NetworkInterface.OutgoingPackets;
   if Packet.Delete then
   begin
     {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: Freeing packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
@@ -277,44 +280,40 @@ var
   PacketQueue: PPacket;
 begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  PacketQueue := DedicateNetworks[GetCoreId].NetworkInterface.IncomingPackets;
+  PacketQueue := GetNetwork.NetworkInterface.IncomingPackets;
   Packet.Next := nil;
   if PacketQueue = nil then
   begin
-    DedicateNetworks[GetCoreId].NetworkInterface.IncomingPackets := Packet;
+    GetNetwork.NetworkInterface.IncomingPackets := Packet;
     {$IFDEF DebugNetwork}
-      if DedicateNetworks[GetCoreId].NetworkInterface.IncomingPacketTail <> nil then
+      if GetNetwork.NetworkInterface.IncomingPacketTail <> nil then
       begin
         WriteDebug('EnqueueIncomingPacket: IncomingPacketTail <> nil\n', []);
       end;
     {$ENDIF}
   end else
   begin
-    DedicateNetworks[GetCoreId].NetworkInterface.IncomingPacketTail.Next := Packet;
+    GetNetwork.NetworkInterface.IncomingPacketTail.Next := Packet;
   end;
-  DedicateNetworks[GetCoreId].NetworkInterface.IncomingPacketTail := Packet
+  GetNetwork.NetworkInterface.IncomingPacketTail := Packet
 end;
 
 procedure FreePort(LocalPort: LongInt);
 var
-  CPUID: LongInt;
   Bitmap: Pointer;
 begin
-  CPUID:= GetCoreId;
-  Bitmap := @DedicateNetworks[CPUID].SocketStreamBitmap[0];
+  Bitmap := @GetNetwork.SocketStreamBitmap[0];
   Bit_Reset(Bitmap, LocalPort);
 end;
 
 procedure FreeSocket(Socket: PSocket);
 var
   ClientSocket: PSocket;
-  CPUID: LongInt;
   Service: PNetworkService;
   tmp, tmp2: PBufferSender;
 begin
-  CPUID:= GetCoreId;
   {$IFDEF DebugSocket} WriteDebug('FreeSocket: Freeing Socket %h\n', [PtrUInt(Socket)]); {$ENDIF}
-  Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
+  Service := GetNetwork.SocketStream[Socket.SourcePort];
   if Service.ClientSocket = Socket then
     Service.ClientSocket := Socket.Next
   else
@@ -327,9 +326,9 @@ begin
   if Socket.NeedFreePort then
   begin
     if Socket.SocketType = SOCKET_STREAM then
-      DedicateNetworks[CPUID].SocketStream[Socket.SourcePort] := nil
+      GetNetwork.SocketStream[Socket.SourcePort] := nil
     else
-      DedicateNetworks[CPUID].SocketDatagram[Socket.SourcePort] := nil;
+      GetNetwork.SocketDatagram[Socket.SourcePort] := nil;
     FreePort(Socket.SourcePort);
     ToroFreeMem(Service);
   end;
@@ -352,19 +351,17 @@ end;
 // Read a packet from Buffer of local Network Interface
 function SysNetworkRead: PPacket;
 var
-  CPUID: LongInt;
   Packet: PPacket;
 begin
-  CPUID := GetCoreId;
   DisableInt;
-  Packet := DedicateNetworks[CPUID].NetworkInterface.IncomingPackets;
+  Packet := GetNetwork.NetworkInterface.IncomingPackets;
   if Packet=nil then
     Result := nil
   else
   begin
-    DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := Packet.Next;
+    GetNetwork.NetworkInterface.IncomingPackets := Packet.Next;
     If Packet.Next = nil then
-      DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
+      GetNetwork.NetworkInterface.IncomingPacketTail := nil;
     Packet.Next := nil;
     Result := Packet;
     {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
@@ -384,7 +381,7 @@ begin
   Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
-  VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+  VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := DstCID;
   VPacket.hdr.src_port := LocalPort;
   VPacket.hdr.dst_port := DstPort;
@@ -404,7 +401,7 @@ begin
   Result := nil;
   if tp <> VIRTIO_VSOCK_TYPE_STREAM then
     Exit;
-  Service := DedicateNetworks[GetCoreId].SocketStream[LocalPort];
+  Service := GetNetwork.SocketStream[LocalPort];
   if (Service = nil) or (Service.ServerSocket = nil) then
     Exit;
   ServerSocket := Service.ServerSocket;
@@ -419,7 +416,7 @@ var
   Socket: PSocket;
 begin
   Result := nil;
-  Service := DedicateNetworks[GetCoreId].SocketStream[LocalPort];
+  Service := GetNetwork.SocketStream[LocalPort];
   if (Service = nil) or (Service.ClientSocket = nil) then
     Exit;
   Socket := Service.ClientSocket;
@@ -474,7 +471,7 @@ begin
   Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
-  VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+  VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIp;
   VPacket.hdr.src_port := Socket.SourcePort;
   VPacket.hdr.dst_port := Socket.DestPort;
@@ -500,7 +497,7 @@ begin
   Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
-  VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+  VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIP;
   VPacket.hdr.op := VIRTIO_VSOCK_OP_CREDIT_UPDATE;
   VPacket.hdr.tp := VIRTIO_VSOCK_TYPE_STREAM;
@@ -610,7 +607,7 @@ begin
         end;
       VIRTIO_VSOCK_OP_RESPONSE:
         begin
-          Service := DedicateNetworks[GetCoreId].SocketStream[VPacket.hdr.dst_port];
+          Service := GetNetwork.SocketStream[VPacket.hdr.dst_port];
           if Service = nil then
           begin
             VSocketReset(VPacket.hdr.src_cid, VPacket.hdr.src_port, VPacket.hdr.dst_port);
@@ -629,33 +626,33 @@ end;
 
 function LocalNetworkInit(PacketHandler: Pointer): Boolean;
 var
-  I, CPUID: LongInt;
+  I: LongInt;
 begin
-  CPUID := GetCoreId;
+  SetPerCPUVar(PERCPUCURRENTNET, PtrUInt(@DedicateNetworks[GetCoreId]));
   Result := false;
-  DedicateNetworks[CPUID].NetworkInterface.OutgoingPackets := nil;
-  DedicateNetworks[CPUID].NetworkInterface.OutgoingPacketTail := nil;
-  DedicateNetworks[CPUID].NetworkInterface.IncomingPackets := nil;
-  DedicateNetworks[CPUID].NetworkInterface.IncomingPacketTail := nil;
-  DedicateNetworks[CPUID].SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
-  if DedicateNetworks[CPUID].SocketStream = nil then
+  GetNetwork.NetworkInterface.OutgoingPackets := nil;
+  GetNetwork.NetworkInterface.OutgoingPacketTail := nil;
+  GetNetwork.NetworkInterface.IncomingPackets := nil;
+  GetNetwork.NetworkInterface.IncomingPacketTail := nil;
+  GetNetwork.SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if GetNetwork.SocketStream = nil then
     Exit;
-  DedicateNetworks[CPUID].SocketDatagram := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
-  if DedicateNetworks[CPUID].SocketDatagram = nil then
+  GetNetwork.SocketDatagram := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
+  if GetNetwork.SocketDatagram = nil then
   begin
-    ToroFreeMem(DedicateNetworks[CPUID].SocketStream);
+    ToroFreeMem(GetNetwork.SocketStream);
     Exit;
   end;
   for I:= 0 to (MAX_SocketPORTS-1) do
   begin
-    DedicateNetworks[CPUID].SocketStream[I]:=nil;
-    DedicateNetworks[CPUID].SocketDatagram[I]:=nil;
+    GetNetwork.SocketStream[I]:=nil;
+    GetNetwork.SocketDatagram[I]:=nil;
   end;
   if PtrUInt(BeginThread(nil, ServiceStack, PacketHandler, nil, DWORD(-1), ThreadID)) <> 0 then
     WriteConsoleF('Networks Packets Service .... Thread: %h\n',[ThreadID])
   else
     WriteConsoleF('Networks Packets Service .... /VFailed!/n\n',[]);
-  DedicateNetworks[CPUID].NetworkInterface.start(DedicateNetworks[CPUID].NetworkInterface);
+  GetNetwork.NetworkInterface.start(GetNetwork.NetworkInterface);
   Result := True;
 end;
 
@@ -726,11 +723,10 @@ end;
 // Return a free port from Local Socket Bitmap
 function GetFreePort: LongInt;
 var
-  CPUID, J: LongInt;
+  J: LongInt;
   Bitmap: Pointer;
 begin
-  CPUID:= GetCoreId;
-  Bitmap := @DedicateNetworks[CPUID].SocketStreamBitmap[0];
+  Bitmap := @GetNetwork.SocketStreamBitmap[0];
   for J := 0 to MAX_SocketPorts-USER_START_PORT do
   begin
     if not Bit_Test(bitmap, J) then
@@ -745,13 +741,11 @@ end;
 
 function SysSocketConnect(Socket: PSocket): Boolean;
 var
-  CPUID: LongInt;
   Service: PNetworkService;
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
 begin
   Result := True;
-  CPUID:= GetCoreId;
   Socket.Buffer := ToroGetMem(MAX_WINDOW);
   if Socket.Buffer = nil then
   begin
@@ -766,7 +760,7 @@ begin
   Socket.BufferReader := Socket.Buffer;
   // TODO: to check if this is nill
   Service := ToroGetMem(sizeof(TNetworkService));
-  DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
+  GetNetwork.SocketStream[Socket.SourcePort]:= Service;
   Service.ServerSocket := Socket;
   Service.ClientSocket := Socket;
   Socket.Next := nil;
@@ -781,7 +775,7 @@ begin
   Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
-  VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+  VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIp;
   VPacket.hdr.src_port := Socket.SourcePort;
   VPacket.hdr.dst_port := Socket.DestPort;
@@ -799,8 +793,8 @@ begin
     if (Socket.TimeOut < read_rdtsc) or (Socket.State = SCK_BLOCKED) then
     begin
       ToroFreeMem(Socket.Buffer);
-      ToroFreeMem(DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]);
-      DedicateNetworks[CPUID].SocketStream[Socket.SourcePort] := nil;
+      ToroFreeMem(GetNetwork.SocketStream[Socket.SourcePort]);
+      GetNetwork.SocketStream[Socket.SourcePort] := nil;
       FreePort(Socket.SourcePort);
       Result := False;
       Exit;
@@ -829,7 +823,7 @@ begin
     Packet.Delete := False;
     Packet.Next := nil;
     VPacket := Pointer(Packet.Data);
-    VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+    VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
     VPacket.hdr.dst_cid := Socket.DestIp;
     VPacket.hdr.src_port := Socket.SourcePort;
     VPacket.hdr.dst_port := Socket.DestPort;
@@ -846,16 +840,14 @@ end;
 
 function SysSocketListen(Socket: PSocket; QueueLen: LongInt): Boolean;
 var
-  CPUID: LongInt;
   Service: PNetworkService;
 begin
-  CPUID := GetCoreId;
   Result := False;
   if Socket.SocketType <> SOCKET_STREAM then
     Exit;
   if Socket.SourcePORT >= USER_START_PORT then
     Exit;
-  Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
+  Service := GetNetwork.SocketStream[Socket.SourcePort];
   if Service <> nil then
    Exit;
   if Socket.Blocking then
@@ -868,7 +860,7 @@ begin
   end;
   Service:= GetCurrentThread.NetworkService;
   Service.ServerSocket := Socket;
-  DedicateNetworks[CPUID].SocketStream[Socket.SourcePort]:= Service;
+  GetNetwork.SocketStream[Socket.SourcePort]:= Service;
   Socket.State := SCK_LISTENING;
   Socket.Mode := MODE_SERVER;
   Socket.NeedfreePort := False;
@@ -882,7 +874,6 @@ end;
 function SysSocketAccept(Socket: PSocket): PSocket;
 var
   NextSocket, tmp: PSocket;
-  CPUID: LongInt;
   Service: PNetworkService;
 begin
   if not Socket.Blocking then
@@ -890,8 +881,7 @@ begin
     Result := nil;
     Exit;
   end;
-  CPUID := GetCoreId;
-  Service := DedicateNetworks[CPUID].SocketStream[Socket.SourcePort];
+  Service := GetNetwork.SocketStream[Socket.SourcePort];
   while True do
   begin
     NextSocket := Service.ClientSocket;
@@ -1055,7 +1045,7 @@ begin
     Packet.Delete := False;
     Packet.Next := nil;
     VPacket := Pointer(Packet.Data);
-    VPacket.hdr.src_cid := DedicateNetworks[GetCoreId].NetworkInterface.Minor;
+    VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
     VPacket.hdr.dst_cid := Socket.DestIp;
     VPacket.hdr.src_port := Socket.SourcePort;
     VPacket.hdr.dst_port := Socket.DestPort;

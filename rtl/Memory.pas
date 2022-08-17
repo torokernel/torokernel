@@ -613,7 +613,7 @@ begin
       Result := nil; // this maybe a cause for future memory leak (due to not releasing the whole root Scratch)
       Exit;
     end;
-    Result := XHeapAcquire(GetApicID);
+    Result := XHeapAcquire(GetCoreId);
     Root.StackHeaps[Root.StackHeapIndex] := Result;
     Inc(Root.StackHeapCount);
     Result.Root := Root;
@@ -649,7 +649,7 @@ begin
   {$IFDEF DebugMemory} WriteDebug('SplitChunk Chunk: %h Size: %d bytes\n', [PtrUInt(Chunk), ChunkSize]); {$ENDIF}
   {$IFDEF HEAP_STATS} BlockCount := 0; {$ENDIF}
   SX := 0; // avoid warning when using dcc64
-  CPU := GetApicID;
+  CPU := GetCoreId;
   while ChunkSize > 0 do
   begin
     // DO NOT use GetSX in this case, since we are locating the lower index and not the upper index
@@ -739,7 +739,7 @@ begin
     RestoreInt;
     Exit;
   end;
-  CPU := GetApicID;
+  CPU := GetCoreId;
   MemoryAllocator := @MemoryAllocators[CPU];
   SX := GetSX(Size);
   {$IFDEF HEAP_STATS_REQUESTED_SIZE}
@@ -1024,7 +1024,7 @@ begin
       BlockList.Count := 0;
       Chunk := Chunk + SizeOf(BLOCK_HEADER_SIZE);
       bSX := GetSX(BlockList.Capacity*SizeOf(Pointer));
-      SetHeaderSX(GetApicId, bSX, 0, Chunk);
+      SetHeaderSX(GetCoreId, bSX, 0, Chunk);
       BlockList.List := Chunk;
       ChunkSize := ChunkSize - DirectorySX[bSX] - sizeof(BLOCK_HEADER_SIZE);
       {$IFDEF HEAP_STATS} Inc(CurrentVirtualAllocated, BlockList.Capacity); {$ENDIF}

@@ -58,7 +58,7 @@ begin
   while true do
   begin
     RecvFrom(id, @buff[0]);
-    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [id, GetApicId, PtrUInt(@buff[0])]);
+    WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [id, GetCoreId, PtrUInt(@buff[0])]);
     SendTo(id, pong, strlen(pong)+1);
   end;
 end;
@@ -71,9 +71,9 @@ begin
  begin
    SendTo(1, ping, strlen(ping)+1);
    RecvFrom(1, @buff[0]);
-   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [1, GetApicId, PtrUInt(@buff[0])]);
+   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [1, GetCoreId, PtrUInt(@buff[0])]);
    SendTo(2, ping, strlen(ping)+1);
    RecvFrom(2, @buff[0]);
-   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [2, GetApicId, PtrUInt(@buff[0])]);
+   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [2, GetCoreId, PtrUInt(@buff[0])]);
  end;
 end.

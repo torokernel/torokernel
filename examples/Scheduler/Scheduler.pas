@@ -50,7 +50,7 @@ function Thread(param: Pointer): PtrInt;
 begin
   //while true do
   //begin
-    WriteConsoleF('Hello from %d at %d\n', [PtrUInt(param), GetApicId]);
+    WriteConsoleF('Hello from %d at %d\n', [PtrUInt(param), GetCoreId]);
     //ThreadSwitch;
   //end;
 end;

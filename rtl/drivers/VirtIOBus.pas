@@ -70,7 +70,7 @@ var
   bi: TBufferInfo;
   buf: PQueueBuffer;
 begin
-  id := GetApicId;
+  id := GetCoreId;
   // check what rx vq needs attention
   for cpu := 0 to CPU_COUNT-1 do
   begin
@@ -148,9 +148,9 @@ var
   tmp: PQueueBuffer;
   buffer_index: WORD;
 begin
-  tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetApicId].QueueTx[core], buffer_index);
+  tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index);
   Move(Pchar(Buffer)^, Pchar(tmp.address)^, Len);
-  VirtIOAddConsumedBuffer(@VirtIOCPUs[GetApicId].QueueTx[core], buffer_index, tmp.length);
+  VirtIOAddConsumedBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index, tmp.length);
   // NotifyFrontEnd(Core);
 end;
 
@@ -161,7 +161,7 @@ var
   bi: TBufferInfo;
   buf: PQueueBuffer;
 begin
-  id := GetApicId;
+  id := GetCoreId;
 
   while (VirtIOCPUs[id].QueueRx[core].last_used_index = VirtIOCPUs[id].QueueRx[core].used.index) do ThreadSwitch;
 

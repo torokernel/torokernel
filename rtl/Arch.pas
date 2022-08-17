@@ -47,6 +47,8 @@ const
   // Max CPU speed in Mhz
   MAX_CPU_SPEED_MHZ = 2393;
 
+  PERCPUAPICID = 0;
+
 type
 {$IFDEF UNICODE}
   XChar = AnsiChar;
@@ -98,12 +100,14 @@ procedure InttoStr(Value: PtrUInt; buff: PXChar);
 function StrCmp(p1, p2: PXChar; Len: LongInt): Boolean;
 procedure StrConcat(left, right, dst: PXChar);
 
+procedure SetPerCPUVar(Off: Byte; Value: QWORD);
+function GetGSOffset(off: Byte): QWORD;
 procedure bit_reset(Value: Pointer; Offset: QWord);
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 function bit_test ( Val : Pointer ; pos : QWord ) : Boolean;
 procedure change_sp (new_esp : Pointer ) ;
 procedure Delay(ms: LongInt);
-function GetApicID: Byte;
+function GetCoreId: Byte; inline;
 function GetApicBaseAddr: Pointer;
 procedure IOApicIrqOn(Irq: Byte);
 function is_apic_ready: Boolean ;
@@ -205,7 +209,8 @@ const
   // Address of Page Directory
   PDADD = $100000;
   Kernel_Param = $200000;
-  IDTADDRESS = $3020;
+  IDTADDRESS = $3080;
+  GDTADDRESS = $3000;
 
   Kernel_Code_Sel = $18;
   Kernel_Data_Sel = $10;
@@ -281,6 +286,16 @@ type
     res: DWORD;
   end;
 
+  PDescriptor = ^TDescriptor;
+  TDescriptor = record
+    limit_0_15: Word;
+    base_0_15: Word;
+    base_23_16: Byte;
+    tipe: Byte;
+    limit_16_19: Byte;
+    base_31_24: Byte;
+  end;
+
   TInterruptGateArray = array[0..255] of TInteruptGate;
   PInterruptGateArray = ^TInterruptGateArray;
   p_intr_gate_struct = ^TInteruptGate;
@@ -302,6 +317,8 @@ type
     pad: array[0..1] of BYTE;
   end;
 
+
+function GetApicId: Byte; forward;
 
 procedure InttoStr(Value: PtrUInt; buff: PXChar);
 var
@@ -374,6 +391,53 @@ begin
   idt_gates^[int].handler_32_63 := DWORD(PtrUInt(Handler) shr 32);
   idt_gates^[int].res := 0;
   idt_gates^[int].nu := 0;
+end;
+
+const
+  MAX_PERCPU_VAR = 10;
+
+var
+  PerCPUVar: array[0..MAX_CPU-1] of array[0..MAX_PERCPU_VAR-1] of QWORD;
+
+procedure LoadGs(Des: Longint); assembler;
+asm
+   mov gs, word Des
+end;
+
+procedure InitGS;
+var
+  gdt_p : PDescriptor;
+  sel: LongInt;
+  CoreId: Byte;
+  base: Pointer;
+begin
+  CoreId := GetApicId;
+  PerCPUVar[CoreId][PERCPUAPICID] := CoreId;
+  base := @PerCPUVar[CoreId][PERCPUAPICID];
+  sel := sizeof(TDescriptor) * (CoreId + 5);
+  gdt_p := Pointer(GDTADDRESS + sel);
+  gdt_p.limit_0_15 := $ffff;
+  gdt_p.base_0_15 := DWORD(PtrUInt(base)) and $ffff;
+  gdt_p.base_23_16 := (DWORD(PtrUInt(base)) and $ff0000) shr 16;
+  gdt_p.tipe := $93;
+  gdt_p.limit_16_19 := $cf;
+  gdt_p.base_31_24 := (DWORD(PtrUInt(base)) and $ff000000) shr 24;
+  LoadGs(sel);
+end;
+
+function GetGSOffset(off: byte): QWORD; assembler;
+asm
+  mov rax, QWORD PTR gs:off
+end;
+
+function GetCoreId: Byte; inline;
+begin
+  Result := Byte(GetGSOffset(PERCPUAPICID));
+end;
+
+procedure SetPerCPUVar(Off: Byte; Value: QWORD);
+begin
+  PerCPUVar[GetApicId][Off] := Value;
 end;
 
 procedure CaptureException(Exception: Byte; Handler: Pointer);
@@ -517,7 +581,7 @@ asm
  @break:
 end;
 
-function GetApicID: Byte; inline;
+function GetApicId: Byte; inline;
 begin
   Result := PDWORD(apicid_reg)^ shr 24;
 end;
@@ -1034,6 +1098,7 @@ var
 begin
   enable_local_apic;
   CpuID := GetApicID;
+  InitGS;
   Cores[CPUID].InitConfirmation := True;
   Cores[CPUID].InitProc;
 end;
@@ -1345,6 +1410,7 @@ var
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
+  InitGS;
   if sodpointer <> Nil then
   begin
     tmp := sodpointer + PVH_CMDLINE_PADDR;

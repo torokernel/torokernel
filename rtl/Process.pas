@@ -987,7 +987,7 @@ begin
     NewThreadMsg.StackSize := StackSize;
     NewThreadMsg.StartArg := Arg;
     NewThreadMsg.ThreadFunc := ThreadFunction;
-    NewThreadMsg.CPU := GetCPU;
+    NewThreadMsg.CPU := @CPU[CPUID];
     Current := GetCurrentThread;
     NewThreadMsg.Parent := Current;
     NewThreadMsg.Next := nil;

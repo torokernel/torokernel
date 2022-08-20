@@ -1,7 +1,7 @@
 # guest memory in MB
 mem=256
 # time on qemu-kvm microvm in ms
-test1=200
+test1=75
 ../../examples/CloudIt.sh TestBootTime "-dProfileBootTime" "-M maca"
 starttime=$(($(date +%s%N)/1000000))
 sudo ~/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64 -nographic -no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -kernel TestBootTime -m $mem -no-reboot

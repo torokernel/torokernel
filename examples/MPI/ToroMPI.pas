@@ -45,6 +45,7 @@ function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt;
 procedure printf(p: PChar; param: LongInt); cdecl;
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl;
+procedure MPI_Barrier(value: LongInt); cdecl;
 
 implementation
 
@@ -161,4 +162,29 @@ begin
     ToroFreeMem(s);
   end;
 end;
+
+var
+  CoreCounter: LongInt;
+  globalsense: LongInt = 1;
+
+// this is a simple counter-based algorithm
+procedure Mpi_Barrier(value: LongInt); cdecl; [public, alias: 'Mpi_Barrier'];
+var
+ localsense: LongInt;
+begin
+  localsense := 2;
+  localsense := not localsense;
+  if InterlockedDecrement(CoreCounter) = 1 then
+  begin
+    CoreCounter := CPU_COUNT;
+    globalsense := localsense;
+  end else
+  begin
+    while globalsense <> localsense do
+      ThreadSwitch;
+  end;
+end;
+
+initialization
+  CoreCounter := CPU_COUNT;
 end.

@@ -11,6 +11,7 @@ void mainC(){
     for (i=0; i < VECTOR_LEN; i++){
         r[i] = rank;
     }
+    Mpi_Barrier(MPI_COMM_WORLD);
     printf("hello from core", rank);
     // reduce an array of size VECTOR_LEN
     // by using the MPI_SUM operation

@@ -185,6 +185,50 @@ begin
   end;
 end;
 
+procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt);
+var
+  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  tmp, r: PChar;
+  cpu: LongInt;
+begin
+  if GetCoreId = root then
+  begin
+    for cpu:= 0 to CPU_COUNT-1 do
+    begin
+      if cpu <> root then
+        SendTo(cpu, data, count);
+    end;
+  end else
+  begin
+    RecvFrom(root, @buff[0]);
+    tmp := @buff[0];
+    r := data;
+    Move(tmp^, r^, count);
+  end;
+end;
+
+function Mpi_Send(data: pointer; count: LongInt; dest: Longint): LongInt;
+begin
+  SendTo(dest, data, count);
+end;
+
+function Mpi_Recv(data: pointer; count: LongInt; source: LongInt): LongInt;
+var
+  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  r, tmp: PChar;
+begin
+  RecvFrom(source, @buff[0]);
+  tmp := @buff[0];
+  r := data;
+  Move(tmp^, r^, count);
+end;
+
+// This function just returns the rdtsc counter, we should change it for the kvm wallclock
+function Mpi_Wtime: LongInt;
+begin
+  Result := read_rdtsc;
+end;
+
 initialization
   CoreCounter := CPU_COUNT;
 end.

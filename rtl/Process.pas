@@ -129,18 +129,12 @@ uses
 {$DEFINE RestoreInt := asm popf;end;}
 {$DEFINE GetRBP := asm mov rbp_reg, rbp;end;}
 {$DEFINE StoreRBP := asm mov rbp, rbp_reg;end;}
+// only save/restore nonvolatile registers
 {$DEFINE SaveContext:=
  asm
-  push rax
   push rbx
-  push rcx
-  push rdx
   push rdi
   push rsi
-  push r8
-  push r9
-  push r10
-  push r11
   push r12
   push r13
   push r14
@@ -152,16 +146,9 @@ asm
  pop r14
  pop r13
  pop r12
- pop r11
- pop r10
- pop r9
- pop r8
  pop rsi
  pop rdi
- pop rdx
- pop rcx
  pop rbx
- pop rax
 end;}
 
 const
@@ -1241,12 +1228,12 @@ var
 begin
   SaveContext;
   Scheduling(nil);
+  RestoreContext;
   if GetCurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} WriteDebug('Signaling - killing CurrentThread\n', []); {$ENDIF}
     ThreadExit(True);
   end;
-  RestoreContext;
 end;
 
 procedure ThreadMain;

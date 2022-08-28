@@ -147,6 +147,7 @@ procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
 function GetKernelParam(I: LongInt): Pchar;
 function read_ioapic_reg(offset: dword): dword;
 procedure write_ioapic_reg(offset, val: dword);
+function find_msb_set(value: DWORD): LongInt; assembler;
 
 const
   MP_START_ADD = $e0000;
@@ -846,6 +847,13 @@ procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 asm
   {$IFDEF WINDOWS} bts [rcx], rdx {$ENDIF}
   {$IFDEF LINUX} bts [rdi], rsi {$ENDIF}
+end;
+
+// This function returns 32 if all bits are zero
+function find_msb_set(value: DWORD): LongInt; assembler;
+asm
+  mov rax, 32
+  bsf rax, rdi
 end;
 
 // change_sp() is only used to start executing PASCALMAIN

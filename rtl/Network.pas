@@ -36,7 +36,8 @@ const
   MAX_SocketPORTS = 20000;
   MAX_WINDOW = $4000;
   USER_START_PORT = 10000;
-  SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div SizeOf(Byte)+1;
+  // size of the bitmap in bytes
+  SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div 8;
   ServiceStack = 40*1024;
 
   VIRTIO_VSOCK_OP_INVALID = 0;
@@ -90,9 +91,9 @@ type
     NetworkInterface: PNetworkInterface;
     IpAddress: TIPAddress;
     SocketStream: PTANetworkService;
-    SocketStreamBitmap: array[0..SZ_SocketBitmap] of Byte;
+    SocketStreamBitmap: array[0..SZ_SocketBitmap-1] of Byte;
     SocketDatagram: PTANetworkService;
-    SocketDatagramBitmap: array[0..SZ_SocketBitmap] of Byte;
+    SocketDatagramBitmap: array[0..SZ_SocketBitmap-1] of Byte;
   end;
   PNetworkDedicate = ^TNetworkDedicate;
 
@@ -303,7 +304,7 @@ var
   Bitmap: Pointer;
 begin
   Bitmap := @GetNetwork.SocketStreamBitmap[0];
-  Bit_Reset(Bitmap, LocalPort);
+  Bit_Set(Bitmap, LocalPort);
 end;
 
 procedure FreeSocket(Socket: PSocket);
@@ -690,9 +691,9 @@ begin
   for I := 0 to MAX_CPU - 1 do
   begin
     DedicateNetworks[I].NetworkInterface := nil;
-    FillChar(DedicateNetworks[I].SocketStreamBitmap, SZ_SocketBitmap, 0);
-    FillChar(DedicateNetworks[I].SocketDatagram, MAX_SocketPORTS*SizeOf(Pointer), 0);
-    FillChar(DedicateNetworks[I].SocketStream, MAX_SocketPORTS*SizeOf(Pointer), 0);
+    FillChar(DedicateNetworks[I].SocketStreamBitmap, SZ_SocketBitmap, $ff);
+    DedicateNetworks[I].SocketDatagram := nil;
+    DedicateNetworks[I].SocketStream := nil;
   end;
 end;
 
@@ -723,20 +724,24 @@ end;
 // Return a free port from Local Socket Bitmap
 function GetFreePort: LongInt;
 var
-  J: LongInt;
-  Bitmap: Pointer;
+  j, pos: LongInt;
+  Bitmap: ^DWORD;
 begin
   Bitmap := @GetNetwork.SocketStreamBitmap[0];
-  for J := 0 to MAX_SocketPorts-USER_START_PORT do
+  Result := 0;
+  // the lastest 48 bits are ignored
+  for j := 0 to (SZ_SocketBitmap div sizeof(DWORD))-1 do
   begin
-    if not Bit_Test(bitmap, J) then
+    pos := find_msb_set(Bitmap^);
+    if pos > (sizeof(DWORD) * 8 - 1) then
     begin
-      Bit_Set(bitmap, J);
-      Result := J + USER_START_PORT;
-      Exit;
+      Inc(Bitmap);
+      continue;
     end;
+    Bitmap^ := Bitmap^ and (not (1 shl pos));
+    Result := USER_START_PORT + j * sizeof(DWORD) * 8 + pos;
+    Exit;
   end;
-  Result := USER_START_PORT-1;
 end;
 
 function SysSocketConnect(Socket: PSocket): Boolean;
@@ -753,6 +758,11 @@ begin
     Exit;
   end;
   Socket.SourcePort := GetFreePort;
+  if Socket.SourcePort = 0 then
+  begin
+    Result := False;
+    Exit;
+  end;
   Socket.State := SCK_CONNECTING;
   Socket.mode := MODE_CLIENT;
   Socket.NeedFreePort := True;

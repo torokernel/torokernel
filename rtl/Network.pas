@@ -750,17 +750,14 @@ var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
 begin
-  Result := True;
+  Result := False;
   Socket.Buffer := ToroGetMem(MAX_WINDOW);
   if Socket.Buffer = nil then
-  begin
-    Result := False;
     Exit;
-  end;
   Socket.SourcePort := GetFreePort;
   if Socket.SourcePort = 0 then
   begin
-    Result := False;
+    ToroFreeMem(Socket.Buffer);
     Exit;
   end;
   Socket.State := SCK_CONNECTING;
@@ -768,8 +765,13 @@ begin
   Socket.NeedFreePort := True;
   Socket.BufferLength :=0;
   Socket.BufferReader := Socket.Buffer;
-  // TODO: to check if this is nill
   Service := ToroGetMem(sizeof(TNetworkService));
+  if Service = nil then
+  begin
+    ToroFreeMem(Socket.Buffer);
+    FreePort(Socket.SourcePort);
+    Exit;
+  end;
   GetNetwork.SocketStream[Socket.SourcePort]:= Service;
   Service.ServerSocket := Socket;
   Service.ClientSocket := Socket;
@@ -777,8 +779,15 @@ begin
   Socket.SocketType := SOCKET_STREAM;
   Socket.BufferSender := nil;
   Socket.BufferSenderTail := nil;
-  // TODO: to check if it is nill
   Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
+  if Packet = nil then
+  begin
+    ToroFreeMem(Socket.Buffer);
+    ToroFreeMem(GetNetwork.SocketStream[Socket.SourcePort]);
+    GetNetwork.SocketStream[Socket.SourcePort] := nil;
+    FreePort(Socket.SourcePort);
+    Exit;
+  end;
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
   Packet.Ready := False;
@@ -806,11 +815,13 @@ begin
       ToroFreeMem(GetNetwork.SocketStream[Socket.SourcePort]);
       GetNetwork.SocketStream[Socket.SourcePort] := nil;
       FreePort(Socket.SourcePort);
-      Result := False;
       Exit;
     end
     else if Socket.State = SCK_TRANSMITTING then
+    begin
+      Result := True;
       Exit;
+    end;
     SysThreadSwitch;
   end;
 end;

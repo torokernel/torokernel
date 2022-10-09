@@ -1228,12 +1228,14 @@ var
 begin
   SaveContext;
   Scheduling(nil);
-  RestoreContext;
+  //RestoreContext;
   if GetCurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} WriteDebug('Signaling - killing CurrentThread\n', []); {$ENDIF}
     ThreadExit(True);
   end;
+  // Restore at this point otherwise %rdi is not correctly restored
+  RestoreContext;
 end;
 
 procedure ThreadMain;

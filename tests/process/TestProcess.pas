@@ -62,13 +62,8 @@ end;
 function TestThreadSwitch(out test: Longint): Boolean;
 var
   rbx_reg, rbx_regb: QWord;
-  rcx_reg, rcx_regb: QWord;
-  rax_reg, rax_regb: QWord;
-  rdx_reg, rdx_regb: QWord;
-  r8_reg, r8_regb: QWord;
-  r9_reg, r9_regb: QWord;
-  r10_reg, r10_regb: QWord;
-  r11_reg, r11_regb: QWord;
+  rdi_reg, rdi_regb: QWord;
+  rsi_reg, rsi_regb: QWord;
   r12_reg, r12_regb: QWord;
   r13_reg, r13_regb: QWord;
   r14_reg, r14_regb: QWord;
@@ -81,14 +76,9 @@ begin
 
   Result := false;
   asm
-    mov rax_reg, rax
     mov rbx_reg, rbx
-    mov rcx_reg, rcx
-    mov rdx_reg, rdx
-    mov r8_reg, r8
-    mov r9_reg, r9
-    mov r10_reg, r10
-    mov r11_reg, r11
+    mov rsi_reg, rsi
+    mov rdi_reg, rdi
     mov r12_reg, r12
     mov r13_reg, r13
     mov r14_reg, r14
@@ -99,42 +89,22 @@ begin
   SysThreadSwitch;
 
   asm
-    mov rax_regb, rax
     mov rbx_regb, rbx
-    mov rcx_regb, rcx
-    mov rdx_regb, rdx
-    mov r8_regb, r8
-    mov r9_regb, r9
-    mov r10_regb, r10
-    mov r11_regb, r11
+    mov rsi_regb, rsi
+    mov rdi_regb, rdi
     mov r12_regb, r12
     mov r13_regb, r13
     mov r14_regb, r14
     mov r15_regb, r15
   end;
 
-  if rax_reg <> rax_regb then
-    Exit;
-
   if rbx_reg <> rbx_regb then
     Exit;
 
-  if rcx_reg <> rcx_regb then
+  if rdi_reg <> rdi_regb then
     Exit;
 
-  if rdx_reg <> rdx_regb then
-    Exit;
-
-  if r8_reg <> r8_regb then
-    Exit;
-
-  if r9_reg <> r9_regb then
-    Exit;
-
-  if r10_reg <> r10_regb then
-    Exit;
-
-  if r11_reg <> r11_regb then
+  if rsi_reg <> rsi_regb then
     Exit;
 
   if r12_reg <> r12_regb then

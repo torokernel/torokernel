@@ -19,13 +19,13 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-global _pvstart
+global _startkernel
 STACKSPACE  equ 0x4000
 IDT         equ  3080h
 GDT         equ  3000h
 ; number of supported cores
 MAXCORES    equ 8
-NRDESC      equ 5
+NRDESC      equ 4
 
 section .text:
 ; macro to build null descriptors
@@ -63,23 +63,22 @@ kernel_data_sel equ 10h
 kernel_code64 equ 18h
   dd 0ffffh
   dd 0af9b00h
-kernel_data_sel_tmp equ 20h
-  dw 0xffff
-  dw 00h
-  db 0h
-  db 0x93
-  db 0xcf
-  db 0
 data:
 ; per-cpu descriptores
 DESCPERCPU MAXCORES
 fin_gdt:
+gdtr64:
+  dw fin_gdt - gdt - 1
+  dq GDT
+idtr64:
+  dw 13ebh
+  dq IDT
 
 mbinfo:
   dd 0
 
 [BITS 32]
-_pvstart:
+_startkernel:
   ; load gdt
   cli
   mov esp, _sys_stack
@@ -160,9 +159,13 @@ start64:
   xor rax, rax
   mov rax, rbx
   push rax
-  ; We need to page more memory
+  ; load a 64 bits gdt
+  lgdt [gdtr64]
+  lidt [idtr64]
+  ; map 512Gb VA
   call paging
-  ; When the signal INIT is sent, the execution starts in trampoline_add address
+  ; When the signal INIT is sent,
+  ; the execution starts at trampoline_add address
   ; Move trampoline code
   mov rsi , trampoline_init
   mov rdi , trampoline_add
@@ -179,6 +182,7 @@ movetrampoline:
   mov cr3 , rax
   ; Pointer to start of day structure in rbx
   pop rbx
+  mov rcx , 1 ; SIG_PVH
 jumpkernel:
   jmp _mainCRTStartup
 
@@ -239,15 +243,24 @@ trampoline_gdt:
 trampoline_idt:
   dw 13ebh
   dd IDT
+trampoline_gdt64:
+  dw fin_gdt - gdt - 1
+  dq GDT
+trampoline_idt64:
+  dw 13ebh
+  dq IDT
 trampoline_longmode:
   mov eax, kernel_data_sel
   mov ss, eax
   mov esp , 1000h
+  ; load 64 bits gdt
+  lgdt [trampoline_gdt64 - trampoline_init + trampoline_add]
+  lidt [trampoline_idt64 - trampoline_init + trampoline_add]
   ; enable long mode
   mov eax , cr4
   bts eax , 5
   mov cr4 , eax
-  mov eax , 90000h
+  mov eax , pagedir
   mov cr3 , eax
   mov ecx, 0c0000080h
   rdmsr
@@ -258,6 +271,7 @@ trampoline_longmode:
   btr eax, 29 ; nw
   btr eax, 30 ; cd
   mov cr0, eax
+  mov edx, 01987h
   db 066h
   db 0eah
   dd _mainCRTStartup
@@ -284,7 +298,7 @@ SECTION .note
 SECTION .note
 elfnotes:
 XEN_ELFNOTE_PHYS32_ENTRY equ 18
-ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _pvstart
+ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _startkernel
 
 SECTION .bss
 _sys_stackend:

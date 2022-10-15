@@ -3,7 +3,7 @@
 //
 // This units contains the the code that is platform-dependent.
 //
-// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2022 Matias Vara <matiasevara@torokernel.io>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -209,7 +209,7 @@ const
 
   // Address of Page Directory
   PDADD = $100000;
-  Kernel_Param = $200000;
+  KERNEL_PARAM = $200000;
   IDTADDRESS = $3080;
   GDTADDRESS = $3000;
 
@@ -220,6 +220,16 @@ const
 
   MSR_KVM_SYSTEM_TIME_NEW = $4b564d01;
   MSR_KVM_WALL_CLOCK_NEW =  $4b564d00;
+
+  // Bootloader signatures
+  SIG_PVH = 1;
+  SIG_K64 = 2;
+  SIG_BARE = 3;
+
+  // first descriptor after Null, CS, DS, CS64
+  FIRST_DESCRIPTOR = 4;
+
+  BOOT_CMDLINE_OFFSET : array[1..3] of LongInt = (0 , $1f1 + 55, PVH_CMDLINE_PADDR);
 
 type
   p_apicid_register = ^apicid_register ;
@@ -381,6 +391,8 @@ var
   idt_gates: PInterruptGateArray; // Pointer to IDT
   // pointer to start of the day structure
   sodpointer: Pointer;
+  // bootloader signature
+  bootsig: LongInt;
   ToroClock: TWallClock;
 
 procedure CaptureInt(int: Byte; Handler: Pointer);
@@ -415,7 +427,7 @@ begin
   CoreId := GetApicId;
   PerCPUVar[CoreId][PERCPUAPICID] := CoreId;
   base := @PerCPUVar[CoreId][PERCPUAPICID];
-  sel := sizeof(TDescriptor) * (CoreId + 5);
+  sel := sizeof(TDescriptor) * (CoreId + FIRST_DESCRIPTOR);
   gdt_p := Pointer(GDTADDRESS + sel);
   gdt_p.limit_0_15 := $ffff;
   gdt_p.base_0_15 := DWORD(PtrUInt(base)) and $ffff;
@@ -887,6 +899,13 @@ type
     res: dword;
   end;
 
+  PBoote820Entry = ^TBoote820Entry;
+  TBoote820Entry = packed record
+    Addr: QWord;
+    Size: QWord;
+    tp: Dword;
+  end;
+
 const
   INT15H_TABLE = $30000;
 
@@ -897,26 +916,41 @@ function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
   Desc: PInt15h_info;
   DescMB: PPVHentry;
+  DescMBe820: PBoote820Entry;
   mbp: ^QWORD;
 begin
   if ID > CounterID then
-    Result := 0
+  begin
+    Result := 0;
+    Exit;
+  end
   else
     Result := SizeOf(TMemoryRegion);
-  if sodpointer = nil then
-  begin
-    Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
-    Buffer.Base := Desc.Base;
-    Buffer.Length := Desc.Length;
-    Buffer.Flag := Desc.tipe;
-  end
-  else begin
-    mbp := Pointer(sodpointer + PVH_MEMMAP_PADDR);
-    DescMB := Pointer(PtrUInt(mbp^));
-    Inc(DescMB, ID-1);
-    Buffer.Base := DescMB.Addr;
-    Buffer.Length := DescMB.Size;
-    Buffer.Flag := DescMB.Tp;
+  case bootsig of
+    SIG_BARE:
+      begin
+        Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
+        Buffer.Base := Desc.Base;
+        Buffer.Length := Desc.Length;
+        Buffer.Flag := Desc.tipe;
+      end;
+    SIG_PVH:
+      begin
+        mbp := Pointer(sodpointer + PVH_MEMMAP_PADDR);
+        DescMB := Pointer(PtrUInt(mbp^));
+        Inc(DescMB, ID-1);
+        Buffer.Base := DescMB.Addr;
+        Buffer.Length := DescMB.Size;
+        Buffer.Flag := DescMB.Tp;
+      end;
+    SIG_K64:
+      begin
+        DescMBe820 := Pointer(sodpointer + $2d0);
+        Inc(DescMBe820, ID-1);
+        Buffer.Base := DescMBe820.Addr;
+        Buffer.Length := DescMBe820.Size;
+        Buffer.Flag := DescMBe820.Tp;
+      end;
   end;
 end;
 
@@ -927,42 +961,61 @@ const
 procedure MemoryCounterInit;
 var
   Magic: ^DWORD;
-  maplen, mapaddr: ^QWORD;
+  mapaddr: ^QWORD;
+  maplen: ^Byte;
   Desc: PInt15h_info;
-  DescMB: PPVHentry;
+  DescPVH: PPVHentry;
+  DescE820: PBoote820Entry;
   Count: DWORD;
 begin
   CounterID := 0;
   AvailableMemory := 0;
-  if sodpointer = nil then
-  begin
-    Magic := Pointer(INT15H_TABLE);
-    Desc := Pointer(INT15H_TABLE);
-    while Magic^ <> $1234 do
-    begin
-      if (Desc.tipe = 1) and (Desc.Base >= $100000) then
-        AvailableMemory := AvailableMemory + Desc.Length;
-      Inc(Magic);
-      Inc(Desc);
-    end;
-    AvailableMemory := AvailableMemory;
-    CounterID := (QWord(Magic)-INT15H_TABLE);
-    CounterID := CounterID div SizeOf(Int15h_info);
-  end else
-  begin
-    maplen := sodpointer + PVH_MEMMAP_ENTRIES;
-    mapaddr := sodpointer + PVH_MEMMAP_PADDR;
-    DescMB := Pointer(PtrUInt(mapaddr^));
-    Count := maplen^;
-    while count <> 0 do
-    begin
-      if (DescMB.tp = E820_TYPE_RAM) and (DescMB.addr >= $100000) then
-        AvailableMemory := AvailableMemory + DescMB.Size;
-      Inc(DescMB);
-      Inc(CounterID);
-      Dec(Count, 1);
-    end;
-  end;
+   case bootsig of
+    SIG_BARE:
+      begin
+        Magic := Pointer(INT15H_TABLE);
+        Desc := Pointer(INT15H_TABLE);
+        while Magic^ <> $1234 do
+        begin
+          if (Desc.tipe = 1) and (Desc.Base >= $100000) then
+            AvailableMemory := AvailableMemory + Desc.Length;
+          Inc(Magic);
+          Inc(Desc);
+        end;
+        AvailableMemory := AvailableMemory;
+        CounterID := (QWord(Magic)-INT15H_TABLE);
+        CounterID := CounterID div SizeOf(Int15h_info);
+      end;
+    SIG_PVH:
+      begin
+        maplen := sodpointer + PVH_MEMMAP_ENTRIES;
+        mapaddr := sodpointer + PVH_MEMMAP_PADDR;
+        DescPVH := Pointer(PtrUInt(mapaddr^));
+        Count := maplen^;
+        while count <> 0 do
+        begin
+          if (DescPVH.tp = E820_TYPE_RAM) and (DescPVH.addr >= $100000) then
+            AvailableMemory := AvailableMemory + DescPVH.Size;
+          Inc(DescPVH);
+          Inc(CounterID);
+          Dec(Count, 1);
+        end;
+      end;
+    SIG_K64:
+      begin
+        maplen := sodpointer + $1e8;
+        DescE820 := Pointer(sodpointer + $2d0);
+        Count := maplen^;
+        while count <> 0 do
+        begin
+          if (DescE820.tp = E820_TYPE_RAM) and (DescE820.addr >= $100000) then
+            AvailableMemory := AvailableMemory + DescE820.Size;
+          Inc(DescE820);
+          Inc(CounterID);
+          Dec(Count, 1);
+        end;
+      end;
+   end;
 end;
 
 procedure Bcd_To_Bin(var val: LongInt); inline;
@@ -1127,9 +1180,6 @@ asm
   mov gs, ax
   mov fs, ax
   mov rsp, esp_tmp
-  mov rax, PDADD
-  {$IFDEF FPC} mov cr3, rax {$ENDIF}
-  {$IFDEF DCC} mov cr3, eax {$ENDIF}
   xor rbp, rbp
   sti
   call SSEInit
@@ -1140,12 +1190,12 @@ end;
 // This procedure is executed in parallel by all CPUs when booting
 procedure main; [public, alias: '_mainCRTStartup']; assembler;
 asm
-  mov rax, cr3 // Cannot remove this warning! using eax generates error at compile-time.
-  cmp rax, 90000h  // rax = $100000 when executed the first time from the bootloader (debugged once using FPC version)
+  cmp edx, 1987h
   je InitCpu
   mov rsp, pstack
   xor rbp, rbp
   mov sodpointer, rbx
+  mov bootsig, rcx
   call KernelStart
 end;
 {$ENDIF}
@@ -1388,19 +1438,58 @@ asm
   sfence
 end;
 
-function GetKernelParam(I: LongInt): Pchar;
+function GetKernelParam(I: LongInt): PChar;
 var
   tmp: Pchar;
 begin
+  Result := nil;
+  If I >= KernelParamCount then
+    Exit;
+  if I = 0 then
+  begin
+    Result := KernelParam;
+    Exit;
+  end;
+  // only I > 0 cases
   tmp := KernelParam;
-  while (I > 0) do
+  while (I > 0) and (tmp < KernelParamEnd) do
   begin
     if tmp^ = #0 then
       Dec(I);
-    if tmp < KernelParamEnd then
-      Inc(tmp);
+    Inc(tmp);
   end;
   Result := tmp;
+end;
+
+procedure ParseKernelParams;
+var
+  tmp: ^DWORD;
+  Len: LongInt;
+  p: PChar;
+begin
+  tmp := sodpointer + BOOT_CMDLINE_OFFSET[bootsig];
+  p := PChar(PtrUInt(tmp^));
+  KernelParam := Pointer(KERNEL_PARAM);
+  Len := 0;
+  while p^ <> #0 do
+  begin
+    Inc(Len);
+    if (p^ = ',') or (p^ = ' ') then
+    begin
+      KernelParam^ := #0;
+      Len := 0;
+      Inc(KernelParamCount)
+    end
+    else
+      KernelParam^ := p^;
+    Inc(KernelParam);
+    Inc(p);
+  end;
+  KernelParam^ := #0;
+  if Len > 0 then
+    Inc(KernelParamCount);
+  KernelParamEnd := KernelParam;
+  KernelParam := Pointer(KERNEL_PARAM);
 end;
 
 procedure EnableNMI;
@@ -1411,35 +1500,13 @@ end;
 
 procedure ArchInit;
 var
-  I: LongInt;
-  tmp: ^QWORD;
-  p: PChar;
+  I, Len: LongInt;
   clk: KVMClock;
 begin
   idt_gates := Pointer(IDTADDRESS);
   FillChar(PChar(IDTADDRESS)^, SizeOf(TInteruptGate)*256, 0);
   InitGS;
-  if sodpointer <> Nil then
-  begin
-    tmp := sodpointer + PVH_CMDLINE_PADDR;
-    p := PChar(PtrUInt(tmp^));
-    KernelParam := Pointer(Kernel_Param);
-    while p^ <> #0 do
-    begin
-      if (p^ = ',') or (p^ = ' ') then
-      begin
-        KernelParam^ := #0;
-        Inc(KernelParamCount)
-      end
-      else
-        KernelParam^ := p^;
-      Inc(KernelParam);
-      Inc(p);
-    end;
-    KernelParam^ := #0;
-    KernelParamEnd := KernelParam;
-    KernelParam := Pointer(Kernel_Param);
-  end;
+  ParseKernelParams;
   MemoryCounterInit;
   PML4_Table := Pointer(PDADD);
   LocalCpuSpeed := PtrUInt(CalculateCpuSpeed);

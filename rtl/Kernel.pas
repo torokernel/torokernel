@@ -1,7 +1,7 @@
 //
 // This unit contains the initialization of the kernel.
 //
-// Copyright (c) 2003-2018 Matias Vara <matiasvara@yahoo.com>
+// Copyright (c) 2003-2022 Matias Vara <matiasevara@torokernel.io>
 // All Rights Reserved
 //
 //
@@ -61,7 +61,6 @@ begin
   WriteConsoleF('Loading Toro ... \n', []);
   WriteConsoleF('commit: %p, build time: %p\n', [PtrUInt(Kernel_Head), PtrUInt(Build_Time)]);
   ArchInit;
-  FillChar(CPU, sizeof(CPU), 0);
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}
   ProcessInit;
   MemoryInit;

@@ -1369,7 +1369,16 @@ begin
 end;
 
 procedure ProcessInit;
+var
+  j: LongInt;
 begin
+  if KernelParamCount > 0 then
+  begin
+    WriteConsoleF('Kernel Parameters:\n', []);
+    for j:= 0 to KernelParamCount-1 do
+      WriteConsoleF('param[%d]: %p\n', [j, PtrUInt(GetKernelParam(j))]);
+  end;
+  FillChar(CPU, sizeof(CPU), 0);
   Panic(LocalCpuSpeed = 0,'LocalCpuSpeed = 0\n', []);
   {$IFDEF DebugProcess}
     if LocalCpuSpeed = MAX_CPU_SPEED_MHZ then

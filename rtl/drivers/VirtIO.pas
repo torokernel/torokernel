@@ -460,7 +460,7 @@ var
   Base: QWord;
   Irq: Byte;
 begin
-  for j:= 1 to KernelParamCount do
+  for j:= 0 to KernelParamCount-1 do
   begin
     if StrPos(GetKernelParam(j), 'virtio_mmio') <> Nil then
     begin

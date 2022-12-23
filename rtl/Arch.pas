@@ -910,7 +910,7 @@ const
   INT15H_TABLE = $30000;
 
 var
-  CounterID: LongInt; // starts with CounterID = 1
+  CounterID: LongInt;
 
 function GetMemoryRegion(ID: LongInt; Buffer: PMemoryRegion): LongInt;
 var
@@ -919,17 +919,15 @@ var
   DescMBe820: PBoote820Entry;
   mbp: ^QWORD;
 begin
-  if ID > CounterID then
-  begin
-    Result := 0;
-    Exit;
-  end
+  Result := 0;
+  if ID >= CounterID then
+    Exit
   else
     Result := SizeOf(TMemoryRegion);
   case bootsig of
     SIG_BARE:
       begin
-        Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * (ID-1));
+        Desc := Pointer(INT15H_TABLE + SizeOf(Int15h_info) * ID);
         Buffer.Base := Desc.Base;
         Buffer.Length := Desc.Length;
         Buffer.Flag := Desc.tipe;
@@ -938,7 +936,7 @@ begin
       begin
         mbp := Pointer(sodpointer + PVH_MEMMAP_PADDR);
         DescMB := Pointer(PtrUInt(mbp^));
-        Inc(DescMB, ID-1);
+        Inc(DescMB, ID);
         Buffer.Base := DescMB.Addr;
         Buffer.Length := DescMB.Size;
         Buffer.Flag := DescMB.Tp;
@@ -946,7 +944,7 @@ begin
     SIG_K64:
       begin
         DescMBe820 := Pointer(sodpointer + $2d0);
-        Inc(DescMBe820, ID-1);
+        Inc(DescMBe820, ID);
         Buffer.Base := DescMBe820.Addr;
         Buffer.Length := DescMBe820.Size;
         Buffer.Flag := DescMBe820.Tp;
@@ -998,7 +996,7 @@ begin
             AvailableMemory := AvailableMemory + DescPVH.Size;
           Inc(DescPVH);
           Inc(CounterID);
-          Dec(Count, 1);
+          Dec(Count);
         end;
       end;
     SIG_K64:
@@ -1012,7 +1010,7 @@ begin
             AvailableMemory := AvailableMemory + DescE820.Size;
           Inc(DescE820);
           Inc(CounterID);
-          Dec(Count, 1);
+          Dec(Count);
         end;
       end;
    end;

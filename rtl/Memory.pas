@@ -1101,10 +1101,8 @@ var
   MajorBlockSize: PtrUInt;
   SizeDiv8: Cardinal;
   SX: Byte;
-  {$IFDEF DebugMemory}
-   ID: LongInt;
-   Buff: TMemoryRegion;
-  {$ENDIF}
+  ID: LongInt;
+  Buff: TMemoryRegion;
 begin
   FillByte(MemoryAllocators, sizeof(MemoryAllocators), 0);
   DirectorySX[0] := 0;
@@ -1124,19 +1122,16 @@ begin
     MapSX[SizeDiv8] := SX;
   end;
   MIN_GETSX := MapSX[MAPSX_COUNT-1];
-  {$IFDEF DebugMemory}
-   // memory map
-   ID := 1;
-   WriteDebug('Memory Map\n',[]);
-   while GetMemoryRegion(ID, @Buff) <> 0 do
-   begin
-     if Buff.Flag = MEM_RESERVED then
-       WriteDebug('%h:%h, Flags: Reserved\n',[Buff.Base,Buff.Base + Buff.Length -1])
-     else
-       WriteDebug('%h:%h, Flags: Free\n',[Buff.Base,Buff.Base + Buff.Length -1]);
-     Inc(ID);
-   end;
-  {$ENDIF}
+  ID := 0;
+  WriteConsoleF('Memory Map Entries:\n',[]);
+  while GetMemoryRegion(ID, @Buff) <> 0 do
+  begin
+    if Buff.Flag = MEM_RESERVED then
+       WriteConsoleF('entry[%d]: [%h:%h], reserved\n',[ID, Buff.Base, Buff.Base + Buff.Length -1])
+    else
+       WriteConsoleF('entry[%d]: [%h:%h], usable\n',[ID, Buff.Base, Buff.Base + Buff.Length -1]);
+    Inc(ID);
+  end;
   DistributeMemoryRegions; // Initialization of Directory for every Core
   ToroMemoryManager.GetMem := @ToroGetMem;
   ToroMemoryManager.FreeMem := @ToroFreeMem;

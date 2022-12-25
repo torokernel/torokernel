@@ -229,7 +229,7 @@ const
   // first descriptor after Null, CS, DS, CS64
   FIRST_DESCRIPTOR = 4;
 
-  BOOT_CMDLINE_OFFSET : array[1..3] of LongInt = (0 , $1f1 + 55, PVH_CMDLINE_PADDR);
+  BOOT_CMDLINE_OFFSET : array[1..3] of LongInt = (PVH_CMDLINE_PADDR, $1f1 + 55, 0);
 
 type
   p_apicid_register = ^apicid_register ;

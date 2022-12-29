@@ -42,18 +42,11 @@ const
 function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl;
-procedure printf(p: PChar; param: LongInt); cdecl;
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Barrier(value: LongInt); cdecl;
 
 implementation
-
-// this is a simple implementation of printf that supports only one parameter
-procedure printf(p: PChar; param: LongInt); cdecl; [public, alias: 'printf'];
-begin
-  WriteConsoleF('%p %d\n', [PtrUInt(p), param]);
-end;
 
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl; [public, alias: 'MPI_Comm_size'];
 begin

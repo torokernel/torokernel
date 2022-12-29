@@ -59,7 +59,7 @@ procedure PrintString(const S: AnsiString); forward;
 var
   PutC: procedure (C: Char) = PutCtoSerial;
 
-procedure FlushUp;
+procedure FlushUp; [public, alias : 'FlushUp'];
 begin
   PutCtoSerial(XChar(13));
   PutCtoSerial(XChar(10));
@@ -74,7 +74,7 @@ begin
   until (lsr and $20) = $20;
 end;
 
-procedure PutCtoSerial(C: XChar);
+procedure PutCtoSerial(C: XChar); [public, alias : 'PutCtoSerial'];
 begin
   WaitForCompletion;
   write_portb(Byte(C), BASE_COM_PORT);
@@ -98,7 +98,7 @@ begin
 end;
 {$ENDIF}
 
-procedure PrintDecimal(Value: PtrUInt);
+procedure PrintDecimal(Value: PtrUInt); [public, alias : 'PrintDecimal'];
 var
   I, Len: Byte;
   S: string[21]; // 21 is the max number of characters needed to represent 64 bits number in decimal

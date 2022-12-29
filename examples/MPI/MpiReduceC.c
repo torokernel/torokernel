@@ -12,7 +12,7 @@ void mainC(){
         r[i] = rank;
     }
     Mpi_Barrier(MPI_COMM_WORLD);
-    printf("hello from core", rank);
+    printf("hello from core: %d\n", rank);
     // reduce an array of size VECTOR_LEN
     // by using the MPI_SUM operation
     Mpi_Reduce(r, s, VECTOR_LEN, MPI_SUM, root);
@@ -20,12 +20,12 @@ void mainC(){
      for (i=0;  i < VECTOR_LEN; i++){
        // Sum = ((N - 1) * N) / 2
        if (s[i] != (((world_size-1) * world_size) / 2)){
-           printf("failed!, core:", rank);
+           printf("failed!, core: %d\n", rank);
            break;
        }
      }
      if (i == VECTOR_LEN){
-        printf("success! value:", s[i-1]);
+        printf("success! value: %d\n", s[i-1]);
      }
     }
 }

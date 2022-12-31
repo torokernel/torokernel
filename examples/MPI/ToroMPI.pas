@@ -37,7 +37,10 @@ uses
 const
   MPI_SUM = 0;
   MPI_MIN = 1;
+  MPI_MAX = 2;
   MPI_COMM_WORLD = 0;
+
+  MinLongInt    = LongInt(Low(LongInt));
 
 function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
@@ -45,6 +48,7 @@ function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt;
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Barrier(value: LongInt); cdecl;
+function Mpi_Wtime: PtrUInt; cdecl;
 
 implementation
 
@@ -151,6 +155,15 @@ begin
           if ret[j] > s[i * send_count + j] then
             ret[j] := s[i * send_count +j];
       end;
+    end else if Operation = MPI_MAX then
+    begin
+      for j := 0 to send_count -1 do
+      begin
+        ret[j] := MinLongInt;
+        for i := 0 to CPU_COUNT-1 do
+          if ret[j] < s[i * send_count + j] then
+            ret[j] := s[i * send_count +j];
+      end;
     end;
     ToroFreeMem(s);
   end;
@@ -178,6 +191,7 @@ begin
   end;
 end;
 
+// TODO: count must always be less or equal than VIRTIO_CPU_MAX_PKT_BUF_SIZE
 procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt);
 var
   buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
@@ -205,6 +219,7 @@ begin
   SendTo(dest, data, count);
 end;
 
+// TODO: count must be less or equal than VIRTIO_CPU_MAX_PKT_BUF_SIZE
 function Mpi_Recv(data: pointer; count: LongInt; source: LongInt): LongInt;
 var
   buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
@@ -217,7 +232,7 @@ begin
 end;
 
 // This function just returns the rdtsc counter, we should change it for the kvm wallclock
-function Mpi_Wtime: LongInt;
+function Mpi_Wtime: PtrUInt; cdecl; [public, alias: 'Mpi_Wtime'];
 begin
   Result := read_rdtsc;
 end;

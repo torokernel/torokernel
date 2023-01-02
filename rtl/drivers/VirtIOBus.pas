@@ -148,7 +148,12 @@ var
   tmp: PQueueBuffer;
   buffer_index: WORD;
 begin
-  tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index);
+  tmp := nil;
+  while tmp = nil do
+  begin
+    tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index);
+    ThreadSwitch;
+  end;
   Move(Pchar(Buffer)^, Pchar(tmp.address)^, Len);
   VirtIOAddConsumedBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index, tmp.length);
   // NotifyFrontEnd(Core);

@@ -1,6 +1,6 @@
 // MpiBcast.pas
 //
-// Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2023 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify

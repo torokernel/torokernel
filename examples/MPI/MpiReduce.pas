@@ -38,51 +38,15 @@ uses
  ToroMPI,
  Console;
 
-const
-  VECTOR_LEN = 64;
-
-var
-  root: LongInt = 0;
-
-{$L MpiReduceC.o}
+{$L MPI_Reduce.o}
 
 function mainC(param: Pointer): PtrInt; external name 'mainC';
-
-function Main2(param: Pointer): PtrInt;
-var
-  r: ^LongInt;
-  s: ^LongInt;
-  len, i, rank: LongInt;
-begin
-  // build a vector with the rank of each core
-  // and reduce it with the MPI_SUM operation
-  rank := GetCoreId;
-  r := ToroGetMem(VECTOR_LEN * sizeof(LongInt));
-  s := ToroGetMem(VECTOR_LEN * sizeof(LongInt));
-  for i:= 0 to VECTOR_LEN-1 do
-    r[i] := rank;
-  Mpi_Reduce(@r[0], @s[0], VECTOR_LEN, MPI_SUM, root);
-  if rank = root then
-  begin
-    for i:= 0 to VECTOR_LEN-1 do
-      if s[i] <> (((CPU_COUNT-1) * CPU_COUNT) div 2) then
-      begin
-        WriteConsoleF('Test has failed\n',[]);
-        Break;
-      end;
-    if i = VECTOR_LEN-1 then
-      WriteConsoleF('Test has succeeded\n',[]);
-  end;
-  FreeMem(r);
-  FreeMem(s);
-end;
 
 var
   i: LongInt;
   tmp: QWORD;
 begin
  for i:= 0 to CPU_COUNT-1 do
-   //tmp := BeginThread(nil, 4096, @Main2, Nil, i, tmp);
    tmp := BeginThread(nil, 4096, @mainC, Nil, i, tmp);
  while True do ThreadSwitch;
 end.

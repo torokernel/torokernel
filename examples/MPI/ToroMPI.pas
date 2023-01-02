@@ -180,7 +180,7 @@ var
 begin
   localsense := 2;
   localsense := not localsense;
-  if InterlockedDecrement(CoreCounter) = 1 then
+  if InterlockedDecrement(CoreCounter) = 0 then
   begin
     CoreCounter := CPU_COUNT;
     globalsense := localsense;
@@ -192,7 +192,7 @@ begin
 end;
 
 // TODO: count must always be less or equal than VIRTIO_CPU_MAX_PKT_BUF_SIZE
-procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt);
+procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt); cdecl; [public, alias: 'Mpi_Bcast'];
 var
   buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
   tmp, r: PChar;

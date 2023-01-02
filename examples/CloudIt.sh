@@ -29,7 +29,7 @@ compileropt="$2";
 # if you sudo CloudIt, this may contain an incorrect USER
 fpcrtlsource="$(eval echo ~$USER)/fpc-3.2.0/rtl/";
 # change to -O- for debugging
-compileropti="-O2 -v0"
+compileropti="-O2 -v0 -g"
 qemudir="$(eval echo ~$USER)/qemuforvmm/build/x86_64-softmmu"
 
 export KERNEL_HEAD=$(git rev-parse HEAD|cut -c1-7)

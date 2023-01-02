@@ -1,9 +1,6 @@
-// MpiReduce.pas
+// MpiBarrier.pas
 //
-// This example shows the use of MPI_REDUCE to reduce a vector
-// by using the MPI_SUM reduction.
-//
-// Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2023 Matias Vara <matiasevara@gmail.com>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -20,7 +17,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-program MpiReduce;
+program MpiBarrier;
 
 uses
  Kernel,

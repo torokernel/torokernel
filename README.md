@@ -29,6 +29,11 @@ You can also pull the image from dockerhub instead of building it:
 sudo docker pull torokernel/toro-kernel-dev-debian-10
 sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-10
 ```
+You can share a directory from the host by running:
+```bash
+sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root/torokernel-host -it torokernel/toro-kernel-dev-debian-10
+```
+You will find $pwd from host at /root/torokernel-host in the container.
 
 ## How build ToroMicroVM locally?
 ### Step 1. Install Freepascal 3.2.0

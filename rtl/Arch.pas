@@ -1233,7 +1233,7 @@ var
   cp: p_mp_processor_entry ;
 begin
   m := Pointer(PtrUInt(table) + SizeOf(mp_table_header));
-  while (m^ = cpu_type) and (CPU_COUNT < MAX_CPU-1) do
+  while (m^ = cpu_type) and (CPU_COUNT < MAX_CPU) do
   begin
     cp := Pointer(m);
     Inc(CPU_COUNT);

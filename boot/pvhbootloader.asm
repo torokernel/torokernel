@@ -24,7 +24,7 @@ STACKSPACE  equ 0x4000
 IDT         equ  3080h
 GDT         equ  3000h
 ; number of supported cores
-MAXCORES    equ 8
+MAXCORES    equ 16
 NRDESC      equ 4
 
 section .text:

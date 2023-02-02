@@ -154,7 +154,7 @@ const
   RESET_VECTOR = $467; // when the IPI occurs the procesor jumps here
   cpu_type = 0;
   apic_type = 2;
-  MAX_CPU = 8;  // Number of max CPU support
+  MAX_CPU = 16;  // Number of max CPU support
   ALLOC_MEMORY_START = $800000; // Address Start of Alloc Memory
   KERNEL_IMAGE_START = $400000;
   PAGE_SIZE = 2*1024*1024; // 2 MB per Page

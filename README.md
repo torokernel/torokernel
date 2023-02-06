@@ -156,3 +156,5 @@ GPLv3
 [5] Leveraging Virtio-fs and Virtio-vsocket in Toro Unikernel. Matias Vara. DevConfCZ 2020.
 
 [6] Building a Cloud Infrastructure to Deploy Microservices as Microvm Guests. Matias Vara. KVM Forum 2020.
+
+[7] Running MPI applications on Toro unikernel. Matias Vara. FOSDEM 2023.

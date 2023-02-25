@@ -1474,6 +1474,13 @@ begin
     Inc(Len);
     if (p^ = ',') or (p^ = ' ') then
     begin
+      // ignore arguments with only spaces
+      if Len = 1 Then
+      begin
+        Len := 0;
+        Inc(p);
+        Continue;
+      end;
       KernelParam^ := #0;
       Len := 0;
       Inc(KernelParamCount)

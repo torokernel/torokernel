@@ -186,13 +186,13 @@ begin
   VirtIOConsoleDev.IRQ := Device.Irq;
   VirtIOConsoleDev.Base := Device.Base;
 
-  if not VirtIOInitQueue(VirtIOConsoleDev.Base, RX_QUEUE, @VirtIOConsoleDev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE) then
+  if not VirtIOInitQueue(VirtIOConsoleDev.Base, RX_QUEUE, @VirtIOConsoleDev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_CONSOLE_MAX_PKT_BUF_SIZE, 1) then
   begin
     WriteConsoleF('VirtIOConsole: RX_QUEUE has not been initialized\n', []);
     Exit;
   end;
 
-  if not VirtIOInitQueue(VirtIOConsoleDev.Base, TX_QUEUE, @VirtIOConsoleDev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0) then
+  if not VirtIOInitQueue(VirtIOConsoleDev.Base, TX_QUEUE, @VirtIOConsoleDev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0, 1) then
   begin
     WriteConsoleF('VirtIOConsole: TX_QUEUE has not been initialized\n', []);
     Exit;

@@ -31,7 +31,7 @@ void mainC(){
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    __asm__ __volatile__  ( "" ::: "memory" ) ;
+    __asm__ __volatile__( "" ::: "memory" );
     Mpi_Barrier(MPI_COMM_WORLD);
 
     for (vectorlen=1; vectorlen < 128; vectorlen*=2){
@@ -41,7 +41,8 @@ void mainC(){
             Mpi_Reduce(r, s, vectorlen, MPI_SUM, root);
             end = Mpi_Wtime();
             sum += (int)(end - start);
-            __asm__ __volatile__( "" ::: "memory" ) ;
+            __asm__ __volatile__( "" ::: "memory" );
+            // TODO: to verify the result
             Mpi_Barrier(MPI_COMM_WORLD);
         }
         sum /= 100;
@@ -49,7 +50,7 @@ void mainC(){
         Mpi_Reduce(&sum, &max_time, 1, MPI_MAX, root);
         Mpi_Reduce(&sum, &avg_time, 1, MPI_SUM, root);
         if (rank == root){
-            printf("\nMPI_REDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
+            printf("MPI_REDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
                     max_time, avg_time / world_size);
         }
     }

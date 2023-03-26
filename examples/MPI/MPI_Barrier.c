@@ -29,7 +29,7 @@ void mainC(){
     sum = 0;
     for (i=0; i< 100; i++){
         start = Mpi_Wtime();
-        __asm__ __volatile__  ( "" ::: "memory" ) ;
+        __asm__ __volatile__( "" ::: "memory" ) ;
         Mpi_Barrier(MPI_COMM_WORLD);
         end = Mpi_Wtime();
         sum += (int)(end - start);
@@ -39,7 +39,7 @@ void mainC(){
     Mpi_Reduce(&sum, &max_time, 1, MPI_MAX, root);
     Mpi_Reduce(&sum, &avg_time, 1, MPI_SUM, root);
     if (rank == root){
-        printf("\nMPI_BARRIER: min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", min_time,
+        printf("MPI_BARRIER: min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", min_time,
                 max_time, avg_time / world_size);
     }
 }

@@ -40,6 +40,7 @@ void mainC(){
             Mpi_Bcast(data, msgsize, root);
             end = Mpi_Wtime();
             
+            // TODO: to verify the result
             __asm__ __volatile__( "" ::: "memory" ) ;
             Mpi_Barrier(MPI_COMM_WORLD);
             

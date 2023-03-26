@@ -150,7 +150,7 @@ procedure SetIntACK(Base: QWORD; Value: DWORD);
 function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD; Align : LongInt): Boolean;
 procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
@@ -356,7 +356,7 @@ begin
   end;
 end;
 
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD; Align: LongInt): Boolean;
 var
   j: LongInt;
   QueueSize, sizeOfBuffers: DWORD;
@@ -368,6 +368,8 @@ var
   EnableQueue: ^DWORD;
 begin
   Result := False;
+  if (Align <> 0) and (Align <> 1) then
+    Exit;
   FillByte(Queue^, sizeof(TVirtQueue), 0);
 
   QueueSel := Pointer(Base + MMIO_QUEUESEL);
@@ -393,11 +395,11 @@ begin
   sizeofQueueUsed := (2*sizeof(WORD)+2)+(QueueSize*sizeof(VirtIOUsedItem));
 
   // buff must be 4k aligned
-  buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2);
+  buff := ToroGetMem(sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + (PAGE_SIZE*2) * Align);
   If buff = nil then
     Exit;
-  FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + PAGE_SIZE*2, 0);
-  buff := buff + (PAGE_SIZE - PtrUInt(buff) mod PAGE_SIZE);
+  FillByte(buff^, sizeOfBuffers + sizeofQueueAvailable + sizeofQueueUsed + (PAGE_SIZE*2) * Align, 0);
+  buff := buff + (PAGE_SIZE - PtrUInt(buff) mod PAGE_SIZE) * Align;
 
   // 16 bytes aligned
   Queue.buffers := PQueueBuffer(buff);
@@ -430,10 +432,10 @@ begin
 
   if HeaderLen <> 0 then
   begin
-    Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen) + PAGE_SIZE);
+    Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen) + PAGE_SIZE * Align);
     if Queue.Buffer = nil then
       Exit;
-    Queue.Buffer := Pointer(PtrUint(queue.Buffer) + (PAGE_SIZE - PtrUInt(Queue.Buffer) mod PAGE_SIZE));
+    Queue.Buffer := Pointer(PtrUint(queue.Buffer) + ((PAGE_SIZE - PtrUInt(Queue.Buffer) mod PAGE_SIZE)) * Align);
     Queue.chunk_size := HeaderLen;
 
     bi.size := HeaderLen;

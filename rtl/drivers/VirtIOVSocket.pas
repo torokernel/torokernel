@@ -180,7 +180,7 @@ begin
   Dev.GuestID := guestid^;
   WriteConsoleF('VirtIOVSocket: cid=%d\n',[Dev.GuestID]);
 
-  if not VirtIOInitQueue(Dev.Base, RX_QUEUE, @Dev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) then
+  if not VirtIOInitQueue(Dev.Base, RX_QUEUE, @Dev.VirtQueues[RX_QUEUE], QUEUE_LEN, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr), 1) then
   begin
     WriteConsoleF('VirtIOVSocket: RX_QUEUE has not been initializated\n', []);
     Exit;
@@ -192,7 +192,7 @@ begin
     Exit;
   end;
 
-  if not VirtIOInitQueue(Dev.Base, TX_QUEUE, @Dev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0) then
+  if not VirtIOInitQueue(Dev.Base, TX_QUEUE, @Dev.VirtQueues[TX_QUEUE], QUEUE_LEN, 0, 1) then
   begin
     WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
     Exit;

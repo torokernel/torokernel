@@ -345,7 +345,7 @@ begin
   end;
 
   vq.last_desc_index := buffer_index;
-  vq.available.index:= vq.available.index + 1;
+  Inc(vq.available.index);
 
   // notification are not needed
   // TODO: remove the use of base
@@ -370,6 +370,7 @@ begin
   Result := False;
   if (Align <> 0) and (Align <> 1) then
     Exit;
+
   FillByte(Queue^, sizeof(TVirtQueue), 0);
 
   QueueSel := Pointer(Base + MMIO_QUEUESEL);

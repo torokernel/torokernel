@@ -33,7 +33,7 @@ uses
 
 type
   PThread = ^TThread;
-  PCPU = ^TCPU;
+  PCPU = ^TPerCPU;
   PThreadCreateMsg = ^TThreadCreateMsg;
   TMxSlot = Pointer;
   // MxSlots[SenderID][ReceiverID] can be assigned only if slot is empty (nil)
@@ -72,11 +72,14 @@ type
     CPU: PCPU;
   end;
 
-  TCPU = record
+  // PerCPU variables require to be padded to CACHELINE_LEN
+  TPerCPU = record
     ApicID: LongInt;
+    pad: LongInt;
     CurrentThread: PThread;
     Threads: PThread;
     LastIRQ: QWORD;
+    pad1: array[1..CACHELINE_LEN-4] of QWORD;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
   end;
 
@@ -113,8 +116,13 @@ procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
 function GetCPU: PCPU; inline;
 
+{$push}
+{$codealign varmin=64}
 var
-  CPU: array[0..MAX_CPU-1] of TCPU;
+  CPU: array[0..MAX_CPU-1] of TPerCPU;
+{$pop}
+
+var
   CpuMxSlots: TMxSlots;
   ShutdownProcedure: procedure;
 

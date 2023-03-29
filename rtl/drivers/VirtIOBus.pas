@@ -41,6 +41,7 @@ const
   RX_QUEUE = 0;
 
 type
+  // TODO: to pad this record to the cacheline
   TVirtIOCPU = record
     QueueRx: array[0..MAX_CPU-1] of TVirtQueue;
     QueueTx: array[0..MAX_CPU-1] of TVirtQueue;

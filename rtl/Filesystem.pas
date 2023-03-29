@@ -47,7 +47,7 @@ const
 
 type
   PBlockDriver = ^TBlockDriver;
-  PStorage = ^TStorage;
+  PStorage = ^TPerCPUStorage;
   PFileBlock = ^TFileBlock;
   PFileRegular = ^TFileRegular;
   PSuperBlock = ^TSuperBlock;
@@ -127,10 +127,12 @@ type
     Next: PFileSystemDriver;
   end;
 
-  TStorage = record
+  // PerCPU variables require to be padded to CACHELINE_LEN
+  TPerCPUStorage = record
     BlockFiles : PFileBlock; // Block File Descriptors
     RegularFiles: PFileBlock; // Regular File Decriptors
-    FileSystemMounted: PSuperBlock; // ??? Not sure about it ???
+    FileSystemMounted: PSuperBlock; // Pointer to mounted filesystem
+    Pad: array[1..CACHELINE_LEN-3] of QWORD;
   end;
 
 procedure FileSystemInit;
@@ -157,8 +159,13 @@ var
 
 implementation
 
+{$push}
+{$codealign varmin=64}
 var
-  Storages: array [0..MAX_CPU-1] of TStorage; // Dedicated Storage
+  Storages: array[0..MAX_CPU-1] of TPerCPUStorage;
+{$pop}
+
+var
   BlockDevices: PBlockDriver; // Block Drivers installed
 
 procedure RegisterBlockDriver(Driver: PBlockDriver);

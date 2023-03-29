@@ -49,6 +49,9 @@ const
 
   PERCPUAPICID = 0;
 
+  // Lenght of the cacheline in qwords
+  CACHELINE_LEN = 8;
+
 type
 {$IFDEF UNICODE}
   XChar = AnsiChar;
@@ -87,12 +90,14 @@ type
   end;
   PMemoryRegion = ^TMemoryRegion;
 
-  TCore = record
+  TPerCPUCore = record
     ApicID: LongInt;
     Present: Boolean;
     CPUBoot: Boolean;
     InitConfirmation: Boolean;
+    pad0: Byte;
     InitProc: procedure;
+    pad1: array[1..CACHELINE_LEN-2] of QWORD;
   end;
 
 // Utils
@@ -173,7 +178,7 @@ var
   AvailableMemory: QWord;
   LocalCpuSpeed: Int64 = 0; // LocalCpuSpeed has the speed of the local CPU in Mhz
   StartTime: TNow;
-  Cores: array[0..MAX_CPU-1] of TCore;
+  Cores: array[0..MAX_CPU-1] of TPerCPUCore;
   LargestMonitorLine: longint;
   SmallestMonitorLine: longint;
   KernelParam: Pchar = Nil;
@@ -406,11 +411,15 @@ begin
   idt_gates^[int].nu := 0;
 end;
 
+// The value of MAX_PERCPU_VAR shall be CACHELINE_LEN aligned
 const
-  MAX_PERCPU_VAR = 10;
+  MAX_PERCPU_VAR = CACHELINE_LEN * 2;
 
+{$push}
+{$codealign varmin=64}
 var
   PerCPUVar: array[0..MAX_CPU-1] of array[0..MAX_PERCPU_VAR-1] of QWORD;
+{$pop}
 
 procedure LoadGs(Des: Longint); assembler;
 asm

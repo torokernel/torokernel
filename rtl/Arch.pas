@@ -172,6 +172,8 @@ const
   PVH_CMDLINE_PADDR = 24;
   BASE_IRQ = 32;
   MAX_ADDR_MEM = 512*1024*1014*1014;
+  // The value of MAX_PERCPU_VAR shall be CACHELINE_LEN aligned
+  MAX_PERCPU_VAR = CACHELINE_LEN * 2;
 
 var
   CPU_COUNT: LongInt;
@@ -184,6 +186,10 @@ var
   KernelParam: Pchar = Nil;
   KernelParamEnd: Pchar = Nil;
   KernelParamCount: LongInt = 0;
+{$push}
+{$codealign varmin=64}
+  PerCPUVar: array[0..MAX_CPU-1] of array[0..MAX_PERCPU_VAR-1] of QWORD;
+{$pop}
 
 implementation
 
@@ -410,16 +416,6 @@ begin
   idt_gates^[int].res := 0;
   idt_gates^[int].nu := 0;
 end;
-
-// The value of MAX_PERCPU_VAR shall be CACHELINE_LEN aligned
-const
-  MAX_PERCPU_VAR = CACHELINE_LEN * 2;
-
-{$push}
-{$codealign varmin=64}
-var
-  PerCPUVar: array[0..MAX_CPU-1] of array[0..MAX_PERCPU_VAR-1] of QWORD;
-{$pop}
 
 procedure LoadGs(Des: Longint); assembler;
 asm

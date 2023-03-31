@@ -154,16 +154,16 @@ function GetInode(Inode: LongInt): PInode;
 procedure PutInode(Inode: PInode);
 function SysCreateFile(Path:  PXChar): THandle;
 
-var
-  FileSystemDrivers: PFileSystemDriver;
-
-implementation
-
 {$push}
 {$codealign varmin=64}
 var
   Storages: array[0..MAX_CPU-1] of TPerCPUStorage;
 {$pop}
+
+var
+  FileSystemDrivers: PFileSystemDriver;
+
+implementation
 
 var
   BlockDevices: PBlockDriver; // Block Drivers installed

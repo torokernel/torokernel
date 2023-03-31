@@ -36,6 +36,9 @@ def main():
   os.chdir(cwd + '/tests/memory')
   if os.system ('./TestMemory.sh'):
     ret = 0
+  os.chdir(cwd + '/tests/misc')
+  if os.system ('./TestPerCPUAlign.sh'):
+    ret = 0
   os.chdir(cwd + '/tests/benchmarks')
   os.system ('./ProfileBootTime.sh')
   os.system ('./ProfileKernelInitTime.sh')

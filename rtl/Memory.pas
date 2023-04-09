@@ -92,18 +92,16 @@ type
     List: PPointerArray;
   end;
   PBlockList = ^TBlockList;
-  TMemoryAllocator = record // per CPU
-    StartAddress: Pointer;
-    EndAddress : Pointer ;
+  TMemoryAllocator = record
     Size: PtrUInt;
     Initialized: Boolean; // Was Internal Tables initialized ?
-    CurrentVirtualAlloc: Integer; // for this CPU
-    TotalVirtualAlloc: Integer; // for this CPU
+    CurrentVirtualAlloc: Integer;
+    TotalVirtualAlloc: Integer;
     Current: Integer; // Counter to track the current number of allocated blocks
     CurrentAllocatedSize: PtrUInt;
     Total: Integer; // Counter to track the total number of memory allocations
-    FreeCount: Integer; // for this CPU
-    FreeSize: PtrUInt; // for this CPU
+    FreeCount: Integer;
+    FreeSize: PtrUInt;
     Directory: array[0..MAX_SX-1] of TBlockList; // Index is the SX (Size indeX)
     PoolHeap: TBlockList; // Blocks of XHEAP_INITIAL_CAPACITY (128KB)
     PoolHeapChunk: TBlockList; // Blocks of XHEAP_CHUNK_CAPACITY (1MB)
@@ -1054,45 +1052,85 @@ end;
 // TODO: To test in a system with more than 3.5 Gb physical memory
 procedure DistributeMemoryRegions;
 var
-  AssignableMemory: QWord;
+  AssignableMemory, CurrCpuMemory, CurrRegionSize: QWord;
   Buff: TMemoryRegion;
-  ID, CPU: LongInt;
+  ID, CPU, NewRegion, FirstRegion: LongInt;
   MemoryAllocator: PMemoryAllocator;
   StartAddress: Pointer;
+  IsFirst, HasInit: Boolean;
 begin
-  ID := 1;
+  ID := 0;
+  AssignableMemory := 0;
+  IsFirst := True;
+  HasInit := False;
   while GetMemoryRegion(ID, @Buff) <> 0 do
   begin
-    if (Buff.Flag = MEM_AVAILABLE) and (Buff.Base >= $10000) then
-      Break;
+    if (Buff.Flag = MEM_AVAILABLE) and (Buff.Base >= $100000) then
+    begin
+      Inc(AssignableMemory, Buff.Length);
+      If IsFirst = True Then
+      begin
+        FirstRegion := ID;
+        IsFirst := False;
+      end;
+    end;
     Inc(ID);
   end;
-  Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n', []);
-  Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n', []);
-  AssignableMemory := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
+  // Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n', []);
+  // Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n', []);
+  ID := FirstRegion;
+  AssignableMemory := AssignableMemory - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
   MemoryPerCpu := AssignableMemory div CPU_COUNT;
-  WriteConsoleF('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
+  WriteConsoleF('System Memory ... %d MB\n', [AssignableMemory div 1024 div 1024]);
   WriteConsoleF('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
   {$IFDEF DebugMemory}
-    WriteDebug('System Memory ... %d MB\n', [AvailableMemory div 1024 div 1024]);
+    WriteDebug('System Memory ... %d MB\n', [AssignableMemory div 1024 div 1024]);
     WriteDebug('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
   {$ENDIF}
   StartAddress := Pointer(ALLOC_MEMORY_START);
+  GetMemoryRegion(ID, @Buff);
+  // assume ALLOC_MEMORY_START is in FirstRegion
+  CurrRegionSize := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
+
   for CPU := 0 to (CPU_COUNT-1) do
   begin
     MemoryAllocator := @MemoryAllocators[CPU];
-    MemoryAllocator.StartAddress := StartAddress;
-    MemoryAllocator.Size := MemoryPerCpu;
-    MemoryAllocator.EndAddress := Pointer(PtrUInt(StartAddress) + MemoryAllocator.Size - 1);
-    MemoryAllocator.FreeSize := MemoryAllocator.Size;
-    WriteConsoleF('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
-    {$IFDEF DebugMemory}
-      WriteDebug('Core#%d, StartAddress: %h, EndAddress: %h\n',[CPU, PtrUInt(StartAddress), PtrUInt(MemoryAllocator.EndAddress)]);
-    {$ENDIF}
-    InitializeDirectory(MemoryAllocator, StartAddress, MemoryAllocator.Size);
-    InitBlockList(@MemoryAllocator.PoolHeap, 0);
-    InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
-    StartAddress := Pointer(PtrUInt(MemoryAllocator.EndAddress) + 1);
+    MemoryAllocator.FreeSize := MemoryPerCpu;
+    CurrCpuMemory := MemoryPerCpu;
+    while True do
+    begin
+      if CurrRegionSize >= CurrCpuMemory then
+      begin
+        InitializeDirectory(MemoryAllocator, StartAddress, CurrCpuMemory);
+        If HasInit = False then
+        begin
+          InitBlockList(@MemoryAllocator.PoolHeap, 0);
+          InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
+          HasInit := True;
+        end;
+        WriteConsoleF('Core#%d, region addr: %h, Size: %d bytes\n',[CPU, PtrUInt(StartAddress), CurrCpuMemory]);
+        StartAddress := Pointer(PtrUInt(StartAddress) + CurrCpuMemory);
+        Dec(CurrRegionSize, CurrCpuMemory);
+        break;
+      end else
+      begin
+        InitializeDirectory(MemoryAllocator, StartAddress, CurrRegionSize);
+        If HasInit = False then
+        begin
+          InitBlockList(@MemoryAllocator.PoolHeap, 0);
+          InitBlockList(@MemoryAllocator.PoolHeapChunk, 0);
+          HasInit := True;
+        end;
+        Dec(CurrCpuMemory, CurrRegionSize);
+        WriteConsoleF('Core#%d, region addr: %h, Size: %d bytes\n',[CPU, PtrUInt(StartAddress), CurrRegionSize]);
+        NewRegion := GetNextUsableMemoryRegion(ID);
+        If NewRegion = 0 then
+          Panic(True, 'No enough usable memory regions\n', []);
+        GetMemoryRegion(NewRegion, @Buff);
+        CurrRegionSize := Buff.Length;
+        StartAddress := Pointer(Buff.Base);
+      end;
+    end;
   end;
 end;
 

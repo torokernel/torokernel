@@ -133,6 +133,7 @@ procedure ArchInit;
 procedure Now (Data: PNow);
 procedure Interruption_Ignore;
 function GetMemoryRegion (ID: LongInt ; Buffer : PMemoryRegion): LongInt;
+function GetNextUsableMemoryRegion(Curr: LongInt): LongInt;
 function InitCore(ApicID: Byte): Boolean;
 procedure SetPageCache(Add: Pointer);
 procedure RemovePageCache(Add: Pointer);
@@ -954,6 +955,23 @@ begin
         Buffer.Length := DescMBe820.Size;
         Buffer.Flag := DescMBe820.Tp;
       end;
+  end;
+end;
+
+function GetNextUsableMemoryRegion(Curr: LongInt): LongInt;
+var
+  tmp: TMemoryRegion;
+begin
+  Result := 0;
+  Inc(Curr);
+  While GetMemoryRegion(Curr, @tmp) <> 0 do
+  begin
+    if tmp.Flag = MEM_AVAILABLE Then
+    begin
+      Result := Curr;
+      Exit;
+    end;
+    Inc(Curr);
   end;
 end;
 

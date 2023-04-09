@@ -1,6 +1,6 @@
 // MPI_Barrier.c
 //
-// Copyright (c) 2003-2023 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2023 Matias Vara <matiasevara@torokernel.io>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify

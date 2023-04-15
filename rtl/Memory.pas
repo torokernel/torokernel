@@ -1076,9 +1076,9 @@ begin
     end;
     Inc(ID);
   end;
-  // Panic(Buff.Flag = MEM_RESERVED,'DistributeMemoryRegions: Cannot find available memory region\n', []);
-  // Panic(Buff.Length <= ALLOC_MEMORY_START,'DistributeMemoryRegions: Not enough memory to initialize\n', []);
   ID := FirstRegion;
+  GetMemoryRegion(ID, @Buff);
+  StartAddress := Pointer(ALLOC_MEMORY_START);
   AssignableMemory := AssignableMemory - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
   MemoryPerCpu := AssignableMemory div CPU_COUNT;
   WriteConsoleF('System Memory ... %d MB\n', [AssignableMemory div 1024 div 1024]);
@@ -1087,8 +1087,6 @@ begin
     WriteDebug('System Memory ... %d MB\n', [AssignableMemory div 1024 div 1024]);
     WriteDebug('Memory per Core ... %d MB\n', [MemoryPerCpu div 1024 div 1024]);
   {$ENDIF}
-  StartAddress := Pointer(ALLOC_MEMORY_START);
-  GetMemoryRegion(ID, @Buff);
   // assume ALLOC_MEMORY_START is in FirstRegion
   CurrRegionSize := Buff.Length - (ALLOC_MEMORY_START - PtrUInt(Buff.Base));
 

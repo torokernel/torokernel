@@ -48,6 +48,7 @@ var
  pong: PChar = 'pong'#0;
  tmp: TThreadId;
  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+ CPU: LongInt;
 
 function Thread(param: Pointer): PtrInt;
 var
@@ -64,16 +65,22 @@ begin
 end;
 
 begin
- tmp := BeginThread(nil, 4096, Thread, Pointer(0), 1, tmp);
- tmp := BeginThread(nil, 4096, Thread, Pointer(0), 2, tmp);
+ If CPU_COUNT < 2 Then
+ begin
+   WriteConsoleF('CPU_COUNT must be > 2!', []);
+   Exit;
+ end;
+ // create threads and migrate them to its core
+ for CPU:= 1 to (CPU_COUNT-1) do
+   tmp := BeginThread(nil, 4096, Thread, Pointer(0), CPU, tmp);
  ThreadSwitch;
  while True do
  begin
-   SendTo(1, ping, strlen(ping)+1);
-   RecvFrom(1, @buff[0]);
-   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [1, GetCoreId, PtrUInt(@buff[0])]);
-   SendTo(2, ping, strlen(ping)+1);
-   RecvFrom(2, @buff[0]);
-   WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [2, GetCoreId, PtrUInt(@buff[0])]);
+   for CPU:= 1 to (CPU_COUNT-1) do
+   begin
+     SendTo(CPU, ping, strlen(ping)+1);
+     RecvFrom(CPU, @buff[0]);
+     WriteConsoleF('Core[%d] -> Core[%d]: %p\n', [CPU, GetCoreId, PtrUInt(@buff[0])]);
+   end;
  end;
 end.

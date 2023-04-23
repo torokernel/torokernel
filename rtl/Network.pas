@@ -3,7 +3,7 @@
 //
 // This unit contains the code to support vsocket communication.
 //
-// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2023 Matias Vara <matiasevara@torokernel.com>
 // All Rights Reserved
 //
 //
@@ -165,6 +165,7 @@ procedure EnqueueIncomingPacket(Packet: PPacket);
 procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
 procedure DedicateNetworkSocket(const Name: PXChar);
+function AllocatePacket(Size: LongInt): PPacket;
 
 implementation
 
@@ -237,6 +238,17 @@ begin
   {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sending packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
   NetworkInterface.Send(NetworkInterface, Packet);
   {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sent packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
+end;
+
+function AllocatePacket(Size: LongInt): PPacket;
+begin
+  Result := ToroGetMem(Size + sizeof(TPacket));
+  If Result = Nil Then
+    Exit;
+  // TODO: Data shall be PAGE_SIZE aligned
+  Result.Data := Pointer(PtrUInt(Result)+ sizeof(TPacket));
+  Result.Size := Size;
+  Result.Next := nil;
 end;
 
 // Inform kernel that Packet has been sent
@@ -347,10 +359,7 @@ var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
 begin
-  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-  Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Next := nil;
+  Packet := AllocatePacket(sizeof(TVirtIOVSockHdr));
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := DstCID;
@@ -434,10 +443,7 @@ var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
 begin
-  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-  Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Next := nil;
+  Packet := AllocatePacket(sizeof(TVirtIOVSockHdr));
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIp;
@@ -457,10 +463,7 @@ var
   Packet: PPacket;
   VPacket: PVirtIOVSocketPacket;
 begin
-  Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-  Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Next := nil;
+  Packet := AllocatePacket(sizeof(TVirtIOVSockHdr));
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIP;
@@ -749,9 +752,7 @@ begin
     FreePort(Socket.SourcePort);
     Exit;
   end;
-  Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-  Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Next := nil;
+  Packet := AllocatePacket(sizeof(TVirtIOVSockHdr));
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
   VPacket.hdr.dst_cid := Socket.DestIp;
@@ -795,10 +796,7 @@ begin
   end else
   begin
     Socket.State := SCK_PEER_DISCONNECTED;
-    Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-    Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-    Packet.Size := sizeof(TVirtIOVSockHdr);
-    Packet.Next := nil;
+    Packet := AllocatePacket(sizeof(TVirtIOVSockHdr));
     VPacket := Pointer(Packet.Data);
     VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
     VPacket.hdr.dst_cid := Socket.DestIp;
@@ -1014,10 +1012,7 @@ begin
     if FragLen > Socket.RemoteWinLen - Socket.RemoteWinCount then
       FragLen := Socket.RemoteWinLen - Socket.RemoteWinCount;
 
-    Packet := ToroGetMem(FragLen + sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
-    Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
-    Packet.Size := FragLen + sizeof(TVirtIOVSockHdr);
-    Packet.Next := nil;
+    Packet := AllocatePacket(sizeof(TVirtIOVSockHdr) + FragLen);
     VPacket := Pointer(Packet.Data);
     VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
     VPacket.hdr.dst_cid := Socket.DestIp;

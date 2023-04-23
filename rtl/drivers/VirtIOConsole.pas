@@ -142,8 +142,6 @@ begin
       begin
         Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
         Packet.size:= PacketSize;
-        Packet.Delete:= False;
-        Packet.Ready:= False;
         Packet.Next:= nil;
         Data := Packet.data;
         for I := 0 to PacketSize-1 do

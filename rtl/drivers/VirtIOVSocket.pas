@@ -73,13 +73,16 @@ procedure VirtIOProcessTxQueue(vq: PVirtQueue);
 var
   index, buffer_index: Word;
   tmp: PQueueBuffer;
+  Packet: PPacket;
 begin
   UpdateLastIrq;
   index := VirtIOGetBuffer(vq);
-
   buffer_index := vq.used.rings[index].index;
   tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-
+  // inform kernel that Packet has been sent
+  Packet := Pointer(tmp.address - sizeof(TPacket));
+  DequeueOutgoingPacket(Packet);
+  // TODO: to check if this is required
   // mark buffer as free
   tmp.length:= 0;
 end;
@@ -115,8 +118,6 @@ begin
    begin
      Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
      Packet.size:= Len;
-     Packet.Delete:= False;
-     Packet.Ready:= False;
      Packet.Next:= nil;
      Data := Packet.data;
      for I := 0 to Len-1 do
@@ -133,7 +134,6 @@ begin
     VirtIOAddBuffer(Dev.Base, vq, @bi, 1);
 end;
 
-// TODO: Use net to get the IRQ
 procedure VirtIOVSocketStart(Net: PNetworkInterface);
 var
   Dev: PVirtIOVSocketDevice;
@@ -148,16 +148,13 @@ var
   Dev: PVirtIOVSocketDevice;
 begin
   DisableInt;
-
   Dev := Net.Device;
   bi.buffer := Packet.Data;
   bi.size := Packet.Size;
   bi.flags := 0;
-  bi.copy := true;
-
-  Net.OutgoingPackets := Packet;
+  // use Packet.Data in descriptor
+  bi.copy := false;
   VirtIOAddBuffer(Dev.Base, @Dev.VirtQueues[TX_QUEUE], @bi, 1);
-  DequeueOutgoingPacket;
   RestoreInt;
 end;
 
@@ -186,7 +183,7 @@ begin
     Exit;
   end;
 
-  if not VirtIOInitQueue(Dev.Base, EVENT_QUEUE, @Dev.VirtQueues[EVENT_QUEUE], QUEUE_LEN, sizeof(TVirtIOVSockEvent)) then
+  if not VirtIOInitQueue(Dev.Base, EVENT_QUEUE, @Dev.VirtQueues[EVENT_QUEUE], QUEUE_LEN, sizeof(TVirtIOVSockEvent), 1) then
   begin
     WriteConsoleF('VirtIOVSocket: EVENT_QUEUE has not been initializated\n', []);
     Exit;
@@ -197,11 +194,6 @@ begin
     WriteConsoleF('VirtIOVSocket: TX_QUEUE has not been initializated\n', []);
     Exit;
   end;
-
-  tx := @Dev.VirtQueues[TX_QUEUE];
-  tx.buffer := ToroGetMem((VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr)) * tx.queue_size + PAGE_SIZE);
-  tx.buffer := Pointer(PtrUInt(tx.buffer) + (PAGE_SIZE - PtrUInt(tx.buffer) mod PAGE_SIZE));
-  tx.chunk_size:= VIRTIO_VSOCK_MAX_PKT_BUF_SIZE + sizeof(TVirtIOVSockHdr);
 
   Device.Vqs := @Dev.VirtQueues[RX_QUEUE];
   Dev.VirtQueues[RX_QUEUE].VqHandler := @VirtIOProcessRxQueue;

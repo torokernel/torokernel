@@ -82,9 +82,6 @@ begin
   // inform kernel that Packet has been sent
   Packet := Pointer(tmp.address - sizeof(TPacket));
   DequeueOutgoingPacket(Packet);
-  // TODO: to check if this is required
-  // mark buffer as free
-  tmp.length:= 0;
 end;
 
 type

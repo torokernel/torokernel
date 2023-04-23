@@ -91,14 +91,9 @@ begin
   Inc(vq.last_used_index);
   VirtIOAddBuffer(VirtIOConsoleDev.Base, vq, @bi, 1);
 
+  // wait until device consumes the buffer
   while (vq.last_used_index <> vq.used.index) do;
 
-  index := vq.last_used_index;
-  norm_index := index mod vq.queue_size;
-  buffer_index := vq.used.rings[norm_index].index;
-  tmp := Pointer(PtrUInt(vq.buffers) + buffer_index * sizeof(TQueueBuffer));
-  // mark buffer as free
-  tmp.length:= 0;
   Inc(vq.free_nr_desc);
   WriteLockConsole := 3;
 end;

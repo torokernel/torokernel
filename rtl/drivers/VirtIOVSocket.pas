@@ -109,14 +109,11 @@ begin
    P := Pointer(buf.address);
    Len := vq.used.rings[index].length;
 
-   Packet := ToroGetMem(Len+SizeOf(TPacket));
+   Packet := AllocatePacket(Len);
 
-   if (Packet <> nil) then
+   if Packet <> nil then
    begin
-     Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
-     Packet.size:= Len;
-     Packet.Next:= nil;
-     Data := Packet.data;
+     Data := Packet.Data;
      for I := 0 to Len-1 do
        Data^[I] := P^[I];
      EnqueueIncomingPacket(Packet);

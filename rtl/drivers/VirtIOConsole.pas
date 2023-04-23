@@ -131,13 +131,10 @@ begin
       PacketSize := vq.used.rings[index].length;
       if CurrentPacket <> nil then
         ToroFreeMem(CurrentPacket);
-      Packet := ToroGetMem(PacketSize+SizeOf(TPacket));
+      Packet := AllocatePacket(PacketSize);
 
-      if (Packet <> nil) then
+      if Packet <> nil then
       begin
-        Packet.data:= Pointer(PtrUInt(Packet) + SizeOf(TPacket));
-        Packet.size:= PacketSize;
-        Packet.Next:= nil;
         Data := Packet.data;
         for I := 0 to PacketSize-1 do
           Data^[I] := P^[I];

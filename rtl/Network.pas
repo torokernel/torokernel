@@ -62,9 +62,6 @@ type
   TPacket = record
     Size: LongInt;
     Data: Pointer;
-    Status: Boolean;
-    Ready: Boolean;
-    Delete: Boolean;
     Next: PPacket;
   end;
 
@@ -74,8 +71,6 @@ type
     Device: Pointer;
     IncomingPacketTail: PPacket;
     IncomingPackets: PPacket;
-    OutgoingPacketTail: PPacket;
-    OutgoingPackets: PPacket;
     Start: procedure (NetInterface: PNetworkInterface);
     Send: procedure (NetInterface: PNetWorkInterface;Packet: PPacket);
     Reset: procedure (NetInterface: PNetWorkInterface);
@@ -165,7 +160,7 @@ function SysSocketSend(Socket: PSocket; Addr: PChar; AddrLen, Flags: UInt32): Lo
 function SysSocketSelect(Socket:PSocket;TimeOut: LongInt):Boolean;
 procedure NetworkInit;
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
-function DequeueOutgoingPacket: PPacket;
+procedure DequeueOutgoingPacket(Packet: PPacket);
 procedure EnqueueIncomingPacket(Packet: PPacket);
 procedure SysNetworkSend(Packet: PPacket);
 function SysNetworkRead: PPacket;
@@ -220,8 +215,6 @@ procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
   NetInterface.IncomingPackets := nil;
   NetInterface.IncomingPacketTail := nil;
-  NetInterface.OutgoingPackets := nil;
-  NetInterface.OutgoingPacketTail := nil;
   NetInterface.Next := NetworkInterfaces;
   NetInterface.CPUID := -1;
   NetworkInterfaces := NetInterface;
@@ -234,44 +227,23 @@ begin
   {$IFDEF DebugSocket}WriteDebug('SetSocketTimeOut: Socket %h, SocketTimeOut: %d, TimeOut: %d\n', [PtrUInt(Socket), Socket.TimeOut, TimeOut]);{$ENDIF}
 end;
 
+// Send Packet through Network Interface, sender loses ownership of Packet
 procedure SysNetworkSend(Packet: PPacket);
 var
   NetworkInterface: PNetworkInterface;
 begin
   NetworkInterface := GetNetwork.NetworkInterface;
-  Packet.Ready := False; // the packet has been sent when Ready = True
-  Packet.Status := False;
   Packet.Next := nil;
   {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sending packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
   NetworkInterface.Send(NetworkInterface, Packet);
   {$IFDEF DebugNetwork}WriteDebug('SysNetworkSend: sent packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
 end;
 
-// Inform the Kernel that the last packet has been sent, returns the next packet to be sent
-function DequeueOutgoingPacket: PPacket;
-var
-  Packet: PPacket;
+// Inform kernel that Packet has been sent
+procedure DequeueOutgoingPacket(Packet: PPacket);
 begin
-  Packet := GetNetwork.NetworkInterface.OutgoingPackets;
-  If Packet = nil then
-  begin
-    {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: OutgoingPackets = NULL\n', []);{$ENDIF}
-    Result := nil;
-    Exit;
-  end;
-  GetNetwork.NetworkInterface.OutgoingPackets := Packet.Next;
-  if Packet.Next = nil then
-  begin
-     GetNetwork.NetworkInterface.OutgoingPacketTail := nil
-  end;
-  Result := GetNetwork.NetworkInterface.OutgoingPackets;
-  if Packet.Delete then
-  begin
-    {$IFDEF DebugNetwork}WriteDebug('DequeueOutgoingPacket: Freeing packet %h\n', [PtrUInt(Packet)]);{$ENDIF}
+  If Packet <> Nil then
     ToroFreeMem(Packet);
-    Exit;
-  end;
-  Packet.Ready := True;
 end;
 
 // Inform the Kernel that a new Packet has arrived
@@ -378,8 +350,6 @@ begin
   Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Ready := False;
-  Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -391,7 +361,6 @@ begin
   VPacket.hdr.op := VIRTIO_VSOCK_OP_RST;
   VPacket.hdr.len := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 function VSocketValidateIncomingConnection(tp, LocalPort: DWORD): PNetworkService;
@@ -468,8 +437,6 @@ begin
   Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Ready := False;
-  Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -483,7 +450,6 @@ begin
   VPacket.hdr.buf_alloc := MAX_WINDOW;
   VPacket.hdr.fwd_cnt := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 procedure VSocketUpdateCredit(Socket: PSocket);
@@ -494,8 +460,6 @@ begin
   Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Ready := False;
-  Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -509,7 +473,6 @@ begin
   VPacket.hdr.len := 0;
   VPacket.hdr.flags := 0;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
 end;
 
 function ProcessSocketPacket(Param: Pointer): PtrUInt;
@@ -631,8 +594,6 @@ var
 begin
   SetPerCPUVar(PERCPUCURRENTNET, PtrUInt(@DedicateNetworks[GetCoreId]));
   Result := false;
-  GetNetwork.NetworkInterface.OutgoingPackets := nil;
-  GetNetwork.NetworkInterface.OutgoingPacketTail := nil;
   GetNetwork.NetworkInterface.IncomingPackets := nil;
   GetNetwork.NetworkInterface.IncomingPacketTail := nil;
   GetNetwork.SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
@@ -790,8 +751,6 @@ begin
   end;
   Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
   Packet.Size := sizeof(TVirtIOVSockHdr);
-  Packet.Ready := False;
-  Packet.Delete := False;
   Packet.Next := nil;
   VPacket := Pointer(Packet.Data);
   VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -805,7 +764,6 @@ begin
   VPacket.hdr.buf_alloc := MAX_WINDOW;
   VPacket.hdr.fwd_cnt := Socket.BufferLength;
   SysNetworkSend(Packet);
-  ToroFreeMem(Packet);
   SetSocketTimeOut(Socket, WAIT_ACK);
   while True do
   begin
@@ -840,8 +798,6 @@ begin
     Packet := ToroGetMem(sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
     Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
     Packet.Size := sizeof(TVirtIOVSockHdr);
-    Packet.Ready := False;
-    Packet.Delete := False;
     Packet.Next := nil;
     VPacket := Pointer(Packet.Data);
     VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -855,7 +811,6 @@ begin
     VPacket.hdr.buf_alloc := MAX_WINDOW;
     VPacket.hdr.fwd_cnt := Socket.BufferLength;
     SysNetworkSend(Packet);
-    ToroFreeMem(Packet);
   end;
 end;
 
@@ -1062,8 +1017,6 @@ begin
     Packet := ToroGetMem(FragLen + sizeof(TPacket)+ sizeof(TVirtIOVSockHdr));
     Packet.Data := Pointer(PtrUInt(Packet)+ sizeof(TPacket));
     Packet.Size := FragLen + sizeof(TVirtIOVSockHdr);
-    Packet.Ready := False;
-    Packet.Delete := False;
     Packet.Next := nil;
     VPacket := Pointer(Packet.Data);
     VPacket.hdr.src_cid := GetNetwork.NetworkInterface.Minor;
@@ -1080,7 +1033,6 @@ begin
     P := Pointer(@VPacket.data);
     Move(Addr^, P^, FragLen);
     SysNetworkSend(Packet);
-    ToroFreeMem(Packet);
     Dec(AddrLen, FragLen);
     Inc(Addr, FragLen);
   end;

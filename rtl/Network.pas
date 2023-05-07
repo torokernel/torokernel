@@ -77,6 +77,7 @@ type
     Stop: procedure (NetInterface: PNetworkInterface);
     CPUID: LongInt;
     Next: PNetworkInterface;
+    Pad: array[0..1] of QWord;
   end;
 
   PTANetworkService = ^TANetworkService;
@@ -174,8 +175,13 @@ implementation
 {$DEFINE DisableInt := asm pushf;cli;end;}
 {$DEFINE RestoreInt := asm popf;end;}
 
+{$push}
+{$codealign varmin=64}
 var
   DedicateNetworks: array[0..MAX_CPU-1] of TNetworkDedicate;
+{$pop}
+
+var
   NetworkInterfaces: PNetworkInterface = nil;
 
 const

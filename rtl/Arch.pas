@@ -119,7 +119,7 @@ function is_apic_ready: Boolean ;
 procedure NOP;
 function read_portb(port: Word): Byte;
 procedure read_portd(Data: Pointer; Port: Word);
-function read_rdtsc: Int64;
+function read_rdtsc: QWORD;
 procedure send_apic_init (apicid : Byte) ;
 procedure send_apic_startup (apicid , vector : Byte );
 function SpinLock(CmpVal, NewVal: UInt64; var addval: UInt64): UInt64; assembler;
@@ -564,7 +564,6 @@ var
 begin
   tmp := Pointer(eoi_reg);
   tmp^ := 0;
-  Delay(10);
 end;
 
 procedure write_ioapic_reg(offset, val: dword);
@@ -828,18 +827,17 @@ begin
   end;
 end;
 
-function read_rdtsc: Int64;
+function read_rdtsc: QWORD;
 var
   l, h: QWORD;
 begin
+  // TODO: to check why using eax does not work
   asm
-    xor rax, rax
-    xor rdx, rdx
     rdtsc
     mov l, rax
     mov h, rdx
   end ['RAX', 'RDX'];
-  Result := QWORD(h shl 32) or l;
+  Result := QWORD(h shl 32) or (l and $ffffffff);
 end;
 
 function bit_test(Val: Pointer; pos: QWord): Boolean;

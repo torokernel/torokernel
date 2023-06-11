@@ -3,7 +3,7 @@
 // This unit is a simple implementation of the MPI API for Toro unikernel.
 // The functions are defined by following the cdecl ABI so they can be used from a C program.
 //
-// Copyright (c) 2003-2022 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2023 Matias Vara <matiasevara@torokernel.io>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -45,12 +45,15 @@ const
 function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer; var recv_count: LongInt; root: LongInt): LongInt; cdecl;
 function Mpi_Reduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl;
+function Mpi_AllReduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl;
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Comm_rank(value: LongInt; out param: LongInt); cdecl;
 procedure MPI_Barrier(value: LongInt); cdecl;
 function Mpi_Wtime: PtrUInt; cdecl;
 
 implementation
+
+procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt); cdecl; forward;
 
 procedure MPI_Comm_size(value: LongInt; out param: LongInt); cdecl; [public, alias: 'MPI_Comm_size'];
 begin
@@ -167,6 +170,14 @@ begin
     end;
     ToroFreeMem(s);
   end;
+end;
+
+function Mpi_AllReduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl; [public, alias: 'Mpi_AllReduce'];
+begin
+  Mpi_Reduce(send_data, recv_data, send_count, Operation, root);
+  // only root gets the reduced values
+  // bcast the other values to the other cores
+  Mpi_Bcast(recv_data, send_count, root);
 end;
 
 var

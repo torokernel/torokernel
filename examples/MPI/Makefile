@@ -1,4 +1,4 @@
-all: MPI_Reduce.o MPI_Barrier.o MPI_Bcast.o
+all: MPI_Reduce.o MPI_Barrier.o MPI_Bcast.o MPI_AllReduce.o
 
 %.o: %.c
 	gcc -g -nostdlib -c $< -o $@

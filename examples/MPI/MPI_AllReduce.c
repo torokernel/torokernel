@@ -23,7 +23,7 @@
 
 void mainC(){
     int rank, world_size, i, j, vectorlen;
-    int sum, avg_time, max_time, min_time;
+    uint32_t sum, avg_time, max_time, min_time;
     uint64_t start, end;
     int r[VECTOR_LEN];
     int s[VECTOR_LEN];
@@ -36,13 +36,25 @@ void mainC(){
     }
     __asm__ __volatile__( "" ::: "memory" );
     Mpi_Barrier(MPI_COMM_WORLD);
+    int val = ((world_size-1) * (world_size)) / 2;
 
     for (vectorlen=1; vectorlen < 128; vectorlen*=2){
         sum = 0;
         for (i=0; i< 100; i++){
+            for (j=0; j< vectorlen; j++){
+                s[j] = 0;
+            }
             start = Mpi_Wtime();
             Mpi_AllReduce(r, s, vectorlen, MPI_SUM, root);
             end = Mpi_Wtime();
+            // verify result
+            for (j=0; j < vectorlen; j++){
+                if (!(s[j] == val)){
+                    break;
+                }
+            }
+            if (j != vectorlen)
+                printf("error! %d %d %d %d\n", j, vectorlen, rank, s[j]);
             sum += (int)(end - start);
             __asm__ __volatile__( "" ::: "memory" );
             Mpi_Barrier(MPI_COMM_WORLD);
@@ -52,18 +64,8 @@ void mainC(){
         Mpi_Reduce(&sum, &max_time, 1, MPI_MAX, root);
         Mpi_Reduce(&sum, &avg_time, 1, MPI_SUM, root);
         if (rank == root){
-            int val = ((world_size-1) * (world_size)) / 2;
-            // verify result
-            for (j=0; j < vectorlen; j++){
-                if (!(s[j] == val)){
-                    break;
-                }
-            }
-            if (j == vectorlen)
-                printf("MPI_ALLREDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
+            printf("MPI_ALLREDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
                     max_time, avg_time / world_size);
-            else
-                printf("MPI_ALLREDUCE(%d): verification has failed\n", vectorlen);
         }
-    }
+   }
 }

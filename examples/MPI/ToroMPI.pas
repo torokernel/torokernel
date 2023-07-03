@@ -175,21 +175,21 @@ end;
 function Mpi_AllReduce(send_data: Pointer; recv_data: Pointer; send_count: LongInt; Operation: Longint; root:LongInt): LongInt; cdecl; [public, alias: 'Mpi_AllReduce'];
 begin
   Mpi_Reduce(send_data, recv_data, send_count, Operation, root);
-  // only root gets the reduced values
-  // bcast the other values to the other cores
+  Mpi_Barrier(MPI_COMM_WORLD);
   Mpi_Bcast(recv_data, send_count, root);
 end;
 
 var
   CoreCounter: LongInt;
-  globalsense: LongInt = 1;
+  globalsense: Boolean;
+
+Threadvar
+  localsense: Boolean;
 
 // this is a simple counter-based algorithm
+// see https://github.com/yuleihit/Barrier-Synchronization/blob/master/sensereversal_openmp.c
 procedure Mpi_Barrier(value: LongInt); cdecl; [public, alias: 'Mpi_Barrier'];
-var
- localsense: LongInt;
 begin
-  localsense := 2;
   localsense := not localsense;
   if InterlockedDecrement(CoreCounter) = 0 then
   begin
@@ -214,14 +214,14 @@ begin
     for cpu:= 0 to CPU_COUNT-1 do
     begin
       if cpu <> root then
-        SendTo(cpu, data, count);
+        SendTo(cpu, data, count * sizeof(LongInt));
     end;
   end else
   begin
     RecvFrom(root, @buff[0]);
     tmp := @buff[0];
     r := data;
-    Move(tmp^, r^, count);
+    Move(tmp^, r^, count * sizeof(LongInt));
   end;
 end;
 

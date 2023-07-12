@@ -615,7 +615,7 @@ begin
   SelDriverFeatures(Device.Base, 1);
   SetDriverFeatures(Device.Base, (1 shl VIRTIO_F_VERSION_1) shr 32);
   SetDeviceStatus(Device.Base, VIRTIO_ACKNOWLEDGE or VIRTIO_DRIVER or VIRTIO_FEATURES_OK);
-  if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, QUEUE_LEN, 0, 1) then
+  if not VirtIOInitQueue(Device.Base, REQUEST_QUEUE, @FsVirtio.RqQueue, QUEUE_LEN, 0) then
   begin
     WriteConsoleF('VirtIOFS: queue 0, failed\n', []);
     Exit;

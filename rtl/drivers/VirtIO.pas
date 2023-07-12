@@ -150,7 +150,7 @@ procedure SetIntACK(Base: QWORD; Value: DWORD);
 function GetDeviceFeatures(Base: QWORD): DWORD;
 procedure SetDriverFeatures(Base: QWORD; Value: DWORD);
 procedure SelDriverFeatures(Base: DWORD; Value: DWORD);
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD; Align : LongInt): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
 procedure VirtIOAddBuffer(Base: QWORD; Queue: PVirtQueue; bi:PBufferInfo; count: QWord);
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);
 function HexStrtoQWord(start, last: PChar): QWord;
@@ -356,7 +356,7 @@ begin
   end;
 end;
 
-function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD; Align: LongInt): Boolean;
+function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;
 var
   j: LongInt;
   QueueSize, sizeOfBuffers: DWORD;
@@ -368,8 +368,6 @@ var
   EnableQueue: ^DWORD;
 begin
   Result := False;
-  if (Align <> 0) and (Align <> 1) then
-    Exit;
 
   FillByte(Queue^, sizeof(TVirtQueue), 0);
 
@@ -431,7 +429,7 @@ begin
 
   if HeaderLen <> 0 then
   begin
-    Queue.Buffer := ToroGetMem(Queue.queue_size * (HeaderLen));
+    Queue.Buffer := ToroGetMem(Queue.queue_size * HeaderLen);
     if Queue.Buffer = nil then
       Exit;
     Queue.chunk_size := HeaderLen;

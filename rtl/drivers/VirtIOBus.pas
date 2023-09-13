@@ -205,7 +205,7 @@ begin
     begin
       if rxi = cpu then
         Continue;
-      if VirtIOInitQueue(PtrUInt(mmioconf), RX_QUEUE, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE, 0) then
+      if VirtIOInitQueue(PtrUInt(mmioconf), RX_QUEUE, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE) then
       begin
         WriteConsoleF('VirtIOBus: Core[%d]->Core[%d] queue has been initiated\n', [rxi, cpu]);
       end;

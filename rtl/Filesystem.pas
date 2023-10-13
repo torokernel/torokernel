@@ -724,7 +724,6 @@ procedure FileSystemInit;
 var
   I: LongInt;
 begin
-  WriteConsoleF('Loading Virtual FileSystem ...\n',[]);
   for I := 0 to MAX_CPU-1 do
   begin
     Storages[I].BlockFiles := nil;

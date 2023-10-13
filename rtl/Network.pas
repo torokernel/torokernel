@@ -657,7 +657,6 @@ procedure NetworkInit;
 var
   I: LongInt;
 begin
-  WriteConsoleF('Loading Network Stack ...\n',[]);
   for I := 0 to MAX_CPU - 1 do
   begin
     DedicateNetworks[I].NetworkInterface := nil;

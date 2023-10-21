@@ -111,7 +111,7 @@ function SysSuspendThread(ThreadID: TThreadID): DWORD;
 function SysKillThread(ThreadID: TThreadID): DWORD;
 procedure SysThreadSwitch;
 procedure ThreadExit(Schedule: Boolean);
-procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
+procedure Panic(const cond: Boolean; const Format: PChar; const Args: array of PtrUInt);
 procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
 function GetCPU: PCPU; inline;
@@ -1318,7 +1318,7 @@ begin
 end;
 
 // Halt core if a Panic condition is reached
-procedure Panic(const cond: Boolean; const Format: AnsiString; const Args: array of PtrUInt);
+procedure Panic(const cond: Boolean; const Format: PChar; const Args: array of PtrUInt);
 var
  rbp_reg: QWord;
  addr: pointer;

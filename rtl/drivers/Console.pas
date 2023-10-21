@@ -30,7 +30,7 @@ interface
 uses Arch, Process;
 
 procedure PrintDecimal(Value: PtrUInt);
-procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
+procedure WriteConsoleF(const Format: PChar; const Args: array of PtrUInt);
 procedure ConsoleInit;
 procedure ReadFromSerial(out C: XChar);
 procedure PutCtoSerial(C: XChar);
@@ -144,7 +144,7 @@ begin
     PutC(S[I]);
 end;
 
-procedure WriteConsoleF(const Format: AnsiString; const Args: array of PtrUInt);
+procedure WriteConsoleF(const Format: PChar; const Args: array of PtrUInt);
 var
   ArgNo: LongInt;
   I, J: LongInt;
@@ -159,13 +159,13 @@ begin
   SpinLock (3,4,LockConsole);
 
   ArgNo := 0 ;
-  J := 1;
-  while J <= Length(Format) do
+  J := 0;
+  while Format[J] > #0 do
   begin
     if (Format[J] = '%') and (High(Args) <> -1) and (High(Args) >= ArgNo) then
     begin
       Inc(J);
-      if J > Length(Format) then
+      if Format[J] = #0 then
       begin
         LockConsole := 3;
         RestoreInt;
@@ -217,7 +217,7 @@ begin
     if Format[J] = '\' then
     begin
       Inc(J);
-      if J > Length(Format) then
+      if Format[J] = #0 then
       begin
         LockConsole := 3;
         RestoreInt;

@@ -107,7 +107,6 @@ type
     ConnectionsQueueLen: LongInt;
     ConnectionsQueueCount: LongInt;
     NeedFreePort: Boolean;
-    DispatcherEvent: LongInt;
     TimeOut: Int64;
     BufferSenderTail: PBufferSender;
     BufferSender: PBufferSender;
@@ -118,6 +117,7 @@ type
 
   TNetworkService = record
     ServerSocket: PSocket;
+    ArrivalSockets: PSocket;
     ClientSocket: PSocket;
   end;
 
@@ -230,7 +230,6 @@ end;
 procedure SetSocketTimeOut(Socket: PSocket; TimeOut: Int64); inline;
 begin
   Socket.TimeOut := read_rdtsc + TimeOut * LocalCPUSpeed * 1000;
-  Socket.DispatcherEvent := DISP_WAITING;
   {$IFDEF DebugSocket}WriteDebug('SetSocketTimeOut: Socket %h, SocketTimeOut: %d, TimeOut: %d\n', [PtrUInt(Socket), Socket.TimeOut, TimeOut]);{$ENDIF}
 end;
 
@@ -436,7 +435,6 @@ begin
   ClientSocket.Buffer := Buffer;
   ClientSocket.BufferReader := ClientSocket.Buffer;
   ClientSocket.SocketType := SOCKET_STREAM;
-  ClientSocket.DispatcherEvent := DISP_ACCEPT;
   ClientSocket.Mode := MODE_CLIENT;
   ClientSocket.BufferSender := nil;
   ClientSocket.BufferSenderTail := nil;
@@ -515,8 +513,8 @@ begin
             if ClientSocket <> nil then
             begin
               Inc(Service.ServerSocket.ConnectionsQueueCount);
-              ClientSocket.Next := Service.ClientSocket;
-              Service.ClientSocket := ClientSocket;
+              ClientSocket.Next := Service.ArrivalSockets;
+              Service.ArrivalSockets := ClientSocket;
               ClientSocket.SourcePort := VPacket.hdr.dst_port;
               ClientSocket.DestPort := VPacket.hdr.src_port;
               ClientSocket.DestIp := VPacket.hdr.src_cid;
@@ -677,7 +675,6 @@ begin
     {$IFDEF DebugSocket} WriteDebug('SysSocket: fail not enough memory\n', []); {$ENDIF}
     Exit;
   end;
-  Socket.DispatcherEvent := DISP_ZOMBIE;
   Socket.State := 0;
   Socket.SocketType := SocketType;
   Socket.BufferLength := 0;
@@ -855,28 +852,23 @@ var
   NextSocket, tmp: PSocket;
   Service: PNetworkService;
 begin
+  Result := nil;
   if not Socket.Blocking then
-  begin
-    Result := nil;
     Exit;
-  end;
   Service := GetNetwork.SocketStream[Socket.SourcePort];
   while True do
   begin
-    NextSocket := Service.ClientSocket;
-    while NextSocket <> nil do
+    NextSocket := Service.ArrivalSockets;
+    if NextSocket <> nil then
     begin
-      tmp := NextSocket;
-      NextSocket := tmp.Next;
-      if tmp.DispatcherEvent = DISP_ACCEPT then
-      begin
-        Dec(Service.ServerSocket.ConnectionsQueueCount);
-        // TODO: This may be not needed because client socket are created based on the father socket
-        tmp.Blocking := True;
-        tmp.DispatcherEvent := DISP_ZOMBIE;
-        Result := tmp;
-        Exit;
-      end;
+      Service.ArrivalSockets := NextSocket.next;
+      NextSocket.next := Service.ClientSocket;
+      Service.ClientSocket := NextSocket;
+      Dec(Service.ServerSocket.ConnectionsQueueCount);
+      // TODO: This may be not needed because client socket are created based on the father socket
+      NextSocket.Blocking := True;
+      Result := NextSocket;
+      Exit;
     end;
     SysThreadSwitch;
   end;
@@ -953,13 +945,11 @@ begin
     {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
     if Socket.State = SCK_LOCALCLOSING then
     begin
-      Socket.DispatcherEvent := DISP_CLOSE;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
       Exit;
     end;
     if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
     begin
-      Socket.DispatcherEvent := DISP_RECEIVE;
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
       Exit;
     end;
@@ -973,14 +963,12 @@ begin
       {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h TimeOut: %d\n', [PtrUInt(Socket), TimeOut]); {$ENDIF}
       if Socket.State = SCK_LOCALCLOSING then
       begin
-        Socket.DispatcherEvent := DISP_CLOSE;
         Result := False;
         {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h in SCK_LOCALCLOSING, executing DISP_CLOSE\n', [PtrUInt(Socket)]); {$ENDIF}
         Exit;
       end;
       if Socket.BufferReader < Socket.Buffer+Socket.BufferLength then
       begin
-        Socket.DispatcherEvent := DISP_RECEIVE;
         {$IFDEF DebugSocket} WriteDebug('SysSocketSelect: Socket %h executing, DISP_RECEIVE\n', [PtrUInt(Socket)]); {$ENDIF}
         Exit;
       end;

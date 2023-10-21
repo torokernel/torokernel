@@ -865,8 +865,6 @@ begin
       NextSocket.next := Service.ClientSocket;
       Service.ClientSocket := NextSocket;
       Dec(Service.ServerSocket.ConnectionsQueueCount);
-      // TODO: This may be not needed because client socket are created based on the father socket
-      NextSocket.Blocking := True;
       Result := NextSocket;
       Exit;
     end;

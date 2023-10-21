@@ -32,15 +32,20 @@ def generate_msg(size):
 
 def send_msg(cdi, port, msg, size):
     s = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-    s.connect((cdi, port))
-    s.sendall(msg)
     response = bytearray()
-    while len(response) < size:
-        packet = s.recv(size - len(response))
-        if not packet:
-            break
-        response.extend(packet)
-    s.close()
+    try:
+        s.connect((cdi, port))
+        print(size)
+        s.sendall(msg)
+        while len(response) < size:
+            packet = s.recv(size - len(response))
+            if not packet:
+                break
+            response.extend(packet)
+    except socket.error:
+        print("Some error has happened")
+    finally:
+        s.close()
     return response
 
 # test server mode by sending chunks and waiting to get the same

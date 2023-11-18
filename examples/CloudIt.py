@@ -20,7 +20,8 @@
 #
 import argparse
 import os
-from subprocess import call, check_output
+from subprocess import call, check_output, CalledProcessError
+import subprocess
 from datetime import datetime
 import asyncio
 from qemu.qmp import QMPClient
@@ -103,6 +104,9 @@ def qemu_run(params):
         print("error running qemu")
 
 parser = argparse.ArgumentParser(description='Compile and Deploy applications using Toro unikernel')
+# TODO: 
+# - add argument for headless
+# - add argument for clean up before compiling
 parser.add_argument('-a', '--application', type=str, required=True, help='Freepascal application to compile')
 parser.add_argument('-v', '--verbose', action='store_true')
 parser.add_argument('-p', '--pinning', action='store_true', help='Pin VCPUs to CPUs, this requires the cpu argument')
@@ -128,10 +132,15 @@ fpc_compile(['/objpas/sysutils', '/linux/x86_64', '/linux/', '/x86_64/', '/inc/'
             [],
             False)
 
-head_commit = check_output(['git', 'rev-parse', 'HEAD'])
-
 # add kernel head commit and building time
-os.environ['KERNEL_HEAD'] = head_commit[0:7].decode()
+try:
+    head_commit = check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL)
+    os.environ['KERNEL_HEAD'] = head_commit[0:7].decode()
+except CalledProcessError as e:
+    os.environ['KERNEL_HEAD'] = "0000000"
+except OSError:
+    os.environ['KERNEL_HEAD'] = "0000000"
+
 os.environ['BUILD_TIME'] = str(datetime.now())
 
 fpc_compile(['/objpas/sysutils', '/linux/x86_64', '/linux/', '/x86_64/', '/inc/', '/unix/'],

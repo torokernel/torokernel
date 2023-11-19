@@ -21,7 +21,7 @@ wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfil
 sudo docker build -t torokernel-dev .
 sudo docker run --privileged --rm -it torokernel-dev
 cd examples/HelloWorld
-../CloudIt.sh HelloWorld
+python3 ../CloudIt.py -a HelloWorld
 ```
 If these commands execute successfully, you will get the output of the HelloWorld example. 
 You can also pull the image from dockerhub instead of building it:
@@ -68,13 +68,13 @@ git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
 ```
 Note that Step 1, 2, 3 and 4 can be found in the script at `ci/prepare_host.sh`.
 
-### Step 5. Edit path to Qemu and FPC in CloudIt.sh
-Go to `torokernel/examples` and edit `CloudIt.sh` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
+### Step 5. Edit path to Qemu and FPC in CloudIt.py
+Go to `torokernel/examples` and edit `CloudIt.py` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
 
 ## Run the HelloWorld Example
 You have to go to `examples/HelloWorld/` and execute:
 ```bash
-../CloudIt.sh HelloWorld
+python3 ../CloudIt.py -a HelloWorld
 ```
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/helloworld.gif)
 
@@ -101,14 +101,14 @@ In a second terminal, execute:
 Replace `source` with the directory to serve. Finally, launch the static webserver by executing:  
 
 ```bash
-../CloudIt.sh StaticWebServer "-dShutdownWhenFinished"
+python3 ../CloudIt.py -a StaticWebServer
 ```
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/staticwebser.gif)
 
 ## Run the Intercore Communication example
 This example shows how cores can communicate by using the VirtIOBus device. In this example, core #0 sends a packet to every core in the system with the **ping** string. Each core responds with a packet that contains the message **pong**. This example is configured to use three cores. To launch it, simply executes the following commands in the context of the container presented above:
 ```bash
-../CloudIt.sh InterCoreComm
+python3 ../CloudIt.py -a InterCoreComm
 ```
 You will get the following output:
 ![InterComm](https://github.com/torokernel/torokernel/wiki/images/intercom.gif)

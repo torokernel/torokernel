@@ -58,7 +58,7 @@ async def pin_cores(server, cpu):
         try:
             call(["taskset", "-pc", str(cpuid), str(tid)], stdout=devnull)
         except OSError:
-            print(f"Failed to pin vCPU{vcpuid} to CPU{cpuid}")  # .format(vcpuid, cpuid)
+            print(f"Failed to pin vCPU{vcpuid} to CPU{cpuid}")
     await qmp.disconnect()
 
 
@@ -115,6 +115,7 @@ parser = argparse.ArgumentParser(
 # TODO:
 # - add argument for headless
 # - add argument for clean up before compiling
+# - add argument to create a new template project
 parser.add_argument(
     "-a",
     "--application",
@@ -126,11 +127,9 @@ parser.add_argument("-v", "--verbose", action="store_true")
 parser.add_argument(
     "-p",
     "--pinning",
-    action="store_true",
-    help="Pin VCPUs to CPUs, this requires the cpu argument",
+    nargs="+",
+    help="Pin VCPUs to CPUs",
 )
-# TODO: this arg should be different
-parser.add_argument("cpu", type=int, nargs="*", help="Physical CPUs IDs")
 argscmd = parser.parse_args()
 
 fpc_compile(
@@ -195,7 +194,7 @@ if argscmd.pinning:
     th = threading.Thread(target=qemu_run, args=(args,))
     th.start()
     time.sleep(1)
-    asyncio.run(pin_cores("./qmp-sock", argscmd.cpu))
+    asyncio.run(pin_cores("./qmp-sock", argscmd.pinning))
     asyncio.run(run("./qmp-sock"))
 else:
     th = threading.Thread(target=qemu_run, args=(args,))

@@ -182,7 +182,7 @@ fpc_compile(
     ["-v0", "-TLinux", "-Xm", "-Si", "-O2", "-g", "-MObjfpc", "-kprt0.o"],
     argscmd.application + ".pas",
     ["-Fu../../rtl", "-Fu../../rtl/drivers", "-o" + argscmd.application],
-    False,
+    True,
 )
 
 signal.signal(signal.SIGINT, handler)

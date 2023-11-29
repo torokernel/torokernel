@@ -49,6 +49,12 @@ type
     NrDesc: DWORD;
   end;
 
+  PVirtIOBusHeader = ^TVirtIOBusHeader;
+  TVirtIOBusHeader = record
+    Len: LongInt;
+    Payload: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE - sizeof(LongInt) - 1] of Char;
+  end;
+
 var
   VirtIOCPUs: array[0..MAX_CPU-1] of TVirtIOCPU;
   mmioconf: Pointer;
@@ -147,15 +153,23 @@ end;
 procedure SendTo(Core: DWORD; Buffer: Pointer; Len: DWORD);
 var
   tmp: PQueueBuffer;
+  hdr: PVirtIOBusHeader;
   buffer_index: WORD;
 begin
+  if Len > VIRTIO_CPU_MAX_PKT_BUF_SIZE - sizeof(LongInt) then
+    Exit;
+
   tmp := nil;
   while tmp = nil do
   begin
     tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index);
     ThreadSwitch;
   end;
-  Move(Pchar(Buffer)^, Pchar(tmp.address)^, Len);
+
+  hdr := Pointer(tmp.address);
+  hdr.Len := Len;
+
+  Move(Pchar(Buffer)^, Pchar(@hdr.PayLoad)^, Len);
   VirtIOAddConsumedBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index, tmp.length);
   // NotifyFrontEnd(Core);
 end;
@@ -165,6 +179,7 @@ var
   index, buffer_index: WORD;
   id, Len: DWORD;
   bi: TBufferInfo;
+  hdr: PVirtIOBusHeader;
   buf: PQueueBuffer;
 begin
   id := GetCoreId;
@@ -178,7 +193,9 @@ begin
   Inc(buf, buffer_index);
   Len := VirtIOCPUs[id].QueueRx[core].used.rings[index].length;
 
-  Move(Pchar(buf.address)^, Pchar(Buffer)^, Len);
+  hdr := Pointer(buf.address);
+
+  Move(Pchar(@hdr.Payload)^, Pchar(Buffer)^, hdr.Len);
 
   bi.size := Len;
   bi.buffer := Pointer(buf.address);

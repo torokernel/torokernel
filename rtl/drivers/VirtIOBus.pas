@@ -36,7 +36,8 @@ uses
   Arch, VirtIO, Console, Network, Process, Memory;
 
 const
-  VIRTIO_CPU_MAX_PKT_BUF_SIZE = 1024;
+  VIRTIO_CPU_MAX_PKT_SIZE = 1024;
+  VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE = VIRTIO_CPU_MAX_PKT_SIZE - sizeof(LongInt);
   QUEUE_LEN = 10;
   RX_QUEUE = 0;
 
@@ -52,7 +53,7 @@ type
   PVirtIOBusHeader = ^TVirtIOBusHeader;
   TVirtIOBusHeader = record
     Len: LongInt;
-    Payload: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE - sizeof(LongInt) - 1] of Char;
+    Payload: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE - 1] of Char;
   end;
 
 var
@@ -156,7 +157,7 @@ var
   hdr: PVirtIOBusHeader;
   buffer_index: WORD;
 begin
-  if Len > VIRTIO_CPU_MAX_PKT_BUF_SIZE - sizeof(LongInt) then
+  if Len > VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE then
     Exit;
 
   tmp := nil;
@@ -222,7 +223,7 @@ begin
     begin
       if rxi = cpu then
         Continue;
-      if VirtIOInitQueue(PtrUInt(mmioconf), RX_QUEUE, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_BUF_SIZE) then
+      if VirtIOInitQueue(PtrUInt(mmioconf), RX_QUEUE, @VirtIOCPUs[cpu].QueueRx[rxi], QUEUE_LEN, VIRTIO_CPU_MAX_PKT_SIZE) then
       begin
         WriteConsoleF('VirtIOBus: Core[%d]->Core[%d] queue has been initiated\n', [rxi, cpu]);
       end;

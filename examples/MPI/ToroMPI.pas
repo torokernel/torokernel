@@ -70,7 +70,7 @@ function Mpi_Scatter(send_data: Pointer; send_count: LongInt; recv_data: Pointer
 var
   r, tmp: ^LongInt;
   cpu, len_per_core: LongInt;
-  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE - 1] of Char;
 begin
   r := send_data;
   len_per_core := (send_count * sizeof(LongInt)) div CPU_COUNT;
@@ -102,7 +102,7 @@ function Mpi_Gather(send_data: Pointer; send_count: LongInt; recv_data: Pointer;
 var
   r, tmp: ^LongInt;
   cpu, len_per_core: LongInt;
-  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE - 1] of Char;
 begin
   r := recv_data;
   len_per_core := send_count * sizeof(LongInt);
@@ -205,7 +205,7 @@ end;
 // TODO: count must always be less or equal than VIRTIO_CPU_MAX_PKT_BUF_SIZE
 procedure Mpi_Bcast(data: Pointer; count: LongInt; root: LongInt); cdecl; [public, alias: 'Mpi_Bcast'];
 var
-  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE - 1] of Char;
   tmp, r: PChar;
   cpu: LongInt;
 begin
@@ -233,7 +233,7 @@ end;
 // TODO: count must be less or equal than VIRTIO_CPU_MAX_PKT_BUF_SIZE
 function Mpi_Recv(data: pointer; count: LongInt; source: LongInt): LongInt;
 var
-  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE - 1] of Char;
   r, tmp: PChar;
 begin
   RecvFrom(source, @buff[0]);

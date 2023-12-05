@@ -161,9 +161,10 @@ begin
     Exit;
 
   tmp := nil;
-  while tmp = nil do
+  while True do
   begin
     tmp := VirtIOGetAvailBuffer(@VirtIOCPUs[GetCoreId].QueueTx[core], buffer_index);
+    if tmp <> nil then Break;
     ThreadSwitch;
   end;
 

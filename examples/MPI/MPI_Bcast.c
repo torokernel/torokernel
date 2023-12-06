@@ -33,8 +33,10 @@ void mainC(){
     __asm__ __volatile__( "" ::: "memory" ) ;
     Mpi_Barrier(MPI_COMM_WORLD);
     
-    for (msgsize=2; msgsize < 2048; msgsize*=2){
+    for (msgsize=2; msgsize < 1024; msgsize*=2){
         sum = 0;
+        __asm__ __volatile__( "" ::: "memory" ) ;
+        Mpi_Barrier(MPI_COMM_WORLD);
         for (i=0; i< 100; i++){
             start = Mpi_Wtime();
             Mpi_Bcast(data, msgsize, root);

@@ -154,6 +154,7 @@ function GetKernelParam(I: LongInt): Pchar;
 function read_ioapic_reg(offset: dword): dword;
 procedure write_ioapic_reg(offset, val: dword);
 function find_msb_set(value: DWORD): LongInt; assembler;
+function GetStealCPU: QWORD;
 
 const
   MP_START_ADD = $e0000;
@@ -232,6 +233,7 @@ const
 
   MSR_KVM_SYSTEM_TIME_NEW = $4b564d01;
   MSR_KVM_WALL_CLOCK_NEW =  $4b564d00;
+  MSR_KVM_STEAL_TIME = $4b564d03;
 
   // Bootloader signatures
   SIG_PVH = 1;
@@ -340,8 +342,21 @@ type
     pad: array[0..1] of BYTE;
   end;
 
+  PKVMStealTime = ^TKVMStealTime;
+  TKVMStealTime = packed record
+      steal: QWORD;
+      version: DWORD;
+      flags: DWORD;
+      preempted: Byte;
+      u8_pad: array[0..2] of Byte;
+      pad: array[0..10] of DWORD;
+  end;
+
 
 function GetApicId: Byte; forward;
+
+var
+  ToroStealClocks: array[0..MAX_CPU-1] of TKVMStealTime;
 
 procedure InttoStr(Value: PtrUInt; buff: PXChar);
 var
@@ -1057,6 +1072,27 @@ begin
   end ['EAX', 'EDX', 'ECX'];
 end;
 
+procedure KVMSetStealClock;
+var
+  l, h: DWORD;
+  PClock: PKVMStealTime;
+begin
+  PClock := @ToroStealClocks[GetCoreId];
+  l := (PTrUInt(PClock) and $ffffffff) or 1;
+  h := (PTrUInt(PClock) and $ffffffff00000000) shr 32;
+  asm
+    mov eax, l
+    mov edx, h
+    mov ecx, MSR_KVM_STEAL_TIME
+    wrmsr
+  end ['EAX', 'EDX', 'ECX'];
+end;
+
+function GetStealCPU: QWORD;
+begin
+  Result := ToroStealClocks[GetApicId].steal;
+end;
+
 Type
   PKVMClock = ^KVMClock;
   KVMClock = packed record
@@ -1202,6 +1238,7 @@ asm
   xor rbp, rbp
   sti
   call SSEInit
+  call KVMSetStealClock
   call boot_confirmation
 end;
 
@@ -1541,6 +1578,8 @@ begin
   CaptureInt(INTER_CORE_IRQ, @Apic_IRQ_Ignore);
   EnableInt;
   KVMInstallClock(@ToroClock);
+  FillChar(PChar(@ToroStealClocks)^, sizeof(ToroStealClocks), 0);
+  KVMSetStealClock;
   KVMGetClock(@clk);
   StartTime.Sec := clk.sec mod 86400;
   StartTime.Min := (StartTime.Sec  div 60) mod 60;

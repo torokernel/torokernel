@@ -40,6 +40,8 @@ void mainC(){
 
     for (vectorlen=1; vectorlen < 128; vectorlen*=2){
         sum = 0;
+        __asm__ __volatile__( "" ::: "memory" ) ;
+        Mpi_Barrier(MPI_COMM_WORLD);
         for (i=0; i< 100; i++){
             for (j=0; j< vectorlen; j++){
                 s[j] = 0;
@@ -67,5 +69,5 @@ void mainC(){
             printf("MPI_ALLREDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
                     max_time, avg_time / world_size);
         }
-   }
+    }
 }

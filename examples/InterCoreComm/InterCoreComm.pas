@@ -47,12 +47,12 @@ var
  ping: PChar = 'ping'#0;
  pong: PChar = 'pong'#0;
  tmp: TThreadId;
- buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+ buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE-1] of Char;
  CPU: LongInt;
 
 function Thread(param: Pointer): PtrInt;
 var
-  buff: array[0..VIRTIO_CPU_MAX_PKT_BUF_SIZE-1] of Char;
+  buff: array[0..VIRTIO_CPU_MAX_PKT_PAYLOAD_SIZE-1] of Char;
   id: DWORD;
 begin
   id := PtrUInt(param);

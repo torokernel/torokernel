@@ -19,7 +19,7 @@
 
 #include <stddef.h>
 #include "ToroMpi.h"
-#define VECTOR_LEN 64
+#define VECTOR_LEN 128
 
 void mainC(){
     int rank, world_size, i, j, vectorlen;
@@ -38,7 +38,7 @@ void mainC(){
     Mpi_Barrier(MPI_COMM_WORLD);
     int val = ((world_size-1) * (world_size)) / 2;
 
-    for (vectorlen=1; vectorlen < 128; vectorlen*=2){
+    for (vectorlen=1; vectorlen < VECTOR_LEN; vectorlen*=2){
         sum = 0;
         __asm__ __volatile__( "" ::: "memory" ) ;
         Mpi_Barrier(MPI_COMM_WORLD);
@@ -66,7 +66,7 @@ void mainC(){
         Mpi_Reduce(&sum, &max_time, 1, MPI_MAX, root);
         Mpi_Reduce(&sum, &avg_time, 1, MPI_SUM, root);
         if (rank == root){
-            printf("MPI_ALLREDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen, min_time,
+            printf("MPI_ALLREDUCE(%d): min_time: %d cycles, max_time: %d cycles, avg_time: %d cycles\n", vectorlen * sizeof(int), min_time,
                     max_time, avg_time / world_size);
         }
     }

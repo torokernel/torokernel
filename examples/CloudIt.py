@@ -144,6 +144,7 @@ parser.add_argument(
     help="Pin VCPUs to CPUs",
 )
 parser.add_argument("-c", "--clean", action="store_true", help="Clean before compile")
+parser.add_argument("-s", "--shutdown", action="store_true", help="Shutdown when application finishes")
 argscmd = parser.parse_args()
 
 if argscmd.clean:
@@ -193,10 +194,15 @@ except OSError:
 
 os.environ["BUILD_TIME"] = str(datetime.now())
 
+flags = ["-v0", "-TLinux", "-Xm", "-Si", "-O2", "-g", "-MObjfpc", "-kprt0.o"]
+
+if argscmd.shutdown:
+    flags.append("-dShutdownWhenFinished")
+
 fpc_compile(
     ["/objpas/sysutils", "/linux/x86_64", "/linux/", "/x86_64/", "/inc/", "/unix/"],
     ["/unix/", "/linux/", "/objpas/", "/inc/"],
-    ["-v0", "-TLinux", "-Xm", "-Si", "-O2", "-g", "-MObjfpc", "-kprt0.o"],
+    flags,
     argscmd.application + ".pas",
     ["-Fu../../rtl", "-Fu../../rtl/drivers", "-o" + argscmd.application],
     True,

@@ -28,6 +28,7 @@ from qemu.qmp import QMPClient
 import threading
 import time
 import signal
+from os import listdir
 
 # set up the correct path
 fpcrtlsource = "/root/fpc-3.2.0/rtl"
@@ -108,13 +109,25 @@ def qemu_run(params):
     except OSError:
         print("error running qemu")
 
+def do_clean(app):
+    BinPath = '../../rtl/'
+    BinDriverPath = '../../rtl/drivers/'
+    AppPath = app
+    AppPathBin = app + '.o'
+    for fileName in listdir(BinPath):
+        if fileName.endswith('.ppu') or fileName.endswith('.o'):
+            os.remove(BinPath + fileName)
+    for fileName in listdir(BinDriverPath):
+        if fileName.endswith('.ppu') or fileName.endswith('.o'):
+            os.remove(BinDriverPath + fileName)
+    os.remove(AppPath)
+    os.remove(AppPathBin)
 
 parser = argparse.ArgumentParser(
     description="Compile and Deploy applications using Toro unikernel"
 )
 # TODO:
 # - add argument for headless
-# - add argument for clean up before compiling
 # - add argument to create a new template project
 parser.add_argument(
     "-a",
@@ -130,7 +143,11 @@ parser.add_argument(
     nargs="+",
     help="Pin VCPUs to CPUs",
 )
+parser.add_argument("-c", "--clean", action="store_true", help="Clean before compile")
 argscmd = parser.parse_args()
+
+if argscmd.clean:
+    do_clean(argscmd.application)
 
 fpc_compile(
     ["/objpas/sysutils", "/linux/x86_64", "/linux/", "/x86_64/", "/inc/", "/unix/"],

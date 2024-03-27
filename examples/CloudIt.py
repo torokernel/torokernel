@@ -92,7 +92,7 @@ def fpc_compile(inc, units, flags, file, extras, output):
 
 
 # run qemu with given parameters
-def qemu_run(params):
+def qemu_run(params, output=None):
     qemuparamms = ""
     try:
         with open("qemu.args") as f:
@@ -104,10 +104,17 @@ def qemu_run(params):
     qemu_args = []
     qemu_args.append(qemubin)
     qemu_args += qemuparams.split()
-    try:
-        call(qemu_args)
-    except OSError:
-        print("error running qemu")
+    if output is not None:
+        f = open(output, "w")
+        try:
+            call(qemu_args, stdout=f)
+        except OSError:
+            print("error running qemu")
+    else:
+        try:
+            call(qemu_args)
+        except OSError:
+            print("error running qemu")
 
 def do_clean(app):
     BinPath = '../../rtl/'
@@ -135,6 +142,12 @@ parser.add_argument(
     type=str,
     required=True,
     help="Freepascal application to compile",
+)
+parser.add_argument(
+    "-o",
+    "--output",
+    type=str,
+    help="Output to a file",
 )
 parser.add_argument("-v", "--verbose", action="store_true")
 parser.add_argument(
@@ -214,13 +227,13 @@ args = "-kernel " + argscmd.application
 
 if argscmd.pinning:
     args += " -S"
-    th = threading.Thread(target=qemu_run, args=(args,))
+    th = threading.Thread(target=qemu_run, args=(args, argscmd.output))
     th.start()
     time.sleep(1)
     asyncio.run(pin_cores("./qmp-sock", argscmd.pinning))
     asyncio.run(run("./qmp-sock"))
 else:
-    th = threading.Thread(target=qemu_run, args=(args,))
+    th = threading.Thread(target=qemu_run, args=(args, argscmd.output))
     th.start()
 
 th.join()

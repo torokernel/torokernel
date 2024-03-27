@@ -116,6 +116,7 @@ def qemu_run(params, output=None):
         except OSError:
             print("error running qemu")
 
+
 def do_clean(app):
     BinPath = '../../rtl/'
     BinDriverPath = '../../rtl/drivers/'
@@ -129,6 +130,7 @@ def do_clean(app):
             os.remove(BinDriverPath + fileName)
     os.remove(AppPath)
     os.remove(AppPathBin)
+
 
 parser = argparse.ArgumentParser(
     description="Compile and Deploy applications using Toro unikernel"
@@ -156,8 +158,10 @@ parser.add_argument(
     nargs="+",
     help="Pin VCPUs to CPUs",
 )
-parser.add_argument("-c", "--clean", action="store_true", help="Clean before compile")
-parser.add_argument("-s", "--shutdown", action="store_true", help="Shutdown when application finishes")
+parser.add_argument("-c", "--clean", action="store_true",
+                    help="Clean before compile")
+parser.add_argument("-s", "--shutdown", action="store_true",
+                    help="Shutdown when application finishes")
 argscmd = parser.parse_args()
 
 if argscmd.clean:
@@ -198,7 +202,8 @@ fpc_compile(
 
 # add kernel head commit and building time
 try:
-    head_commit = check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+    head_commit = check_output(
+        ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
     os.environ["KERNEL_HEAD"] = head_commit[0:7].decode()
 except CalledProcessError as e:
     os.environ["KERNEL_HEAD"] = "0000000"

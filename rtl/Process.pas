@@ -986,8 +986,10 @@ begin
     Current := GetCurrentThread;
     NewThreadMsg.Parent := Current;
     NewThreadMsg.Next := nil;
-    AddThreadMsg(@NewThreadMsg);
+    // Remote core wakes up current thread
+    // once operation is finished
     Current.State := tsSuspended;
+    AddThreadMsg(@NewThreadMsg);
     SysThreadSwitch;
     Result := NewThreadMsg.RemoteResult;
   end;

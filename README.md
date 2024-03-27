@@ -158,3 +158,5 @@ GPLv3
 [6] Building a Cloud Infrastructure to Deploy Microservices as Microvm Guests. Matias Vara. KVM Forum 2020.
 
 [7] Running MPI applications on Toro unikernel. Matias Vara. FOSDEM 2023.
+
+[8] Is Toro unikernel faster for MPI?. Matias Vara. FOSDEM 2024.

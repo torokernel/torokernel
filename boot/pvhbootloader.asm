@@ -3,7 +3,7 @@
 ;
 ; PVH bootloader for torokernel
 ;
-; Copyright (c) 2003-2022 Matias Vara <matiasevara@torokernel.com>
+; Copyright (c) 2003-2024 Matias Vara <matiasevara@torokernel.com>
 ; All Rights Reserved
 ;
 ; This program is free software: you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-global _startkernel
+global _start
 STACKSPACE  equ 0x4000
 IDT         equ  3080h
 GDT         equ  3000h
@@ -27,7 +27,7 @@ GDT         equ  3000h
 MAXCORES    equ 16
 NRDESC      equ 4
 
-section .text:
+SECTION .text
 ; macro to build null descriptors
 %macro DESCPERCPU 1
   %assign i 0
@@ -78,7 +78,7 @@ mbinfo:
   dd 0
 
 [BITS 32]
-_startkernel:
+_start:
   ; load gdt
   cli
   mov esp, _sys_stack
@@ -278,9 +278,10 @@ trampoline_longmode:
   dw kernel_code64
 trampoline_end:
 
-# the following macro allows
-# the definition of ELFNOTE
-SECTION .note
+; The following macro allows the definition of the ELFNOTE for a PVH bootloader
+; see https://nasm.us/doc/nasmdoc8.html#section-8.9.2 to understand section
+; parameters
+SECTION .note note alloc noexec nowrite align=4
 %macro ELFNOTE 3
     align 4
     dd %%2 - %%1
@@ -295,10 +296,9 @@ SECTION .note
   %%4:
     align 4
 %endmacro
-SECTION .note
 elfnotes:
 XEN_ELFNOTE_PHYS32_ENTRY equ 18
-ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _startkernel
+ELFNOTE "Xen", XEN_ELFNOTE_PHYS32_ENTRY, _start
 
 SECTION .bss
 _sys_stackend:

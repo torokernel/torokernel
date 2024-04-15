@@ -24,11 +24,6 @@ unit Kernel;
 
 interface
 
-{$IFDEF DCC}
-type
-  PtrInt = Int64;
-{$ENDIF}
-
 // function InitSystem is declared only for compatibility
 function InitSystem(notused: pointer): PtrInt; external {$IFDEF DCC} '' {$ENDIF} name 'PASCALMAIN';
 procedure KernelStart;
@@ -41,12 +36,9 @@ uses
 
 const
   MainThreadStackSize = 64*1024;
-  {$IFDEF LINUX}
-    Kernel_Head : PChar = {$I %KERNEL_HEAD%};
-    Build_Time : PChar =  {$I %BUILD_TIME%};
-  {$ELSE}
-    Kernel_Head : PChar = '';
-  {$ENDIF}
+  Kernel_Head : PChar = {$I %KERNEL_HEAD%};
+  Build_Time : PChar =  {$I %BUILD_TIME%};
+  FPCV : PChar = {$I %FPCVERSION%};
 
 procedure KernelStart;
 {$IFDEF EnableDebug}
@@ -58,7 +50,8 @@ begin
     ShutdownInQemu;
   {$ENDIF}
   ConsoleInit;
-  WriteConsoleF('Loading Toro ... \n', []);
+  WriteConsoleF('\nLoading Toro ... \n', []);
+  WriteConsoleF('compiled with: FPC-%p\n', [PtrUInt(FPCV)]);
   WriteConsoleF('commit: %p, build time: %p\n', [PtrUInt(Kernel_Head), PtrUInt(Build_Time)]);
   ArchInit;
   {$IFDEF EnableDebug} DebugInit; {$ENDIF}

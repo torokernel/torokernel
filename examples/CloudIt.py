@@ -2,7 +2,7 @@
 #
 # Example: CloudIt.py -a HelloWorld
 #
-# Copyright (c) 2003-2023 Matias Vara <matiasevara@torokernel.io>
+# Copyright (c) 2003-2024 Matias Vara <matiasevara@torokernel.io>
 # All Rights Reserved
 #
 # This program is free software: you can redistribute it and/or modify
@@ -30,9 +30,10 @@ import time
 import signal
 from os import listdir
 
-# set up the correct path
-fpcrtlsource = "/root/fpc-3.2.0/rtl"
-qemubin = "/root/qemuforvmm/build/x86_64-softmmu/qemu-system-x86_64"
+# set the correct path
+qemubin = "/home/z0rr0/Desktop/torokernel/qemu/build/qemu-system-x86_64"
+fpc = "/home/z0rr0/Desktop/source-fpc/compiler/ppcx64"
+fpcrtl = "/home/z0rr0/Desktop/source-fpc/rtl/units/x86_64-toro/"
 
 
 def handler(signum, frame):
@@ -62,43 +63,43 @@ async def pin_cores(server, cpu):
             print(f"Failed to pin vCPU{vcpuid} to CPU{cpuid}")
     await qmp.disconnect()
 
-
 # compile a fpc application using fpc
-def fpc_compile(inc, units, flags, file, extras, output):
-    includes = []
+
+
+def fpc_compile(units, flags, file, output):
     un = []
     devnull = open(os.devnull, "w")
-    for i in inc:
-        includes.append("-I" + fpcrtlsource + i)
     for i in units:
-        un.append("-Fu" + fpcrtlsource + i)
+        un.append("-Fu" + i)
     args = []
-    args.append("fpc")
+    args.append(fpc)
     args.append(file)
-    args += includes
     args += un
     args += flags
-    args += extras
     if output:
         try:
-            call(args)
-        except OSError:
-            print("Error compiling " + file)
+            ret = call(args)
+        except OSError as error:
+            print("Error compiling " + file +
+                  ", args: ", args, ", error: ", error)
     else:
         try:
-            call(args, stdout=devnull)
-        except OSError:
-            print("Error compiling " + file)
-
+            ret = call(args, stdout=devnull)
+        except OSError as error:
+            print("Error compiling " + file +
+                  ", args: ", args, ", error: ", error)
+    return ret
 
 # run qemu with given parameters
+
+
 def qemu_run(params, output=None):
     qemuparamms = ""
     try:
         with open("qemu.args") as f:
             qemuparams = f.read()
     except Exception:
-        qemuparams = "-no-acpi -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false"
+        qemuparams = "-enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false"
     qemuparams += params
     qemuparams += " -qmp unix:./qmp-sock,server,nowait"
     qemu_args = []
@@ -108,13 +109,15 @@ def qemu_run(params, output=None):
         f = open(output, "w")
         try:
             call(qemu_args, stdout=f)
-        except OSError:
-            print("error running qemu")
+        except OSError as error:
+            print("Error running qemu ", ", args: ",
+                  qemu_args, ", error: ", error)
     else:
         try:
             call(qemu_args)
-        except OSError:
-            print("error running qemu")
+        except OSError as error:
+            print("Error running qemu ", ", args: ",
+                  qemu_args, ", error: ", error)
 
 
 def do_clean(app):
@@ -167,39 +170,6 @@ argscmd = parser.parse_args()
 if argscmd.clean:
     do_clean(argscmd.application)
 
-fpc_compile(
-    ["/objpas/sysutils", "/linux/x86_64", "/linux/", "/x86_64/", "/inc/", "/unix/"],
-    ["/unix/", "/linux/", "/objpas/", "/inc/"],
-    [
-        "-v0",
-        "-dFPC_NO_DEFAULT_MEMORYMANAGER",
-        "-uFPC_HAS_INDIRECT_ENTRY_INFORMATION",
-        "-dHAS_MEMORYMANAGER",
-        "-dx86_64",
-        "-MObjfpc",
-    ],
-    fpcrtlsource + "/linux/si_prc.pp",
-    [],
-    False,
-)
-
-fpc_compile(
-    ["/objpas/sysutils", "/linux/x86_64", "/linux/", "/x86_64/", "/inc/", "/unix/"],
-    ["/unix/", "/linux/", "/objpas/", "/inc/"],
-    [
-        "-v0",
-        "-dFPC_NO_DEFAULT_MEMORYMANAGER",
-        "-uFPC_HAS_INDIRECT_ENTRY_INFORMATION",
-        "-dHAS_MEMORYMANAGER",
-        "-dx86_64",
-        "-MObjfpc",
-        "-Us",
-    ],
-    fpcrtlsource + "/linux/system.pp",
-    [],
-    False,
-)
-
 # add kernel head commit and building time
 try:
     head_commit = check_output(
@@ -212,23 +182,22 @@ except OSError:
 
 os.environ["BUILD_TIME"] = str(datetime.now())
 
-flags = ["-v0", "-TLinux", "-Xm", "-Si", "-O2", "-g", "-MObjfpc", "-kprt0.o"]
+flags = ["-TToro", "-Xm", "-Si", "-O2", "-g", "-MObjfpc"]
 
 if argscmd.shutdown:
     flags.append("-dShutdownWhenFinished")
 
-fpc_compile(
-    ["/objpas/sysutils", "/linux/x86_64", "/linux/", "/x86_64/", "/inc/", "/unix/"],
-    ["/unix/", "/linux/", "/objpas/", "/inc/"],
+if fpc_compile(
+    [fpcrtl, "../../rtl", "../../rtl/drivers"],
     flags,
     argscmd.application + ".pas",
-    ["-Fu../../rtl", "-Fu../../rtl/drivers", "-o" + argscmd.application],
     True,
-)
+) != 0:
+    exit(1)
 
 signal.signal(signal.SIGINT, handler)
 
-args = "-kernel " + argscmd.application
+args = "-kernel " + argscmd.application + ".elf"
 
 if argscmd.pinning:
     args += " -S"

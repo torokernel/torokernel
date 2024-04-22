@@ -384,7 +384,7 @@ begin
    for I := (sizeof(S)-Len) to sizeof(S)-1 do
    begin
     buff^ := S[I];
-    buff +=1;
+    Inc(buff);
    end;
    buff^ := #0;
   end;
@@ -399,8 +399,8 @@ begin
   begin
     if p1^ <> p2^ then
       Exit;
-    p1 += 1;
-    p2 += 1;
+    Inc(p1);
+    Inc(p2);
   end;
   Result := true;
 end;
@@ -410,7 +410,7 @@ begin
   Move(left^,dst^,Length(left));
   dst := dst + Length(left);
   Move(right^,dst^,Length(right));
-  dst +=Length(right);
+  Inc(dst, Length(right));
   dst^ := #0;
 end;
 
@@ -487,14 +487,14 @@ end;
 
 procedure write_portb(Data: Byte; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-  {$IFDEF LINUX} mov dx, port {$ENDIF}
+  mov dx, port
   mov al, data
   out dx, al
 end;
 
 procedure write_portw(Data: Word; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm
-  {$IFDEF LINUX} mov dx, port {$ENDIF}
+  mov dx, port
   mov ax, data
   out dx, ax
 end;
@@ -514,7 +514,7 @@ end;
 procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
   push rsi
-  {$IFDEF LINUX} mov dx, port {$ENDIF}
+  mov dx, port
   mov rsi, data // DX=port
   outsd
   pop rsi
@@ -523,7 +523,7 @@ end;
 procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
 asm // RCX: data, RDX: port
   push rdi
-  {$IFDEF LINUX} mov dx, port {$ENDIF}
+  mov dx, port
   mov rdi, data // DX=port
   insd
   pop rdi
@@ -607,8 +607,7 @@ asm
     je @break
   @spin:
     mov rax, CmpVal
-    {$IFDEF LINUX} lock cmpxchg [rdx], rsi {$ENDIF}
-    {$IFDEF WINDOWS} lock cmpxchg [r8], rdx {$ENDIF}
+    lock cmpxchg [rdx], rsi
     pause
     jnz @spin
  @break:
@@ -857,8 +856,7 @@ end;
 
 function bit_test(Val: Pointer; pos: QWord): Boolean;
 asm
-  {$IFDEF WINDOWS} bt  [rcx], rdx {$ENDIF}
-  {$IFDEF LINUX} bt [rdi], rsi {$ENDIF}
+  bt [rdi], rsi
   jc  @True
   @False:
    mov rax , 0
@@ -870,14 +868,12 @@ end;
 
 procedure bit_reset(Value: Pointer; Offset: QWord); assembler;
 asm
-  {$IFDEF WINDOWS} btr [rcx], rdx {$ENDIF}
-  {$IFDEF LINUX} btr [rdi], rsi {$ENDIF}
+  btr [rdi], rsi
 end;
 
 procedure bit_set(Value: Pointer; Offset: QWord); assembler;
 asm
-  {$IFDEF WINDOWS} bts [rcx], rdx {$ENDIF}
-  {$IFDEF LINUX} bts [rdi], rsi {$ENDIF}
+  bts [rdi], rsi
 end;
 
 // This function returns 32 if all bits are zero

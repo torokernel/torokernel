@@ -1,1 +1,1 @@
--enable-kvm -M microvm,pic=off,pit=off,rtc=off -no-reboot -cpu host -smp 1 -nographic -device vhost-vsock-device,guest-cid=5 -m 128M -d guest_errors -D qemu.log -global virtio-mmio.force-legacy=false -no-acpi
+-enable-kvm -M microvm,pic=off,pit=off,rtc=off -no-reboot -cpu host -smp 1 -nographic -device vhost-vsock-device,guest-cid=5 -m 128M -d guest_errors -D qemu.log -global virtio-mmio.force-legacy=false -machine acpi=off

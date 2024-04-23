@@ -125,7 +125,7 @@ def qemu_run(params, sudo=False, output=None):
 def do_clean(app):
     BinPath = '../../rtl/'
     BinDriverPath = '../../rtl/drivers/'
-    AppPath = app
+    AppPath = app + '.elf'
     AppPathBin = app + '.o'
     for fileName in listdir(BinPath):
         if fileName.endswith('.ppu') or fileName.endswith('.o'):
@@ -169,6 +169,8 @@ parser.add_argument("-s", "--shutdown", action="store_true",
                     help="Shutdown when application finishes")
 parser.add_argument("-r", "--root", action="store_true",
                     help="Run QEMU with sudo")
+parser.add_argument("-l", "--logs", action="store_true",
+                    help="Enable logs to virtio-console")
 argscmd = parser.parse_args()
 
 if argscmd.clean:
@@ -187,6 +189,9 @@ except OSError:
 os.environ["BUILD_TIME"] = str(datetime.now())
 
 flags = ["-TToro", "-Xm", "-Si", "-O2", "-g", "-MObjfpc"]
+
+if argscmd.logs:
+    flags.append("-dEnableDebug")
 
 if argscmd.shutdown:
     flags.append("-dShutdownWhenFinished")

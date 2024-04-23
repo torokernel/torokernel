@@ -93,16 +93,18 @@ def fpc_compile(units, flags, file, output):
 # run qemu with given parameters
 
 
-def qemu_run(params, output=None):
+def qemu_run(params, sudo=False, output=None):
     qemuparamms = ""
     try:
         with open("qemu.args") as f:
             qemuparams = f.read()
     except Exception:
-        qemuparams = "-enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false"
+        qemuparams = "-enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -smp 1 -nographic -D qemu.log -d guest_errors -no-reboot -global virtio-mmio.force-legacy=false -machine acpi=off"
     qemuparams += params
     qemuparams += " -qmp unix:./qmp-sock,server,nowait"
     qemu_args = []
+    if sudo:
+        qemu_args.append("sudo")
     qemu_args.append(qemubin)
     qemu_args += qemuparams.split()
     if output is not None:
@@ -165,6 +167,8 @@ parser.add_argument("-c", "--clean", action="store_true",
                     help="Clean before compile")
 parser.add_argument("-s", "--shutdown", action="store_true",
                     help="Shutdown when application finishes")
+parser.add_argument("-r", "--root", action="store_true",
+                    help="Run QEMU with sudo")
 argscmd = parser.parse_args()
 
 if argscmd.clean:
@@ -201,13 +205,13 @@ args = "-kernel " + argscmd.application + ".elf"
 
 if argscmd.pinning:
     args += " -S"
-    th = threading.Thread(target=qemu_run, args=(args, argscmd.output))
+    th = threading.Thread(target=qemu_run, args=(args, argscmd.root, argscmd.output))
     th.start()
     time.sleep(1)
     asyncio.run(pin_cores("./qmp-sock", argscmd.pinning))
     asyncio.run(run("./qmp-sock"))
 else:
-    th = threading.Thread(target=qemu_run, args=(args, argscmd.output))
+    th = threading.Thread(target=qemu_run, args=(args, argscmd.root, argscmd.output))
     th.start()
 
 th.join()

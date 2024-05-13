@@ -34,7 +34,7 @@ from os import listdir
 qemubin = "/home/z0rr0/Desktop/torokernel/qemu/build/qemu-system-x86_64"
 fpc = "/home/z0rr0/Desktop/source-fpc/compiler/ppcx64"
 fpcrtl = "/home/z0rr0/Desktop/source-fpc/rtl/units/x86_64-toro/"
-
+virtiofsd = "/home/z0rr0/Desktop/torokernel/virtiofsd/target/release/virtiofsd"
 
 def handler(signum, frame):
     exit(1)
@@ -89,6 +89,14 @@ def fpc_compile(units, flags, file, output):
             print("Error compiling " + file +
                   ", args: ", args, ", error: ", error)
     return ret
+
+def virtiofsd_run(directory):
+    try:
+        child = subprocess.Popen([virtiofsd, "--shared-dir", directory, "--socket-path", "/tmp/vhostqemu1"])
+    except OSError as error:
+        print("Error running virtiofsd ", ", args: ",
+               args, ", error: ", error)
+    return child
 
 # run qemu with given parameters
 
@@ -171,6 +179,12 @@ parser.add_argument("-r", "--root", action="store_true",
                     help="Run QEMU with sudo")
 parser.add_argument("-l", "--logs", action="store_true",
                     help="Enable logs to virtio-console")
+parser.add_argument(
+    "-d",
+    "--directory",
+    type=str,
+    help="Share directory with guest through virtiofs",
+)
 argscmd = parser.parse_args()
 
 if argscmd.clean:
@@ -208,6 +222,9 @@ signal.signal(signal.SIGINT, handler)
 
 args = "-kernel " + argscmd.application + ".elf"
 
+if argscmd.directory:
+    virtiofsd_child = virtiofsd_run(argscmd.directory)
+
 if argscmd.pinning:
     args += " -S"
     th = threading.Thread(target=qemu_run, args=(args, argscmd.root, argscmd.output))
@@ -220,3 +237,6 @@ else:
     th.start()
 
 th.join()
+
+if argscmd.directory:
+    virtiofsd_child.kill()

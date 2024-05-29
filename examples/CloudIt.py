@@ -35,6 +35,7 @@ qemubin = "/home/z0rr0/Desktop/torokernel/qemu/build/qemu-system-x86_64"
 fpc = "/home/z0rr0/Desktop/source-fpc/compiler/ppcx64"
 fpcrtl = "/home/z0rr0/Desktop/source-fpc/rtl/units/x86_64-toro/"
 virtiofsd = "/home/z0rr0/Desktop/torokernel/virtiofsd/target/release/virtiofsd"
+socat = "/home/z0rr0/Desktop/torokernel/socat-vsock/socat"
 
 def handler(signum, frame):
     exit(1)
@@ -96,6 +97,15 @@ def virtiofsd_run(directory):
     except OSError as error:
         print("Error running virtiofsd ", ", args: ",
                args, ", error: ", error)
+    return child
+
+def socat_run(forward):
+    ports = forward[0].split(':')
+    try:
+        child = subprocess.Popen([socat, "TCP4-LISTEN:" + ports[0] + ",reuseaddr,fork", "VSOCK-CONNECT:5:" + ports[1]])
+    except OSError as error:
+        print("Error running socat ", ", args: ",
+               forward, ", error: ", error)
     return child
 
 # run qemu with given parameters
@@ -171,6 +181,12 @@ parser.add_argument(
     nargs="+",
     help="Pin VCPUs to CPUs",
 )
+parser.add_argument(
+    "-f",
+    "--forward",
+    nargs="+",
+    help="Forward ports from host to guest using socat and vsock",
+)
 parser.add_argument("-c", "--clean", action="store_true",
                     help="Clean before compile")
 parser.add_argument("-s", "--shutdown", action="store_true",
@@ -225,6 +241,9 @@ args = "-kernel " + argscmd.application + ".elf"
 if argscmd.directory:
     virtiofsd_child = virtiofsd_run(argscmd.directory)
 
+if argscmd.forward:
+    socat_child = socat_run(argscmd.forward)
+
 if argscmd.pinning:
     args += " -S"
     th = threading.Thread(target=qemu_run, args=(args, argscmd.root, argscmd.output))
@@ -240,3 +259,6 @@ th.join()
 
 if argscmd.directory:
     virtiofsd_child.kill()
+
+if argscmd.forward:
+    socat_child.kill()

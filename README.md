@@ -1,6 +1,6 @@
-# ToroMicroVM ![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
+# Toro![build passing](https://api.travis-ci.org/torokernel/torokernel.svg?branch=master)
 ## Introduction
-ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMicroVM leverages on virtio-fs and virtio-vsocket to provide a minimalistic architecture. Microservices are deployed as Toro guests in which binaries and files are distributed in a Ceph cluster. The common fileystem allows to easely launch microvms from any node of the cluster.
+Toro is a unikernel dedicated to deploy applications as microVMs. Toro leverages on virtio-fs and virtio-vsocket to provide a minimalistic architecture.
 
 ## Features
 * Support x86-64 architecture
@@ -13,8 +13,8 @@ ToroMicroVM is a unikernel dedicated to deploy microservices as microVMs. ToroMi
 * Tiny image
 * Built-in gdbstub
 
-## How try ToroMicroVM?
-You can quickly get a first taste of ToroMicroVM by running the HelloWorld example by building a docker image that includes all the required tools. To do so, execute the following commands in a console (These steps require KVM and Docker):
+## How try Toro?
+You can quickly get a first taste of Toro by running the HelloWorld example using a docker image that includes all the required tools. To do so, execute the following commands in a console (these steps require KVM and Docker):
 
 ```bash
 wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile
@@ -35,7 +35,7 @@ sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root
 ```
 You will find $pwd from host at /root/torokernel-host in the container.
 
-## How build ToroMicroVM locally?
+## How build Toro locally?
 ### Step 1. Install Freepascal 3.2.0
 ```bash
 wget https://sourceforge.net/projects/lazarus/files/Lazarus%20Linux%20amd64%20DEB/Lazarus%202.0.10/fpc-laz_3.2.0-1_amd64.deb/download
@@ -58,11 +58,11 @@ cd build
 ../configure --target-list=x86_64-softmmu
 make
 ```
-### Step 3. Get ToroMicroVM
+### Step 3. Get Toro
 ```bash
 git clone https://github.com/torokernel/torokernel.git
 ```
-### Step 4. Get the RTL for ToroMicroVM
+### Step 4. Get the RTL for Toro
 ```bash
 git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
 ```
@@ -112,28 +112,6 @@ python3 ../CloudIt.py -a InterCoreComm
 ```
 You will get the following output:
 ![InterComm](https://github.com/torokernel/torokernel/wiki/images/intercom.gif)
-
-## Building Toro in Windows by using Lazarus
-First you have to follow [this](https://github.com/torokernel/torokernel/wiki/How-to-get-a-Crosscompiler-of-Freepascal-for-a-Windows-host-and-Linux-target) tutorial to get a FPC cross-compiler from Windows to Linux.  Then, you have to execute the following script which compiles the RTL for Toro and outputs the generated files in the *x86_64-linux* directory. Note that this script overwrites the RTL for Linux, which is used when the *-TLinux* parameter is passed. This script requires three paths to set up:
-
-1.  *fpcrtlsource*, which is the path to the repository from https://github.com/torokernel/freepascal
-2.  *fpcrtllinuxbin*, which is the path to the cross-compiled linux RTL
-3. *fpcbinlinux*, which is the path to the fpc compiler.
-
-```bash
-fpcrtlsource="c:\Users\Matias\Desktop\fpc-3.2.0\rtl"
-fpcrtllinuxbin="c:\fpcupdeluxefortoromicrovm\fpc\bin\x86_64-linux"
-fpcbinlinux="c:\fpcupdeluxefortoromicrovm\fpc\bin\x86_64-win64"
-
-$fpcbinlinux/ppcx64.exe -TLinux -dFPC_NO_DEFAULT_MEMORYMANAGER -dHAS_MEMORYMANAGER -uFPC_HAS_INDIRECT_ENTRY_INFORMATION -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix/ -Fu$fpcrtlsource/linux/ -MObjfpc $fpcrtlsource/linux/si_prc.pp -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc -FE$fpcrtllinuxbin
-
-$fpcbinlinux/ppcx64.exe -Us -TLinux -dx86_64 -I$fpcrtlsource/objpas/sysutils/ -I$fpcrtlsource/linux/x86_64/ -I$fpcrtlsource/x86_64/ -I$fpcrtlsource/linux/ -I$fpcrtlsource/inc/ -I$fpcrtlsource/unix/ -Fu$fpcrtlsource/unix -Fu$fpcrtlsource/linux -Fu$fpcrtlsource/objpas -Fu$fpcrtlsource/inc $fpcrtlsource/linux/system.pp -FE$fpcrtllinuxbin
-```
-
-Then, you have to go to Lazarus and open the project **HelloWorld.lpi**. You are able to compile the project from compile.
-
-## Create your own distributed filesystem with CephFS
-To create a CephFS cluster you can follow these [instructions](https://github.com/torokernel/torocloudscripts).
 
 ## Contributing
 You have many ways to contribute to Toro. One of them is by joining the Google Group [here](https://groups.google.com/forum/#!forum/torokernel). In addition, you can find more information [here](

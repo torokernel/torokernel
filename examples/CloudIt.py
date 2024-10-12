@@ -31,11 +31,11 @@ import signal
 from os import listdir
 
 # set the correct path
-qemubin = "/home/z0rr0/Desktop/torokernel/qemu/build/qemu-system-x86_64"
-fpc = "/home/z0rr0/Desktop/source-fpc/compiler/ppcx64"
-fpcrtl = "/home/z0rr0/Desktop/source-fpc/rtl/units/x86_64-toro/"
-virtiofsd = "/home/z0rr0/Desktop/torokernel/virtiofsd/target/release/virtiofsd"
-socat = "/home/z0rr0/Desktop/torokernel/socat-vsock/socat"
+qemubin = "/root/qemuforvmm/build/qemu-system-x86_64"
+fpc = "/root/source-fpc/compiler/ppcx64"
+fpcrtl = "/root/source-fpc/rtl/units/x86_64-toro/"
+virtiofsd = "/root/virtiofsd/target/release/virtiofsd"
+socat = "/root/socat-vsock/socat"
 
 def handler(signum, frame):
     exit(1)

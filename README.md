@@ -14,7 +14,7 @@ Toro is a unikernel dedicated to deploy applications as microVMs. Toro leverages
 * Built-in gdbstub
 
 ## How try Toro?
-You can quickly get a first taste of Toro by running the HelloWorld example using a docker image that includes all the required tools. To do so, execute the following commands in a console (these steps require KVM and Docker):
+You can try Toro by running the HelloWorld example using a Docker image that includes all the required tools. To do so, execute the following commands in a console (these steps require you to install before KVM and Docker):
 
 ```bash
 wget https://raw.githubusercontent.com/torokernel/torokernel/master/ci/Dockerfile
@@ -26,50 +26,17 @@ python3 ../CloudIt.py -a HelloWorld
 If these commands execute successfully, you will get the output of the HelloWorld example. 
 You can also pull the image from dockerhub instead of building it:
 ```bash
-sudo docker pull torokernel/toro-kernel-dev-debian-10
-sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-10
+sudo docker pull torokernel/toro-kernel-dev-debian-latest
+sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-latest
 ```
 You can share a directory from the host by running:
 ```bash
-sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root/torokernel-host -it torokernel/toro-kernel-dev-debian-10
+sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root/torokernel -it torokernel/toro-kernel-dev-debian-latest
 ```
-You will find $pwd from host at /root/torokernel-host in the container.
+You will find $pwd from host at `/root/torokernel` in the container.
 
 ## How build Toro locally?
-### Step 1. Install Freepascal 3.2.0
-```bash
-wget https://sourceforge.net/projects/lazarus/files/Lazarus%20Linux%20amd64%20DEB/Lazarus%202.0.10/fpc-laz_3.2.0-1_amd64.deb/download
-mv download fpc-laz_3.2.0-1_amd64.deb
-apt install ./fpc-laz_3.2.0-1_amd64.deb -y
-```
-### Step 2. Build Qemu-KVM (qemu 5.2.50 or #51204c2f)
-```bash
-apt-get update
-apt-get install python3-pip make git libcap-dev libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev libglib2.0-dev libpixman-1-dev libseccomp-dev -y
-pip3 install ninja
-# uncomment to change PATH permanently
-# echo 'export PATH=/home/debian/.local/bin:$PATH' >>~/.bashrc
-export PATH="/home/debian/.local/bin:$PATH"
-git clone https://github.com/qemu/qemu.git qemuforvmm
-cd qemuforvmm
-git checkout 51204c2f
-mkdir build 
-cd build
-../configure --target-list=x86_64-softmmu
-make
-```
-### Step 3. Get Toro
-```bash
-git clone https://github.com/torokernel/torokernel.git
-```
-### Step 4. Get the RTL for Toro
-```bash
-git clone https://github.com/torokernel/freepascal.git -b fpc-3.2.0 fpc-3.2.0
-```
-Note that Step 1, 2, 3 and 4 can be found in the script at `ci/prepare_host.sh`.
-
-### Step 5. Edit path to Qemu and FPC in CloudIt.py
-Go to `torokernel/examples` and edit `CloudIt.py` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock).
+Execute the commands in `ci/Dockerfile` to install the required components locally. Then, Go to `torokernel/examples` and edit `CloudIt.py` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock) and virtio-fs from [here](https://gitlab.com/virtio-fs/virtiofsd.git). You need to set the correct path to virtiofsd and socat.
 
 ## Run the HelloWorld Example
 You have to go to `examples/HelloWorld/` and execute:
@@ -79,7 +46,7 @@ python3 ../CloudIt.py -a HelloWorld
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/helloworld.gif)
 
 ## Run the StaticWebServer Example
-You can easily get the StaticWebServer up and running by following the tutorial at [here](https://github.com/torokernel/torowebserverappliance). This would require only a Debian 10 installation. For example, you can get a s1-2 host from OVH. If you prefer to run it step by step, follow the next instructions. You have first to compile vsock-socat and virtiofds. The latter is built during the building of Qemu. The former can be built by executing:
+To run the StaticWebserver, you require virtiofsd and socat. To compile socat, execute the following commands:
 ```bash
 git clone git@github.com:stefano-garzarella/socat-vsock.git
 cd socat-vsock
@@ -87,22 +54,16 @@ autoreconf -fiv
 ./configure
 make socat
 ```
-Then, launch vsock-socat by executing:
-
+Set the path to socat binary in CloudIt.py and then execute:
 ```bash
-./socat TCP4-LISTEN:4000,reuseaddr,fork VSOCK-CONNECT:5:80
+python3 ../CloudIt.py -a StaticWebServer -r -d /path-to-directory/ -f 4000:80
 ```
-In a second terminal, execute:
-
-```bash
-./virtiofsd -d --socket-path=/tmp/vhostqemu1 -o source=/root/qemulast/build/testdir/ -o cache=always
+You have to replace the `/path-to-directory/` to a directory that containing the files, e.g., index.html. To try it, you can execute:
 ```
-
-Replace `source` with the directory to serve. Finally, launch the static webserver by executing:  
-
-```bash
-python3 ../CloudIt.py -a StaticWebServer
+wget http://127.0.0.1:4000/index.html
 ```
+The `-f` parameter indicates a forwarding of the 4000 port from the host to the 80 port in the guest using vsock.
+
 ![HelloWorld](https://github.com/torokernel/torokernel/wiki/images/staticwebser.gif)
 
 ## Run the Intercore Communication example

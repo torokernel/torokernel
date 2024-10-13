@@ -26,12 +26,12 @@ python3 ../CloudIt.py -a HelloWorld
 If these commands execute successfully, you will get the output of the HelloWorld example. 
 You can also pull the image from dockerhub instead of building it:
 ```bash
-sudo docker pull torokernel/toro-kernel-dev-debian-latest
-sudo docker run --privileged --rm -it torokernel/toro-kernel-dev-debian-latest
+sudo docker pull torokernel/torokernel-dev:latest
+sudo docker run --privileged --rm -it torokernel/torokernel-dev:latest
 ```
 You can share a directory from the host by running:
 ```bash
-sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root/torokernel -it torokernel/toro-kernel-dev-debian-latest
+sudo docker run --privileged --rm --mount type=bind,source="$(pwd)",target=/root/torokernel -it torokernel/torokernel-dev:latest
 ```
 You will find $pwd from host at `/root/torokernel` in the container.
 
@@ -39,7 +39,7 @@ You will find $pwd from host at `/root/torokernel` in the container.
 Execute the commands in `ci/Dockerfile` to install the required components locally. Then, Go to `torokernel/examples` and edit `CloudIt.py` to set the correct paths to Qemu and fpc. Optionally, you can install vsock-socat from [here](https://github.com/stefano-garzarella/socat-vsock) and virtio-fs from [here](https://gitlab.com/virtio-fs/virtiofsd.git). You need to set the correct path to virtiofsd and socat.
 
 ## Run the HelloWorld Example
-You have to go to `examples/HelloWorld/` and execute:
+Go to `examples/HelloWorld/` and execute:
 ```bash
 python3 ../CloudIt.py -a HelloWorld
 ```

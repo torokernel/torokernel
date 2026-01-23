@@ -29,7 +29,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, Process, Console, Memory;
+  Arch, Process, Console, Memory, RingBuffer;
 
 const
   SOCKET_STREAM = 2;
@@ -39,6 +39,8 @@ const
   // size of the bitmap in bytes
   SZ_SocketBitmap = (MAX_SocketPORTS - USER_START_PORT) div 8;
   ServiceStack = 40*1024;
+
+  PACKET_RING_LEN = 128;
 
   VIRTIO_VSOCK_OP_INVALID = 0;
   VIRTIO_VSOCK_OP_REQUEST = 1;
@@ -69,8 +71,7 @@ type
     Name: array[0..MAX_NET_NAME-1] of Char;
     Minor: LongInt;
     Device: Pointer;
-    IncomingPacketTail: PPacket;
-    IncomingPackets: PPacket;
+    IncomingPacketsRing: PRingBuffer;
     Start: procedure (NetInterface: PNetworkInterface);
     Send: procedure (NetInterface: PNetWorkInterface;Packet: PPacket);
     Reset: procedure (NetInterface: PNetWorkInterface);
@@ -220,8 +221,7 @@ end;
 
 procedure RegisterNetworkInterface(NetInterface: PNetworkInterface);
 begin
-  NetInterface.IncomingPackets := nil;
-  NetInterface.IncomingPacketTail := nil;
+  NetInterface.IncomingPacketsRing := nil;
   NetInterface.Next := NetworkInterfaces;
   NetInterface.CPUID := -1;
   NetworkInterfaces := NetInterface;
@@ -263,29 +263,14 @@ begin
     ToroFreeMem(Packet);
 end;
 
-// Inform the Kernel that a new Packet has arrived
-// This procedure is not interruption-safe so caller needs to disable interruptions
 procedure EnqueueIncomingPacket(Packet: PPacket);
 var
-  PacketQueue: PPacket;
+  PacketRing: PRingBuffer;
 begin
   {$IFDEF DebugNetwork}WriteDebug('EnqueueIncomingPacket: new packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  PacketQueue := GetNetwork.NetworkInterface.IncomingPackets;
-  Packet.Next := nil;
-  if PacketQueue = nil then
-  begin
-    GetNetwork.NetworkInterface.IncomingPackets := Packet;
-    {$IFDEF DebugNetwork}
-      if GetNetwork.NetworkInterface.IncomingPacketTail <> nil then
-      begin
-        WriteDebug('EnqueueIncomingPacket: IncomingPacketTail <> nil\n', []);
-      end;
-    {$ENDIF}
-  end else
-  begin
-    GetNetwork.NetworkInterface.IncomingPacketTail.Next := Packet;
-  end;
-  GetNetwork.NetworkInterface.IncomingPacketTail := Packet
+  PacketRing := GetNetwork.NetworkInterface.IncomingPacketsRing;
+  if not RingPush(PacketRing, Packet) then
+    WriteConsoleF('Failed to enqueue packet\n', []);
 end;
 
 procedure FreePort(LocalPort: LongInt);
@@ -338,25 +323,13 @@ begin
   ToroFreeMem(Socket);
 end;
 
-// Read a packet from Buffer of local Network Interface
 function SysNetworkRead: PPacket;
 var
-  Packet: PPacket;
+  PacketRing: PRingBuffer;
 begin
-  DisableInt;
-  Packet := GetNetwork.NetworkInterface.IncomingPackets;
-  if Packet=nil then
-    Result := nil
-  else
-  begin
-    GetNetwork.NetworkInterface.IncomingPackets := Packet.Next;
-    If Packet.Next = nil then
-      GetNetwork.NetworkInterface.IncomingPacketTail := nil;
-    Packet.Next := nil;
-    Result := Packet;
-    {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Packet)]); {$ENDIF}
-  end;
-  RestoreInt;
+  PacketRing := GetNetwork.NetworkInterface.IncomingPacketsRing;
+  Result := RingPop(PacketRing);
+  {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Result)]); {$ENDIF}
 end;
 
 procedure VSocketReset(DstCID, DstPort, LocalPort: DWORD);
@@ -598,11 +571,14 @@ end;
 function LocalNetworkInit(PacketHandler: Pointer): Boolean;
 var
   I: LongInt;
+  PacketRing: PRingBuffer;
 begin
-  SetPerCPUVar(PERCPUCURRENTNET, PtrUInt(@DedicateNetworks[GetCoreId]));
   Result := false;
-  GetNetwork.NetworkInterface.IncomingPackets := nil;
-  GetNetwork.NetworkInterface.IncomingPacketTail := nil;
+  SetPerCPUVar(PERCPUCURRENTNET, PtrUInt(@DedicateNetworks[GetCoreId]));
+  PacketRing := RingCreate(PACKET_RING_LEN);
+  if PacketRing = nil then
+    Exit;
+  GetNetwork.NetworkInterface.IncomingPacketsRing := PacketRing;
   GetNetwork.SocketStream := ToroGetMem(MAX_SocketPORTS * sizeof(PNetworkService));
   if GetNetwork.SocketStream = nil then
     Exit;

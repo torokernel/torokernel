@@ -4,7 +4,7 @@
 // This unit contains the Scheduler and the Interruption Manager.
 // It also does the SMP initialization and contains the API for thread manipulation.
 //
-// Copyright (c) 2003-2020 Matias Vara <matiasevara@gmail.com>
+// Copyright (c) 2003-2026 Matias Vara <matiasevara@torokernel.io>
 // All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
@@ -29,7 +29,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, SysUtils;
+  Arch, SysUtils, RingBuffer;
 
 type
   PThread = ^TThread;
@@ -53,13 +53,12 @@ type
   TThreadFunc = function(Param: Pointer): PtrInt;
   TThread = record
     ThreadID: TThreadID;
-    Next: PThread;
-    Previous: PThread;
     Parent: PThread;
     IOScheduler: IOInfo;
     State: Byte;
     PrivateHeap: Pointer;
     FlagKill: boolean;
+    FlagSuspend: boolean;
     IsService: boolean;
     StartArg: Pointer;
     ThreadFunc: TThreadFunc;
@@ -79,7 +78,8 @@ type
     CurrentThread: PThread;
     Threads: PThread;
     LastIRQ: QWORD;
-    pad1: array[1..CACHELINE_LEN-4] of QWORD;
+    RunQueue: PRingBuffer;
+    pad1: array[1..CACHELINE_LEN-3] of QWORD;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
   end;
 
@@ -88,16 +88,16 @@ type
     ThreadFunc: TThreadFunc;
     StackSize: SizeUInt;
     RemoteResult: Pointer;
-    Parent: PThread;
+    RemoteStatus: Boolean;
     CPU: PCPU;
     Next: PThreadCreateMsg;
   end;
 
 const
   tsIOPending = 5 ; // GetDevice and FreeDevice use this state
-  tsReady = 2 ;
+  tsRunning = 3;
+  tsRunnable = 6;
   tsSuspended = 1 ;
-  tsZombie = 4 ;
 
 // Interface function matching common declaration
 function BeginThread(SecurityAttributes: Pointer; StackSize: SizeUInt; ThreadFunction: TThreadFunc; Parameter: Pointer; CreationFlags: DWORD; var ThreadID: TThreadID): TThreadID;
@@ -115,7 +115,9 @@ procedure Panic(const cond: Boolean; const Format: PChar; const Args: array of P
 procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
 function GetCPU: PCPU; inline;
+procedure SchedulerInit;
 
+// align to 64 bits
 {$push}
 {$codealign varmin=64}
 var
@@ -171,7 +173,7 @@ const
   PERCPUCURRENTCPU = 2;
 
 procedure SystemExit; forward;
-procedure Scheduling(Candidate: PThread); forward;
+procedure Scheduling; forward;
 procedure ThreadMain; forward;
 
 var
@@ -800,10 +802,11 @@ end;
 
 procedure InitPerCPUProcessVar; forward;
 
+// initialization of the non-bsp cores
 procedure InitLocalData;
 begin
   InitPerCPUProcessVar;
-  Scheduling(nil);
+  Scheduling;
 end;
 
 procedure InitCores;
@@ -811,6 +814,7 @@ var
   I, J: LongInt;
   Attemps: Longint;
 begin
+  WriteConsoleF('Starting Cores ...\n', []);
   for I := 0 to Max_CPU-1 do
   begin
     CPU[I].ApicID := 0 ;
@@ -853,39 +857,20 @@ begin
   end;
 end;
 
-procedure AddThreadReady(Thread: PThread);
+procedure AddThreadToRunQueue(Thread: PThread);
 var
   CPU: PCPU;
 begin
   CPU := Thread.CPU;
-  if CPU.Threads = nil then
-  begin
-    CPU.Threads := Thread;
-    Thread.Next := Thread;
-    Thread.Previous := Thread;
-    Exit;
-  end;
-  Thread.Previous := CPU.Threads.Previous;
-  Thread.Next := CPU.Threads;
-  CPU.Threads.Previous.Next := Thread;
-  CPU.Threads.Previous := Thread;
+  RingPush(CPU.RunQueue, Thread);
 end;
 
-procedure RemoveThreadReady(Thread: PThread);
+function GetThreadFromRunQueue: PThread;
+var
+  CPU: PCPU;
 begin
-  if (Thread.CPU.Threads = Thread) and (Thread.CPU.Threads.Next = Thread.CPU.Threads) then
-  begin
-    Thread.CPU.Threads := nil ;
-    Thread.Previous := nil;
-    Thread.Next := nil;
-    Exit;
-  end;
-  if (Thread.CPU.Threads = Thread) then
-    Thread.CPU.Threads := Thread.Next;
-  Thread.Previous.Next := Thread.Next;
-  Thread.Next.Previous := Thread.Previous;
-  Thread.Next := nil ;
-  Thread.Previous := nil;
+  CPU := GetCPU;
+  Result := RingPop(CPU.RunQueue);
 end;
 
 procedure AddThreadMsg(Msg: PThreadCreateMsg);
@@ -917,6 +902,9 @@ end;
 const
   Initialized: Boolean = False; // This is used only when the first thread in the system is created
 
+// Create a new thread in a given CPU in a tsRunnable state
+// The Thread is not queued into the RunQueue
+// If success, returns a pointer to the thread or nil otherwise
 function ThreadCreate(const StackSize: SizeUInt; CPUID: DWORD; ThreadFunction: TThreadFunc; Arg: Pointer): PThread;
 var
   NewThread, Current: PThread;
@@ -961,7 +949,8 @@ begin
     NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.StackAddress) + StackSize-1);
     NewThread.sleep_rdtsc := 0;
     NewThread.FlagKill := False;
-    NewThread.State := tsReady;
+    NewThread.FlagSuspend := False;
+    NewThread.State := tsRunnable;
     NewThread.StartArg := Arg;
     NewThread.ThreadFunc := ThreadFunction;
     {$IFDEF DebugProcess} WriteDebug('ThreadCreate: NewThread.ThreadFunc: %h\n', [PtrUInt(@NewThread.ThreadFunc)]); {$ENDIF}
@@ -975,7 +964,6 @@ begin
     Dec(ip_ret);
     ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
     NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer)*2);
-    AddThreadReady(NewThread);
     Result := NewThread
   end else
   begin
@@ -984,13 +972,12 @@ begin
     NewThreadMsg.ThreadFunc := ThreadFunction;
     NewThreadMsg.CPU := @CPU[CPUID];
     Current := GetCurrentThread;
-    NewThreadMsg.Parent := Current;
     NewThreadMsg.Next := nil;
-    // Remote core wakes up current thread
-    // once operation is finished
-    Current.State := tsSuspended;
+    NewThreadMsg.RemoteStatus := False;
     AddThreadMsg(@NewThreadMsg);
-    SysThreadSwitch;
+    // wait until remote creation
+    while not NewThreadMsg.RemoteStatus do
+      SysThreadSwitch;
     Result := NewThreadMsg.RemoteResult;
   end;
 end;
@@ -1002,7 +989,7 @@ begin
   ResumeTime := read_rdtsc + Miliseg * LocalCPUSpeed * 1000;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime: %d\n', [ResumeTime]); {$ENDIF}
   while ResumeTime > read_rdtsc do
-    Scheduling(nil);
+    SysThreadSwitch;
   {$IFDEF DebugProcess} WriteDebug('Sleep: ResumeTime exiting\n', []); {$ENDIF}
 end;
 
@@ -1019,27 +1006,23 @@ begin
       WriteDebug('ThreadExit: Warning! MainThread has been killed',[]);
     {$ENDIF}
   end;
-  NextThread := CurrentThread.Next;
-  RemoveThreadReady(CurrentThread);
   if THREADVAR_BLOCKSIZE <> 0 then
     ToroFreeMem(CurrentThread.TLS);
   ToroFreeMem(CurrentThread.StackAddress);
   ToroFreeMem(CurrentThread);
   {$IFDEF DebugProcess} WriteDebug('ThreadExit: ThreadID: %h\n', [CurrentThread.ThreadID]); {$ENDIF}
   if Schedule then
-    Scheduling(NextThread);
+    Scheduling;
 end;
 
 function SysKillThread(ThreadID: TThreadID): DWORD;
 var
-  CurrentThread: PThread;
   Thread: PThread;
 begin
   Thread := PThread(ThreadID);
-  CurrentThread := GetCurrentThread;
-  if CurrentThread = nil then
+  if Thread = nil then
   begin
-    Result := 0;
+    Result := -1;
     Exit;
   end;
   {$IFDEF DebugProcess} WriteDebug('SysKillThread - sending signal to Thread: %h in CPU: %d \n', [ThreadID, Thread.CPU.ApicID]); {$ENDIF}
@@ -1053,19 +1036,25 @@ var
   Thread: PThread;
 begin
   Thread := PThread(ThreadID);
-  CurrentThread := GetCurrentThread;
-  if CurrentThread = nil then
+  if Thread = nil then
   begin
-    Result := 0;
+    Result := -1;
     Exit;
   end;
-  if (Thread = nil) or (CurrentThread.ThreadID = ThreadID) then
+  CurrentThread := GetCurrentThread;
+  if CurrentThread.ThreadID = ThreadID then
   begin
-    CurrentThread.state := tsSuspended;
-    SysThreadSwitch;
-    {$IFDEF DebugProcess} WriteDebug('SuspendThread: Current Threads was Suspended\n',[]); {$ENDIF}
+    // Suspend self: set state directly and call
+    // scheduler without re-enqueuing
+    CurrentThread.State := tsSuspended;
+    SaveContext;
+    Scheduling;
+    RestoreContext;
+    {$IFDEF DebugProcess} WriteDebug('SuspendThread: Current Thread was Suspended\n',[]); {$ENDIF}
   end else
-    Thread.State := tsSuspended;
+    // Suspend another thread: set flag, it will suspend
+    // itself on next SysThreadSwitch
+    Thread.FlagSuspend := True;
   Result := 0;
 end;
 
@@ -1075,13 +1064,8 @@ var
   Thread: PThread;
 begin
   Thread := PThread(ThreadID);
-  CurrentThread := GetCurrentThread;
-  if CurrentThread = nil then
-  begin
-    Result := 0;
-    Exit;
-  end;
-  Thread.State := tsReady;
+  Thread.State := tsRunnable;
+  AddThreadToRunQueue(Thread);
   Result := 0;
 end;
 
@@ -1089,6 +1073,7 @@ procedure Inmigrating(CurrentCPU: PCPU);
 var
   RemoteCpuID: LongInt;
   RemoteMsgs: PThreadCreateMsg;
+  Thread: PThread;
 begin
   for RemoteCpuID := 0 to CPU_COUNT-1 do
   begin
@@ -1097,8 +1082,14 @@ begin
       RemoteMsgs := CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID];
       while RemoteMsgs <> nil do
       begin
-        RemoteMsgs.RemoteResult := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
-        RemoteMsgs.Parent.state := tsReady;
+        Thread := ThreadCreate(RemoteMsgs.StackSize, CurrentCPU.ApicID, RemoteMsgs.ThreadFunc, RemoteMsgs.StartArg);
+        RemoteMsgs.RemoteResult := Thread;
+        RemoteMsgs.RemoteStatus := True;
+        if Thread <> nil then
+        begin
+          Thread.State := tsRunnable;
+          AddThreadToRunQueue(Thread);
+        end;
         RemoteMsgs := RemoteMsgs.Next;
       end;
       CpuMxSlots[CurrentCPU.ApicID][RemoteCpuID] := nil;
@@ -1122,61 +1113,49 @@ begin
   end;
 end;
 
-// if Candidate <> nil, the scheduler assumes that CurrentThread can't be used
-procedure Scheduling(Candidate: PThread); {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
+procedure Scheduling; {$IFDEF FPC} [public , alias :'scheduling']; {$ENDIF}
 var
   CurrentCPU: PCPU;
-  CurrentThread, LastThread, Th, tmp: PThread;
+  CurrentThread, NextThread: PThread;
+  // this pointer is used together with
+  // GetRBP and StoreRBP macros
   rbp_reg: pointer;
 begin
   CurrentCPU := GetCPU;
+  CurrentThread := CurrentCPU.CurrentThread;
+
   while True do
   begin
-    if CurrentCPU.Threads = nil then
+    NextThread := nil;
+    while NextThread = nil do
     begin
-      {$IFDEF DebugProcess} WriteDebug('Scheduling: scheduler goes to inmigration loop\n', []); {$ENDIF}
-      while CurrentCPU.Threads = nil do
-      begin
-        Inmigrating(CurrentCPU);
-      end;
-      CurrentCPU.CurrentThread := CurrentCPU.Threads;
-      {$IFDEF DebugProcess} WriteDebug('Scheduling: current thread, stack: %h\n', [PtrUInt(CurrentCPU.CurrentThread.ret_thread_sp)]); {$ENDIF}
+      // Process cross-core thread migration before picking the next thread
+      Emigrating(CurrentCPU);
+      Inmigrating(CurrentCPU);
+      NextThread := GetThreadFromRunQueue;
+    end;
+
+    NextThread.State := tsRunning;
+
+    // this is true only in non bsp cores
+    // in which CurrentThread is nil after boot
+    // this could be replaced with a init idle
+    // thread per core so CurrentThread is never nil
+    if CurrentThread = Nil then
+    begin
+      CurrentCPU.CurrentThread := NextThread;
       SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
-      Exit;
+      Exit
     end;
-    Emigrating(CurrentCPU);
-    Inmigrating(CurrentCPU);
-    CurrentThread := CurrentCPU.CurrentThread;
-    tmp := Candidate;
-    if Candidate <> nil then
-      LastThread := Candidate
-    else
-    begin
-      LastThread := CurrentCPU.CurrentThread;
-      Candidate := LastThread.Next;
-    end;
-    repeat
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate %h, state: %d\n', [PtrUInt(Candidate), Candidate.State]); {$ENDIF}
-      if Candidate.State = tsReady then
-        Break
-      else if (Candidate.State = tsIOPending) and not Candidate.IOScheduler.DeviceState^ then
-      begin
-        Candidate.State := tsReady;
-        Break;
-      end else
-        Candidate := Candidate.Next;
-    until Candidate = LastThread;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: Candidate state: %d\n', [Candidate.state]); {$ENDIF}
-    if Candidate.state <> tsReady then
-      Continue;
-    CurrentCPU.CurrentThread := Candidate;
-    {$IFDEF DebugProcess} WriteDebug('Scheduling: thread %h, state: %d, stack: %h\n', [PtrUInt(Candidate), Candidate.State, PtrUInt(Candidate.ret_thread_sp)]); {$ENDIF}
-    if Candidate = CurrentThread then
+
+    If NextThread = CurrentThread Then
       Exit;
+
+    // Store RBP of current thread and load the new one
     GetRBP;
-    If tmp = nil then
-      CurrentThread.ret_thread_sp := rbp_reg;
-    rbp_reg := Candidate.ret_thread_sp;
+    CurrentThread.ret_thread_sp := rbp_reg;
+    CurrentCPU.CurrentThread := NextThread;
+    rbp_reg := NextThread.ret_thread_sp;
     StoreRBP;
     Break;
   end;
@@ -1219,12 +1198,11 @@ begin
   LocalCPU.CurrentThread := InitThread;
   InitialThreadID := TThreadID(InitThread);
   WriteConsoleF('Starting MainThread: %h\n', [InitialThreadID]);
-  // only performed explicitely for initialization procedure
-  {$IFDEF FPC} InitThreadVars(@SysRelocateThreadvar); {$ENDIF}
-  // TODO: InitThreadVars for DELPHI
+  InitThreadVars(@SysRelocateThreadvar);
+  // Schedule the initial thread without calling the scheduler
+  // by switching the stack
+  InitThread.State := tsRunning;
   {$IFDEF DebugProcess} WriteDebug('CreateInitThread: InitialThreadID: %h\n', [InitialThreadID]); {$ENDIF}
-  // TODO: when compiling with DCC, check that previous assertion is correct
-  // TODO: when previous IFDEF is activated, check that WriteDebug is not messing
   InitThread.ret_thread_sp := Pointer(PtrUInt(InitThread.ret_thread_sp)+SizeOf(Pointer));
   {$IFDEF DebugProcess} WriteDebug('CreateInitThread: InitThread.ret_thread_sp: %h\n', [PtrUInt(InitThread.ret_thread_sp)]); {$ENDIF}
   change_sp(InitThread.ret_thread_sp);
@@ -1232,17 +1210,22 @@ end;
 
 // Yield the current CPU to the next ready thread
 procedure SysThreadSwitch;
-var
- tmp: PCPU;
- Thread: PThread;
 begin
   SaveContext;
-  Scheduling(nil);
-  //RestoreContext;
+  // Add current thread to run queue
+  GetCurrentThread.state := tsRunnable;
+  AddThreadToRunQueue(GetCurrentThread);
+  Scheduling;
   if GetCurrentThread.FlagKill then
   begin
     {$IFDEF DebugProcess} WriteDebug('Signaling - killing CurrentThread\n', []); {$ENDIF}
     ThreadExit(True);
+  end;
+  if GetCurrentThread.FlagSuspend then
+  begin
+    GetCurrentThread.FlagSuspend := False;
+    GetCurrentThread.State := tsSuspended;
+    Scheduling;
   end;
   // Restore at this point otherwise %rdi is not correctly restored
   RestoreContext;
@@ -1253,8 +1236,7 @@ var
   CurrentThread: PThread;
 begin
   CurrentThread := GetCurrentThread ;
-  {$IFDEF FPC} InitThread(CurrentThread.StackSize); {$ENDIF}
-  // TODO: InitThread() for Delphi
+  InitThread(CurrentThread.StackSize);
   {$IFDEF DebugProcess} WriteDebug('ThreadMain: CurrentThread: #%h\n', [PtrUInt(CurrentThread)]); {$ENDIF}
   {$IFDEF DebugProcess} WriteDebug('ThreadMain: CurrentThread.ThreadFunc: %h\n', [PtrUInt(@CurrentThread.ThreadFunc)]); {$ENDIF}
   ExitCode := CurrentThread.ThreadFunc(CurrentThread.StartArg);
@@ -1285,6 +1267,7 @@ begin
     Result := 0;
     Exit;
   end;
+  AddThreadToRunQueue(NewThread);
   ThreadID := NewThread.ThreadID;
   {$IFDEF DebugProcess} WriteDebug('SysBeginThread: ThreadID: %h on CPU %d\n', [NewThread.ThreadID, NewThread.CPU.ApicID]); {$ENDIF}
   Result := NewThread.ThreadID;
@@ -1378,6 +1361,18 @@ begin
   SetPerCPUVar(PERCPUCURRENTCPU, PtrUInt(@CPU[GetCoreId]));
 end;
 
+procedure SchedulerInit;
+var
+  j: LongInt;
+begin
+  // initialize RunQueue for each CPU
+  for j := 0 to CPU_COUNT-1 do
+  begin
+    CPU[j].RunQueue := RingCreate(512);
+  end;
+  InitCores;
+end;
+
 procedure ProcessInit;
 var
   j: LongInt;
@@ -1397,7 +1392,6 @@ begin
   if HasException then
     InitializeExceptions;
   InitPerCPUProcessVar;
-  InitCores;
   ShutdownProcedure := nil;
   {$IFDEF EnableDebug}
     WriteDebug('ProcessInit: LocalCpuSpeed: %d Mhz, Cores: %d\n', [LocalCpuSpeed, CPU_COUNT]);

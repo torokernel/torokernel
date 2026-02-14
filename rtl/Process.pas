@@ -115,6 +115,8 @@ procedure Panic(const cond: Boolean; const Format: PChar; const Args: array of P
 procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
 function GetCPU: PCPU; inline;
+procedure Scheduling;
+procedure AddThreadToRunQueue(Thread: PThread);
 procedure SchedulerInit;
 
 // align to 64 bits
@@ -173,7 +175,6 @@ const
   PERCPUCURRENTCPU = 2;
 
 procedure SystemExit; forward;
-procedure Scheduling; forward;
 procedure ThreadMain; forward;
 
 var

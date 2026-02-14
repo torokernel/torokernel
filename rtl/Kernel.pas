@@ -65,15 +65,9 @@ begin
   {$ENDIF}
   FileSystemInit;
   NetworkInit;
-  // we will never return from this procedure call
-  {$IFDEF FPC} CreateInitThread(@InitSystem, MainThreadStackSize); {$ENDIF}
-  {$IFDEF DCC}
-//    CreateInitThread(@InitSystem, MainThreadStackSize);
-  {$ENDIF}
+  SchedulerInit;
+  CreateInitThread(@InitSystem, MainThreadStackSize);
 end;
-
-initialization
-  {$IFDEF DCC} KernelStart; {$ENDIF}
 
 end.
 

@@ -639,8 +639,6 @@ begin
   FsVirtio.Driver.CloseFile := VirtioFSCloseFile;
   RegisterFilesystem(@FsVirtio.Driver);
   Move(FsVirtio.FsConfig.tag, FsVirtio.BlkDriver.name, StrLen(FsVirtio.FsConfig.tag)+1);
-  FsVirtio.BlkDriver.Busy := false;
-  FsVirtio.BlkDriver.WaitOn := nil;
   FsVirtio.BlkDriver.major := 0;
   FsVirtIO.BlkDriver.Dedicate := VirtIOFSDedicate;
   FsVirtIO.BlkDriver.CPUID := -1;

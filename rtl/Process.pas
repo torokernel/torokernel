@@ -45,16 +45,10 @@ type
   // 2. Scheduling[CurrentCPU] set threads queue in CpuMxSlots[CurrentCpuID][RemoteCpuID] if empty (nil)
   // 3. Scheduling[RemoteCPU] ForEach CpuMxSlots[][RemoteCpuID] read slot and reset slot (if not empty)
 
-  // Drivers fill this structure
-  IOInfo = record
-    DeviceState: ^boolean;
-  end;
-
   TThreadFunc = function(Param: Pointer): PtrInt;
   TThread = record
     ThreadID: TThreadID;
     Parent: PThread;
-    IOScheduler: IOInfo;
     State: Byte;
     PrivateHeap: Pointer;
     FlagKill: boolean;
@@ -94,7 +88,6 @@ type
   end;
 
 const
-  tsIOPending = 5 ; // GetDevice and FreeDevice use this state
   tsRunning = 3;
   tsRunnable = 6;
   tsSuspended = 1 ;

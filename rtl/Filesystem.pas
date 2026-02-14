@@ -27,7 +27,7 @@ interface
 
 uses
   {$IFDEF EnableDebug} Debug, {$ENDIF}
-  Arch, Process, Console, Memory;
+  Arch, Process, Mutex, Console, Memory;
 
 const
   MAX_INODES_IN_CACHE= 300;
@@ -55,8 +55,7 @@ type
   PInode = ^TInode;
 
   TBlockDriver = record
-    Busy: Boolean; // protection for access from Local CPU.
-    WaitOn: PThread; // Thread using the Driver.
+    Lock: PMutex;
     Name: array[0..MAX_DEV_NAME-1] of Char;
     Major: LongInt;
     Dedicate: procedure (Controller:PBlockDriver;CPUID: LongInt);
@@ -136,8 +135,6 @@ type
   end;
 
 procedure FileSystemInit;
-procedure GetDevice(Dev:PBlockDriver);
-procedure FreeDevice(Dev:PBlockDriver);
 procedure RegisterBlockDriver(Driver:PBlockDriver);
 procedure RegisterFilesystem (Driver: PFileSystemDriver);
 procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
@@ -175,27 +172,6 @@ begin
   {$IFDEF DebugFS} WriteDebug('RegisterBlockDriver: New Driver\n',[]); {$ENDIF}
 end;
 
-procedure GetDevice(Dev: PBlockDriver);
-begin
-  if Dev.Busy then
-  begin
-    GetCurrentThread.State := tsIOPending;
-    GetCurrentThread.IOScheduler.DeviceState:= @Dev.Busy;
-    {$IFDEF DebugFS} WriteDebug('GetDevice: Sleeping\n',[]); {$ENDIF}
-    SysThreadSwitch;
-  end;
-  GetCurrentThread.IOScheduler.DeviceState:=nil;
-  Dev.Busy := True;
-  Dev.WaitOn := GetCurrentThread;
-  {$IFDEF DebugFS} WriteDebug('GetDevice: Device in use\n',[]); {$ENDIF}
-end;
-
-procedure FreeDevice(Dev: PBlockDriver);
-begin
-  Dev.Busy := False;
-  Dev.WaitOn := nil;
-  {$IFDEF DebugFS} WriteDebug('FreeDevice: Device is Free\n', []); {$ENDIF}
-end;
 
 procedure DedicateBlockDriver(const Name: PXChar; CPUID: LongInt);
 var

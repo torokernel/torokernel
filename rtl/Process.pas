@@ -68,7 +68,7 @@ type
   // PerCPU variables require to be padded to CACHELINE_LEN
   TPerCPU = record
     ApicID: LongInt;
-    pad: LongInt;
+    ThreadCount: LongInt;
     CurrentThread: PThread;
     Threads: PThread;
     LastIRQ: QWORD;
@@ -88,6 +88,7 @@ type
   end;
 
 const
+  MAX_THREADS_PER_CPU = 512;
   tsRunning = 3;
   tsRunnable = 6;
   tsSuspended = 1 ;
@@ -109,7 +110,7 @@ procedure UpdateLastIrq;
 procedure SysSetCoreIdle;
 function GetCPU: PCPU; inline;
 procedure Scheduling;
-procedure AddThreadToRunQueue(Thread: PThread);
+function AddThreadToRunQueue(Thread: PThread): Boolean;
 procedure SchedulerInit;
 
 // align to 64 bits
@@ -851,12 +852,12 @@ begin
   end;
 end;
 
-procedure AddThreadToRunQueue(Thread: PThread);
+function AddThreadToRunQueue(Thread: PThread): Boolean;
 var
   CPU: PCPU;
 begin
   CPU := Thread.CPU;
-  RingPush(CPU.RunQueue, Thread);
+  Result := RingPush(CPU.RunQueue, Thread);
 end;
 
 function GetThreadFromRunQueue: PThread;
@@ -907,6 +908,11 @@ var
 begin
   if CPUID = GetCoreId then
   begin
+    if GetCPU.ThreadCount >= MAX_THREADS_PER_CPU then
+    begin
+      Result := nil;
+      Exit;
+    end;
     NewThread := ToroGetMem(SizeOf(TThread));
     if NewThread = nil then
     begin
@@ -958,6 +964,7 @@ begin
     Dec(ip_ret);
     ip_ret^ := PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer);
     NewThread.ret_thread_sp := Pointer(PtrUInt(NewThread.ret_thread_sp) - SizeOf(Pointer)*2);
+    Inc(GetCPU.ThreadCount);
     Result := NewThread
   end else
   begin
@@ -991,7 +998,8 @@ procedure ThreadExit(Schedule: Boolean);
 var
   CurrentThread, NextThread: PThread;
 begin
-  CurrentThread := GetCurrentThread ;
+  CurrentThread := GetCurrentThread;
+  Dec(CurrentThread.CPU.ThreadCount);
   XHeapRelease(CurrentThread.PrivateHeap);
   if CurrentThread = PThread(InitialThreadID) then
   begin
@@ -1054,7 +1062,6 @@ end;
 
 function SysResumeThread(ThreadID: TThreadID): DWORD;
 var
-  CurrentThread: PThread;
   Thread: PThread;
 begin
   Thread := PThread(ThreadID);
@@ -1206,9 +1213,11 @@ end;
 procedure SysThreadSwitch;
 begin
   SaveContext;
-  // Add current thread to run queue
   GetCurrentThread.state := tsRunnable;
-  AddThreadToRunQueue(GetCurrentThread);
+  // This should never fail: the number of threads
+  // is constant and less than MAX_THREADS_PER_CPU
+  Panic(not AddThreadToRunQueue(GetCurrentThread),
+    'SysThreadSwitch: RunQueue is full\n', []);
   Scheduling;
   if GetCurrentThread.FlagKill then
   begin
@@ -1362,7 +1371,7 @@ begin
   // initialize RunQueue for each CPU
   for j := 0 to CPU_COUNT-1 do
   begin
-    CPU[j].RunQueue := RingCreate(512);
+    CPU[j].RunQueue := RingCreate(MAX_THREADS_PER_CPU);
   end;
   InitCores;
 end;

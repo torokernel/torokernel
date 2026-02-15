@@ -449,7 +449,7 @@ begin
   Result := True;
 end;
 
-procedure VirtIOIRQHandler; forward;
+procedure VirtIOHandler; forward;
 
 // parse the kernel command-line to get the device tree
 procedure FindVirtIOMMIODevices;
@@ -464,7 +464,7 @@ begin
     begin
       Base := HexStrtoQWord(StrScan(GetKernelParam(j), '@') + 3 , StrScan(GetKernelParam(j), ':'));
       Irq := StrtoByte(StrScan(GetKernelParam(j), ':') + 1);
-      CaptureInt(BASE_IRQ + Irq, @VirtIOIrqHandler);
+      CaptureInt(BASE_IRQ + Irq, @VirtIOHandler);
       VirtIOMMIODevices[VirtIOMMIODevicesCount].Base := Base;
       VirtIOMMIODevices[VirtIOMMIODevicesCount].Irq := Irq;
       VirtIOMMIODevices[VirtIOMMIODevicesCount].Vqs := nil;
@@ -486,7 +486,7 @@ begin
   end;
 end;
 
-procedure VirtIOHandler;
+procedure VirtIOHandler; interrupt;
 var
   r, j: DWORD;
   vqs: PVirtQueue;
@@ -507,45 +507,6 @@ begin
     end;
   end;
   eoi_apic;
-end;
-
-procedure VirtIOIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  // save registers
-  push rbp
-  push rax
-  push rbx
-  push rcx
-  push rdx
-  push rdi
-  push rsi
-  push r8
-  push r9
-  push r10
-  push r11
-  push r12
-  push r13
-  push r14
-  push r15
-  xor rcx , rcx
-  Call VirtIOHandler
-  pop r15
-  pop r14
-  pop r13
-  pop r12
-  pop r11
-  pop r10
-  pop r9
-  pop r8
-  pop rsi
-  pop rdi
-  pop rdx
-  pop rcx
-  pop rbx
-  pop rax
-  pop rbp
-  iretq
 end;
 
 procedure InitVirtIODriver(ID: DWORD; InitDriver: TVirtIODriver);

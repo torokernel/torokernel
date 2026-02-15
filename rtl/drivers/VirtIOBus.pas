@@ -71,7 +71,7 @@ implementation
 {$DEFINE RestoreInt := asm popfq;end;}
 
 // This handler executes in each core when producer adds a desc in the used ring
-procedure VirtIOInterHandler;
+procedure VirtIOInterHandler; interrupt;
 var
   index, buffer_index: WORD;
   Len, id, cpu: DWORD;
@@ -104,46 +104,6 @@ begin
     end;
   end;
   eoi_apic;
-end;
-
-procedure VirtIOInterIrqHandler; {$IFDEF FPC} [nostackframe]; assembler; {$ENDIF}
-asm
-  {$IFDEF DCC} .noframe {$ENDIF}
-  // save registers
-  push rbp
-  push rax
-  push rbx
-  push rcx
-  push rdx
-  push rdi
-  push rsi
-  push r8
-  push r9
-  push r10
-  push r11
-  push r12
-  push r13
-  push r14
-  push r15
-  xor rcx , rcx
-  Call VirtIOInterHandler
-  pop r15
-  pop r14
-  pop r13
-  pop r12
-  pop r11
-  pop r10
-  pop r9
-  pop r8
-  pop rsi
-  pop rdi
-  pop rdx
-  pop rcx
-  pop rbx
-  pop rax
-  pop rbp
-  db $48
-  db $cf
 end;
 
 procedure NotifyFrontEnd(Core: DWORD);
@@ -247,7 +207,7 @@ begin
   end;
 
   // Capture inter-core irq in all cores
-  CaptureInt(INTER_CORE_IRQ, @VirtIOInterIrqHandler);
+  CaptureInt(INTER_CORE_IRQ, @VirtIOInterHandler);
 end;
 
 initialization

@@ -37,10 +37,6 @@ uses
 
 implementation
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushfq;cli;end;}
-{$DEFINE RestoreInt := asm popfq;end;}
 
 type
   PVirtioFsConfig = ^TVirtioFsConfig;

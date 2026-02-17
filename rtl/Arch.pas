@@ -146,10 +146,15 @@ procedure send_apic_int (apicid, vector: Byte);
 procedure eoi_apic;
 procedure monitor(addr: Pointer; ext: DWORD; hint: DWORD);
 procedure mwait(ext: DWORD; hint: DWORD);
-procedure hlt; assembler;
-procedure ReadBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
-procedure ReadWriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
-procedure WriteBarrier;assembler;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure hlt; assembler; inline;
+procedure EnableInt; assembler; inline;
+procedure DisableInt; assembler; inline;
+procedure RestoreInt; assembler; inline;
+procedure ReadBarrier;assembler; inline;
+// not inlined: PPU serialization fails
+// with asm instructions that have operands
+procedure ReadWriteBarrier;assembler;
+procedure WriteBarrier;assembler; inline;
 function GetKernelParam(I: LongInt): Pchar;
 function read_ioapic_reg(offset: dword): dword;
 procedure write_ioapic_reg(offset, val: dword);
@@ -198,9 +203,6 @@ implementation
 uses Kernel, Console;
 
 {$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
 
 const
   IOApic_Base = $FEC00000;
@@ -485,33 +487,33 @@ begin
   idt_gates^[Exception].nu := 0 ;
 end;
 
-procedure write_portb(Data: Byte; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure write_portb(Data: Byte; Port: Word); assembler;
 asm
   mov dx, port
   mov al, data
   out dx, al
 end;
 
-procedure write_portw(Data: Word; Port: Word); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure write_portw(Data: Word; Port: Word); assembler;
 asm
   mov dx, port
   mov ax, data
   out dx, ax
 end;
 
-function read_portb(port: Word): Byte; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+function read_portb(port: Word): Byte; assembler;
 asm
   mov dx, port
   in al, dx
 end;
 
-function read_portw(port: Word): Word; assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+function read_portw(port: Word): Word; assembler;
 asm
   mov dx, port
   in ax, dx
 end;
 
-procedure write_portd(const Data: Pointer; const Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure write_portd(const Data: Pointer; const Port: Word);
 asm // RCX: data, RDX: port
   push rsi
   mov dx, port
@@ -520,7 +522,7 @@ asm // RCX: data, RDX: port
   pop rsi
 end;
 
-procedure read_portd(Data: Pointer; Port: Word); {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure read_portd(Data: Pointer; Port: Word);
 asm // RCX: data, RDX: port
   push rdi
   mov dx, port
@@ -634,7 +636,7 @@ begin
 end;
 
 
-function is_apic_ready: Boolean;{$IFDEF ASMINLINE} inline; {$ENDIF}
+function is_apic_ready: Boolean;
 var
   r: PDWORD;
 begin
@@ -884,14 +886,14 @@ asm
 end;
 
 // change_sp() is only used to start executing PASCALMAIN
-procedure change_sp(new_esp: Pointer); [nostackframe] assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure change_sp(new_esp: Pointer); [nostackframe] assembler;
 asm
   xor rbp, rbp
   mov rsp, new_esp
   ret
 end;
 
-procedure SwitchStack(sv: Pointer; ld: Pointer); assembler; {$IFDEF ASMINLINE} inline; {$ENDIF}
+procedure SwitchStack(sv: Pointer; ld: Pointer); assembler;
 asm
   mov [sv] , rbp
   mov rbp , [ld]
@@ -1470,22 +1472,38 @@ begin
   end ['EAX', 'EBX'];
 end;
 
-procedure hlt;assembler;
+procedure hlt; [nostackframe]; assembler; inline;
 asm
   hlt
 end;
 
-procedure ReadBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure EnableInt; [nostackframe]; assembler; inline;
+asm
+  sti
+end;
+
+procedure DisableInt; [nostackframe]; assembler; inline;
+asm
+  pushf
+  cli
+end;
+
+procedure RestoreInt; [nostackframe]; assembler; inline;
+asm
+  popf
+end;
+
+procedure ReadBarrier;assembler;nostackframe; inline;
 asm
   lfence
 end;
 
-procedure ReadWriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure ReadWriteBarrier;assembler;nostackframe;
 asm
   lock add DWORD [rsp] - 4, 0
 end;
 
-procedure WriteBarrier;assembler;nostackframe;{$ifdef SYSTEMINLINE}inline;{$endif}
+procedure WriteBarrier;assembler;nostackframe; inline;
 asm
   sfence
 end;

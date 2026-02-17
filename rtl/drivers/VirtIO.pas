@@ -164,10 +164,6 @@ var
 
 implementation
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushfq;cli;end;}
-{$DEFINE RestoreInt := asm popfq;end;}
 
 function HexStrtoQWord(start, last: PChar): QWord;
 var

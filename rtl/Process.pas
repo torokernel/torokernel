@@ -130,12 +130,12 @@ uses
   Console, Memory, lnfodwrfToro;
 
 {$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
 {$DEFINE GetRBP := asm mov rbp_reg, rbp;end;}
 {$DEFINE StoreRBP := asm mov rbp, rbp_reg;end;}
-// only save/restore nonvolatile registers
+// save/restore nonvolatile registers
+// these are macros because cross-unit inline
+// fails for asm instructions with operands
+// (PPU serialization error 200208181)
 {$DEFINE SaveContext:=
  asm
   push rbx
@@ -156,7 +156,6 @@ asm
  pop rdi
  pop rbx
 end;}
-
 const
   CPU_NIL: LongInt = -1;
   SPINLOCK_FREE = 3;

@@ -171,10 +171,6 @@ function AllocatePacket(Size: LongInt): PPacket;
 
 implementation
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
 
 {$push}
 {$codealign varmin=64}

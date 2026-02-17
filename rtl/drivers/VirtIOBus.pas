@@ -65,10 +65,6 @@ procedure RecvFrom(Core: DWORD; Buffer: Pointer);
 
 implementation
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushfq;cli;end;}
-{$DEFINE RestoreInt := asm popfq;end;}
 
 // This handler executes in each core when producer adds a desc in the used ring
 procedure VirtIOInterHandler; interrupt;

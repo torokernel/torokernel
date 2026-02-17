@@ -234,6 +234,16 @@ if fpc_compile(
 ) != 0:
     exit(1)
 
+# compile twice to ensure cross-unit inline assembler
+# procedures get their inlininginfo from the PPU
+if fpc_compile(
+    [fpcrtl, "../../rtl", "../../rtl/drivers"],
+    flags,
+    argscmd.application + ".pas",
+    True,
+) != 0:
+    exit(1)
+
 signal.signal(signal.SIGINT, handler)
 
 args = "-kernel " + argscmd.application + ".elf"

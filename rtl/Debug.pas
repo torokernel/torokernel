@@ -39,10 +39,6 @@ implementation
 uses
   Console, Process, Network, VirtIO, VirtIOConsole;
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
 
 var
   LockDebug: UInt64 = 3;

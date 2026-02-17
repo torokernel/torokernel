@@ -33,9 +33,6 @@ uses
 
 implementation
 {$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushfq;cli;end;}
-{$DEFINE RestoreInt := asm popfq;end;}
 {$DEFINE Int3 := asm db $cc end;}
 
 const

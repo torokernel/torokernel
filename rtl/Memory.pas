@@ -145,10 +145,6 @@ procedure MemoryInit;
 
 implementation
 
-{$MACRO ON}
-{$DEFINE EnableInt := asm sti;end;}
-{$DEFINE DisableInt := asm pushf;cli;end;}
-{$DEFINE RestoreInt := asm popf;end;}
 
 const
   INITIAL_ALLOC_SIZE = 1024*1024; // 1MB

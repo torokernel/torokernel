@@ -73,8 +73,8 @@ type
     Threads: PThread;
     LastIRQ: QWORD;
     RunQueue: PRingBuffer;
-    pad1: array[1..CACHELINE_LEN-3] of QWORD;
     MsgsToBeDispatched: array[0..MAX_CPU-1] of PThreadCreateMsg;
+    pad1: array[1..CACHELINE_LEN-5] of QWORD;
   end;
 
   TThreadCreateMsg = record

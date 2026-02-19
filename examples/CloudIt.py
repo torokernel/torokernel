@@ -30,12 +30,13 @@ import time
 import signal
 from os import listdir
 
-# set the correct path
-qemubin = "/root/qemuforvmm/build/qemu-system-x86_64"
-fpc = "/root/source-fpc/compiler/ppcx64"
-fpcrtl = "/root/source-fpc/rtl/units/x86_64-toro/"
-virtiofsd = "/root/virtiofsd/target/release/virtiofsd"
-socat = "/root/socat-vsock/socat"
+# set TORO_ROOT to the parent directory of the torokernel repos
+toro_root = os.environ.get("TORO_ROOT", "/home/mvaralar/Desktop/torokernel")
+qemubin = os.path.join(toro_root, "qemuforvmm/build/qemu-system-x86_64")
+fpc = os.path.join(toro_root, "source-fpc/compiler/ppcx64")
+fpcrtl = os.path.join(toro_root, "source-fpc/rtl/units/x86_64-toro")
+virtiofsd = os.path.join(toro_root, "virtiofsd/target/release/virtiofsd")
+socat = os.path.join(toro_root, "socat-vsock/socat")
 
 def handler(signum, frame):
     exit(1)

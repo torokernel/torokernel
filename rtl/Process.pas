@@ -1269,7 +1269,10 @@ begin
     Result := 0;
     Exit;
   end;
-  AddThreadToRunQueue(NewThread);
+  // for remote threads, Inmigrating already added
+  // the thread to the RunQueue
+  if CPU = GetCoreId then
+    AddThreadToRunQueue(NewThread);
   ThreadID := NewThread.ThreadID;
   {$IFDEF DebugProcess} WriteDebug('SysBeginThread: ThreadID: %h on CPU %d\n', [NewThread.ThreadID, NewThread.CPU.ApicID]); {$ENDIF}
   Result := NewThread.ThreadID;

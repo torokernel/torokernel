@@ -1124,41 +1124,36 @@ begin
   CurrentCPU := GetCPU;
   CurrentThread := CurrentCPU.CurrentThread;
 
-  while True do
+  NextThread := nil;
+  while NextThread = nil do
   begin
-    NextThread := nil;
-    while NextThread = nil do
-    begin
-      // Process cross-core thread migration before picking the next thread
-      Emigrating(CurrentCPU);
-      Inmigrating(CurrentCPU);
-      NextThread := GetThreadFromRunQueue;
-    end;
-
-    NextThread.State := tsRunning;
-
-    // this is true only in non bsp cores
-    // in which CurrentThread is nil after boot
-    // this could be replaced with a init idle
-    // thread per core so CurrentThread is never nil
-    if CurrentThread = Nil then
-    begin
-      CurrentCPU.CurrentThread := NextThread;
-      SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
-      Exit
-    end;
-
-    If NextThread = CurrentThread Then
-      Exit;
-
-    // Store RBP of current thread and load the new one
-    GetRBP;
-    CurrentThread.ret_thread_sp := rbp_reg;
-    CurrentCPU.CurrentThread := NextThread;
-    rbp_reg := NextThread.ret_thread_sp;
-    StoreRBP;
-    Break;
+    Emigrating(CurrentCPU);
+    Inmigrating(CurrentCPU);
+    NextThread := GetThreadFromRunQueue;
   end;
+
+  NextThread.State := tsRunning;
+
+  // this is true only in non bsp cores
+  // in which CurrentThread is nil after boot
+  // this could be replaced with a init idle
+  // thread per core so CurrentThread is never nil
+  if CurrentThread = Nil then
+  begin
+    CurrentCPU.CurrentThread := NextThread;
+    SwitchStack(nil, @CurrentCPU.CurrentThread.ret_thread_sp);
+    Exit
+  end;
+
+  If NextThread = CurrentThread Then
+    Exit;
+
+  // Store RBP of current thread and load the new one
+  GetRBP;
+  CurrentThread.ret_thread_sp := rbp_reg;
+  CurrentCPU.CurrentThread := NextThread;
+  rbp_reg := NextThread.ret_thread_sp;
+  StoreRBP;
 end;
 
 procedure SysInitThreadVar(var Offset: DWORD; Size: DWORD);

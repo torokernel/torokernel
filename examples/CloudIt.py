@@ -152,8 +152,10 @@ def do_clean(app):
     for fileName in listdir(BinDriverPath):
         if fileName.endswith('.ppu') or fileName.endswith('.o'):
             os.remove(BinDriverPath + fileName)
-    os.remove(AppPath)
-    os.remove(AppPathBin)
+    if os.path.exists(AppPath):
+        os.remove(AppPath)
+    if os.path.exists(AppPathBin):
+        os.remove(AppPathBin)
 
 
 parser = argparse.ArgumentParser(

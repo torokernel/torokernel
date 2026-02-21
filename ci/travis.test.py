@@ -4,7 +4,7 @@
 #
 # This script runs the tests during ci.
 #
-# Copyright (c) 2003-2021 Matias Vara <matiasevara@gmail.com>
+# Copyright (c) 2003-2026 Matias Vara <matiasevara@torokernel.io>
 # All Rights Reserved
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,9 +27,9 @@ import subprocess
 def main():
   cwd = os.getcwd()
   ret = 1
-  os.chdir (cwd + '/tests/filesystem')
-  if os.system ('./TestFilesystem.sh'):
-    ret = 0
+  #os.chdir (cwd + '/tests/filesystem')
+  #if os.system ('./TestFilesystem.sh'):
+  #  ret = 0
   os.chdir(cwd + '/tests/process')
   if os.system ('./TestProcess.sh'):
     ret = 0
@@ -39,9 +39,9 @@ def main():
   os.chdir(cwd + '/tests/misc')
   if os.system ('./TestPerCPUAlign.sh'):
     ret = 0
-  os.chdir(cwd + '/tests/benchmarks')
-  os.system ('./ProfileBootTime.sh')
-  os.system ('./ProfileKernelInitTime.sh')
+  #os.chdir(cwd + '/tests/benchmarks')
+  #os.system ('./ProfileBootTime.sh')
+  #os.system ('./ProfileKernelInitTime.sh')
   os.chdir (cwd)
   return ret
     

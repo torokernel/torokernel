@@ -1,0 +1,1 @@
+-machine acpi=off -enable-kvm -M microvm,pic=off,pit=off,rtc=off -cpu host -m 128 -device virtio-serial-device,id=virtio-serial0 -chardev file,path=./testmemory.report,id=charconsole0 -device virtconsole,chardev=charconsole0,id=console0 -smp 1 -nographic -no-reboot -global virtio-mmio.force-legacy=false

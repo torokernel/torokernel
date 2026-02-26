@@ -490,16 +490,24 @@ begin
   for j := 0 to VirtIOMMIODevicesCount -1 do
   begin
     r := GetIntStatus(VirtIOMMIODevices[j].Base);
-    if r and 1 = 1 then
+    while r and 1 = 1 do
     begin
+      SetIntACK(VirtIOMMIODevices[j].Base, r);
       vqs := VirtIOMMIODevices[j].Vqs;
       while vqs <> nil do
       begin
-	    if @vqs.VqHandler <> nil then
+        if @vqs.VqHandler <> nil then
           VirtIOProcessQueue(vqs);
         vqs := vqs.Next;
       end;
-      SetIntACK(VirtIOMMIODevices[j].Base, r);
+      r := GetIntStatus(VirtIOMMIODevices[j].Base);
+    end;
+    vqs := VirtIOMMIODevices[j].Vqs;
+    while vqs <> nil do
+    begin
+      if (@vqs.VqHandler <> nil) and (vqs.last_used_index <> vqs.used.index) then
+        VirtIOProcessQueue(vqs);
+      vqs := vqs.Next;
     end;
   end;
   eoi_apic;

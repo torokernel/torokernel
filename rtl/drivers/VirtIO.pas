@@ -344,13 +344,12 @@ begin
   vq.last_desc_index := buffer_index;
   Inc(vq.available.index);
 
-  // notification are not needed
-  // TODO: remove the use of base
-  if (vq.used.flags and 1 <> 1) then
-  begin
-    QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
-    QueueNotify^ := vq.index;
-  end;
+  // sfence: flush write buffer so host sees updated available.index
+  // before the ioeventfd fires (required by virtio spec on x86)
+  WriteBarrier;
+  // always notify host regardless of used.flags poll mode
+  QueueNotify := Pointer(Base + MMIO_QUEUENOTIFY);
+  QueueNotify^ := vq.index;
 end;
 
 function VirtIOInitQueue(Base: QWORD; QueueId: Word; Queue: PVirtQueue; QueueLen: Word; HeaderLen: DWORD): Boolean;

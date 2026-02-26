@@ -132,6 +132,19 @@ begin
   IOApicIrqOn(Dev.IRQ);
 end;
 
+// Poll the RX used ring directly
+procedure VirtIOVSocketPoll(Net: PNetworkInterface);
+var
+  vq: PVirtQueue;
+begin
+  vq := @VirtIOVSocketDev[0].VirtQueues[RX_QUEUE];
+  if vq.last_used_index = vq.used.index then
+    Exit;
+  DisableInt;
+  VirtIOProcessQueue(vq);
+  RestoreInt;
+end;
+
 procedure virtIOVSocketSend(Net: PNetworkInterface; Packet: PPacket);
 var
   bi: TBufferInfo;
@@ -201,6 +214,7 @@ begin
   Net.Name := 'virtiovsocket';
   Net.start := @VirtIOVSocketStart;
   Net.send := @VirtIOVSocketSend;
+  Net.Poll := @VirtIOVSocketPoll;
   Net.Minor := Dev.GuestID;
   RegisterNetworkInterface(Net);
   Inc(VSockCount);

@@ -76,6 +76,7 @@ type
     Send: procedure (NetInterface: PNetWorkInterface;Packet: PPacket);
     Reset: procedure (NetInterface: PNetWorkInterface);
     Stop: procedure (NetInterface: PNetworkInterface);
+    Poll: procedure (NetInterface: PNetworkInterface);
     CPUID: LongInt;
     Next: PNetworkInterface;
     Pad: array[0..1] of QWord;
@@ -322,10 +323,21 @@ end;
 function SysNetworkRead: PPacket;
 var
   PacketRing: PRingBuffer;
+  NetInterface: PNetworkInterface;
 begin
-  PacketRing := GetNetwork.NetworkInterface.IncomingPacketsRing;
+  NetInterface := GetNetwork.NetworkInterface;
+  PacketRing := NetInterface.IncomingPacketsRing;
   Result := RingPop(PacketRing);
-  {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Result)]); {$ENDIF}
+  if Result <> nil then
+  begin
+    {$IFDEF DebugNetwork}WriteDebug('SysNetworkRead: getting packet: %h\n', [PtrUInt(Result)]); {$ENDIF}
+    Exit;
+  end;
+  if @NetInterface.Poll <> nil then
+  begin
+    NetInterface.Poll(NetInterface);
+    Result := RingPop(PacketRing);
+  end;
 end;
 
 procedure VSocketReset(DstCID, DstPort, LocalPort: DWORD);

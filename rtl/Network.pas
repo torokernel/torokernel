@@ -382,9 +382,21 @@ var
 begin
   Result := nil;
   Service := GetNetwork.SocketStream[LocalPort];
-  if (Service = nil) or (Service.ClientSocket = nil) then
+  if Service = nil then
     Exit;
   Socket := Service.ClientSocket;
+  while Socket <> nil do
+  begin
+    if Socket.DestPort = RemotePort then
+    begin
+      Result := Socket;
+      Exit;
+    end;
+    Socket := Socket.Next;
+  end;
+  // payload may arrive before SysSocketAccept moves the socket
+  // from ArrivaSockets to ClientSocket
+  Socket := Service.ArrivalSockets;
   while Socket <> nil do
   begin
     if Socket.DestPort = RemotePort then

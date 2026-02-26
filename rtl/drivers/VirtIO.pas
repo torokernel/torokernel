@@ -157,6 +157,7 @@ function HexStrtoQWord(start, last: PChar): QWord;
 function VirtIOGetBuffer(Queue: PVirtQueue): Word;
 function VirtIOGetAvailBuffer(Queue: PVirtQueue; var buffer_index: WORD): PQueueBuffer;
 procedure VirtIOAddConsumedBuffer(Queue: PVirtQueue; buffer_index: WORD; Len: DWORD);
+procedure VirtIOProcessQueue(vq: PVirtQueue);
 
 var
   VirtIOMMIODevices: array[0..MAX_MMIO_DEVICES-1] of TVirtIOMMIODevice;

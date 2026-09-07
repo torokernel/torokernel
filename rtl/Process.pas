@@ -1332,9 +1332,11 @@ end;
 procedure SysSetCoreIdle;
 begin
   // TODO: Set the core idle in the table
-  If (read_rdtsc - GetCPU.LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
-    hlt
-  else
+  // TODO: Enable this after adding a timer to prevent the core in
+  // an idle state indefinitely
+  // If (read_rdtsc - GetCPU.LastIrq) > (LocalCpuSpeed * 1000)* WAIT_IDLE_CORE_MS then
+  //   hlt
+  // else
     SysThreadSwitch;
 end;
 
